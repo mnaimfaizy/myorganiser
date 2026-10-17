@@ -788,6 +788,9 @@ jobs:
       - name: Sandcastle run-outcome contracts
         run: corepack yarn sandcastle:outcome:test
 
+      - name: Sandcastle orphaned-worktree repair contracts
+        run: corepack yarn sandcastle:worktree-repair:test
+
       - name: OpenAPI artifact checker contracts
         run: corepack yarn openapi:artifacts:test
 

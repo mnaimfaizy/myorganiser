@@ -186,6 +186,7 @@
     "sandcastle:subagent-trace:test": "node --test tools/scripts/lib/sandcastle-subagent-trace.test.mjs",
     "sandcastle:spec-anchor:test": "node --test tools/scripts/lib/sandcastle-spec-anchor.test.mjs",
     "sandcastle:outcome:test": "node --test tools/scripts/lib/sandcastle-outcome.test.mjs",
+    "sandcastle:worktree-repair:test": "node --test tools/scripts/lib/sandcastle-worktree-repair.test.mjs",
     "dispatch-agents": "npx tsx .sandcastle/main.mts",
     "dispatch-waves": "npx tsx .sandcastle/dispatch-waves.mts",
     "dispatch-agents:1password": "op run --environment \"$OP_ENVIRONMENT_ID\" -- corepack yarn dispatch-agents",

@@ -533,6 +533,48 @@ git tag wip/<n>-checkpoint
 `--no-verify` is deliberate: husky would lint and format half-finished code and corrupt the
 evidence being preserved.
 
+### An orphaned slice worktree
+
+**Symptom.** A slice that printed its completion promise is reported as crashed with
+`WorktreeError: fatal: '.sandcastle/worktrees/slice-<n>-<slug>' is not a working tree`. The
+directory is still there, but `git worktree list` does not show it, and `.git/worktrees/` has no
+entry for it.
+
+**Cause.** `git worktree prune` ran inside the sandbox. Each worktree's admin entry names a host
+path the container cannot see, so prune deletes the slice's own registration — and any other
+worktree's — while leaving the files. Sandcastle's end-of-run cleanup then fails on the first git
+call in the directory. Slice #1207 of PRD #1206 hit this after finishing its work.
+
+**What prevents it.** The brief forbids the command, and the image installs a `git` shim that
+refuses `git worktree prune`. The image is built only when it is missing, so pick up a Dockerfile
+change by removing it first:
+
+```bash
+docker image rm sandcastle:myorganiser
+```
+
+**What recovers it.** Before any git call in a slice worktree — the success-path finalize, the
+crash checkpoint, and the resume or fresh rebuild — the orchestrator re-registers an orphaned
+directory on its slice branch and rebuilds its index from the branch tip, keeping uncommitted
+edits. When the only failure is sandcastle's own cleanup and the agent's last iteration printed
+the completion promise, the slice is finalized and integrated as a completed run instead of being
+reported as crashed. Otherwise re-running is enough:
+
+```bash
+npx tsx .sandcastle/main.mts --prd <n>
+```
+
+If it reports that the worktree "could not be re-registered" (the slice branch is gone, or the
+`.git` file points outside `.git/worktrees/`), compare the directory with the branch before you
+delete it, since the files may hold work no commit has:
+
+```bash
+W=.sandcastle/worktrees/slice-<n>-<slug>
+GIT_INDEX_FILE=$(mktemp -u) sh -c "git read-tree <branch-or-tag> && git --work-tree=$W diff --stat && git --work-tree=$W ls-files --others --exclude-standard"
+```
+
+Empty output means the directory matches; remove it with `rm -rf "$W"` and re-run.
+
 ## Guardrails inside the sandbox
 
 The repo's `PreToolUse` hooks run in the container too — the image pre-accepts the workspace
