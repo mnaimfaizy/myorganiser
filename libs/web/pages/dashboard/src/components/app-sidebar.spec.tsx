@@ -22,6 +22,32 @@ jest.mock('@myorganiser/web-ui', () => ({
   ),
   SidebarRail: () => <div data-testid="sidebar-rail" />,
   AppLogo: () => <div data-testid="app-logo" />,
+  SidebarFooter: (props: React.ComponentProps<'div'>) => (
+    <div data-testid="sidebar-footer" {...props} />
+  ),
+  SidebarMenu: (props: React.ComponentProps<'ul'>) => (
+    <ul data-testid="sidebar-menu" {...props} />
+  ),
+  SidebarMenuItem: (props: React.ComponentProps<'li'>) => (
+    <li data-testid="sidebar-menu-item" {...props} />
+  ),
+  // The real button reads useSidebar() through its own module-local binding,
+  // which a barrel-level mock cannot reach, so it is stubbed here. The props
+  // it takes that a DOM button does not are swallowed rather than forwarded.
+  SidebarMenuButton: ({
+    asChild: _asChild,
+    isActive: _isActive,
+    tooltip: _tooltip,
+    variant: _variant,
+    size: _size,
+    ...props
+  }: React.ComponentProps<'button'> & {
+    asChild?: boolean;
+    isActive?: boolean;
+    tooltip?: string;
+    variant?: string;
+    size?: string;
+  }) => <button type="button" data-testid="sidebar-menu-button" {...props} />,
 }));
 
 jest.mock('./nav-main', () => ({
@@ -54,6 +80,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { getCurrentUser } from '@myorganiser/auth';
 import { useSidebar } from '@myorganiser/web-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
+import { setFeedbackDialogOpen } from '../hooks/use-feedback-dialog';
+import * as feedbackDialogModule from '../hooks/use-feedback-dialog';
 import { AppSidebar } from './app-sidebar';
 import { NavMain } from './nav-main';
 import { NavUser } from './nav-user';
@@ -81,6 +109,7 @@ describe('AppSidebar', () => {
       email: 'test@example.com',
     });
     stubSidebar(false);
+    setFeedbackDialogOpen(false);
   });
 
   describe('YouTube nav visibility', () => {
@@ -204,6 +233,39 @@ describe('AppSidebar', () => {
 
       expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
       expect(sidebar.setOpen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('feedback button', () => {
+    it('should open the feedback dialog when the Send feedback button is clicked', () => {
+      const openFeedbackDialogSpy = jest.spyOn(
+        feedbackDialogModule,
+        'openFeedbackDialog',
+      );
+
+      render(<AppSidebar />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+      expect(openFeedbackDialogSpy).toHaveBeenCalled();
+      openFeedbackDialogSpy.mockRestore();
+    });
+
+    it('should close the mobile drawer when the Send feedback button is clicked', () => {
+      const sidebar = stubSidebar(true);
+
+      render(<AppSidebar />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+      expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
+    });
+
+    it('should not close the drawer on desktop when the Send feedback button is clicked', () => {
+      const sidebar = stubSidebar(false);
+
+      render(<AppSidebar />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+      expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,7 +7,11 @@ import {
   AppLogo,
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
   SidebarRail,
   useSidebar,
 } from '@myorganiser/web-ui';
@@ -17,6 +21,7 @@ import {
   CreditCard,
   Home,
   MapPin,
+  MessageSquarePlus,
   Phone,
   ShoppingCart,
   Vault,
@@ -24,6 +29,7 @@ import {
 } from 'lucide-react';
 import { NavMain } from './nav-main';
 import { NavUser } from './nav-user';
+import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 
 const allNavItems = [
   {
@@ -99,6 +105,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [isMobile, setOpenMobile],
   );
 
+  const handleFeedback = React.useCallback(() => {
+    openFeedbackDialog();
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -113,6 +124,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent onClickCapture={handleNavigate}>
         <NavMain items={navMain} />
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleFeedback} tooltip="Send feedback">
+              <MessageSquarePlus />
+              <span>Send feedback</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

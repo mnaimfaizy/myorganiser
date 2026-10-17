@@ -48,6 +48,8 @@ model User {
   admin_audit_logs_as_actor  AdminAuditLog[] @relation("AdminAuditActor")
   admin_audit_logs_as_target AdminAuditLog[] @relation("AdminAuditTarget")
 
+  feedback_reports FeedbackReport[] @relation("FeedbackReporter")
+
   @@index([email])
   @@index([role])
 }

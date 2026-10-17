@@ -16,6 +16,12 @@ const nextConfig = {
   // is answering without a shell on the host (issue #1138). Unset, `null`
   // makes Next.js generate its own id, which is every other build.
   generateBuildId: async () => process.env.WEB_BUILD_ID || null,
+  // The Report Context on a Feedback Report names the app version that sent it
+  // (PRD #1206). Read from the workspace package.json at build time, so there
+  // is no second copy of the version and no environment variable to set.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: require('../../package.json').version,
+  },
   poweredByHeader: false,
   async headers() {
     return [

@@ -907,6 +907,105 @@ components:
         - confirmation
       type: object
       additionalProperties: false
+    FeedbackReportKind:
+      type: string
+      enum:
+        - bug_report
+        - suggestion
+      description: "A Feedback Report is a Bug Report or a Suggestion (CONTEXT.md:
+        Feedback)."
+    FeedbackReportStatus:
+      type: string
+      enum:
+        - received
+        - under_review
+        - planned
+        - fixed
+        - shipped
+        - wont_do
+        - cannot_reproduce
+      description: Where a Feedback Report stands as its reporter sees it. There is no
+        Duplicate status.
+    FeedbackReportDto:
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - createdAt
+      type: object
+      additionalProperties: false
+    CreateFeedbackReportResponse:
+      anyOf:
+        - $ref: "#/components/schemas/FeedbackReportDto"
+        - $ref: "#/components/schemas/ErrorResponse"
+    ReportContextRequest:
+      description: >-
+        The Report Context the sender saw before sending. It never carries
+
+        screenshots, logs, or anything read from the Vault, and `path` is the
+        page
+
+        path alone — no query string and no fragment.
+      properties:
+        platform:
+          type: string
+          description: Which app sent the report — `web` for the dashboard.
+        appVersion:
+          type: string
+        browser:
+          type: string
+        operatingSystem:
+          type: string
+        path:
+          type: string
+        sentAt:
+          type: string
+          description: ISO 8601 instant shown in the Report Context preview.
+      required:
+        - platform
+        - appVersion
+        - browser
+        - operatingSystem
+        - path
+        - sentAt
+      type: object
+      additionalProperties: false
+    CreateFeedbackReportRequest:
+      properties:
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        title:
+          type: string
+        description:
+          type: string
+        expectedOutcome:
+          type: string
+          description: Bug Report only — what the sender expected to happen.
+        context:
+          $ref: "#/components/schemas/ReportContextRequest"
+        fixNoticeOptIn:
+          type: boolean
+          description: Fix Notice opt-in. The dialog ticks it by default.
+      required:
+        - kind
+        - title
+        - description
+        - context
+        - fixNoticeOptIn
+      type: object
+      additionalProperties: false
     UserRole:
       type: string
       enum:
@@ -2163,6 +2262,41 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UserDeletionBody"
+  /feedback/reports:
+    post:
+      operationId: CreateReport
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateFeedbackReportResponse"
+        "400":
+          description: Invalid Feedback Report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many Feedback Reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      description: Store a Feedback Report for the signed-in User with Report Status
+        Received.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeedbackReportRequest"
   /auth/login:
     post:
       operationId: Login

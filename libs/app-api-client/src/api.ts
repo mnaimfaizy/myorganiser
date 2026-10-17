@@ -115,6 +115,33 @@ export interface ConfirmResetPasswordBody {
     'password': string;
     'confirm_password': string;
 }
+export interface CreateFeedbackReportRequest {
+    'kind': FeedbackReportKind;
+    'title': string;
+    'description': string;
+    /**
+     * Bug Report only — what the sender expected to happen.
+     */
+    'expectedOutcome'?: string;
+    'context': ReportContextRequest;
+    /**
+     * Fix Notice opt-in. The dialog ticks it by default.
+     */
+    'fixNoticeOptIn': boolean;
+}
+
+
+export interface CreateFeedbackReportResponse {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'createdAt': string;
+    'message': string;
+    'details'?: any;
+}
+
+
 export interface CronDigest200Response {
     'ran': boolean;
     'processed': number;
@@ -214,6 +241,44 @@ export const ExportVaultResponseExportVersionEnum = {
 } as const;
 
 export type ExportVaultResponseExportVersionEnum = typeof ExportVaultResponseExportVersionEnum[keyof typeof ExportVaultResponseExportVersionEnum];
+
+export interface FeedbackReportDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'createdAt': string;
+}
+
+
+/**
+ * A Feedback Report is a Bug Report or a Suggestion (CONTEXT.md: Feedback).
+ */
+
+export const FeedbackReportKind = {
+    BugReport: 'bug_report',
+    Suggestion: 'suggestion',
+} as const;
+
+export type FeedbackReportKind = typeof FeedbackReportKind[keyof typeof FeedbackReportKind];
+
+
+/**
+ * Where a Feedback Report stands as its reporter sees it. There is no Duplicate status.
+ */
+
+export const FeedbackReportStatus = {
+    Received: 'received',
+    UnderReview: 'under_review',
+    Planned: 'planned',
+    Fixed: 'fixed',
+    Shipped: 'shipped',
+    WontDo: 'wont_do',
+    CannotReproduce: 'cannot_reproduce',
+} as const;
+
+export type FeedbackReportStatus = typeof FeedbackReportStatus[keyof typeof FeedbackReportStatus];
+
 
 export interface FilteredUserInterface {
     'id': string;
@@ -492,6 +557,23 @@ export interface RefreshTokenBody {
 export interface RegisterUserResponse {
     'message': string;
     'user'?: FilteredUserInterface;
+}
+/**
+ * The Report Context the sender saw before sending. It never carries screenshots, logs, or anything read from the Vault, and `path` is the page path alone — no query string and no fragment.
+ */
+export interface ReportContextRequest {
+    /**
+     * Which app sent the report — `web` for the dashboard.
+     */
+    'platform': string;
+    'appVersion': string;
+    'browser': string;
+    'operatingSystem': string;
+    'path': string;
+    /**
+     * ISO 8601 instant shown in the Report Context preview.
+     */
+    'sentAt': string;
 }
 export interface ResendVerificationEmailByEmailRequest {
     'email': string;
@@ -1554,6 +1636,115 @@ export class AuthenticationApi extends BaseAPI {
      */
     public verifyEmail(requestParameters: AuthenticationApiVerifyEmailRequest, options?: RawAxiosRequestConfig) {
         return AuthenticationApiFp(this.configuration).verifyEmail(requestParameters.verifyEmailRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * FeedbackApi - axios parameter creator
+ */
+export const FeedbackApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createReport: async (createFeedbackReportRequest: CreateFeedbackReportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'createFeedbackReportRequest' is not null or undefined
+            assertParamExists('createReport', 'createFeedbackReportRequest', createFeedbackReportRequest)
+            const localVarPath = `/feedback/reports`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createFeedbackReportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * FeedbackApi - functional programming interface
+ */
+export const FeedbackApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = FeedbackApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createReport(createFeedbackReportRequest: CreateFeedbackReportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateFeedbackReportResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createReport(createFeedbackReportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.createReport']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * FeedbackApi - factory interface
+ */
+export const FeedbackApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = FeedbackApiFp(configuration)
+    return {
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig): AxiosPromise<CreateFeedbackReportResponse> {
+            return localVarFp.createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for createReport operation in FeedbackApi.
+ */
+export interface FeedbackApiCreateReportRequest {
+    readonly createFeedbackReportRequest: CreateFeedbackReportRequest
+}
+
+/**
+ * FeedbackApi - object-oriented interface
+ */
+export class FeedbackApi extends BaseAPI {
+    /**
+     * Store a Feedback Report for the signed-in User with Report Status Received.
+     * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

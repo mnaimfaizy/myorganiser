@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   CreditCard,
   LogOut,
+  MessageSquarePlus,
   Sparkles,
 } from 'lucide-react';
 
@@ -29,6 +30,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@myorganiser/web-ui';
+import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 
 export function NavUser({
   user,
@@ -63,6 +65,11 @@ export function NavUser({
     void handleLogout();
     closeMobileSidebar();
   }, [handleLogout, closeMobileSidebar]);
+
+  const handleSendFeedbackSelect = useCallback(() => {
+    openFeedbackDialog();
+    closeMobileSidebar();
+  }, [closeMobileSidebar]);
 
   const initials = user.name
     .split(' ')
@@ -133,6 +140,10 @@ export function NavUser({
               <DropdownMenuItem>
                 <Bell />
                 Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleSendFeedbackSelect}>
+                <MessageSquarePlus />
+                Send feedback
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
