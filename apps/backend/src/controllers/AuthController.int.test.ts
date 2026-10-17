@@ -243,6 +243,11 @@ jest.mock('../services/YouTubeSyncService', () => ({
   default: {},
 }));
 
+jest.mock('../services/FeedbackService', () => ({
+  __esModule: true,
+  default: {},
+}));
+
 function asSetCookieHeaders(headers: string | string[] | undefined): string[] {
   if (!headers) return [];
   return Array.isArray(headers) ? headers : [headers];

@@ -96,6 +96,11 @@ jest.mock('../services/YouTubeSyncService', () => ({
   default: {},
 }));
 
+jest.mock('../services/FeedbackService', () => ({
+  __esModule: true,
+  default: {},
+}));
+
 function makeApp() {
   // Ensure mocks are applied before importing the generated routes.
 

@@ -11,10 +11,6 @@ const meta: Meta<typeof Textarea> = {
       control: 'boolean',
       description: 'Whether the textarea is disabled',
     },
-    'aria-invalid': {
-      control: 'boolean',
-      description: 'Whether the textarea is in an invalid state',
-    },
   },
 };
 
@@ -60,24 +56,6 @@ export const Disabled: Story = {
     defaultValue: 'This textarea is disabled and cannot be edited.',
     disabled: true,
   },
-};
-
-function InvalidExample() {
-  return (
-    <div className="grid w-full max-w-sm items-center gap-1.5">
-      <Label htmlFor="feedback-required">Feedback</Label>
-      <Textarea
-        id="feedback-required"
-        defaultValue="Entered text"
-        aria-invalid
-        placeholder="Please enter your feedback"
-      />
-    </div>
-  );
-}
-
-export const Invalid: Story = {
-  render: () => <InvalidExample />,
 };
 
 export const WithRows: Story = {

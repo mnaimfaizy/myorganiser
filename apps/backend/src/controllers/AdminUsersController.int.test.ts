@@ -106,6 +106,11 @@ jest.mock('../services/YouTubeSyncService', () => ({
   default: {},
 }));
 
+jest.mock('../services/FeedbackService', () => ({
+  __esModule: true,
+  default: {},
+}));
+
 function makeApp() {
   jest.resetModules();
 

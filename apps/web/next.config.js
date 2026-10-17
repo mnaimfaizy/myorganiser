@@ -1,5 +1,20 @@
 //@ts-check
 
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+/**
+ * The workspace version, for the Report Context on a Feedback Report.
+ *
+ * Read as a file rather than `require`d: the workspace package.json is outside
+ * this project, and importing across that line by relative path is what
+ * `@nx/enforce-module-boundaries` refuses. Reading it is also how the
+ * assertion gates and `check-openapi-artifacts.mjs` take the same value.
+ */
+const workspaceVersion = JSON.parse(
+  readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'),
+).version;
+
 /**
  * A plain Next.js config: the Nx Next.js plugin infers `build`, `dev`, and
  * `start` from this file, so nothing here depends on Nx (ADR 0083).
@@ -17,10 +32,10 @@ const nextConfig = {
   // makes Next.js generate its own id, which is every other build.
   generateBuildId: async () => process.env.WEB_BUILD_ID || null,
   // The Report Context on a Feedback Report names the app version that sent it
-  // (PRD #1206). Read from the workspace package.json at build time, so there
+  // (PRD #1206). Taken from the workspace package.json at build time, so there
   // is no second copy of the version and no environment variable to set.
   env: {
-    NEXT_PUBLIC_APP_VERSION: require('../../package.json').version,
+    NEXT_PUBLIC_APP_VERSION: workspaceVersion,
   },
   poweredByHeader: false,
   async headers() {

@@ -7,6 +7,7 @@ import {
   Response,
   Route,
   Security,
+  SuccessResponse,
   Tags,
 } from 'tsoa';
 import { requireUserId } from '../guards/AuthGuard';
@@ -51,6 +52,7 @@ type CreateFeedbackReportResponse = FeedbackReportDto | ErrorResponse;
 export class FeedbackController extends Controller {
   /** Store a Feedback Report for the signed-in User with Report Status Received. */
   @Post()
+  @SuccessResponse(201, 'Created')
   @Response<ErrorResponse>(400, 'Invalid Feedback Report')
   @Response<ErrorResponse>(429, 'Too many Feedback Reports')
   public async createReport(

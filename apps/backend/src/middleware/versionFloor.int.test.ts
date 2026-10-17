@@ -69,6 +69,11 @@ jest.mock('../services/YouTubeSyncService', () => ({
   default: {},
 }));
 
+jest.mock('../services/FeedbackService', () => ({
+  __esModule: true,
+  default: {},
+}));
+
 // Test-only signing key, short of the credential-fixture length limit.
 const TEST_JWT_KEY = 'test-jwt-key';
 const ORIGINAL_JWT_KEY = process.env.ACCESS_JWT_SECRET;
