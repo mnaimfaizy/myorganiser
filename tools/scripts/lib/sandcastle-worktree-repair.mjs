@@ -30,6 +30,8 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
+import { lastIterationOutput } from './sandcastle-outcome.mjs';
+
 /**
  * - `absent`   — no directory; nothing to repair.
  * - `healthy`  — the admin directory exists; git can use the worktree.
@@ -119,4 +121,28 @@ export function repairOrphanedWorktree({ worktreePath, branch }) {
     };
   }
   return { state, repaired: true };
+}
+
+/**
+ * Did the run fail only because sandcastle's own cleanup met an orphaned
+ * worktree, after the agent had already finished?
+ *
+ * Sandcastle has no hook between the agent finishing and its cleanup, so the
+ * repair above cannot run in time; the cleanup throws and `run()` rejects with
+ * no result. When the thrown error is that cleanup failure and the last
+ * iteration in the log carries the completion promise, the work is finished:
+ * the orchestrator repairs the worktree and finalizes it like any completed run
+ * instead of reporting a crash.
+ *
+ * @param {{ errorText: string, logText: string, completionPromise: string }} input
+ */
+export function isCleanupOnlyFailure({
+  errorText,
+  logText,
+  completionPromise,
+}) {
+  return (
+    /is not a working tree/.test(String(errorText ?? '')) &&
+    lastIterationOutput(logText).includes(completionPromise)
+  );
 }

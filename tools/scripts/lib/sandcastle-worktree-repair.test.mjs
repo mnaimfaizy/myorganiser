@@ -11,8 +11,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { COMPLETION_PROMISE } from './sandcastle-outcome.mjs';
 import {
   inspectWorktree,
+  isCleanupOnlyFailure,
   repairOrphanedWorktree,
   WORKTREE_STATES,
 } from './sandcastle-worktree-repair.mjs';
@@ -134,4 +136,58 @@ test('an orphan whose pointer leaves .git/worktrees is foreign', (t) => {
     `gitdir: ${join(dir, 'elsewhere')}\n`,
   );
   assert.equal(inspectWorktree(join(dir, 'sub')), WORKTREE_STATES.foreign);
+});
+
+const CLEANUP_ERROR =
+  "(FiberFailure) WorktreeError: fatal: '/repo/.sandcastle/worktrees/slice-1-demo' is not a working tree";
+const runLog = (...lines) =>
+  ['--- Run started: 2026-10-17T07:30:00.000Z ---', ...lines].join('\n');
+
+test('a cleanup failure after the completion promise is a finished run', () => {
+  assert.equal(
+    isCleanupOnlyFailure({
+      errorText: CLEANUP_ERROR,
+      logText: runLog('Iteration 1/2', COMPLETION_PROMISE, 'Agent stopped'),
+      completionPromise: COMPLETION_PROMISE,
+    }),
+    true,
+  );
+});
+
+test('a cleanup failure without the completion promise is still a crash', () => {
+  assert.equal(
+    isCleanupOnlyFailure({
+      errorText: CLEANUP_ERROR,
+      logText: runLog('Iteration 1/2', 'HANDOFF: TestScaffold -> TestReviewer'),
+      completionPromise: COMPLETION_PROMISE,
+    }),
+    false,
+  );
+});
+
+test('a promise from an earlier iteration does not excuse the last one', () => {
+  assert.equal(
+    isCleanupOnlyFailure({
+      errorText: CLEANUP_ERROR,
+      logText: runLog(
+        'Iteration 1/2',
+        COMPLETION_PROMISE,
+        'Iteration 2/2',
+        'killed',
+      ),
+      completionPromise: COMPLETION_PROMISE,
+    }),
+    false,
+  );
+});
+
+test('any other error after the completion promise is still a crash', () => {
+  assert.equal(
+    isCleanupOnlyFailure({
+      errorText: "AgentError: You've hit your session limit",
+      logText: runLog('Iteration 1/2', COMPLETION_PROMISE),
+      completionPromise: COMPLETION_PROMISE,
+    }),
+    false,
+  );
 });

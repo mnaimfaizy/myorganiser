@@ -59,7 +59,10 @@ import {
   formatHeldComment,
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.mjs';
-import { repairOrphanedWorktree } from '../tools/scripts/lib/sandcastle-worktree-repair.mjs';
+import {
+  isCleanupOnlyFailure,
+  repairOrphanedWorktree,
+} from '../tools/scripts/lib/sandcastle-worktree-repair.mjs';
 
 const REPO = 'mnaimfaizy/myorganiser';
 const SANDBOX_IMAGE = 'sandcastle:myorganiser';
@@ -1366,6 +1369,58 @@ function ensureWorktreeRegistered(
         `re-registered: ${repair.error}. See docs/sandcastle/RUNBOOK.md — ` +
         `"An orphaned slice worktree".`,
     );
+  }
+}
+
+// Sandcastle cleans up the worktree inside run(), with no hook in between, so an
+// orphaned worktree makes run() reject AFTER the agent finished and the result is
+// lost. When that is the only failure and the agent signalled completion, repair
+// the worktree and carry on as a completed run rather than a crash (#1220). The
+// session and per-iteration usage went with the rejected result, so the stand-in
+// carries none; finalize, integration, and the outcome judgement read git and the
+// log, which both survive.
+async function finishedDespiteCleanup(
+  issue: Issue,
+  sliceBranch: string,
+  pending: ReturnType<typeof run>,
+): Promise<Awaited<ReturnType<typeof run>>> {
+  try {
+    return await pending;
+  } catch (e) {
+    const logFilePath = sliceLogPathFor(issue.number);
+    if (
+      !isCleanupOnlyFailure({
+        errorText: String(e),
+        logText: readRunLog(logFilePath, issue.number),
+        completionPromise: COMPLETION_PROMISE,
+      })
+    ) {
+      throw e;
+    }
+    const worktreePath = join(worktreesDir, sliceBranch.replace(/\//g, '-'));
+    ensureWorktreeRegistered(issue.number, worktreePath, sliceBranch);
+    console.log(
+      `  [#${issue.number}] the agent finished; only sandcastle's worktree cleanup ` +
+        `failed. Finalizing as a completed run.`,
+    );
+    const shas = (
+      spawnSync(
+        'git',
+        ['rev-list', '--reverse', `${baseRef}..${sliceBranch}`],
+        {
+          encoding: 'utf8',
+          windowsHide: true,
+        },
+      ).stdout || ''
+    )
+      .split('\n')
+      .filter(Boolean);
+    return {
+      iterations: [],
+      commits: shas.map((sha) => ({ sha })),
+      branch: sliceBranch,
+      logFilePath,
+    } as unknown as Awaited<ReturnType<typeof run>>;
   }
 }
 
@@ -2803,92 +2858,96 @@ while (pendingSlices.length > 0) {
       );
     }
 
-    const result = await run({
-      agent,
-      sandbox: docker({
-        env: {
-          NX_DAEMON: 'false',
-          NX_ISOLATE_PLUGINS: 'false',
-          NX_SKIP_NX_CACHE: 'true',
-          // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
-          // resolve a "main worktree" root to share the cache across worktrees —
-          // a path that does not exist inside the container — and falls back to
-          // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
-          // resolution failure is still wasted work every run). See ADR 0036.
-          NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
-          NX_WORKSPACE_DATA_DIRECTORY:
-            '/home/agent/workspace/.nx/workspace-data',
-          ...providerEnvironment(),
-          ...YARN_CACHE_ENV,
-        },
-        // Bind-mount the shared, content-addressable Yarn global cache so the
-        // in-container install (below) is incremental and never re-downloads
-        // across slices.
-        mounts: [
-          { hostPath: yarnCacheDir, sandboxPath: '/home/agent/.yarn-cache' },
-          {
-            hostPath: sessionsDir,
-            sandboxPath: '/home/agent/.claude/projects',
+    const result = await finishedDespiteCleanup(
+      issue,
+      sliceBranch,
+      run({
+        agent,
+        sandbox: docker({
+          env: {
+            NX_DAEMON: 'false',
+            NX_ISOLATE_PLUGINS: 'false',
+            NX_SKIP_NX_CACHE: 'true',
+            // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
+            // resolve a "main worktree" root to share the cache across worktrees —
+            // a path that does not exist inside the container — and falls back to
+            // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
+            // resolution failure is still wasted work every run). See ADR 0036.
+            NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
+            NX_WORKSPACE_DATA_DIRECTORY:
+              '/home/agent/workspace/.nx/workspace-data',
+            ...providerEnvironment(),
+            ...YARN_CACHE_ENV,
           },
-          ...(graphifyAvailable
-            ? [
-                {
-                  hostPath: 'graphify-out',
-                  sandboxPath: 'graphify-out',
-                  readonly: true,
-                },
-              ]
-            : []),
-        ],
-      }),
-      name: `#${issue.number}`,
-      branchStrategy: {
-        type: 'branch',
-        branch: sliceBranch,
-        baseBranch: baseRef,
-      },
-      // Install this slice's deps INSIDE the container before the agent starts, so
-      // native binaries match the container's platform (correct on WSL2, Linux, and
-      // macOS hosts). Writes node_modules to the bind-mounted worktree, which MUST
-      // be on a native fs (ext4/APFS) — ~2 min there vs ~29 min on a Windows mount.
-      hooks: {
-        sandbox: {
-          onSandboxReady: [
+          // Bind-mount the shared, content-addressable Yarn global cache so the
+          // in-container install (below) is incremental and never re-downloads
+          // across slices.
+          mounts: [
+            { hostPath: yarnCacheDir, sandboxPath: '/home/agent/.yarn-cache' },
             {
-              command: 'corepack yarn install --immutable',
-              timeoutMs: 1200000,
+              hostPath: sessionsDir,
+              sandboxPath: '/home/agent/.claude/projects',
             },
+            ...(graphifyAvailable
+              ? [
+                  {
+                    hostPath: 'graphify-out',
+                    sandboxPath: 'graphify-out',
+                    readonly: true,
+                  },
+                ]
+              : []),
           ],
+        }),
+        name: `#${issue.number}`,
+        branchStrategy: {
+          type: 'branch',
+          branch: sliceBranch,
+          baseBranch: baseRef,
         },
-      },
-      // Iterations after the first do NOT resume the agent session: each spins a
-      // fresh sandbox, re-runs the dependency install, and receives the identical
-      // prompt. They are cold restarts, not continuations, so an agent that failed
-      // to signal completion once meets the same wall again at full price. Two buys
-      // one honest retry for a transient container fault; genuine continuation is
-      // the resume path, which supplies a different prompt. See ADR 0035.
-      maxIterations: 2,
-      // Quiet stretches (codegen, builds) can exceed the 600s default and trip the
-      // idle watchdog; give long-running slices headroom.
-      idleTimeoutSeconds: 1800,
-      prompt: (() => {
-        // Notes wrap the base prompt, so the resume brief inherits them too: a
-        // maintainer reviewing a checkpoint is the likeliest author of one.
-        const basePrompt = withMaintainerNotes(
-          buildPrompt(issue, sliceBranch, parentPrd),
-          maintainerNotes,
-        );
-        return checkpoint
-          ? buildResumeBrief({
-              basePrompt,
-              issueNumber: issue.number,
-              sliceBranch,
-              checkpoint,
-              ...priorRun,
-            })
-          : basePrompt;
-      })(),
-    });
+        // Install this slice's deps INSIDE the container before the agent starts, so
+        // native binaries match the container's platform (correct on WSL2, Linux, and
+        // macOS hosts). Writes node_modules to the bind-mounted worktree, which MUST
+        // be on a native fs (ext4/APFS) — ~2 min there vs ~29 min on a Windows mount.
+        hooks: {
+          sandbox: {
+            onSandboxReady: [
+              {
+                command: 'corepack yarn install --immutable',
+                timeoutMs: 1200000,
+              },
+            ],
+          },
+        },
+        // Iterations after the first do NOT resume the agent session: each spins a
+        // fresh sandbox, re-runs the dependency install, and receives the identical
+        // prompt. They are cold restarts, not continuations, so an agent that failed
+        // to signal completion once meets the same wall again at full price. Two buys
+        // one honest retry for a transient container fault; genuine continuation is
+        // the resume path, which supplies a different prompt. See ADR 0035.
+        maxIterations: 2,
+        // Quiet stretches (codegen, builds) can exceed the 600s default and trip the
+        // idle watchdog; give long-running slices headroom.
+        idleTimeoutSeconds: 1800,
+        prompt: (() => {
+          // Notes wrap the base prompt, so the resume brief inherits them too: a
+          // maintainer reviewing a checkpoint is the likeliest author of one.
+          const basePrompt = withMaintainerNotes(
+            buildPrompt(issue, sliceBranch, parentPrd),
+            maintainerNotes,
+          );
+          return checkpoint
+            ? buildResumeBrief({
+                basePrompt,
+                issueNumber: issue.number,
+                sliceBranch,
+                checkpoint,
+                ...priorRun,
+              })
+            : basePrompt;
+        })(),
+      }),
+    );
 
     logRunUsage(issue.number, agentKind, model, result);
     captureSubagentTraces(issue, result);

@@ -556,7 +556,9 @@ docker image rm sandcastle:myorganiser
 **What recovers it.** Before any git call in a slice worktree — the success-path finalize, the
 crash checkpoint, and the resume or fresh rebuild — the orchestrator re-registers an orphaned
 directory on its slice branch and rebuilds its index from the branch tip, keeping uncommitted
-edits. Re-running is enough:
+edits. When the only failure is sandcastle's own cleanup and the agent's last iteration printed
+the completion promise, the slice is finalized and integrated as a completed run instead of being
+reported as crashed. Otherwise re-running is enough:
 
 ```bash
 npx tsx .sandcastle/main.mts --prd <n>
