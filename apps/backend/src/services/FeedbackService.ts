@@ -1,3 +1,7 @@
+import {
+  FEEDBACK_REPORT_CAP_MESSAGES,
+  FEEDBACK_REPORT_REQUIRED_MESSAGES,
+} from '@myorganiser/core';
 import { PrismaClient, createPrismaClient } from '../prisma';
 import {
   FEEDBACK_REPORT_CONTEXT_FIELD_MAX_LENGTH,
@@ -200,23 +204,26 @@ function validateCreateReportInput(
 
   const title = trimString(input.title);
   if (!title) {
-    return { ok: false, message: 'Enter a title.' };
+    return { ok: false, message: FEEDBACK_REPORT_REQUIRED_MESSAGES.title };
   }
   if (title.length > FEEDBACK_REPORT_TITLE_MAX_LENGTH) {
     return {
       ok: false,
-      message: `The title must be ${formatCount(FEEDBACK_REPORT_TITLE_MAX_LENGTH)} characters or fewer.`,
+      message: FEEDBACK_REPORT_CAP_MESSAGES.title,
     };
   }
 
   const description = trimString(input.description);
   if (!description) {
-    return { ok: false, message: 'Enter a description.' };
+    return {
+      ok: false,
+      message: FEEDBACK_REPORT_REQUIRED_MESSAGES.description,
+    };
   }
   if (description.length > FEEDBACK_REPORT_TEXT_MAX_LENGTH) {
     return {
       ok: false,
-      message: `The description must be ${formatCount(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
+      message: FEEDBACK_REPORT_CAP_MESSAGES.description,
     };
   }
 
@@ -234,7 +241,7 @@ function validateCreateReportInput(
     if (expectedOutcomeText.length > FEEDBACK_REPORT_TEXT_MAX_LENGTH) {
       return {
         ok: false,
-        message: `What you expected must be ${formatCount(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
+        message: FEEDBACK_REPORT_CAP_MESSAGES.expectedOutcome,
       };
     }
     expectedOutcome = expectedOutcomeText;

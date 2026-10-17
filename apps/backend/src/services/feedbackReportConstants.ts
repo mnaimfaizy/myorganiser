@@ -2,6 +2,12 @@ import type {
   FeedbackReportKind as PrismaFeedbackReportKind,
   FeedbackReportStatus as PrismaFeedbackReportStatus,
 } from '@prisma/client';
+import {
+  FEEDBACK_REPORT_TITLE_MAX_LENGTH as CORE_FEEDBACK_REPORT_TITLE_MAX_LENGTH,
+  FEEDBACK_REPORT_TEXT_MAX_LENGTH as CORE_FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+  FEEDBACK_REPORTS_PER_DAY_LIMIT as CORE_FEEDBACK_REPORTS_PER_DAY_LIMIT,
+  FEEDBACK_REPORT_RATE_WINDOW_MS as CORE_FEEDBACK_REPORT_RATE_WINDOW_MS,
+} from '@myorganiser/core';
 
 /** A Feedback Report is a Bug Report or a Suggestion (CONTEXT.md: Feedback). */
 export type FeedbackReportKind = 'bug_report' | 'suggestion';
@@ -25,7 +31,7 @@ interface FeedbackReportKindRule {
 
 interface FeedbackReportStatusRule {
   /** Who moves a report into this status. */
-  setBy: 'system' | 'admin' | 'release';
+  setBy: readonly ('system' | 'admin' | 'release')[];
   /** The kinds the status can apply to. */
   kinds: readonly FeedbackReportKind[];
   /** Whether the status change always carries a Status Note for the reporter. */
@@ -67,43 +73,43 @@ export const FEEDBACK_REPORT_KIND_RULES = {
  */
 export const FEEDBACK_REPORT_STATUS_RULES = {
   received: {
-    setBy: 'system',
+    setBy: ['system'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   under_review: {
-    setBy: 'admin',
+    setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   planned: {
-    setBy: 'admin',
+    setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   fixed: {
-    setBy: 'release',
+    setBy: ['release', 'admin'] as const,
     kinds: ['bug_report'],
     requiresStatusNote: false,
     isFinal: true,
   },
   shipped: {
-    setBy: 'release',
+    setBy: ['release', 'admin'] as const,
     kinds: ['suggestion'],
     requiresStatusNote: false,
     isFinal: true,
   },
   wont_do: {
-    setBy: 'admin',
+    setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: true,
     isFinal: false,
   },
   cannot_reproduce: {
-    setBy: 'admin',
+    setBy: ['admin'] as const,
     kinds: ['bug_report'],
     requiresStatusNote: true,
     isFinal: false,
@@ -124,12 +130,12 @@ export const FEEDBACK_REPORT_STATUSES = Object.keys(
 /**
  * The status whose rule says the system sets it, read out of the table by the
  * type checker rather than written a second time. It resolves to exactly the
- * one member marked `setBy: 'system'`, so moving that mark — or marking two
- * members — fails to compile on the line below instead of silently giving new
- * reports the wrong status.
+ * one member marked with `'system'` in its `setBy` list, so moving that mark —
+ * or marking two members — fails to compile on the line below instead of
+ * silently giving new reports the wrong status.
  */
 type SystemSetFeedbackReportStatus = {
-  [Status in FeedbackReportStatus]: (typeof FEEDBACK_REPORT_STATUS_RULES)[Status]['setBy'] extends 'system'
+  [Status in FeedbackReportStatus]: (typeof FEEDBACK_REPORT_STATUS_RULES)[Status]['setBy'][number] extends 'system'
     ? Status
     : never;
 }[FeedbackReportStatus];
@@ -158,11 +164,16 @@ export function isFeedbackReportStatus(
   );
 }
 
-export const FEEDBACK_REPORT_TITLE_MAX_LENGTH = 120;
-export const FEEDBACK_REPORT_TEXT_MAX_LENGTH = 4000;
+/** Re-exported from the shared core package so both sides of the boundary enforce the same caps. */
+export const FEEDBACK_REPORT_TITLE_MAX_LENGTH =
+  CORE_FEEDBACK_REPORT_TITLE_MAX_LENGTH;
+export const FEEDBACK_REPORT_TEXT_MAX_LENGTH =
+  CORE_FEEDBACK_REPORT_TEXT_MAX_LENGTH;
 /** Defensive cap on each Report Context field, so a client cannot store an unbounded string. */
 export const FEEDBACK_REPORT_CONTEXT_FIELD_MAX_LENGTH = 120;
 export const FEEDBACK_REPORT_CONTEXT_PATH_MAX_LENGTH = 512;
-/** How many reports one User may send in `FEEDBACK_REPORT_RATE_WINDOW_MS`. */
-export const FEEDBACK_REPORTS_PER_DAY_LIMIT = 10;
-export const FEEDBACK_REPORT_RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Re-exported from the shared core package so both sides of the boundary enforce the same rate limit. */
+export const FEEDBACK_REPORTS_PER_DAY_LIMIT =
+  CORE_FEEDBACK_REPORTS_PER_DAY_LIMIT;
+export const FEEDBACK_REPORT_RATE_WINDOW_MS =
+  CORE_FEEDBACK_REPORT_RATE_WINDOW_MS;

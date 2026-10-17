@@ -21,17 +21,17 @@ model FeedbackReport {
   kind   FeedbackReportKind
   status FeedbackReportStatus @default(received)
 
-  title             String
-  description       String
-  expected_outcome  String?
+  title            String
+  description      String
+  expected_outcome String?
 
   // Report Context — captured client-side and shown to the sender before sending.
-  context_platform          String
-  context_app_version       String
-  context_browser           String
-  context_operating_system  String
-  context_path              String
-  context_sent_at           DateTime
+  context_platform         String
+  context_app_version      String
+  context_browser          String
+  context_operating_system String
+  context_path             String
+  context_sent_at          DateTime
 
   fix_notice_opt_in Boolean @default(true)
 

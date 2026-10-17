@@ -16,6 +16,7 @@ import feedbackService, {
 } from '../services/FeedbackService';
 import { FeedbackReportKind } from '../services/feedbackReportConstants';
 import { ErrorResponse } from './ErrorResponse';
+import { VersionFloorRefusal } from '../types';
 
 /**
  * The Report Context the sender saw before sending. It never carries
@@ -48,6 +49,7 @@ type CreateFeedbackReportResponse = FeedbackReportDto | ErrorResponse;
 
 @Tags('Feedback')
 @Route('/feedback/reports')
+@Response<VersionFloorRefusal>(426, 'Below the Version Floor')
 @Security('jwt')
 export class FeedbackController extends Controller {
   /** Store a Feedback Report for the signed-in User with Report Status Received. */

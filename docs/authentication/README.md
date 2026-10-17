@@ -42,6 +42,9 @@ All endpoints are under the backend router prefix (see `ROUTER_PREFIX`).
     Sessions end because the User row is gone. The refresh cookie is cleared
   - Admin Audit Log entries about the User are kept with the User removed from them
     (`actorUserId` / `targetUserId` become `null`)
+  - Feedback Reports the User sent are kept with the reporter removed from them
+    (`reporter_user_id` becomes `null`), so a report can still be fixed and its
+    sender is never contacted about it again (CONTEXT.md § User Deletion)
   - A confirmation Transactional Email is sent to the captured address; a send failure does not fail the request
 
 Email verification:

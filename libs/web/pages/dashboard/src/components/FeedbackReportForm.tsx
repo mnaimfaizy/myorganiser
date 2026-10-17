@@ -9,6 +9,12 @@ import { isAxiosError } from 'axios';
 
 import { FeedbackReportKind } from '@myorganiser/app-api-client';
 import {
+  FEEDBACK_REPORT_TITLE_MAX_LENGTH,
+  FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+  FEEDBACK_REPORT_CAP_MESSAGES,
+  FEEDBACK_REPORT_REQUIRED_MESSAGES,
+} from '@myorganiser/core';
+import {
   Button,
   Checkbox,
   DialogFooter,
@@ -25,10 +31,6 @@ import {
 
 import { readReportContext, type ReportContext } from '../utils/reportContext';
 import { createFeedbackApi } from '../lib/apiClient';
-
-// Mirrors the backend constants; the server enforces them again and 400s on overflow.
-const FEEDBACK_TITLE_MAX_LENGTH = 120;
-const FEEDBACK_TEXT_MAX_LENGTH = 4000;
 
 interface FeedbackKindChoice {
   label: string;
@@ -68,25 +70,22 @@ const feedbackFormSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(1, 'Enter a title.')
-    .max(
-      FEEDBACK_TITLE_MAX_LENGTH,
-      'The title must be 120 characters or fewer.',
-    ),
+    .min(1, FEEDBACK_REPORT_REQUIRED_MESSAGES.title)
+    .max(FEEDBACK_REPORT_TITLE_MAX_LENGTH, FEEDBACK_REPORT_CAP_MESSAGES.title),
   description: z
     .string()
     .trim()
-    .min(1, 'Enter a description.')
+    .min(1, FEEDBACK_REPORT_REQUIRED_MESSAGES.description)
     .max(
-      FEEDBACK_TEXT_MAX_LENGTH,
-      'The description must be 4,000 characters or fewer.',
+      FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+      FEEDBACK_REPORT_CAP_MESSAGES.description,
     ),
   expectedOutcome: z
     .string()
     .trim()
     .max(
-      FEEDBACK_TEXT_MAX_LENGTH,
-      'What you expected must be 4,000 characters or fewer.',
+      FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+      FEEDBACK_REPORT_CAP_MESSAGES.expectedOutcome,
     ),
   fixNoticeOptIn: z.boolean(),
 });
@@ -299,12 +298,10 @@ export function FeedbackReportForm({
           name="kind"
           render={({ field }) => (
             <FormItem>
-              <FormControl>
-                <KindChoiceFieldset
-                  kind={field.value}
-                  onKindChange={field.onChange}
-                />
-              </FormControl>
+              <KindChoiceFieldset
+                kind={field.value}
+                onKindChange={field.onChange}
+              />
             </FormItem>
           )}
         />

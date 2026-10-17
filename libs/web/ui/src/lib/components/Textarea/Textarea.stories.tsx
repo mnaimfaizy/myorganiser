@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { Textarea } from './Textarea';
 import { Label } from '../Label/Label';
 
+// Note: Invalid state is not shown in a story because Textarea renders no styling for aria-invalid.
+// The error state is covered in the consuming form: FormControl wraps Textarea and sets aria-invalid,
+// and validation messages are rendered by FormMessage. See
+// libs/web/pages/dashboard/src/components/FeedbackReportForm.spec.tsx for coverage.
 const meta: Meta<typeof Textarea> = {
   component: Textarea,
   title: 'Components/Textarea',
