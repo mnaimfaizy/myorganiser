@@ -263,6 +263,22 @@ export const FeedbackReportKind = {
 export type FeedbackReportKind = typeof FeedbackReportKind[keyof typeof FeedbackReportKind];
 
 
+export interface FeedbackReportListItemDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'statusNote': string | null;
+    'releaseTag': string | null;
+    /**
+     * Only set when releaseTag is present and status is \'fixed\' or \'shipped\'.
+     */
+    'changelogUrl': string | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+}
+
+
 /**
  * Where a Feedback Report stands as its reporter sees it. There is no Duplicate status.
  */
@@ -430,6 +446,10 @@ export interface ImportVaultResponse {
 export interface ImportVaultResponseAnyOf {
     'ok': boolean;
 }
+export interface ListFeedbackReportsResponse {
+    'items': Array<FeedbackReportListItemDto>;
+    'hasChangedSinceLastSeen': boolean;
+}
 export interface ListVaultBackupsResponse {
     'items': Array<VaultBackupRecordDto>;
     'nextCursor': string | null;
@@ -444,6 +464,9 @@ export interface Login200Response {
 }
 export interface Login401Response {
     'message': string;
+}
+export interface MarkReportSeenResponse {
+    'seenAt': string;
 }
 export interface NotificationSettingsBody {
     'enabled'?: boolean;
@@ -1684,6 +1707,72 @@ export const FeedbackApiAxiosParamCreator = function (configuration?: Configurat
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listReports: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/feedback/reports`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markReportsSeen: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/feedback/reports/seen`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -1705,6 +1794,28 @@ export const FeedbackApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['FeedbackApi.createReport']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listReports(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ListFeedbackReportsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listReports(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.listReports']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async markReportsSeen(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MarkReportSeenResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.markReportsSeen(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.markReportsSeen']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -1722,6 +1833,22 @@ export const FeedbackApiFactory = function (configuration?: Configuration, baseP
          */
         createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig): AxiosPromise<CreateFeedbackReportResponse> {
             return localVarFp.createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listReports(options?: RawAxiosRequestConfig): AxiosPromise<ListFeedbackReportsResponse> {
+            return localVarFp.listReports(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markReportsSeen(options?: RawAxiosRequestConfig): AxiosPromise<MarkReportSeenResponse> {
+            return localVarFp.markReportsSeen(options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -1745,6 +1872,24 @@ export class FeedbackApi extends BaseAPI {
      */
     public createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig) {
         return FeedbackApiFp(this.configuration).createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * List the signed-in User\'s own Feedback Reports, newest first.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listReports(options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).listReports(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public markReportsSeen(options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).markReportsSeen(options).then((request) => request(this.axios, this.basePath));
     }
 }
 

@@ -2,6 +2,7 @@ import { Request as ExRequest } from 'express';
 import {
   Body,
   Controller,
+  Get,
   Post,
   Request,
   Response,
@@ -13,6 +14,7 @@ import {
 import { requireUserId } from '../guards/AuthGuard';
 import feedbackService, {
   FeedbackReportDto,
+  FeedbackReportListItemDto,
 } from '../services/FeedbackService';
 import { FeedbackReportKind } from '../services/feedbackReportConstants';
 import { ErrorResponse } from './ErrorResponse';
@@ -47,6 +49,15 @@ export interface CreateFeedbackReportRequest {
 
 type CreateFeedbackReportResponse = FeedbackReportDto | ErrorResponse;
 
+interface ListFeedbackReportsResponse {
+  items: FeedbackReportListItemDto[];
+  hasChangedSinceLastSeen: boolean;
+}
+
+interface MarkReportSeenResponse {
+  seenAt: string;
+}
+
 @Tags('Feedback')
 @Route('/feedback/reports')
 @Response<VersionFloorRefusal>(426, 'Below the Version Floor')
@@ -66,6 +77,30 @@ export class FeedbackController extends Controller {
     const result = await feedbackService.createReport(userId, body);
     this.setStatus(result.status);
     return result.body as CreateFeedbackReportResponse;
+  }
+
+  /** List the signed-in User's own Feedback Reports, newest first. */
+  @Get()
+  public async listReports(
+    @Request() req: ExRequest,
+  ): Promise<ListFeedbackReportsResponse> {
+    const userId = requireUserId(req);
+
+    const result = await feedbackService.listReports(userId);
+    this.setStatus(result.status);
+    return result.body as ListFeedbackReportsResponse;
+  }
+
+  /** Mark the signed-in User's Feedback Reports as seen (clears the badge). */
+  @Post('/seen')
+  public async markReportsSeen(
+    @Request() req: ExRequest,
+  ): Promise<MarkReportSeenResponse> {
+    const userId = requireUserId(req);
+
+    const result = await feedbackService.markReportsSeen(userId);
+    this.setStatus(result.status);
+    return result.body as MarkReportSeenResponse;
   }
 }
 

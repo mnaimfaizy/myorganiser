@@ -22,6 +22,11 @@ type MockPrisma = {
   feedbackReport: {
     count: jest.Mock<any>;
     create: jest.Mock<any>;
+    findMany: jest.Mock<any>;
+  };
+  user: {
+    findUniqueOrThrow: jest.Mock<any>;
+    update: jest.Mock<any>;
   };
 };
 
@@ -30,6 +35,11 @@ function makePrisma(): MockPrisma {
     feedbackReport: {
       count: jest.fn() as jest.Mock<any>,
       create: jest.fn() as jest.Mock<any>,
+      findMany: jest.fn() as jest.Mock<any>,
+    },
+    user: {
+      findUniqueOrThrow: jest.fn() as jest.Mock<any>,
+      update: jest.fn() as jest.Mock<any>,
     },
   };
 }
@@ -46,6 +56,29 @@ function makeRow(overrides: Partial<Record<string, unknown>> = {}): {
     kind: 'bug_report',
     status: INITIAL_FEEDBACK_REPORT_STATUS,
     title: 'Test Title',
+    created_at: new Date('2026-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function makeListRow(overrides: Partial<Record<string, unknown>> = {}): {
+  id: string;
+  kind: 'bug_report' | 'suggestion';
+  status: string;
+  title: string;
+  status_note: string | null;
+  release_tag: string | null;
+  status_changed_at: Date | null;
+  created_at: Date;
+} {
+  return {
+    id: 'report-1',
+    kind: 'bug_report',
+    status: INITIAL_FEEDBACK_REPORT_STATUS,
+    title: 'Test Title',
+    status_note: null,
+    release_tag: null,
+    status_changed_at: null,
     created_at: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -560,6 +593,285 @@ describe('FeedbackService', () => {
           context_sent_at: oldDate,
         }),
       });
+    });
+  });
+
+  describe('listReports', () => {
+    test('scopes query to the caller via reporter_user_id', async () => {
+      const report = makeListRow();
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      await service.listReports('user-123');
+
+      expect(prisma.feedbackReport.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { reporter_user_id: 'user-123' },
+        }),
+      );
+    });
+
+    test('orders reports newest first by created_at', async () => {
+      const report = makeListRow();
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      await service.listReports('user-1');
+
+      expect(prisma.feedbackReport.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { created_at: 'desc' },
+        }),
+      );
+    });
+
+    test('returns ok: true with status 200 and mapped items', async () => {
+      const now = new Date();
+      const report = makeListRow({
+        id: 'report-1',
+        title: 'Test Bug',
+        kind: 'bug_report',
+        status: 'received',
+        created_at: now,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      if (result.ok) {
+        expect(result.body.items).toHaveLength(1);
+        expect(result.body.items[0]).toMatchObject({
+          id: 'report-1',
+          title: 'Test Bug',
+          kind: 'bug_report',
+          status: 'received',
+          createdAt: now.toISOString(),
+        });
+      }
+    });
+
+    test('hasChangedSinceLastSeen is true when status_changed_at > feedback_reports_seen_at', async () => {
+      const seenAt = new Date('2026-01-01T12:00:00.000Z');
+      const changedAt = new Date('2026-01-01T13:00:00.000Z');
+      const report = makeListRow({
+        status_changed_at: changedAt,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: seenAt,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.hasChangedSinceLastSeen).toBe(true);
+      }
+    });
+
+    test('hasChangedSinceLastSeen is false when status_changed_at <= feedback_reports_seen_at', async () => {
+      const seenAt = new Date('2026-01-01T13:00:00.000Z');
+      const changedAt = new Date('2026-01-01T12:00:00.000Z');
+      const report = makeListRow({
+        status_changed_at: changedAt,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: seenAt,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.hasChangedSinceLastSeen).toBe(false);
+      }
+    });
+
+    test('hasChangedSinceLastSeen is true when feedback_reports_seen_at is null and at least one report has status_changed_at', async () => {
+      const changedAt = new Date('2026-01-01T12:00:00.000Z');
+      const report = makeListRow({
+        status_changed_at: changedAt,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.hasChangedSinceLastSeen).toBe(true);
+      }
+    });
+
+    test('hasChangedSinceLastSeen is false when no reports have status_changed_at', async () => {
+      const report = makeListRow({
+        status_changed_at: null,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.hasChangedSinceLastSeen).toBe(false);
+      }
+    });
+
+    test('hasChangedSinceLastSeen is false when there are zero reports', async () => {
+      prisma.feedbackReport.findMany.mockResolvedValue([]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: new Date(),
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.items).toHaveLength(0);
+        expect(result.body.hasChangedSinceLastSeen).toBe(false);
+      }
+    });
+  });
+
+  describe('toListItemDto changelogUrl mapping', () => {
+    test('bug_report with status fixed and release_tag gets changelogUrl', async () => {
+      const releaseTag = 'v1.2.3';
+      const report = makeListRow({
+        kind: 'bug_report',
+        status: 'fixed',
+        release_tag: releaseTag,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.items[0].changelogUrl).toBe(
+          `https://github.com/mnaimfaizy/myorganiser/blob/${releaseTag}/CHANGELOG.md`,
+        );
+      }
+    });
+
+    test('suggestion with status shipped and release_tag gets changelogUrl', async () => {
+      const releaseTag = 'v1.2.3';
+      const report = makeListRow({
+        kind: 'suggestion',
+        status: 'shipped',
+        release_tag: releaseTag,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.items[0].changelogUrl).toBe(
+          `https://github.com/mnaimfaizy/myorganiser/blob/${releaseTag}/CHANGELOG.md`,
+        );
+      }
+    });
+
+    test('bug_report with wrong status shipped does not get changelogUrl', async () => {
+      const report = makeListRow({
+        kind: 'bug_report',
+        status: 'shipped',
+        release_tag: 'v1.2.3',
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.items[0].changelogUrl).toBeNull();
+      }
+    });
+
+    test('report with release_tag null does not get changelogUrl', async () => {
+      const report = makeListRow({
+        kind: 'bug_report',
+        status: 'fixed',
+        release_tag: null,
+      });
+      prisma.feedbackReport.findMany.mockResolvedValue([report]);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        feedback_reports_seen_at: null,
+      });
+
+      const result = await service.listReports('user-1');
+
+      if (result.ok) {
+        expect(result.body.items[0].changelogUrl).toBeNull();
+      }
+    });
+  });
+
+  describe('markReportsSeen', () => {
+    test('updates user feedback_reports_seen_at and returns seenAt as ISO string', async () => {
+      const beforeCall = Date.now();
+      prisma.user.update.mockImplementation(({ data }) => {
+        return Promise.resolve({
+          id: 'user-1',
+          feedback_reports_seen_at: data.feedback_reports_seen_at,
+        });
+      });
+
+      const result = await service.markReportsSeen('user-1');
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: {
+          feedback_reports_seen_at: expect.any(Date),
+        },
+      });
+
+      // Verify seenAt is the ISO string of the date that was set
+      if (result.ok) {
+        const callData = prisma.user.update.mock.calls[0][0] as any;
+        const expectedSeenAt =
+          callData.data.feedback_reports_seen_at.toISOString();
+        expect(result.body.seenAt).toBe(expectedSeenAt);
+
+        // Verify the timestamp is recent
+        const seenAtTime = new Date(result.body.seenAt).getTime();
+        expect(seenAtTime).toBeGreaterThanOrEqual(beforeCall);
+        expect(seenAtTime).toBeLessThanOrEqual(Date.now());
+      }
+    });
+
+    test('calls user.update with correct userId', async () => {
+      prisma.user.update.mockResolvedValue({
+        id: 'user-456',
+        feedback_reports_seen_at: new Date(),
+      });
+
+      await service.markReportsSeen('user-456');
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'user-456' },
+        }),
+      );
     });
   });
 });

@@ -48,8 +48,21 @@ export interface FeedbackReportDto {
   createdAt: string;
 }
 
+export interface FeedbackReportListItemDto {
+  id: string;
+  kind: FeedbackReportKind;
+  status: FeedbackReportStatus;
+  title: string;
+  statusNote: string | null;
+  releaseTag: string | null;
+  /** Only set when releaseTag is present and status is 'fixed' or 'shipped'. */
+  changelogUrl: string | null;
+  statusChangedAt: string | null;
+  createdAt: string;
+}
+
 type ServiceResult<T> =
-  | { ok: true; status: 201; body: T }
+  | { ok: true; status: 201 | 200; body: T }
   | { ok: false; status: 400 | 429; body: { message: string } };
 
 type Refusal = { ok: false; message: string };
@@ -286,6 +299,35 @@ function toDto(row: {
   };
 }
 
+function toListItemDto(row: {
+  id: string;
+  kind: FeedbackReportKind;
+  status: FeedbackReportStatus;
+  title: string;
+  status_note: string | null;
+  release_tag: string | null;
+  status_changed_at: Date | null;
+  created_at: Date;
+}): FeedbackReportListItemDto {
+  const changelogUrl =
+    row.release_tag &&
+    row.status === FEEDBACK_REPORT_KIND_RULES[row.kind].deliveredStatus
+      ? `https://github.com/mnaimfaizy/myorganiser/blob/${row.release_tag}/CHANGELOG.md`
+      : null;
+
+  return {
+    id: row.id,
+    kind: row.kind,
+    status: row.status,
+    title: row.title,
+    statusNote: row.status_note,
+    releaseTag: row.release_tag,
+    changelogUrl,
+    statusChangedAt: row.status_changed_at?.toISOString() ?? null,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
 export class FeedbackService {
   constructor(private readonly prisma: PrismaClient = createPrismaClient()) {}
 
@@ -342,6 +384,79 @@ export class FeedbackService {
     });
 
     return { ok: true, status: 201, body: toDto(row) };
+  }
+
+  /**
+   * List the User's own Feedback Reports, newest first.
+   */
+  async listReports(userId: string): Promise<
+    ServiceResult<{
+      items: FeedbackReportListItemDto[];
+      hasChangedSinceLastSeen: boolean;
+    }>
+  > {
+    // Fetch all reports and the user's last-seen timestamp
+    const [reports, user] = await Promise.all([
+      this.prisma.feedbackReport.findMany({
+        where: { reporter_user_id: userId },
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          title: true,
+          status_note: true,
+          release_tag: true,
+          status_changed_at: true,
+          created_at: true,
+        },
+      }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { feedback_reports_seen_at: true },
+      }),
+    ]);
+
+    // A report counts as changed since last seen when:
+    // - status_changed_at is not null AND
+    // - (feedback_reports_seen_at is null OR status_changed_at > feedback_reports_seen_at)
+    const hasChangedSinceLastSeen = reports.some((report) => {
+      if (report.status_changed_at === null) {
+        return false;
+      }
+      if (user.feedback_reports_seen_at === null) {
+        return true;
+      }
+      return report.status_changed_at > user.feedback_reports_seen_at;
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        items: reports.map(toListItemDto),
+        hasChangedSinceLastSeen,
+      },
+    };
+  }
+
+  /**
+   * Mark the User's Feedback Reports as seen (clears the badge).
+   */
+  async markReportsSeen(
+    userId: string,
+  ): Promise<ServiceResult<{ seenAt: string }>> {
+    const now = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { feedback_reports_seen_at: now },
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      body: { seenAt: now.toISOString() },
+    };
   }
 }
 

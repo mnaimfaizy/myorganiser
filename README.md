@@ -62,16 +62,17 @@ browser — no build step, no network, no server:
 
 ## Features
 
-| Area               | What it does                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **E2EE Vault**     | AES-GCM encryption in the browser — addresses, mobile numbers, subscriptions, tasks, groceries                                                                      |
-| **Vault Backup**   | Export and import an encrypted envelope; optional Google Drive backup                                                                                               |
-| **Authentication** | JWT access and refresh tokens, email verification, password reset                                                                                                   |
-| **Mobile**         | React Native client sharing the vault format and auth contract                                                                                                      |
-| **YouTube**        | Server-side OAuth with a separate channel refresh and upload sync, a channels page, a channel-first directory, an in-session queue, and a time-capped Shorts budget |
-| **Platform Admin** | User directory, disable and force-logout, role changes, durable audit log                                                                                           |
-| **UI Library**     | Storybook-driven Radix component library built on W3C design tokens                                                                                                 |
-| **API Docs**       | OpenAPI generated from TSOA decorators, served at `/docs`                                                                                                           |
+| Area               | What it does                                                                                                                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **E2EE Vault**     | AES-GCM encryption in the browser — addresses, mobile numbers, subscriptions, tasks, groceries                                                                                                     |
+| **Vault Backup**   | Export and import an encrypted envelope; optional Google Drive backup                                                                                                                              |
+| **Authentication** | JWT access and refresh tokens, email verification, password reset                                                                                                                                  |
+| **Mobile**         | React Native client sharing the vault format and auth contract                                                                                                                                     |
+| **YouTube**        | Server-side OAuth with a separate channel refresh and upload sync, a channels page, a channel-first directory, an in-session queue, and a time-capped Shorts budget                                |
+| **Platform Admin** | User directory, disable and force-logout, role changes, durable audit log                                                                                                                          |
+| **Feedback**       | Send a Bug Report or Suggestion from anywhere in the dashboard; track status, Status Notes, and Release links on "Your reports" under `/dashboard/account`, with a badge for unseen status changes |
+| **UI Library**     | Storybook-driven Radix component library built on W3C design tokens                                                                                                                                |
+| **API Docs**       | OpenAPI generated from TSOA decorators, served at `/docs`                                                                                                                                          |
 
 ---
 

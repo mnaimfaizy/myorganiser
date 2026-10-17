@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLatestBackup } from '../hooks/useLatestBackup';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { InstallAppSection } from './InstallAppSection';
+import { YourReportsSummaryLink } from './YourReportsSummaryLink';
 
 export function AccountPageClient() {
   const { toast } = useToast();
@@ -225,6 +226,8 @@ export function AccountPageClient() {
       </Card>
 
       <InstallAppSection />
+
+      <YourReportsSummaryLink />
 
       {ytConnected && (
         <Card className="p-4">

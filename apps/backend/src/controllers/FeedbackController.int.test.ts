@@ -30,9 +30,11 @@ jest.mock('../middleware/authentication', () => {
 
 jest.mock('../services/FeedbackService', () => {
   const createReport = jest.fn();
+  const listReports = jest.fn();
+  const markReportsSeen = jest.fn();
   return {
     __esModule: true,
-    default: { createReport },
+    default: { createReport, listReports, markReportsSeen },
     FeedbackService: jest.fn(),
   };
 });
@@ -365,6 +367,177 @@ describe('FeedbackController (HTTP integration)', () => {
         'user-1',
         expect.objectContaining({ fixNoticeOptIn: false }),
       );
+    });
+  });
+
+  describe('GET /feedback/reports (list user reports)', () => {
+    test('requires auth for GET /feedback/reports (returns 401)', async () => {
+      const svc = require('../services/FeedbackService').default;
+
+      const res = await request(app).get('/feedback/reports');
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Unauthorized' });
+      expect(svc.listReports).not.toHaveBeenCalled();
+    });
+
+    test('passes authenticated user id to service', async () => {
+      const svc = require('../services/FeedbackService').default;
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          items: [],
+          hasChangedSinceLastSeen: false,
+        },
+      });
+
+      const res = await request(app)
+        .get('/feedback/reports')
+        .set('Authorization', 'Bearer user-7');
+
+      expect(res.status).toBe(200);
+      expect(svc.listReports).toHaveBeenCalledWith('user-7');
+    });
+
+    test('returns populated list with 200', async () => {
+      const svc = require('../services/FeedbackService').default;
+      const mockItems = [
+        {
+          id: 'report-1',
+          kind: 'bug_report',
+          status: 'received',
+          title: 'App crashes on tasks page',
+          statusNote: null,
+          releaseTag: null,
+          changelogUrl: null,
+          statusChangedAt: null,
+          createdAt: '2026-10-15T10:00:00.000Z',
+        },
+        {
+          id: 'report-2',
+          kind: 'bug_report',
+          status: 'fixed',
+          title: "Export button doesn't work",
+          statusNote: 'Shipped in the October release',
+          releaseTag: 'v1.2.0',
+          changelogUrl:
+            'https://github.com/mnaimfaizy/myorganiser/blob/v1.2.0/CHANGELOG.md',
+          statusChangedAt: '2026-10-17T08:30:00.000Z',
+          createdAt: '2026-10-10T14:20:00.000Z',
+        },
+      ];
+
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          items: mockItems,
+          hasChangedSinceLastSeen: true,
+        },
+      });
+
+      const res = await request(app)
+        .get('/feedback/reports')
+        .set('Authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        items: mockItems,
+        hasChangedSinceLastSeen: true,
+      });
+    });
+
+    test('returns empty list with 200', async () => {
+      const svc = require('../services/FeedbackService').default;
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          items: [],
+          hasChangedSinceLastSeen: false,
+        },
+      });
+
+      const res = await request(app)
+        .get('/feedback/reports')
+        .set('Authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        items: [],
+        hasChangedSinceLastSeen: false,
+      });
+    });
+  });
+
+  describe('POST /feedback/reports/seen (mark reports seen)', () => {
+    test('requires auth for POST /feedback/reports/seen (returns 401)', async () => {
+      const svc = require('../services/FeedbackService').default;
+
+      const res = await request(app).post('/feedback/reports/seen');
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Unauthorized' });
+      expect(svc.markReportsSeen).not.toHaveBeenCalled();
+    });
+
+    test('passes authenticated user id to service', async () => {
+      const svc = require('../services/FeedbackService').default;
+      svc.markReportsSeen.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          seenAt: '2026-10-17T12:00:00.000Z',
+        },
+      });
+
+      const res = await request(app)
+        .post('/feedback/reports/seen')
+        .set('Authorization', 'Bearer user-9');
+
+      expect(res.status).toBe(200);
+      expect(svc.markReportsSeen).toHaveBeenCalledWith('user-9');
+    });
+
+    test('returns seenAt with 200', async () => {
+      const svc = require('../services/FeedbackService').default;
+      const seenAtTime = '2026-10-17T12:00:00.000Z';
+      svc.markReportsSeen.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          seenAt: seenAtTime,
+        },
+      });
+
+      const res = await request(app)
+        .post('/feedback/reports/seen')
+        .set('Authorization', 'Bearer user-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        seenAt: seenAtTime,
+      });
+    });
+
+    test('accepts request with empty body', async () => {
+      const svc = require('../services/FeedbackService').default;
+      svc.markReportsSeen.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: {
+          seenAt: '2026-10-17T12:00:00.000Z',
+        },
+      });
+
+      const res = await request(app)
+        .post('/feedback/reports/seen')
+        .set('Authorization', 'Bearer user-1')
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(svc.markReportsSeen).toHaveBeenCalledWith('user-1');
     });
   });
 });

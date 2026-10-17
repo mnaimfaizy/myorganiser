@@ -1006,6 +1006,65 @@ components:
         - fixNoticeOptIn
       type: object
       additionalProperties: false
+    FeedbackReportListItemDto:
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        statusNote:
+          type: string
+          nullable: true
+        releaseTag:
+          type: string
+          nullable: true
+        changelogUrl:
+          type: string
+          nullable: true
+          description: Only set when releaseTag is present and status is 'fixed' or
+            'shipped'.
+        statusChangedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - statusNote
+        - releaseTag
+        - changelogUrl
+        - statusChangedAt
+        - createdAt
+      type: object
+      additionalProperties: false
+    ListFeedbackReportsResponse:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FeedbackReportListItemDto"
+          type: array
+        hasChangedSinceLastSeen:
+          type: boolean
+      required:
+        - items
+        - hasChangedSinceLastSeen
+      type: object
+      additionalProperties: false
+    MarkReportSeenResponse:
+      properties:
+        seenAt:
+          type: string
+      required:
+        - seenAt
+      type: object
+      additionalProperties: false
     UserRole:
       type: string
       enum:
@@ -2303,6 +2362,49 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateFeedbackReportRequest"
+    get:
+      operationId: ListReports
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFeedbackReportsResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: List the signed-in User's own Feedback Reports, newest first.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
+  /feedback/reports/seen:
+    post:
+      operationId: MarkReportsSeen
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReportSeenResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Mark the signed-in User's Feedback Reports as seen (clears the badge).
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
   /auth/login:
     post:
       operationId: Login
