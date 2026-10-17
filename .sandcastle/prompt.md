@@ -15,6 +15,7 @@ You are implementing a vertical slice for MyOrganiser.
 - Read `CLAUDE.md`, `CONTEXT.md`, and `TECH_STACK.md` before making any changes.
 - Follow the slice `gate:*` tier from ADR 0012 / `.claude/checklist.md` (Sandcastle injects gate instructions; default `gate:standard`).
 - Work only on the branch you were given. Do not switch branches.
+- Never run `git worktree prune`. Every worktree's admin entry names a host path this sandbox cannot see, so prune deletes your own worktree's registration while leaving the files. Remove a worktree you added yourself with `git worktree remove <path>`.
 - **Required:** once deterministic checks (jest/tsc/eslint) are green and **before** the final commit, invoke the `/code-review` Skill exactly once for the Slice, act on its findings, then re-run the focused checks. Once per Slice — not after every specialist hop.
 - Commit via the `commit-change-workflow` Skill: stage the intended paths, have the `Commit` sub-agent draft the message from the **staged** diff, then run `corepack yarn ai:commit --message-file <path>`. Do not hand-write the message and do not run `git commit` directly.
 - Do NOT push and do NOT open a PR — the sandbox has no credentials. Just commit locally; the orchestrator integrates your branch into the feature branch on the host.

@@ -70,6 +70,8 @@ if ! git diff --cached --quiet --diff-filter=ACMRT -- \
  tools/scripts/lib/sandcastle-slice-selection.test.mjs \
  tools/scripts/lib/sandcastle-outcome.mjs \
  tools/scripts/lib/sandcastle-outcome.test.mjs \
+ tools/scripts/lib/sandcastle-worktree-repair.mjs \
+ tools/scripts/lib/sandcastle-worktree-repair.test.mjs \
  tools/scripts/review/resolve-spec.mjs \
  .sandcastle/main.mts \
  .sandcastle/dispatch-waves.mts
@@ -78,6 +80,7 @@ corepack yarn sandcastle:resume:test
 corepack yarn sandcastle:subagent-trace:test
 corepack yarn sandcastle:slice-selection:test
 corepack yarn sandcastle:outcome:test
+corepack yarn sandcastle:worktree-repair:test
 # The anchor asserts against the real resolver, so a change to resolve-spec.mjs
 # is a change to this contract even when no sandcastle file is staged.
 corepack yarn sandcastle:spec-anchor:test

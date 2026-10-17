@@ -39,6 +39,32 @@ RUN apt-get update && apt-get install -y \
   default-jre-headless \
   && rm -rf /var/lib/apt/lists/*
 
+# Refuse `git worktree prune` inside the sandbox. Every worktree's admin entry
+# (.git/worktrees/<name>/gitdir) names a HOST path the container cannot see, so
+# prune judges the slice's own worktree stale and deletes its registration while
+# the files stay — the run then crashes at cleanup with "is not a working tree"
+# after the agent has finished (slice #1207). The orchestrator prunes on the host,
+# where those paths resolve. /usr/local/bin precedes /usr/bin on PATH.
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'worktree=0 skip=0' \
+  'for arg in "$@"; do' \
+  '  if [ "$skip" = 1 ]; then skip=0; continue; fi' \
+  '  case "$arg" in -C|-c|--git-dir|--work-tree|--namespace) skip=1; continue ;; -*) continue ;; esac' \
+  '  if [ "$worktree" = 1 ]; then' \
+  '    if [ "$arg" = prune ]; then' \
+  '      echo "git worktree prune is disabled in the sandbox: it deletes this worktree'"'"'s own registration. The orchestrator prunes on the host." >&2' \
+  '      exit 1' \
+  '    fi' \
+  '    break' \
+  '  fi' \
+  '  [ "$arg" = worktree ] || break' \
+  '  worktree=1' \
+  'done' \
+  'exec /usr/bin/git "$@"' \
+  > /usr/local/bin/git \
+  && chmod 755 /usr/local/bin/git
+
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
