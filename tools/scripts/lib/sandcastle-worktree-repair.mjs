@@ -67,8 +67,24 @@ export function inspectWorktree(worktreePath) {
     : WORKTREE_STATES.orphaned;
 }
 
+/**
+ * The environment without git's own `GIT_*` variables. A git hook exports
+ * `GIT_INDEX_FILE`, `GIT_DIR` and friends for the repository it runs in; a git
+ * call here targets a worktree found from `cwd`, and an inherited index path
+ * would point it at the wrong one.
+ */
+export const gitEnvironment = () =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
+  );
+
 const git = (cwd, args) =>
-  spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
+  spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: gitEnvironment(),
+    windowsHide: true,
+  });
 
 /**
  * Re-register `worktreePath` on `branch` if its admin directory is gone.
