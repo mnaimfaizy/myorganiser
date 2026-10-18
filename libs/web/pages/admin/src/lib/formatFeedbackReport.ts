@@ -3,43 +3,105 @@ import type {
   FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
 
-const FEEDBACK_REPORT_STATUS_LABELS = {
-  received: { label: 'Received', variant: 'default' },
-  under_review: { label: 'Under review', variant: 'default' },
-  planned: { label: 'Planned', variant: 'default' },
-  fixed: { label: 'Fixed', variant: 'secondary' },
-  shipped: { label: 'Shipped', variant: 'secondary' },
-  wont_do: { label: "Won't do", variant: 'destructive' },
-  cannot_reproduce: { label: "Can't reproduce", variant: 'outline' },
-} as const satisfies Record<
-  FeedbackReportStatus,
-  {
-    label: string;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-  }
->;
+const REPOSITORY_URL = 'https://github.com/mnaimfaizy/myorganiser';
 
-const FEEDBACK_REPORT_KIND_LABELS = {
-  bug_report: 'Bug report',
-  suggestion: 'Suggestion',
-} as const satisfies Record<FeedbackReportKind, string>;
+export interface FeedbackReportStatusRule {
+  label: string;
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
+  adminSettable: boolean;
+  requiresStatusNote: boolean;
+  kinds: readonly FeedbackReportKind[];
+}
+
+export interface FeedbackReportKindRule {
+  label: string;
+  deliveredStatus: FeedbackReportStatus;
+}
+
+const FEEDBACK_REPORT_STATUS_RULES = {
+  received: {
+    label: 'Received',
+    variant: 'default',
+    adminSettable: false,
+    requiresStatusNote: false,
+    kinds: ['bug_report', 'suggestion'],
+  },
+  under_review: {
+    label: 'Under review',
+    variant: 'default',
+    adminSettable: true,
+    requiresStatusNote: false,
+    kinds: ['bug_report', 'suggestion'],
+  },
+  planned: {
+    label: 'Planned',
+    variant: 'default',
+    adminSettable: true,
+    requiresStatusNote: false,
+    kinds: ['bug_report', 'suggestion'],
+  },
+  fixed: {
+    label: 'Fixed',
+    variant: 'secondary',
+    adminSettable: false,
+    requiresStatusNote: false,
+    kinds: ['bug_report'],
+  },
+  shipped: {
+    label: 'Shipped',
+    variant: 'secondary',
+    adminSettable: false,
+    requiresStatusNote: false,
+    kinds: ['suggestion'],
+  },
+  wont_do: {
+    label: "Won't do",
+    variant: 'destructive',
+    adminSettable: true,
+    requiresStatusNote: true,
+    kinds: ['bug_report', 'suggestion'],
+  },
+  cannot_reproduce: {
+    label: "Can't reproduce",
+    variant: 'outline',
+    adminSettable: true,
+    requiresStatusNote: true,
+    kinds: ['bug_report'],
+  },
+} as const satisfies Record<FeedbackReportStatus, FeedbackReportStatusRule>;
+
+const FEEDBACK_REPORT_KIND_RULES = {
+  bug_report: {
+    label: 'Bug report',
+    deliveredStatus: 'fixed',
+  },
+  suggestion: {
+    label: 'Suggestion',
+    deliveredStatus: 'shipped',
+  },
+} as const satisfies Record<FeedbackReportKind, FeedbackReportKindRule>;
 
 export const FEEDBACK_REPORT_STATUSES = Object.keys(
-  FEEDBACK_REPORT_STATUS_LABELS,
+  FEEDBACK_REPORT_STATUS_RULES,
 ) as FeedbackReportStatus[];
 
+/** The same derived list as FEEDBACK_REPORT_STATUSES, shaped as the non-empty tuple z.enum() requires. Pinned to FEEDBACK_REPORT_STATUS_RULES to prevent silent rejection at runtime (ADR 0053). */
+export const FEEDBACK_REPORT_STATUS_VALUES = Object.keys(
+  FEEDBACK_REPORT_STATUS_RULES,
+) as [FeedbackReportStatus, ...FeedbackReportStatus[]];
+
 export const FEEDBACK_REPORT_KINDS = Object.keys(
-  FEEDBACK_REPORT_KIND_LABELS,
+  FEEDBACK_REPORT_KIND_RULES,
 ) as FeedbackReportKind[];
 
 export function formatFeedbackReportStatus(
   status: FeedbackReportStatus,
 ): string {
-  return FEEDBACK_REPORT_STATUS_LABELS[status].label;
+  return FEEDBACK_REPORT_STATUS_RULES[status].label;
 }
 
 export function formatFeedbackReportKind(kind: FeedbackReportKind): string {
-  return FEEDBACK_REPORT_KIND_LABELS[kind];
+  return FEEDBACK_REPORT_KIND_RULES[kind].label;
 }
 
 export function formatFeedbackReportTimestamp(iso: string): string {
@@ -50,11 +112,45 @@ export function formatFeedbackReportTimestamp(iso: string): string {
 }
 
 export function trackingIssueUrl(issueNumber: number): string {
-  return `https://github.com/mnaimfaizy/myorganiser/issues/${issueNumber}`;
+  return `${REPOSITORY_URL}/issues/${issueNumber}`;
 }
 
 export function getStatusLabelVariant(
   status: FeedbackReportStatus,
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
-  return FEEDBACK_REPORT_STATUS_LABELS[status].variant;
+  return FEEDBACK_REPORT_STATUS_RULES[status].variant;
+}
+
+/**
+ * Returns the admin-settable statuses for a given report kind.
+ * Derived from the status table to ensure exhaustiveness (ADR 0053).
+ */
+export function adminSettableStatusesForKind(
+  kind: FeedbackReportKind,
+): FeedbackReportStatus[] {
+  return (
+    Object.entries(FEEDBACK_REPORT_STATUS_RULES) as Array<
+      [FeedbackReportStatus, FeedbackReportStatusRule]
+    >
+  )
+    .filter(([, rule]) => rule.adminSettable && rule.kinds.includes(kind))
+    .map(([status]) => status);
+}
+
+/**
+ * Returns whether a status requires a status note when changed.
+ * Derived from the status table to ensure exhaustiveness (ADR 0053).
+ */
+export function statusRequiresNote(status: FeedbackReportStatus): boolean {
+  return FEEDBACK_REPORT_STATUS_RULES[status].requiresStatusNote;
+}
+
+/**
+ * Returns the delivered status for a given report kind.
+ * Derived from the kind table to ensure exhaustiveness (ADR 0053).
+ */
+export function deliveredStatusForKind(
+  kind: FeedbackReportKind,
+): FeedbackReportStatus {
+  return FEEDBACK_REPORT_KIND_RULES[kind].deliveredStatus;
 }

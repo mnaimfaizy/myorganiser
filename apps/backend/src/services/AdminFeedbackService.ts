@@ -118,6 +118,20 @@ function trimString(value: unknown): string {
  * than spelled out again here (ADR 0053). Every refusal below names a status
  * through this, so the copy and the rules cannot drift apart.
  */
+/**
+ * Prisma include object for fetching a report with its reporter's identity.
+ * Used across five methods; extracting it ensures the projection never drifts.
+ */
+const REPORT_WITH_REPORTER = {
+  reporter: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+};
+
 function statusLabel(status: FeedbackReportStatus): string {
   return FEEDBACK_REPORT_STATUS_RULES[status].label;
 }
@@ -231,6 +245,71 @@ export class AdminFeedbackService {
   constructor(private readonly prisma: PrismaClient = createPrismaClient()) {}
 
   /**
+   * Load a report by id with reporter details, or return a 404 error.
+   * Shared by five methods to avoid repeating the same twelve-line preamble.
+   */
+  private async loadReportOr404(reportId: string): Promise<
+    | {
+        ok: true;
+        status: 200;
+        body: Prisma.FeedbackReportGetPayload<{
+          include: typeof REPORT_WITH_REPORTER;
+        }>;
+      }
+    | { ok: false; status: 404; body: { message: string } }
+  > {
+    const report = await this.prisma.feedbackReport.findUnique({
+      where: { id: reportId },
+      include: REPORT_WITH_REPORTER,
+    });
+
+    if (!report) {
+      return {
+        ok: false,
+        status: 404,
+        body: { message: 'That feedback report does not exist.' },
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      body: report,
+    };
+  }
+
+  /**
+   * Update a report's data within a transaction and write an audit log row.
+   * Shared by four methods to avoid repeating the same `$transaction` epilogue.
+   */
+  private async updateReportAndAudit(
+    reportId: string,
+    data: Prisma.FeedbackReportUpdateInput,
+    actorUserId: string,
+    reporterUserId: string | null,
+    action: AdminAuditAction,
+    meta: Prisma.InputJsonValue,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.feedbackReport.update({
+        where: { id: reportId },
+        data,
+        include: REPORT_WITH_REPORTER,
+      });
+
+      await this.writeFeedbackAuditLog(
+        tx,
+        actorUserId,
+        { id: reportId, reporter_user_id: reporterUserId },
+        action,
+        meta,
+      );
+
+      return result;
+    });
+  }
+
+  /**
    * List Feedback Reports with optional filters, newest first. All filters are
    * optional and unknown-tolerant. Unrecognised status or kind values result
    * in a 400.
@@ -331,31 +410,16 @@ export class AdminFeedbackService {
   async getReport(
     reportId: string,
   ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
-    const report = await this.prisma.feedbackReport.findUnique({
-      where: { id: reportId },
-      include: {
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const reportResult = await this.loadReportOr404(reportId);
 
-    if (!report) {
-      return {
-        ok: false,
-        status: 404,
-        body: { message: 'That feedback report does not exist.' },
-      };
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
     }
 
     return {
       ok: true,
       status: 200,
-      body: toDetailDto(report),
+      body: toDetailDto(reportResult.body),
     };
   }
 
@@ -378,26 +442,13 @@ export class AdminFeedbackService {
     reportId: string,
     input: ChangeStatusInput,
   ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
-    const report = await this.prisma.feedbackReport.findUnique({
-      where: { id: reportId },
-      include: {
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const reportResult = await this.loadReportOr404(reportId);
 
-    if (!report) {
-      return {
-        ok: false,
-        status: 404,
-        body: { message: 'That feedback report does not exist.' },
-      };
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
     }
+
+    const report = reportResult.body;
 
     // Validate the status value
     if (!isFeedbackReportStatus(input.status)) {
@@ -474,44 +525,26 @@ export class AdminFeedbackService {
     }
 
     // Update the report in a transaction
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.feedbackReport.update({
-        where: { id: reportId },
-        data: {
-          status: newStatus,
-          status_changed_at: new Date(),
-          // An admin may write a Status Note on any change and must on the
-          // ones the table marks. Leaving it out keeps the stored note rather
-          // than clearing it, so the reporter never loses the last reason given.
-          ...(statusNote ? { status_note: statusNote } : {}),
-        },
-        include: {
-          reporter: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // Write audit log
-      await this.writeFeedbackAuditLog(
-        tx,
-        actorUserId,
-        { id: reportId, reporter_user_id: report.reporter_user_id },
-        'feedback_status_change',
-        {
-          reportId,
-          from: report.status,
-          to: newStatus,
-          statusNote: statusNote || null,
-        },
-      );
-
-      return result;
-    });
+    const updated = await this.updateReportAndAudit(
+      reportId,
+      {
+        status: newStatus,
+        status_changed_at: new Date(),
+        // An admin may write a Status Note on any change and must on the
+        // ones the table marks. Leaving it out keeps the stored note rather
+        // than clearing it, so the reporter never loses the last reason given.
+        ...(statusNote ? { status_note: statusNote } : {}),
+      },
+      actorUserId,
+      report.reporter_user_id,
+      'feedback_status_change',
+      {
+        reportId,
+        from: report.status,
+        to: newStatus,
+        statusNote: statusNote || null,
+      },
+    );
 
     return {
       ok: true,
@@ -535,26 +568,13 @@ export class AdminFeedbackService {
     reportId: string,
     input: LinkTrackingIssueInput,
   ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
-    const report = await this.prisma.feedbackReport.findUnique({
-      where: { id: reportId },
-      include: {
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const reportResult = await this.loadReportOr404(reportId);
 
-    if (!report) {
-      return {
-        ok: false,
-        status: 404,
-        body: { message: 'That feedback report does not exist.' },
-      };
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
     }
+
+    const report = reportResult.body;
 
     // Validate the tracking issue number
     const issueNumber = Number(input.trackingIssueNumber);
@@ -570,39 +590,21 @@ export class AdminFeedbackService {
     if (alreadyFinal !== null) return alreadyFinal;
 
     // Update the report in a transaction
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.feedbackReport.update({
-        where: { id: reportId },
-        data: {
-          tracking_issue_number: issueNumber,
-          status: TRACKING_ISSUE_LINKED_STATUS,
-          status_changed_at: new Date(),
-        },
-        include: {
-          reporter: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // Write audit log
-      await this.writeFeedbackAuditLog(
-        tx,
-        actorUserId,
-        { id: reportId, reporter_user_id: report.reporter_user_id },
-        'feedback_tracking_issue_link',
-        {
-          reportId,
-          trackingIssueNumber: issueNumber,
-        },
-      );
-
-      return result;
-    });
+    const updated = await this.updateReportAndAudit(
+      reportId,
+      {
+        tracking_issue_number: issueNumber,
+        status: TRACKING_ISSUE_LINKED_STATUS,
+        status_changed_at: new Date(),
+      },
+      actorUserId,
+      report.reporter_user_id,
+      'feedback_tracking_issue_link',
+      {
+        reportId,
+        trackingIssueNumber: issueNumber,
+      },
+    );
 
     return {
       ok: true,
@@ -626,26 +628,13 @@ export class AdminFeedbackService {
     actorUserId: string,
     reportId: string,
   ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
-    const report = await this.prisma.feedbackReport.findUnique({
-      where: { id: reportId },
-      include: {
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const reportResult = await this.loadReportOr404(reportId);
 
-    if (!report) {
-      return {
-        ok: false,
-        status: 404,
-        body: { message: 'That feedback report does not exist.' },
-      };
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
     }
+
+    const report = reportResult.body;
 
     // Check that there is a tracking issue to unlink
     if (!report.tracking_issue_number) {
@@ -659,38 +648,21 @@ export class AdminFeedbackService {
     const alreadyFinal = refuseWhenFinal(report);
     if (alreadyFinal !== null) return alreadyFinal;
 
-    // Update the report in a transaction
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.feedbackReport.update({
-        where: { id: reportId },
-        data: {
-          tracking_issue_number: null,
-        },
-        include: {
-          reporter: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // Write audit log
-      await this.writeFeedbackAuditLog(
-        tx,
-        actorUserId,
-        { id: reportId, reporter_user_id: report.reporter_user_id },
-        'feedback_tracking_issue_unlink',
-        {
-          reportId,
-          trackingIssueNumber: report.tracking_issue_number,
-        },
-      );
-
-      return result;
-    });
+    // Update the report in a transaction. Status note is deliberately not set
+    // when unlinking because PRD #1206 does not define a reverse transition.
+    const updated = await this.updateReportAndAudit(
+      reportId,
+      {
+        tracking_issue_number: null,
+      },
+      actorUserId,
+      report.reporter_user_id,
+      'feedback_tracking_issue_unlink',
+      {
+        reportId,
+        trackingIssueNumber: report.tracking_issue_number,
+      },
+    );
 
     return {
       ok: true,
@@ -721,26 +693,13 @@ export class AdminFeedbackService {
     reportId: string,
     input: MarkDeliveredInput,
   ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
-    const report = await this.prisma.feedbackReport.findUnique({
-      where: { id: reportId },
-      include: {
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const reportResult = await this.loadReportOr404(reportId);
 
-    if (!report) {
-      return {
-        ok: false,
-        status: 404,
-        body: { message: 'That feedback report does not exist.' },
-      };
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
     }
+
+    const report = reportResult.body;
 
     // Validate and parse the release tag
     const releaseTag = trimString(input.releaseTag);
@@ -786,40 +745,26 @@ export class AdminFeedbackService {
     if (alreadyFinal !== null) return alreadyFinal;
 
     // Update the report in a transaction
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.feedbackReport.update({
-        where: { id: reportId },
-        data: {
-          status: deliveredStatus,
-          release_tag: releaseTag,
-          status_changed_at: new Date(),
-        },
-        include: {
-          reporter: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // Write audit log
-      await this.writeFeedbackAuditLog(
-        tx,
-        actorUserId,
-        { id: reportId, reporter_user_id: report.reporter_user_id },
-        'feedback_manual_delivery',
-        {
-          reportId,
-          status: deliveredStatus,
-          releaseTag,
-        },
-      );
-
-      return result;
-    });
+    const updated = await this.updateReportAndAudit(
+      reportId,
+      {
+        status: deliveredStatus,
+        release_tag: releaseTag,
+        status_changed_at: new Date(),
+        // When a Production deploy marks Fixed/Shipped, the backend sends any
+        // opted-in Fix Notices (ADR 0133). This manual override is the same
+        // transition but deliberately does not send notices; issue #1212 carries
+        // that implementation.
+      },
+      actorUserId,
+      report.reporter_user_id,
+      'feedback_manual_delivery',
+      {
+        reportId,
+        status: deliveredStatus,
+        releaseTag,
+      },
+    );
 
     return {
       ok: true,

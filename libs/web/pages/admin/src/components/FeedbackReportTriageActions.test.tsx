@@ -211,7 +211,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
     });
 
-    it('status dropdown shows only admin-settable statuses', async () => {
+    it('status dropdown for bug_report shows admin-settable statuses including cannot_reproduce', async () => {
       render(
         <FeedbackReportTriageActions
           report={bugReportFixture}
@@ -222,7 +222,7 @@ describe('FeedbackReportTriageActions', () => {
       const statusTrigger = screen.getByRole('combobox', { name: 'Status' });
       fireEvent.click(statusTrigger);
 
-      // Should show these statuses
+      // Should show these statuses for bug_report
       expect(
         screen.getByRole('option', {
           name: formatFeedbackReportStatus('under_review'),
@@ -260,6 +260,84 @@ describe('FeedbackReportTriageActions', () => {
           name: formatFeedbackReportStatus('shipped'),
         }),
       ).not.toBeInTheDocument();
+    });
+
+    it('status dropdown for suggestion does not show cannot_reproduce', async () => {
+      render(
+        <FeedbackReportTriageActions
+          report={suggestionFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      const statusTrigger = screen.getByRole('combobox', { name: 'Status' });
+      fireEvent.click(statusTrigger);
+
+      // Should show these statuses for suggestion
+      expect(
+        screen.getByRole('option', {
+          name: formatFeedbackReportStatus('under_review'),
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', {
+          name: formatFeedbackReportStatus('planned'),
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', {
+          name: formatFeedbackReportStatus('wont_do'),
+        }),
+      ).toBeInTheDocument();
+
+      // Should NOT show cannot_reproduce for suggestion
+      expect(
+        screen.queryByRole('option', {
+          name: formatFeedbackReportStatus('cannot_reproduce'),
+        }),
+      ).not.toBeInTheDocument();
+
+      // Should NOT show non-admin-settable statuses
+      expect(
+        screen.queryByRole('option', {
+          name: formatFeedbackReportStatus('received'),
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', {
+          name: formatFeedbackReportStatus('shipped'),
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('cannot_reproduce status requires note for bug_report and blocks submit without note', async () => {
+      render(
+        <FeedbackReportTriageActions
+          report={bugReportFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      const statusTrigger = screen.getByRole('combobox', { name: 'Status' });
+      fireEvent.click(statusTrigger);
+
+      const cannotReproduceOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('cannot_reproduce'),
+      });
+      fireEvent.click(cannotReproduceOption);
+
+      const submitButton = screen.getByRole('button', {
+        name: 'Update status',
+      });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Write a status note explaining why.'),
+        ).toBeInTheDocument();
+      });
+
+      expect(mockChangeFeedbackReportStatus).not.toHaveBeenCalled();
     });
 
     it('displays server error message when changeFeedbackReportStatus rejects', async () => {

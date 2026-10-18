@@ -5,86 +5,16 @@ jest.mock('../prisma', () => ({
   createPrismaClient: () => ({}),
 }));
 
-import {
-  TRACKING_ISSUE_LINKED_STATUS,
-  FeedbackReportStatus,
-  FeedbackReportKind,
-} from './feedbackReportConstants';
+import { TRACKING_ISSUE_LINKED_STATUS } from './feedbackReportConstants';
 import {
   AdminFeedbackService,
   AdminFeedbackReportDetailDto,
 } from './AdminFeedbackService';
-
-type MockPrisma = {
-  feedbackReport: {
-    findUnique: jest.Mock<any>;
-    findMany: jest.Mock<any>;
-  };
-  $transaction: jest.Mock<any>;
-};
-
-function makePrisma(): MockPrisma {
-  return {
-    feedbackReport: {
-      findUnique: jest.fn() as jest.Mock<any>,
-      findMany: jest.fn() as jest.Mock<any>,
-    },
-    $transaction: jest.fn() as jest.Mock<any>,
-  };
-}
-
-function makeDetailRow(overrides: Partial<Record<string, unknown>> = {}): {
-  id: string;
-  kind: FeedbackReportKind;
-  status: FeedbackReportStatus;
-  title: string;
-  description: string;
-  expected_outcome: string | null;
-  context_platform: string;
-  context_app_version: string;
-  context_browser: string;
-  context_operating_system: string;
-  context_path: string;
-  context_sent_at: Date;
-  follow_up: string | null;
-  status_note: string | null;
-  release_tag: string | null;
-  fix_notice_opt_in: boolean;
-  tracking_issue_number: number | null;
-  reporter_user_id: string | null;
-  status_changed_at: Date | null;
-  created_at: Date;
-  reporter: { id: string; name: string | null; email: string } | null;
-} {
-  return {
-    id: 'report-1',
-    kind: 'bug_report',
-    status: 'received',
-    title: 'Test Bug',
-    description: 'Test Description',
-    expected_outcome: null,
-    context_platform: 'web',
-    context_app_version: '1.0.0',
-    context_browser: 'Chrome',
-    context_operating_system: 'macOS',
-    context_path: '/dashboard',
-    context_sent_at: new Date('2026-01-01T00:00:00.000Z'),
-    follow_up: null,
-    status_note: null,
-    release_tag: null,
-    fix_notice_opt_in: true,
-    tracking_issue_number: null,
-    reporter_user_id: 'user-1',
-    status_changed_at: null,
-    created_at: new Date('2026-01-01T00:00:00.000Z'),
-    reporter: {
-      id: 'user-1',
-      name: 'Test User',
-      email: 'user@example.com',
-    },
-    ...overrides,
-  };
-}
+import {
+  makePrisma,
+  makeDetailRow,
+  type MockPrisma,
+} from '../testing/AdminFeedbackService.testHelpers';
 
 describe('AdminFeedbackService — triage paths', () => {
   let prisma: MockPrisma;

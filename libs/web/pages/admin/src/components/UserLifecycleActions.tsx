@@ -14,11 +14,11 @@ import {
   DialogTitle,
   useToast,
 } from '@myorganiser/web-ui';
-import { isAxiosError } from 'axios';
 import { useCallback, useMemo, useState } from 'react';
 import type { MouseEvent } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
+import { getApiErrorMessage } from '../lib/apiErrorMessage';
 import { formatUserDisplayName } from '../lib/formatUserIdentity';
 
 type LifecycleAction =
@@ -168,23 +168,6 @@ const WITHDRAW_YOUTUBE_ACCESS_TOAST = {
   YouTubeDisconnectOutcome,
   { title: string; description?: string }
 >;
-
-function getApiErrorMessage(err: unknown): string {
-  if (isAxiosError(err)) {
-    const data = err.response?.data;
-
-    if (
-      data &&
-      typeof data === 'object' &&
-      'message' in data &&
-      typeof data.message === 'string'
-    ) {
-      return data.message;
-    }
-  }
-
-  return 'Action failed. Please try again.';
-}
 
 function getResendSuccessMessage(data: unknown): string {
   if (

@@ -9,10 +9,10 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   demote: 'Demote',
   youtube_access_grant: 'Grant YouTube Access',
   youtube_access_withdraw: 'Withdraw YouTube Access',
-  feedback_status_change: 'Change feedback status',
-  feedback_tracking_issue_link: 'Link tracking issue',
-  feedback_tracking_issue_unlink: 'Unlink tracking issue',
-  feedback_manual_delivery: 'Mark feedback delivered',
+  feedback_status_change: 'Change Report Status',
+  feedback_tracking_issue_link: 'Link Tracking Issue',
+  feedback_tracking_issue_unlink: 'Unlink Tracking Issue',
+  feedback_manual_delivery: 'Mark Feedback Report Delivered',
 };
 
 export function formatAuditAction(action: AdminAuditAction): string {
