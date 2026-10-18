@@ -310,6 +310,19 @@ function toDto(row: {
   };
 }
 
+/** The columns `toListItemDto` needs, shared by every query that feeds it. */
+const FEEDBACK_REPORT_LIST_ITEM_SELECT = {
+  id: true,
+  kind: true,
+  status: true,
+  title: true,
+  status_note: true,
+  release_tag: true,
+  status_changed_at: true,
+  created_at: true,
+  follow_up: true,
+} as const;
+
 function toListItemDto(row: {
   id: string;
   kind: FeedbackReportKind;
@@ -413,17 +426,7 @@ export class FeedbackService {
       this.prisma.feedbackReport.findMany({
         where: { reporter_user_id: userId },
         orderBy: { created_at: 'desc' },
-        select: {
-          id: true,
-          kind: true,
-          status: true,
-          title: true,
-          status_note: true,
-          release_tag: true,
-          status_changed_at: true,
-          created_at: true,
-          follow_up: true,
-        },
+        select: FEEDBACK_REPORT_LIST_ITEM_SELECT,
       }),
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
@@ -539,17 +542,7 @@ export class FeedbackService {
         status: 'under_review',
         status_changed_at: new Date(),
       },
-      select: {
-        id: true,
-        kind: true,
-        status: true,
-        title: true,
-        status_note: true,
-        release_tag: true,
-        status_changed_at: true,
-        created_at: true,
-        follow_up: true,
-      },
+      select: FEEDBACK_REPORT_LIST_ITEM_SELECT,
     });
 
     return { ok: true, status: 200, body: toListItemDto(updated) };
