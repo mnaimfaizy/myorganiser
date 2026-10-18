@@ -13,6 +13,7 @@ import {
 } from './feedbackReportConstants';
 import { AdminAuditAction } from '../types';
 import type { Prisma } from '@prisma/client';
+import feedbackFixNoticeService from './FeedbackFixNoticeService';
 
 /**
  * Admin Feedback Report list item: header view without description.
@@ -766,10 +767,6 @@ export class AdminFeedbackService {
         status: deliveredStatus,
         release_tag: releaseTag,
         status_changed_at: new Date(),
-        // When a Production deploy marks Fixed/Shipped, the backend sends any
-        // opted-in Fix Notices (ADR 0133). This manual override is the same
-        // transition but deliberately does not send notices; issue #1212 carries
-        // that implementation.
       },
       actorUserId,
       report.reporter_user_id,
@@ -780,6 +777,10 @@ export class AdminFeedbackService {
         releaseTag,
       },
     );
+
+    // Send the Fix Notice after the transaction commits. Never throws per #1212
+    // acceptance criteria — a mail failure must not roll back the Report Status change.
+    await feedbackFixNoticeService.sendFixNoticeForReport(reportId);
 
     return {
       ok: true,

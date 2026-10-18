@@ -425,6 +425,12 @@ export interface FilteredUserInterface {
 }
 
 
+export interface FixNoticeUnsubscribeBody {
+    'token': string;
+}
+export interface FixNoticeUnsubscribeResponse {
+    'ok': boolean;
+}
 export interface GetAuthUrl200Response {
     'url': string;
     'message': string;
@@ -828,6 +834,11 @@ export interface UnsubscribeBody {
 export interface UnsubscribeFromDigest200Response {
     'ok': boolean;
     'message': string;
+}
+export interface UnsubscribeFromFixNotices200Response {
+    'ok': boolean;
+    'message': string;
+    'details'?: any;
 }
 export interface UnsubscribeResponse {
     'ok': boolean;
@@ -1956,6 +1967,40 @@ export const FeedbackApiAxiosParamCreator = function (configuration?: Configurat
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FixNoticeUnsubscribeBody} fixNoticeUnsubscribeBody 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unsubscribeFromFixNotices: async (fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'fixNoticeUnsubscribeBody' is not null or undefined
+            assertParamExists('unsubscribeFromFixNotices', 'fixNoticeUnsubscribeBody', fixNoticeUnsubscribeBody)
+            const localVarPath = `/feedback/fix-notice/unsubscribe`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(fixNoticeUnsubscribeBody, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -2012,6 +2057,18 @@ export const FeedbackApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['FeedbackApi.markReportsSeen']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FixNoticeUnsubscribeBody} fixNoticeUnsubscribeBody 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async unsubscribeFromFixNotices(fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UnsubscribeFromFixNotices200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.unsubscribeFromFixNotices(fixNoticeUnsubscribeBody, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.unsubscribeFromFixNotices']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -2055,6 +2112,15 @@ export const FeedbackApiFactory = function (configuration?: Configuration, baseP
         markReportsSeen(options?: RawAxiosRequestConfig): AxiosPromise<MarkReportSeenResponse> {
             return localVarFp.markReportsSeen(options).then((request) => request(axios, basePath));
         },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FeedbackApiUnsubscribeFromFixNoticesRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unsubscribeFromFixNotices(requestParameters: FeedbackApiUnsubscribeFromFixNoticesRequest, options?: RawAxiosRequestConfig): AxiosPromise<UnsubscribeFromFixNotices200Response> {
+            return localVarFp.unsubscribeFromFixNotices(requestParameters.fixNoticeUnsubscribeBody, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -2072,6 +2138,13 @@ export interface FeedbackApiAddFollowUpRequest {
  */
 export interface FeedbackApiCreateReportRequest {
     readonly createFeedbackReportRequest: CreateFeedbackReportRequest
+}
+
+/**
+ * Request parameters for unsubscribeFromFixNotices operation in FeedbackApi.
+ */
+export interface FeedbackApiUnsubscribeFromFixNoticesRequest {
+    readonly fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody
 }
 
 /**
@@ -2114,6 +2187,16 @@ export class FeedbackApi extends BaseAPI {
      */
     public markReportsSeen(options?: RawAxiosRequestConfig) {
         return FeedbackApiFp(this.configuration).markReportsSeen(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+     * @param {FeedbackApiUnsubscribeFromFixNoticesRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public unsubscribeFromFixNotices(requestParameters: FeedbackApiUnsubscribeFromFixNoticesRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).unsubscribeFromFixNotices(requestParameters.fixNoticeUnsubscribeBody, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

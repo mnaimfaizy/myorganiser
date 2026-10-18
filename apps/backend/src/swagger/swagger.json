@@ -1295,6 +1295,34 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"FixNoticeUnsubscribeResponse": {
+				"properties": {
+					"ok": {
+						"type": "boolean",
+						"enum": [
+							true
+						],
+						"nullable": false
+					}
+				},
+				"required": [
+					"ok"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"FixNoticeUnsubscribeBody": {
+				"properties": {
+					"token": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"token"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"FeedbackReportKind": {
 				"type": "string",
 				"enum": [
@@ -3823,6 +3851,46 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/UserDeletionBody"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/feedback/fix-notice/unsubscribe": {
+			"post": {
+				"operationId": "UnsubscribeFromFixNotices",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"anyOf": [
+										{
+											"$ref": "#/components/schemas/FixNoticeUnsubscribeResponse"
+										},
+										{
+											"$ref": "#/components/schemas/ErrorResponse"
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				"description": "Turns Fix Notices off for the User the token belongs to. Unauthenticated\nby design — the opaque token is the only credential a mail client can\npresent (mirrors YouTubeController.unsubscribeFromDigest).",
+				"tags": [
+					"Feedback"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/FixNoticeUnsubscribeBody"
 							}
 						}
 					}

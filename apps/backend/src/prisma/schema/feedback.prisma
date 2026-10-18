@@ -44,6 +44,8 @@ model FeedbackReport {
   reporter_user_id String?
   reporter         User?   @relation("FeedbackReporter", fields: [reporter_user_id], references: [id], onDelete: SetNull)
 
+  fix_notice_delivery FeedbackFixNoticeDelivery?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -52,4 +54,23 @@ model FeedbackReport {
   @@index([kind])
   @@index([tracking_issue_number])
   @@index([created_at])
+}
+
+/// Idempotent delivery ledger: at most one Fix Notice per Feedback Report
+/// (CONTEXT.md: Fix Notice). The unique key on report_id is claimed before
+/// the mail is handed to SMTP, mirroring YouTubeDigestDelivery's
+/// claim-then-send pattern.
+model FeedbackFixNoticeDelivery {
+  id         String    @id @default(cuid())
+  report_id  String    @unique
+  /// claimed | sent | failed
+  status     String    @default("claimed")
+  sent_at    DateTime?
+  error      String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  report FeedbackReport @relation(fields: [report_id], references: [id], onDelete: Cascade)
+
+  @@index([report_id])
 }

@@ -12,6 +12,8 @@ import { VaultBackupController } from './../controllers/VaultBackupController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { UserDeletionController } from './../controllers/UserDeletionController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { FeedbackPublicController } from './../controllers/FeedbackPublicController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { FeedbackController } from './../controllers/FeedbackController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AuthController } from './../controllers/AuthController';
@@ -490,6 +492,22 @@ const models: TsoaRoute.Models = {
         "properties": {
             "password": {"dataType":"string","required":true},
             "confirmation": {"dataType":"enum","enums":["DELETE"],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FixNoticeUnsubscribeResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "ok": {"dataType":"enum","enums":[true],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FixNoticeUnsubscribeBody": {
+        "dataType": "refObject",
+        "properties": {
+            "token": {"dataType":"string","required":true},
         },
         "additionalProperties": false,
     },
@@ -1852,6 +1870,36 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 204,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackPublicController_unsubscribeFromFixNotices: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"FixNoticeUnsubscribeBody"},
+        };
+        app.post('/feedback/fix-notice/unsubscribe',
+            ...(fetchMiddlewares<RequestHandler>(FeedbackPublicController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackPublicController.prototype.unsubscribeFromFixNotices)),
+
+            async function FeedbackPublicController_unsubscribeFromFixNotices(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackPublicController_unsubscribeFromFixNotices, request, response });
+
+                const controller = new FeedbackPublicController();
+
+              await templateService.apiHandler({
+                methodName: 'unsubscribeFromFixNotices',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
               });
             } catch (err) {
                 return next(err);

@@ -5,12 +5,28 @@ jest.mock('../prisma', () => ({
   createPrismaClient: () => ({}),
 }));
 
+jest.mock('./FeedbackFixNoticeService', () => {
+  const __mockSendFixNoticeForReport = (
+    jest.fn() as jest.Mock<any>
+  ).mockResolvedValue('sent');
+  return {
+    __esModule: true,
+    default: {
+      sendFixNoticeForReport: __mockSendFixNoticeForReport,
+    },
+    __mockSendFixNoticeForReport,
+  };
+});
+
 import { AdminFeedbackService } from './AdminFeedbackService';
 import {
   makePrisma,
   makeDetailRow,
   type MockPrisma,
 } from '../testing/AdminFeedbackService.testHelpers';
+
+const mockSendFixNoticeForReport =
+  require('./FeedbackFixNoticeService').__mockSendFixNoticeForReport;
 
 describe('AdminFeedbackService', () => {
   let prisma: MockPrisma;
@@ -450,6 +466,45 @@ describe('AdminFeedbackService', () => {
             }),
           }),
         });
+      });
+
+      test('mail failure does not roll back status change: markDelivered returns ok: true even when sendFixNoticeForReport fails', async () => {
+        const report = makeDetailRow({
+          status: 'under_review',
+          kind: 'bug_report',
+        });
+        const updated = makeDetailRow({
+          status: 'fixed',
+          kind: 'bug_report',
+          release_tag: 'v1.0.0',
+        });
+        prisma.feedbackReport.findUnique.mockResolvedValue(report);
+
+        const mockUpdate = (jest.fn() as jest.Mock<any>).mockResolvedValue(
+          updated,
+        );
+        const mockCreate = (jest.fn() as jest.Mock<any>).mockResolvedValue({
+          id: 'audit-1',
+        });
+        const mockTx = {
+          feedbackReport: { update: mockUpdate },
+          adminAuditLog: { create: mockCreate },
+        };
+
+        prisma.$transaction.mockImplementation(async (cb: any) => cb(mockTx));
+
+        // Mock FeedbackFixNoticeService.sendFixNoticeForReport to fail
+        mockSendFixNoticeForReport.mockResolvedValue('failed');
+
+        const result = await service.markDelivered('admin-1', 'report-1', {
+          releaseTag: 'v1.0.0',
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.status).toBe(200);
+        const body = result.body as any;
+        expect(body.status).toBe('fixed');
+        expect(body.releaseTag).toBe('v1.0.0');
       });
     });
 

@@ -42,6 +42,13 @@ model User {
   youtube_acknowledged_at         DateTime?
   /// When the User last opened "Your reports" page. Compared against FeedbackReport.status_changed_at to show a "something changed" badge; null means the page has never been opened.
   feedback_reports_seen_at        DateTime?
+  /// Per-User toggle for Fix Notices (CONTEXT.md: Fix Notice), separate from
+  /// a report's own fix_notice_opt_in captured at send time. Turned off only
+  /// by the unauthenticated unsubscribe link every Fix Notice carries.
+  fix_notices_enabled             Boolean   @default(true)
+  /// Stable per-User secret used in the Fix Notice unsubscribe link, minted
+  /// lazily on first send (mirrors YouTubeNotificationSettings.unsubscribeToken).
+  fix_notice_unsubscribe_token    String?   @unique
 
   encrypted_vault               EncryptedVault?
   vault_backup_records          VaultBackupRecord[]
