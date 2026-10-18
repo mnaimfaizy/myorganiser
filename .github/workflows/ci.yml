@@ -839,6 +839,9 @@ jobs:
       - name: Host Apply workflow checker contracts
         run: corepack yarn host-apply:workflow:test
 
+      - name: Feedback Release marking contracts
+        run: corepack yarn feedback:release:test
+
       - name: Staging web deploy contracts
         run: corepack yarn staging-web:test
 

@@ -176,6 +176,19 @@ const timeoutMinutes = (path, jobId) =>
       fail(`${path} job ${jobId} declares no timeout-minutes`))[1],
   );
 
+/** The Production job that marks a Release's Feedback Reports (ADR 0133). */
+const RELEASE_MARK_JOB = 'mark-feedback-release';
+
+/** A job's `needs: [a, b]` list, in the order the workflow states it. */
+const jobNeeds = (path, jobId) => {
+  const raw = (jobBlock(path, jobId).match(/^\s*needs:\s*\[([^\]]*)\]\s*$/m) ??
+    fail(`${path} job ${jobId} declares no needs: [ … ] list`))[1];
+  return raw
+    .split(',')
+    .map((need) => need.trim())
+    .filter(Boolean);
+};
+
 /** Job ids in a workflow that declare a given `environment:`, in file order. */
 const jobsInEnvironment = (path, environment) =>
   jobIds(path).filter((id) =>
@@ -306,13 +319,18 @@ const EXTRACTORS = {
 
   productionValidateTimeoutMinutes: () =>
     timeoutMinutes(PRODUCTION, 'validate'),
+  // Release marking (ADR 0133) is approval-gated for its secrets but is one
+  // HTTP call, not a deploy, so it carries its own timeout.
   productionDeployTimeoutMinutes: () =>
     theOnly(
-      jobsInEnvironment(PRODUCTION, 'production').map((id) =>
-        timeoutMinutes(PRODUCTION, id),
-      ),
-      'timeout-minutes across the approval-gated production jobs',
+      jobsInEnvironment(PRODUCTION, 'production')
+        .filter((id) => id !== RELEASE_MARK_JOB)
+        .map((id) => timeoutMinutes(PRODUCTION, id)),
+      'timeout-minutes across the approval-gated production deploy jobs',
     ),
+  productionReleaseMarkTimeoutMinutes: () =>
+    timeoutMinutes(PRODUCTION, RELEASE_MARK_JOB),
+  productionReleaseMarkNeeds: () => jobNeeds(PRODUCTION, RELEASE_MARK_JOB),
   stagingDeployTimeoutMinutes: () =>
     theOnly(
       jobsInEnvironment(STAGING, 'staging').map((id) =>

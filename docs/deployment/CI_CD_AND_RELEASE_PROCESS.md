@@ -51,6 +51,7 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
   - Packages backend + frontend and uploads:
     - `dist/deploy/backend-api/`
     - `dist/deploy/web/`
+  - `mark-feedback-release` runs last, after **both** `host-apply` and `deploy-frontend` succeed, and is skipped on an `apply_only` run. It marks the Feedback Reports this Release fixes — see [Release marking](#release-marking-production).
 
 - `.github/workflows/dispatch-production-deploy.yml` (name: `Dispatch Production Deploy (latest release)`)
   - Fires on `create` of a `release/vX.Y.Z` branch, and on manual dispatch.
@@ -219,6 +220,40 @@ not secrets — the value is public and inlined into the browser bundle):
 `deploy-production.yml` passes this variable into the
 `yarn package:web` step. Setting it only on the cPanel Node.js
 app does not change an already-built bundle.
+
+### Release marking (Production)
+
+Once a Release is live, the `mark-feedback-release` job marks every Planned
+Feedback Report on the issues the Release closes as Fixed (Bug Report) or
+Shipped (Suggestion), which sends their Fix Notices
+([ADR 0133](../adr/0133-a-feedback-report-becomes-fixed-when-the-production-deploy-ships-its-tracking-issue.md)).
+It collects the issue numbers from `Closes` / `Fixes` / `Resolves #N` in the
+commits since the previous `vX.Y.Z` tag (`yarn feedback:release:mark`) and
+posts them to `POST /api/v1/feedback/releases/mark`. It reads `API_ORIGIN`
+(above) and one secret of its own:
+
+| Secret                    | What it is for                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| `FEEDBACK_RELEASE_SECRET` | Sent as `X-Deploy-Secret`; must equal the production backend's env var of that name. |
+
+The job declares `environment: production`, so it waits for its own
+required-reviewer approval after the deploy finishes.
+
+**Operator setup (once, before the first Release that should mark reports):**
+
+1. Generate a value, for example `openssl rand -hex 32`. Use a value distinct
+   from `YOUTUBE_CRON_SECRET`.
+2. Set it as `FEEDBACK_RELEASE_SECRET` in the production backend's cPanel
+   Node.js app environment and restart the app — see
+   [Backend on cPanel](CPANEL_BACKEND_HOSTING.md). While it is unset there,
+   the endpoint refuses every request.
+3. Add the same value as a `FEEDBACK_RELEASE_SECRET` secret on the
+   `production` GitHub Environment (**Settings → Environments → production →
+   Environment secrets**). Never commit it or paste it into an issue.
+
+If the job fails, the Release stays live and its reports stay Planned. Fix the
+cause (usually a missing or mismatched secret) and use **Re-run failed jobs**;
+a re-run for the same tag marks nothing twice and sends no Fix Notice twice.
 
 ### Host Apply (Staging & Production)
 

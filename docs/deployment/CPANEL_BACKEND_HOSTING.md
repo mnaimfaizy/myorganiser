@@ -148,7 +148,9 @@ FEEDBACK_RELEASE_SECRET=<deploy-secret>
   `POST /feedback/releases/mark`, sent as `X-Deploy-Secret`
   ([ADR 0133](../adr/0133-a-feedback-report-becomes-fixed-when-the-production-deploy-ships-its-tracking-issue.md)).
   Use a value distinct from `YOUTUBE_CRON_SECRET`. While it is unset, the
-  endpoint refuses every request.
+  endpoint refuses every request. The same value goes in the `production`
+  GitHub Environment — see
+  [Release marking](CI_CD_AND_RELEASE_PROCESS.md#release-marking-production).
 - YouTube is unavailable in production until its Cloud project is verified
   ([ADR 0091](../adr/0091-a-google-cloud-project-is-split-by-verification-not-by-environment.md)).
   Leave `YOUTUBE_AVAILABLE` unset or `false` until then. When it is `true` in

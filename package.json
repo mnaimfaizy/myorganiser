@@ -171,6 +171,8 @@
     "host-apply:test": "node --test tools/scripts/lib/host-apply.test.mjs",
     "host-apply:workflow:check": "node tools/scripts/check-host-apply-workflow.mjs",
     "host-apply:workflow:test": "node --test tools/scripts/check-host-apply-workflow.test.mjs",
+    "feedback:release:mark": "node tools/scripts/mark-feedback-release.mjs",
+    "feedback:release:test": "node --test tools/scripts/lib/feedback-release.test.mjs",
     "runner-image:check": "node tools/scripts/check-runner-image.mjs",
     "runner-image:test": "node --test tools/scripts/check-runner-image.test.mjs",
     "staging-web:test": "node --test tools/scripts/lib/staging-web-deploy.test.mjs tools/scripts/staging-web-deploy.test.mjs",

@@ -361,3 +361,32 @@ jobs:
           local-dir: ./dist/deploy/web/
           server-dir: ${{ secrets.FTP_PROD_FRONTEND_DIR }}
           timeout: 300000
+
+  # ADR 0133: once the Release is live, mark the Feedback Reports its commits
+  # close as Fixed or Shipped. A failure leaves the Release live and the
+  # reports Planned; "Re-run failed jobs" retries this job alone.
+  mark-feedback-release:
+    needs: [validate, host-apply, deploy-frontend]
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') && !inputs.apply_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.release_ref }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Mark Feedback Reports fixed in this Release
+        env:
+          RELEASE_REF: ${{ needs.validate.outputs.release_ref }}
+          API_ORIGIN: ${{ secrets.API_ORIGIN }}
+          FEEDBACK_RELEASE_SECRET: ${{ secrets.FEEDBACK_RELEASE_SECRET }}
+        run: node tools/scripts/mark-feedback-release.mjs

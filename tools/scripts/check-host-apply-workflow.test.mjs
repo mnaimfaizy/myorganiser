@@ -706,3 +706,93 @@ test('fails when DATABASE_URL appears as a secret anywhere in the file', (t) => 
     /references secrets\.DATABASE_URL.*must never be a GitHub secret/,
   );
 });
+
+// ===== mark-feedback-release Job Checks =====
+
+// The job is appended last in the production workflow. Its `needs:` line is
+// unique in the file, and anchoring the `if:` edit on that line keeps it off
+// deploy-backend, whose `if:` text is identical.
+const MARK_NEEDS = '    needs: [validate, host-apply, deploy-frontend]\n';
+
+test('fails when mark-feedback-release drops host-apply from its needs', (t) => {
+  const workspace = createWorkspace(t);
+
+  // Without host-apply in needs, the mark can run before the apply it reports on.
+  edit(
+    workspace,
+    PRODUCTION,
+    MARK_NEEDS,
+    '    needs: [validate, deploy-frontend]\n',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mark-feedback-release.*host-apply/);
+});
+
+test('fails when mark-feedback-release drops deploy-frontend from its needs', (t) => {
+  const workspace = createWorkspace(t);
+
+  edit(
+    workspace,
+    PRODUCTION,
+    MARK_NEEDS,
+    '    needs: [validate, host-apply]\n',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mark-feedback-release.*deploy-frontend/);
+});
+
+test('fails when mark-feedback-release can run after a failed deploy', (t) => {
+  const workspace = createWorkspace(t);
+
+  // always() would let the mark run after a failed or skipped deploy and
+  // report fixes that never reached the host.
+  edit(
+    workspace,
+    PRODUCTION,
+    MARK_NEEDS + '    if: ',
+    MARK_NEEDS + '    if: always() && ',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mark-feedback-release.*always\(\)/);
+});
+
+test('fails when mark-feedback-release does not run the marking script', (t) => {
+  const workspace = createWorkspace(t);
+
+  edit(
+    workspace,
+    PRODUCTION,
+    'run: node tools/scripts/mark-feedback-release.mjs',
+    'run: echo skip',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mark-feedback-release\.mjs/);
+});
+
+test('fails when the production workflow has no mark-feedback-release job', (t) => {
+  const workspace = createWorkspace(t);
+
+  // The job is the last one in the file, so removing it means cutting from its
+  // header to the end of the file.
+  const before = readFixture(workspace, PRODUCTION);
+  const at = before.indexOf('\n  mark-feedback-release:\n');
+  assert.notEqual(at, -1, 'fixture has no mark-feedback-release job');
+  writeFixture(workspace, PRODUCTION, before.slice(0, at) + '\n');
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mark-feedback-release/);
+});
