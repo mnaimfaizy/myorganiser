@@ -12,6 +12,10 @@ enum AdminAuditAction {
   demote
   youtube_access_grant
   youtube_access_withdraw
+  feedback_status_change
+  feedback_tracking_issue_link
+  feedback_tracking_issue_unlink
+  feedback_manual_delivery
 }
 
 model User {

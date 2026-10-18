@@ -22,14 +22,18 @@ export type FeedbackReportStatus =
   | 'wont_do'
   | 'cannot_reproduce';
 
-interface FeedbackReportKindRule {
+export interface FeedbackReportKindRule {
+  /** The kind in the reader's own words, mid-sentence — "Only a bug report …". */
+  label: string;
   /** Only a Bug Report carries what its sender expected to happen. */
   allowsExpectedOutcome: boolean;
   /** The status this kind reaches once a Release delivers it (ADR 0133). */
   deliveredStatus: FeedbackReportStatus;
 }
 
-interface FeedbackReportStatusRule {
+export interface FeedbackReportStatusRule {
+  /** The status as a reader sees it, so a refusal never spells one out twice. */
+  label: string;
   /** Who moves a report into this status. */
   setBy: readonly ('system' | 'admin' | 'release')[];
   /** The kinds the status can apply to. */
@@ -50,8 +54,16 @@ const BOTH_KINDS = ['bug_report', 'suggestion'] as const;
  * until it is given a home.
  */
 export const FEEDBACK_REPORT_KIND_RULES = {
-  bug_report: { allowsExpectedOutcome: true, deliveredStatus: 'fixed' },
-  suggestion: { allowsExpectedOutcome: false, deliveredStatus: 'shipped' },
+  bug_report: {
+    label: 'bug report',
+    allowsExpectedOutcome: true,
+    deliveredStatus: 'fixed',
+  },
+  suggestion: {
+    label: 'suggestion',
+    allowsExpectedOutcome: false,
+    deliveredStatus: 'shipped',
+  },
 } as const satisfies Record<FeedbackReportKind, FeedbackReportKindRule> &
   Record<PrismaFeedbackReportKind, FeedbackReportKindRule>;
 
@@ -73,42 +85,49 @@ export const FEEDBACK_REPORT_KIND_RULES = {
  */
 export const FEEDBACK_REPORT_STATUS_RULES = {
   received: {
+    label: 'Received',
     setBy: ['system'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   under_review: {
+    label: 'Under review',
     setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   planned: {
+    label: 'Planned',
     setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
   },
   fixed: {
+    label: 'Fixed',
     setBy: ['release', 'admin'] as const,
     kinds: ['bug_report'],
     requiresStatusNote: false,
     isFinal: true,
   },
   shipped: {
+    label: 'Shipped',
     setBy: ['release', 'admin'] as const,
     kinds: ['suggestion'],
     requiresStatusNote: false,
     isFinal: true,
   },
   wont_do: {
+    label: "Won't do",
     setBy: ['admin'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: true,
     isFinal: false,
   },
   cannot_reproduce: {
+    label: "Can't reproduce",
     setBy: ['admin'] as const,
     kinds: ['bug_report'],
     requiresStatusNote: true,
@@ -177,3 +196,16 @@ export const FEEDBACK_REPORTS_PER_DAY_LIMIT =
   CORE_FEEDBACK_REPORTS_PER_DAY_LIMIT;
 export const FEEDBACK_REPORT_RATE_WINDOW_MS =
   CORE_FEEDBACK_REPORT_RATE_WINDOW_MS;
+
+/**
+ * A Release tag (`v1.4.0`) or a Mobile Release tag (`mobile-v1.4.0`) — the
+ * Release an admin names when marking a report delivered by hand (ADR 0133).
+ */
+export const FEEDBACK_RELEASE_TAG_PATTERN =
+  /^(?:mobile-)?v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+/**
+ * The Report Status a report transitions to when an admin links a Tracking
+ * Issue (PRD #1206).
+ */
+export const TRACKING_ISSUE_LINKED_STATUS: FeedbackReportStatus = 'planned';

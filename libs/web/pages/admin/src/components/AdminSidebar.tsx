@@ -29,6 +29,7 @@ import {
   ChevronsUpDown,
   Home,
   LogOut,
+  MessageSquare,
   ScrollText,
   Users,
   type LucideIcon,
@@ -55,6 +56,11 @@ const adminNavItems: {
     title: 'Audit Log',
     url: '/admin/audit-logs',
     icon: ScrollText,
+  },
+  {
+    title: 'Feedback',
+    url: '/admin/feedback',
+    icon: MessageSquare,
   },
 ];
 

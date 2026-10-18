@@ -1754,6 +1754,267 @@
 				],
 				"description": "Identity after a YouTube Access withdrawal, with the disconnect outcome."
 			},
+			"AdminFeedbackReportListItemDto": {
+				"description": "Admin Feedback Report list item: header view without description.",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/FeedbackReportKind"
+					},
+					"status": {
+						"$ref": "#/components/schemas/FeedbackReportStatus"
+					},
+					"title": {
+						"type": "string"
+					},
+					"platform": {
+						"type": "string",
+						"description": "Report Context platform, the inbox filters on it."
+					},
+					"trackingIssueNumber": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"reporterUserId": {
+						"type": "string",
+						"nullable": true,
+						"description": "Null once the sender has been removed by User Deletion."
+					},
+					"statusChangedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"kind",
+					"status",
+					"title",
+					"platform",
+					"trackingIssueNumber",
+					"reporterUserId",
+					"statusChangedAt",
+					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ListAdminFeedbackReportsResponse": {
+				"description": "Response body for list feedback reports endpoint.",
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/AdminFeedbackReportListItemDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"items"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AdminFeedbackReportContextDto": {
+				"description": "Admin Feedback Report Context details.",
+				"properties": {
+					"platform": {
+						"type": "string"
+					},
+					"appVersion": {
+						"type": "string"
+					},
+					"browser": {
+						"type": "string"
+					},
+					"operatingSystem": {
+						"type": "string"
+					},
+					"path": {
+						"type": "string"
+					},
+					"sentAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"platform",
+					"appVersion",
+					"browser",
+					"operatingSystem",
+					"path",
+					"sentAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AdminFeedbackReporterDto": {
+				"description": "Admin Feedback Reporter identity.",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string",
+						"nullable": true
+					},
+					"email": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"email"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AdminFeedbackReportDetailDto": {
+				"description": "Admin Feedback Report detail: full report with all fields and reporter info.",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/FeedbackReportKind"
+					},
+					"status": {
+						"$ref": "#/components/schemas/FeedbackReportStatus"
+					},
+					"title": {
+						"type": "string"
+					},
+					"platform": {
+						"type": "string",
+						"description": "Report Context platform, the inbox filters on it."
+					},
+					"trackingIssueNumber": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"reporterUserId": {
+						"type": "string",
+						"nullable": true,
+						"description": "Null once the sender has been removed by User Deletion."
+					},
+					"statusChangedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"description": {
+						"type": "string"
+					},
+					"expectedOutcome": {
+						"type": "string",
+						"nullable": true
+					},
+					"context": {
+						"$ref": "#/components/schemas/AdminFeedbackReportContextDto"
+					},
+					"followUp": {
+						"type": "string",
+						"nullable": true
+					},
+					"statusNote": {
+						"type": "string",
+						"nullable": true
+					},
+					"releaseTag": {
+						"type": "string",
+						"nullable": true
+					},
+					"fixNoticeOptIn": {
+						"type": "boolean"
+					},
+					"reporter": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AdminFeedbackReporterDto"
+							}
+						],
+						"nullable": true,
+						"description": "Null means the sender was removed by User Deletion — every report is sent by a signed-in User."
+					}
+				},
+				"required": [
+					"id",
+					"kind",
+					"status",
+					"title",
+					"platform",
+					"trackingIssueNumber",
+					"reporterUserId",
+					"statusChangedAt",
+					"createdAt",
+					"description",
+					"expectedOutcome",
+					"context",
+					"followUp",
+					"statusNote",
+					"releaseTag",
+					"fixNoticeOptIn",
+					"reporter"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ChangeFeedbackReportStatusRequest": {
+				"description": "Request body for changing a Feedback Report's status.",
+				"properties": {
+					"status": {
+						"$ref": "#/components/schemas/FeedbackReportStatus"
+					},
+					"statusNote": {
+						"type": "string",
+						"description": "Optional note explaining why the status changed."
+					}
+				},
+				"required": [
+					"status"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"LinkFeedbackReportTrackingIssueRequest": {
+				"description": "Request body for linking a Tracking Issue to a Feedback Report.",
+				"properties": {
+					"trackingIssueNumber": {
+						"type": "number",
+						"format": "double",
+						"description": "The GitHub issue number to link."
+					}
+				},
+				"required": [
+					"trackingIssueNumber"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"MarkFeedbackReportDeliveredRequest": {
+				"description": "Request body for marking a Feedback Report as delivered (Fixed or Shipped).",
+				"properties": {
+					"releaseTag": {
+						"type": "string",
+						"description": "The Release tag (e.g., v1.4.0 or mobile-v1.4.0)."
+					}
+				},
+				"required": [
+					"releaseTag"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AdminAuditAction": {
 				"type": "string",
 				"enum": [
@@ -1764,7 +2025,11 @@
 					"promote",
 					"demote",
 					"youtube_access_grant",
-					"youtube_access_withdraw"
+					"youtube_access_withdraw",
+					"feedback_status_change",
+					"feedback_tracking_issue_link",
+					"feedback_tracking_issue_unlink",
+					"feedback_manual_delivery"
 				]
 			},
 			"AdminAuditLogEntry": {
@@ -5044,6 +5309,456 @@
 						}
 					}
 				]
+			}
+		},
+		"/admin/feedback/reports": {
+			"get": {
+				"operationId": "ListFeedbackReports",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ListAdminFeedbackReportsResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid filter",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "List Feedback Reports with optional filters (status, kind, platform,\ntrackingIssueNumber, limit). Newest first. Platform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "status",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/FeedbackReportStatus"
+						}
+					},
+					{
+						"in": "query",
+						"name": "kind",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/FeedbackReportKind"
+						}
+					},
+					{
+						"in": "query",
+						"name": "platform",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "trackingIssueNumber",
+						"required": false,
+						"schema": {
+							"format": "double",
+							"type": "number"
+						}
+					},
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/admin/feedback/reports/{reportId}": {
+			"get": {
+				"operationId": "GetFeedbackReport",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportDetailDto"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Report not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "Get a single Feedback Report by id with full details and reporter info.\nPlatform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "reportId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/admin/feedback/reports/{reportId}/status": {
+			"patch": {
+				"operationId": "ChangeFeedbackReportStatus",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportDetailDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid status or note",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Report not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "Change a Feedback Report's status with an optional status note.\nStatus transitions are guarded by the pinned rules table. Platform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "reportId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ChangeFeedbackReportStatusRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/admin/feedback/reports/{reportId}/tracking-issue": {
+			"put": {
+				"operationId": "LinkFeedbackReportTrackingIssue",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportDetailDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid issue number",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Report not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "Link a GitHub issue to a Feedback Report, transitioning it to Planned.\nPlatform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "reportId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LinkFeedbackReportTrackingIssueRequest"
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "UnlinkFeedbackReportTrackingIssue",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportDetailDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "No tracking issue to unlink",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Report not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "Unlink a GitHub issue from a Feedback Report. Platform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "reportId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/admin/feedback/reports/{reportId}/delivery": {
+			"post": {
+				"operationId": "MarkFeedbackReportDelivered",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportDetailDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid release tag or status",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Report not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for\nSuggestions) by naming the Release. Platform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "reportId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/MarkFeedbackReportDeliveredRequest"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/admin/audit-logs": {
