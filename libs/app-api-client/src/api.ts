@@ -41,6 +41,28 @@ export const AcknowledgementRequiredResponseCodeEnum = {
 
 export type AcknowledgementRequiredResponseCodeEnum = typeof AcknowledgementRequiredResponseCodeEnum[keyof typeof AcknowledgementRequiredResponseCodeEnum];
 
+export interface AddFollowUpRequest {
+    'followUp': string;
+}
+export interface AddFollowUpResponse {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'statusNote': string | null;
+    'releaseTag': string | null;
+    /**
+     * Only set when releaseTag is present and status is \'fixed\' or \'shipped\'.
+     */
+    'changelogUrl': string | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+    'followUp': string | null;
+    'message': string;
+    'details'?: any;
+}
+
+
 
 export const AdminAuditAction = {
     Disable: 'disable',
@@ -370,6 +392,7 @@ export interface FeedbackReportListItemDto {
     'changelogUrl': string | null;
     'statusChangedAt': string | null;
     'createdAt': string;
+    'followUp': string | null;
 }
 
 
@@ -1788,6 +1811,48 @@ export class AuthenticationApi extends BaseAPI {
 export const FeedbackApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {string} reportId 
+         * @param {AddFollowUpRequest} addFollowUpRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addFollowUp: async (reportId: string, addFollowUpRequest: AddFollowUpRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('addFollowUp', 'reportId', reportId)
+            // verify required parameter 'addFollowUpRequest' is not null or undefined
+            assertParamExists('addFollowUp', 'addFollowUpRequest', addFollowUpRequest)
+            const localVarPath = `/feedback/reports/{reportId}/follow-up`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(addFollowUpRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Store a Feedback Report for the signed-in User with Report Status Received.
          * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
          * @param {*} [options] Override http request option.
@@ -1901,6 +1966,19 @@ export const FeedbackApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = FeedbackApiAxiosParamCreator(configuration)
     return {
         /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {string} reportId 
+         * @param {AddFollowUpRequest} addFollowUpRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addFollowUp(reportId: string, addFollowUpRequest: AddFollowUpRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AddFollowUpResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addFollowUp(reportId, addFollowUpRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.addFollowUp']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Store a Feedback Report for the signed-in User with Report Status Received.
          * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
          * @param {*} [options] Override http request option.
@@ -1944,6 +2022,15 @@ export const FeedbackApiFactory = function (configuration?: Configuration, baseP
     const localVarFp = FeedbackApiFp(configuration)
     return {
         /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {FeedbackApiAddFollowUpRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addFollowUp(requestParameters: FeedbackApiAddFollowUpRequest, options?: RawAxiosRequestConfig): AxiosPromise<AddFollowUpResponse> {
+            return localVarFp.addFollowUp(requestParameters.reportId, requestParameters.addFollowUpRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
          * Store a Feedback Report for the signed-in User with Report Status Received.
          * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -1972,6 +2059,15 @@ export const FeedbackApiFactory = function (configuration?: Configuration, baseP
 };
 
 /**
+ * Request parameters for addFollowUp operation in FeedbackApi.
+ */
+export interface FeedbackApiAddFollowUpRequest {
+    readonly reportId: string
+
+    readonly addFollowUpRequest: AddFollowUpRequest
+}
+
+/**
  * Request parameters for createReport operation in FeedbackApi.
  */
 export interface FeedbackApiCreateReportRequest {
@@ -1982,6 +2078,16 @@ export interface FeedbackApiCreateReportRequest {
  * FeedbackApi - object-oriented interface
  */
 export class FeedbackApi extends BaseAPI {
+    /**
+     * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+     * @param {FeedbackApiAddFollowUpRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addFollowUp(requestParameters: FeedbackApiAddFollowUpRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).addFollowUp(requestParameters.reportId, requestParameters.addFollowUpRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * Store a Feedback Report for the signed-in User with Report Status Received.
      * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.

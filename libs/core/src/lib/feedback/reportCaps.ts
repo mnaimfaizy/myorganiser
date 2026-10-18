@@ -15,6 +15,7 @@
 
 export const FEEDBACK_REPORT_TITLE_MAX_LENGTH = 120;
 export const FEEDBACK_REPORT_TEXT_MAX_LENGTH = 4000;
+export const FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH = 2000;
 
 /** How many reports one User may send inside `FEEDBACK_REPORT_RATE_WINDOW_MS`. */
 export const FEEDBACK_REPORTS_PER_DAY_LIMIT = 10;
@@ -37,10 +38,12 @@ export const FEEDBACK_REPORT_CAP_MESSAGES = {
   title: `The title must be ${formatFeedbackReportCap(FEEDBACK_REPORT_TITLE_MAX_LENGTH)} characters or fewer.`,
   description: `The description must be ${formatFeedbackReportCap(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
   expectedOutcome: `What you expected must be ${formatFeedbackReportCap(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
+  followUp: `Your follow-up must be ${formatFeedbackReportCap(FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH)} characters or fewer.`,
 } as const;
 
 /** The refusals for a required field left empty, shared for the same reason. */
 export const FEEDBACK_REPORT_REQUIRED_MESSAGES = {
   title: 'Enter a title.',
   description: 'Enter a description.',
+  followUp: 'Enter a follow-up.',
 } as const;

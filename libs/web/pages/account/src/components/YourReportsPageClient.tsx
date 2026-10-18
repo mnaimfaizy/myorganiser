@@ -11,6 +11,7 @@ import {
 import { Badge, Card, CardTitle } from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../lib/apiClient';
+import { FollowUpForm } from './FollowUpForm';
 
 type ListState =
   | { status: 'loading'; items: null }
@@ -49,40 +50,66 @@ interface FeedbackReportListItemProps {
 }
 
 function FeedbackReportListItem({ report }: FeedbackReportListItemProps) {
-  const statusConfig = REPORT_STATUS_CONFIG[report.status];
-  const kindLabel = REPORT_KIND_LABELS[report.kind];
+  const [currentReport, setCurrentReport] = useState(report);
 
-  const isDelivered = report.status === DELIVERED_STATUS_BY_KIND[report.kind];
+  const statusConfig = REPORT_STATUS_CONFIG[currentReport.status];
+  const kindLabel = REPORT_KIND_LABELS[currentReport.kind];
+
+  const isDelivered =
+    currentReport.status === DELIVERED_STATUS_BY_KIND[currentReport.kind];
   const deliveryWord = `${statusConfig.label} in`;
 
   return (
     <Card className="p-4">
       <div className="flex flex-col gap-3">
         <div>
-          <CardTitle className="mb-2 text-base">{report.title}</CardTitle>
+          <CardTitle className="mb-2 text-base">
+            {currentReport.title}
+          </CardTitle>
           <div className="flex gap-2">
             <span className="text-xs text-muted-foreground">{kindLabel}</span>
             <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
           </div>
         </div>
 
-        {report.statusNote && (
-          <p className="text-sm text-muted-foreground">{report.statusNote}</p>
+        {currentReport.statusNote && (
+          <p className="text-sm text-muted-foreground">
+            {currentReport.statusNote}
+          </p>
         )}
 
-        {isDelivered && report.changelogUrl && report.releaseTag && (
-          <a
-            href={report.changelogUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block text-xs text-primary underline"
-          >
-            {deliveryWord} {report.releaseTag} → View CHANGELOG
-          </a>
+        {currentReport.status === 'cannot_reproduce' &&
+          !currentReport.followUp && (
+            <FollowUpForm
+              reportId={currentReport.id}
+              onSent={setCurrentReport}
+            />
+          )}
+
+        {currentReport.followUp && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">
+              Your follow-up
+            </p>
+            <p className="text-sm">{currentReport.followUp}</p>
+          </div>
         )}
+
+        {isDelivered &&
+          currentReport.changelogUrl &&
+          currentReport.releaseTag && (
+            <a
+              href={currentReport.changelogUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-xs text-primary underline"
+            >
+              {deliveryWord} {currentReport.releaseTag} → View CHANGELOG
+            </a>
+          )}
 
         <p className="text-xs text-muted-foreground">
-          {format(new Date(report.createdAt), 'PP')}
+          {format(new Date(currentReport.createdAt), 'PP')}
         </p>
       </div>
     </Card>

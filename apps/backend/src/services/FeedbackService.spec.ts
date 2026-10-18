@@ -11,7 +11,13 @@ import {
   FEEDBACK_REPORT_RATE_WINDOW_MS,
   FEEDBACK_REPORTS_PER_DAY_LIMIT,
   INITIAL_FEEDBACK_REPORT_STATUS,
+  FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH,
+  FEEDBACK_REPORT_STATUS_RULES,
 } from './feedbackReportConstants';
+import {
+  FEEDBACK_REPORT_CAP_MESSAGES,
+  FEEDBACK_REPORT_REQUIRED_MESSAGES,
+} from '@myorganiser/core';
 import {
   FeedbackService,
   CreateFeedbackReportInput,
@@ -23,6 +29,8 @@ type MockPrisma = {
     count: jest.Mock<any>;
     create: jest.Mock<any>;
     findMany: jest.Mock<any>;
+    findUnique: jest.Mock<any>;
+    update: jest.Mock<any>;
   };
   user: {
     findUniqueOrThrow: jest.Mock<any>;
@@ -36,6 +44,8 @@ function makePrisma(): MockPrisma {
       count: jest.fn() as jest.Mock<any>,
       create: jest.fn() as jest.Mock<any>,
       findMany: jest.fn() as jest.Mock<any>,
+      findUnique: jest.fn() as jest.Mock<any>,
+      update: jest.fn() as jest.Mock<any>,
     },
     user: {
       findUniqueOrThrow: jest.fn() as jest.Mock<any>,
@@ -70,6 +80,8 @@ function makeListRow(overrides: Partial<Record<string, unknown>> = {}): {
   release_tag: string | null;
   status_changed_at: Date | null;
   created_at: Date;
+  follow_up: string | null;
+  reporter_user_id: string;
 } {
   return {
     id: 'report-1',
@@ -80,6 +92,8 @@ function makeListRow(overrides: Partial<Record<string, unknown>> = {}): {
     release_tag: null,
     status_changed_at: null,
     created_at: new Date('2026-01-01T00:00:00.000Z'),
+    follow_up: null,
+    reporter_user_id: 'user-1',
     ...overrides,
   };
 }
@@ -872,6 +886,217 @@ describe('FeedbackService', () => {
           where: { id: 'user-456' },
         }),
       );
+    });
+  });
+
+  describe('addFollowUp', () => {
+    test('happy path: creates follow-up on cannot_reproduce report owned by caller', async () => {
+      const now = new Date();
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+        status_changed_at: now,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+      prisma.feedbackReport.update.mockResolvedValue({
+        ...row,
+        follow_up: 'More detail here',
+        status: 'under_review',
+      });
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: 'More detail here',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      if (result.ok) {
+        expect(result.body.followUp).toBe('More detail here');
+        expect(result.body.status).toBe('under_review');
+      }
+
+      expect(prisma.feedbackReport.update).toHaveBeenCalledWith({
+        where: { id: 'report-1' },
+        data: {
+          follow_up: 'More detail here',
+          status: 'under_review',
+          status_changed_at: expect.any(Date),
+        },
+        select: expect.objectContaining({
+          id: true,
+          kind: true,
+          status: true,
+          title: true,
+          follow_up: true,
+        }),
+      });
+    });
+
+    test('returns 404 when report does not exist', async () => {
+      prisma.feedbackReport.findUnique.mockResolvedValue(null);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: 'Follow-up text',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(404);
+      const body = result.body as any;
+      expect(body.message).toContain('does not exist');
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('returns 404 when report is owned by someone else', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'someone-else',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: 'Follow-up text',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(404);
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when report status is not cannot_reproduce', async () => {
+      const row = makeListRow({
+        status: 'received',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: 'Follow-up text',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      const body = result.body as any;
+      expect(body.message).toContain(
+        FEEDBACK_REPORT_STATUS_RULES.cannot_reproduce.label,
+      );
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when report already has a follow-up', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: 'An earlier follow-up',
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: 'New follow-up text',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      const body = result.body as any;
+      expect(body.message).toContain('already');
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when message is empty (whitespace only)', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: '   ',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      const body = result.body as any;
+      expect(body.message).toBe(FEEDBACK_REPORT_REQUIRED_MESSAGES.followUp);
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when message exceeds the cap (2000 characters)', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+
+      const overCapMessage = 'a'.repeat(
+        FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH + 1,
+      );
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: overCapMessage,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      const body = result.body as any;
+      expect(body.message).toBe(FEEDBACK_REPORT_CAP_MESSAGES.followUp);
+      expect(prisma.feedbackReport.update).not.toHaveBeenCalled();
+    });
+
+    test('accepts message at the cap (2000 characters)', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+      prisma.feedbackReport.update.mockResolvedValue({
+        ...row,
+        follow_up: 'a'.repeat(FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH),
+        status: 'under_review',
+      });
+
+      const capMessage = 'a'.repeat(FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH);
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: capMessage,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      expect(prisma.feedbackReport.update).toHaveBeenCalled();
+    });
+
+    test('trims message before storing', async () => {
+      const row = makeListRow({
+        status: 'cannot_reproduce',
+        reporter_user_id: 'user-1',
+        follow_up: null,
+      });
+      prisma.feedbackReport.findUnique.mockResolvedValue(row);
+      prisma.feedbackReport.update.mockResolvedValue({
+        ...row,
+        follow_up: 'padded message',
+        status: 'under_review',
+      });
+
+      const result = await service.addFollowUp('user-1', 'report-1', {
+        followUp: '  padded message  ',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(prisma.feedbackReport.update).toHaveBeenCalledWith({
+        where: { id: 'report-1' },
+        data: {
+          follow_up: 'padded message',
+          status: 'under_review',
+          status_changed_at: expect.any(Date),
+        },
+        select: expect.any(Object),
+      });
     });
   });
 });

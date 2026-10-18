@@ -5,6 +5,7 @@ import type {
 import {
   FEEDBACK_REPORT_TITLE_MAX_LENGTH as CORE_FEEDBACK_REPORT_TITLE_MAX_LENGTH,
   FEEDBACK_REPORT_TEXT_MAX_LENGTH as CORE_FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+  FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH as CORE_FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH,
   FEEDBACK_REPORTS_PER_DAY_LIMIT as CORE_FEEDBACK_REPORTS_PER_DAY_LIMIT,
   FEEDBACK_REPORT_RATE_WINDOW_MS as CORE_FEEDBACK_REPORT_RATE_WINDOW_MS,
 } from '@myorganiser/core';
@@ -35,7 +36,7 @@ export interface FeedbackReportStatusRule {
   /** The status as a reader sees it, so a refusal never spells one out twice. */
   label: string;
   /** Who moves a report into this status. */
-  setBy: readonly ('system' | 'admin' | 'release')[];
+  setBy: readonly ('system' | 'admin' | 'release' | 'reporter')[];
   /** The kinds the status can apply to. */
   kinds: readonly FeedbackReportKind[];
   /** Whether the status change always carries a Status Note for the reporter. */
@@ -72,7 +73,8 @@ export const FEEDBACK_REPORT_KIND_RULES = {
  * the single place the status semantics from PRD #1206 and ADR 0133 live:
  *
  * - the system sets Received; an admin moves a report between Under review,
- *   Planned, Won't do, and Can't reproduce;
+ *   Planned, Won't do, and Can't reproduce; a reporter's Follow-up also moves
+ *   a Can't reproduce report back to Under review;
  * - Fixed applies only to a Bug Report, Shipped only to a Suggestion, and
  *   Can't reproduce only to a Bug Report;
  * - Won't do and Can't reproduce always carry a Status Note;
@@ -93,7 +95,7 @@ export const FEEDBACK_REPORT_STATUS_RULES = {
   },
   under_review: {
     label: 'Under review',
-    setBy: ['admin'] as const,
+    setBy: ['admin', 'reporter'] as const,
     kinds: BOTH_KINDS,
     requiresStatusNote: false,
     isFinal: false,
@@ -188,6 +190,8 @@ export const FEEDBACK_REPORT_TITLE_MAX_LENGTH =
   CORE_FEEDBACK_REPORT_TITLE_MAX_LENGTH;
 export const FEEDBACK_REPORT_TEXT_MAX_LENGTH =
   CORE_FEEDBACK_REPORT_TEXT_MAX_LENGTH;
+export const FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH =
+  CORE_FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH;
 /** Defensive cap on each Report Context field, so a client cannot store an unbounded string. */
 export const FEEDBACK_REPORT_CONTEXT_FIELD_MAX_LENGTH = 120;
 export const FEEDBACK_REPORT_CONTEXT_PATH_MAX_LENGTH = 512;

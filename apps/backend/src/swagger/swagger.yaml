@@ -1032,6 +1032,9 @@ components:
           nullable: true
         createdAt:
           type: string
+        followUp:
+          type: string
+          nullable: true
       required:
         - id
         - kind
@@ -1042,6 +1045,7 @@ components:
         - changelogUrl
         - statusChangedAt
         - createdAt
+        - followUp
       type: object
       additionalProperties: false
     ListFeedbackReportsResponse:
@@ -1063,6 +1067,18 @@ components:
           type: string
       required:
         - seenAt
+      type: object
+      additionalProperties: false
+    AddFollowUpResponse:
+      anyOf:
+        - $ref: "#/components/schemas/FeedbackReportListItemDto"
+        - $ref: "#/components/schemas/ErrorResponse"
+    AddFollowUpRequest:
+      properties:
+        followUp:
+          type: string
+      required:
+        - followUp
       type: object
       additionalProperties: false
     UserRole:
@@ -2612,6 +2628,52 @@ paths:
       security:
         - jwt: []
       parameters: []
+  /feedback/reports/{reportId}/follow-up:
+    post:
+      operationId: AddFollowUp
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddFollowUpResponse"
+        "400":
+          description: Invalid Follow-up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Feedback Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Add the one Follow-up a reporter may send while their Bug Report is
+        Can't reproduce; it returns the report to Under review.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFollowUpRequest"
   /auth/login:
     post:
       operationId: Login

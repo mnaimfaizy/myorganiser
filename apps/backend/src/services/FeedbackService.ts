@@ -1,6 +1,7 @@
 import {
   FEEDBACK_REPORT_CAP_MESSAGES,
   FEEDBACK_REPORT_REQUIRED_MESSAGES,
+  FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH,
 } from '@myorganiser/core';
 import { PrismaClient, createPrismaClient } from '../prisma';
 import {
@@ -11,6 +12,7 @@ import {
   FEEDBACK_REPORT_TEXT_MAX_LENGTH,
   FEEDBACK_REPORT_TITLE_MAX_LENGTH,
   FEEDBACK_REPORTS_PER_DAY_LIMIT,
+  FEEDBACK_REPORT_STATUS_RULES,
   FeedbackReportKind,
   FeedbackReportStatus,
   INITIAL_FEEDBACK_REPORT_STATUS,
@@ -40,6 +42,10 @@ export interface CreateFeedbackReportInput {
   fixNoticeOptIn: unknown;
 }
 
+export interface AddFollowUpInput {
+  followUp: unknown;
+}
+
 export interface FeedbackReportDto {
   id: string;
   kind: FeedbackReportKind;
@@ -59,11 +65,16 @@ export interface FeedbackReportListItemDto {
   changelogUrl: string | null;
   statusChangedAt: string | null;
   createdAt: string;
+  followUp: string | null;
 }
 
 type ServiceResult<T> =
   | { ok: true; status: 201 | 200; body: T }
   | { ok: false; status: 400 | 429; body: { message: string } };
+
+type FollowUpServiceResult<T> =
+  | { ok: true; status: 200; body: T }
+  | { ok: false; status: 400 | 404; body: { message: string } };
 
 type Refusal = { ok: false; message: string };
 
@@ -308,6 +319,7 @@ function toListItemDto(row: {
   release_tag: string | null;
   status_changed_at: Date | null;
   created_at: Date;
+  follow_up: string | null;
 }): FeedbackReportListItemDto {
   const changelogUrl =
     row.release_tag &&
@@ -325,6 +337,7 @@ function toListItemDto(row: {
     changelogUrl,
     statusChangedAt: row.status_changed_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
+    followUp: row.follow_up,
   };
 }
 
@@ -409,6 +422,7 @@ export class FeedbackService {
           release_tag: true,
           status_changed_at: true,
           created_at: true,
+          follow_up: true,
         },
       }),
       this.prisma.user.findUniqueOrThrow({
@@ -457,6 +471,88 @@ export class FeedbackService {
       status: 200,
       body: { seenAt: now.toISOString() },
     };
+  }
+
+  /**
+   * Add the one Follow-up a reporter may send while their own Bug Report is
+   * Can't reproduce; it returns the report to Under review (CONTEXT.md:
+   * Follow-up). Refuses with 404 if the report does not exist or belongs to
+   * someone else — ownership is never distinguished from absence. Refuses
+   * with 400 if the report is not Can't reproduce, already carries a
+   * Follow-up, or the message is empty or over its cap.
+   */
+  async addFollowUp(
+    userId: string,
+    reportId: string,
+    input: AddFollowUpInput,
+  ): Promise<FollowUpServiceResult<FeedbackReportListItemDto>> {
+    const report = await this.prisma.feedbackReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report || report.reporter_user_id !== userId) {
+      return {
+        ok: false,
+        status: 404,
+        body: { message: 'That feedback report does not exist.' },
+      };
+    }
+
+    if (report.status !== 'cannot_reproduce') {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          message: `A Follow-up can only be added while a report is ${FEEDBACK_REPORT_STATUS_RULES.cannot_reproduce.label}.`,
+        },
+      };
+    }
+
+    if (report.follow_up) {
+      return {
+        ok: false,
+        status: 400,
+        body: { message: 'You have already sent a Follow-up on that report.' },
+      };
+    }
+
+    const message = trimString(input.followUp);
+    if (!message) {
+      return {
+        ok: false,
+        status: 400,
+        body: { message: FEEDBACK_REPORT_REQUIRED_MESSAGES.followUp },
+      };
+    }
+    if (message.length > FEEDBACK_REPORT_FOLLOW_UP_MAX_LENGTH) {
+      return {
+        ok: false,
+        status: 400,
+        body: { message: FEEDBACK_REPORT_CAP_MESSAGES.followUp },
+      };
+    }
+
+    const updated = await this.prisma.feedbackReport.update({
+      where: { id: reportId },
+      data: {
+        follow_up: message,
+        status: 'under_review',
+        status_changed_at: new Date(),
+      },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        title: true,
+        status_note: true,
+        release_tag: true,
+        status_changed_at: true,
+        created_at: true,
+        follow_up: true,
+      },
+    });
+
+    return { ok: true, status: 200, body: toListItemDto(updated) };
   }
 }
 

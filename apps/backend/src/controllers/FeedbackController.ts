@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Path,
   Post,
   Request,
   Response,
@@ -58,6 +59,12 @@ interface MarkReportSeenResponse {
   seenAt: string;
 }
 
+export interface AddFollowUpRequest {
+  followUp: string;
+}
+
+type AddFollowUpResponse = FeedbackReportListItemDto | ErrorResponse;
+
 @Tags('Feedback')
 @Route('/feedback/reports')
 @Response<VersionFloorRefusal>(426, 'Below the Version Floor')
@@ -101,6 +108,22 @@ export class FeedbackController extends Controller {
     const result = await feedbackService.markReportsSeen(userId);
     this.setStatus(result.status);
     return result.body as MarkReportSeenResponse;
+  }
+
+  /** Add the one Follow-up a reporter may send while their Bug Report is Can't reproduce; it returns the report to Under review. */
+  @Post('/{reportId}/follow-up')
+  @Response<ErrorResponse>(400, 'Invalid Follow-up')
+  @Response<ErrorResponse>(404, 'Feedback Report not found')
+  public async addFollowUp(
+    @Request() req: ExRequest,
+    @Path() reportId: string,
+    @Body() body: AddFollowUpRequest,
+  ): Promise<AddFollowUpResponse> {
+    const userId = requireUserId(req);
+
+    const result = await feedbackService.addFollowUp(userId, reportId, body);
+    this.setStatus(result.status);
+    return result.body as AddFollowUpResponse;
   }
 }
 
