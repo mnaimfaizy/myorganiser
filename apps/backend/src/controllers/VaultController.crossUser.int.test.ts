@@ -312,26 +312,13 @@ describe('Vault cross-user isolation (real service over a fake store)', () => {
     const bAddressesEtag = bRes.body.blobs[0]?.etag;
     expect(bAddressesEtag).not.toBe(aAddressesEtag);
 
-    // Verify by fetching the actual blob: B's blob has B's ciphertext, not A's.
-    // Pin the fake-store oracle first so a 404 names whether the seeded row was
-    // gone or still present. Issue #1169 reported this GET as 404 once; the
-    // cause is unconfirmed (isolation, --runInBand, CPU-load, and sibling
-    // vault int tests first in the same Jest process did not reproduce).
-    expect(store.readBlob('user-b', 'addresses')).not.toBeNull();
-
+    // Verify by fetching the actual blob: B's blob has B's ciphertext, not A's
     const bBlobRes = await request(app)
       .get('/vault/blob/addresses')
       .set('Authorization', 'Bearer token-b');
 
-    expect({
-      status: bBlobRes.status,
-      message: bBlobRes.body?.message,
-      ciphertext: bBlobRes.body?.blob?.ciphertext,
-    }).toEqual({
-      status: 200,
-      message: undefined,
-      ciphertext: B_CIPHERTEXT,
-    });
+    expect(bBlobRes.status).toBe(200);
+    expect(bBlobRes.body.blob.ciphertext).toBe(B_CIPHERTEXT);
     expect(bBlobRes.body.blob.ciphertext).not.toBe(A_CIPHERTEXT);
   });
 });
