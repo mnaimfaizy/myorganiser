@@ -13,6 +13,7 @@ import test from 'node:test';
 
 import { COMPLETION_PROMISE } from './sandcastle-outcome.mjs';
 import {
+  gitEnvironment,
   inspectWorktree,
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
@@ -22,7 +23,13 @@ import {
 const BRANCH = 'slice/1-demo';
 
 const git = (cwd, ...args) => {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  // gitEnvironment: under a pre-commit hook the inherited GIT_INDEX_FILE would
+  // send every call in the scratch repo to the hook's own index.
+  const result = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: gitEnvironment(),
+  });
   assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
   return result.stdout.trim();
 };
@@ -98,6 +105,7 @@ test('a pruned slice worktree is re-registered on its branch with edits kept', (
     spawnSync('git', ['status', '--porcelain'], {
       cwd: repo.worktreePath,
       encoding: 'utf8',
+      env: gitEnvironment(),
     }).stdout,
     ' M tracked.txt\n?? new.txt\n',
   );
