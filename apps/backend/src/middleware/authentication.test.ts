@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  jest,
+  test,
+} from '@jest/globals';
 import type * as express from 'express';
 
 import { decodeToken } from '../helpers/jwtHelper';
@@ -33,6 +40,7 @@ describe('expressAuthentication (tsoa jwt)', () => {
     jest.clearAllMocks();
     process.env.ACCESS_JWT_SECRET = 'secret';
     delete process.env.YOUTUBE_CRON_SECRET;
+    delete process.env.FEEDBACK_RELEASE_SECRET;
   });
 
   test('rejects when no token provided', async () => {
@@ -291,5 +299,112 @@ describe('expressAuthentication (tsoa cron-secret)', () => {
     await expect(
       expressAuthentication(req, 'cron-secret'),
     ).rejects.toHaveProperty('status', 401);
+  });
+});
+
+describe('expressAuthentication (tsoa deploy-secret)', () => {
+  const savedEnv = {
+    ACCESS_JWT_SECRET: process.env.ACCESS_JWT_SECRET,
+    YOUTUBE_CRON_SECRET: process.env.YOUTUBE_CRON_SECRET,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.FEEDBACK_RELEASE_SECRET = 'release-key1';
+  });
+
+  afterEach(() => {
+    delete process.env.FEEDBACK_RELEASE_SECRET;
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  });
+
+  async function expectUnauthorized(run: () => Promise<unknown>) {
+    const err = await run().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+
+    expect(err).toHaveProperty('status', 401);
+    expect(err).toHaveProperty('message', 'Unauthorized');
+    return err;
+  }
+
+  test('accepts matching x-deploy-secret header', async () => {
+    const req = makeReq({ headers: { 'x-deploy-secret': 'release-key1' } });
+
+    await expect(
+      expressAuthentication(req, 'deploy-secret'),
+    ).resolves.toBeUndefined();
+  });
+
+  test('rejects missing x-deploy-secret header', async () => {
+    const req = makeReq();
+
+    await expectUnauthorized(() => expressAuthentication(req, 'deploy-secret'));
+  });
+
+  test('rejects wrong secret of the same length', async () => {
+    const req = makeReq({ headers: { 'x-deploy-secret': 'release-key2' } });
+
+    await expectUnauthorized(() => expressAuthentication(req, 'deploy-secret'));
+  });
+
+  test('rejects wrong secret of a different length without a RangeError', async () => {
+    const req = makeReq({ headers: { 'x-deploy-secret': 'rel-key' } });
+
+    const err = await expectUnauthorized(() =>
+      expressAuthentication(req, 'deploy-secret'),
+    );
+
+    expect(err).not.toBeInstanceOf(RangeError);
+  });
+
+  test('rejects when FEEDBACK_RELEASE_SECRET env is unset, even with a header sent', async () => {
+    delete process.env.FEEDBACK_RELEASE_SECRET;
+
+    await expectUnauthorized(() =>
+      expressAuthentication(
+        makeReq({ headers: { 'x-deploy-secret': 'release-key1' } }),
+        'deploy-secret',
+      ),
+    );
+
+    await expectUnauthorized(() =>
+      expressAuthentication(
+        makeReq({ headers: { 'x-deploy-secret': '' } }),
+        'deploy-secret',
+      ),
+    );
+  });
+
+  test('rejects a valid user JWT when no x-deploy-secret header is sent', async () => {
+    process.env.ACCESS_JWT_SECRET = 'secret';
+    decodeTokenMock.mockReturnValue({ userId: 'u1' });
+    getByIdMock.mockResolvedValue({ id: 'u1', disabled: false });
+
+    const req = makeReq({ headers: { authorization: 'Bearer abc' } });
+
+    // Sanity: the same token is valid for the user scheme.
+    await expect(expressAuthentication(req, 'jwt')).resolves.toEqual({
+      id: 'u1',
+      disabled: false,
+    });
+
+    await expectUnauthorized(() => expressAuthentication(req, 'deploy-secret'));
+  });
+
+  test('rejects the cron secret sent as x-deploy-secret', async () => {
+    process.env.YOUTUBE_CRON_SECRET = 'cron-key-one1';
+    process.env.FEEDBACK_RELEASE_SECRET = 'release-key1';
+
+    const req = makeReq({ headers: { 'x-deploy-secret': 'cron-key-one1' } });
+
+    await expectUnauthorized(() => expressAuthentication(req, 'deploy-secret'));
   });
 });

@@ -47,7 +47,7 @@ export interface LinkFeedbackReportTrackingIssueRequest {
  * Request body for marking a Feedback Report as delivered (Fixed or Shipped).
  */
 export interface MarkFeedbackReportDeliveredRequest {
-  /** The Release tag (e.g., v1.4.0 or mobile-v1.4.0). */
+  /** The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fix shipped in. */
   releaseTag: string;
 }
 

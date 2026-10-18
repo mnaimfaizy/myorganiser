@@ -358,6 +358,15 @@ export const ExportVaultResponseExportVersionEnum = {
 
 export type ExportVaultResponseExportVersionEnum = typeof ExportVaultResponseExportVersionEnum[keyof typeof ExportVaultResponseExportVersionEnum];
 
+/**
+ * Counts returned to the Production deploy once a Release has been marked.
+ */
+export interface FeedbackReleaseMarkCounts {
+    'reportsMarked': number;
+    'fixNoticesSent': number;
+    'fixNoticesSkipped': number;
+    'fixNoticesFailed': number;
+}
 export interface FeedbackReportDto {
     'id': string;
     'kind': FeedbackReportKind;
@@ -604,13 +613,34 @@ export interface Login401Response {
     'message': string;
 }
 /**
+ * Request body the Production deploy sends to mark a Release\'s Planned Feedback Reports delivered (ADR 0133).
+ */
+export interface MarkFeedbackReleaseRequest {
+    /**
+     * The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fixes shipped in.
+     */
+    'releaseTag': string;
+    /**
+     * The Tracking Issue numbers the Release shipped, at most 500.
+     */
+    'issueNumbers': Array<number>;
+}
+/**
  * Request body for marking a Feedback Report as delivered (Fixed or Shipped).
  */
 export interface MarkFeedbackReportDeliveredRequest {
     /**
-     * The Release tag (e.g., v1.4.0 or mobile-v1.4.0).
+     * The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fix shipped in.
      */
     'releaseTag': string;
+}
+export interface MarkRelease200Response {
+    'reportsMarked': number;
+    'fixNoticesSent': number;
+    'fixNoticesSkipped': number;
+    'fixNoticesFailed': number;
+    'message': string;
+    'details'?: any;
 }
 export interface MarkReportSeenResponse {
     'seenAt': string;
@@ -1935,6 +1965,43 @@ export const FeedbackApiAxiosParamCreator = function (configuration?: Configurat
             };
         },
         /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {MarkFeedbackReleaseRequest} markFeedbackReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markRelease: async (markFeedbackReleaseRequest: MarkFeedbackReleaseRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'markFeedbackReleaseRequest' is not null or undefined
+            assertParamExists('markRelease', 'markFeedbackReleaseRequest', markFeedbackReleaseRequest)
+            const localVarPath = `/feedback/releases/mark`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication deploy-secret required
+            await setApiKeyToObject(localVarHeaderParameter, "X-Deploy-Secret", configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(markFeedbackReleaseRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2047,6 +2114,18 @@ export const FeedbackApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {MarkFeedbackReleaseRequest} markFeedbackReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async markRelease(markFeedbackReleaseRequest: MarkFeedbackReleaseRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MarkRelease200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.markRelease(markFeedbackReleaseRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.markRelease']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2105,6 +2184,15 @@ export const FeedbackApiFactory = function (configuration?: Configuration, baseP
             return localVarFp.listReports(options).then((request) => request(axios, basePath));
         },
         /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {FeedbackApiMarkReleaseRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markRelease(requestParameters: FeedbackApiMarkReleaseRequest, options?: RawAxiosRequestConfig): AxiosPromise<MarkRelease200Response> {
+            return localVarFp.markRelease(requestParameters.markFeedbackReleaseRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
          * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2138,6 +2226,13 @@ export interface FeedbackApiAddFollowUpRequest {
  */
 export interface FeedbackApiCreateReportRequest {
     readonly createFeedbackReportRequest: CreateFeedbackReportRequest
+}
+
+/**
+ * Request parameters for markRelease operation in FeedbackApi.
+ */
+export interface FeedbackApiMarkReleaseRequest {
+    readonly markFeedbackReleaseRequest: MarkFeedbackReleaseRequest
 }
 
 /**
@@ -2178,6 +2273,16 @@ export class FeedbackApi extends BaseAPI {
      */
     public listReports(options?: RawAxiosRequestConfig) {
         return FeedbackApiFp(this.configuration).listReports(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+     * @param {FeedbackApiMarkReleaseRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public markRelease(requestParameters: FeedbackApiMarkReleaseRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).markRelease(requestParameters.markFeedbackReleaseRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

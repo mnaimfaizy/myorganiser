@@ -12,6 +12,8 @@ import { VaultBackupController } from './../controllers/VaultBackupController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { UserDeletionController } from './../controllers/UserDeletionController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { FeedbackReleaseController } from './../controllers/FeedbackReleaseController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { FeedbackPublicController } from './../controllers/FeedbackPublicController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { FeedbackController } from './../controllers/FeedbackController';
@@ -492,6 +494,26 @@ const models: TsoaRoute.Models = {
         "properties": {
             "password": {"dataType":"string","required":true},
             "confirmation": {"dataType":"enum","enums":["DELETE"],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReleaseMarkCounts": {
+        "dataType": "refObject",
+        "properties": {
+            "reportsMarked": {"dataType":"double","required":true},
+            "fixNoticesSent": {"dataType":"double","required":true},
+            "fixNoticesSkipped": {"dataType":"double","required":true},
+            "fixNoticesFailed": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MarkFeedbackReleaseRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "releaseTag": {"dataType":"string","required":true},
+            "issueNumbers": {"dataType":"array","array":{"dataType":"double"},"required":true},
         },
         "additionalProperties": false,
     },
@@ -1870,6 +1892,37 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 204,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackReleaseController_markRelease: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"MarkFeedbackReleaseRequest"},
+        };
+        app.post('/feedback/releases/mark',
+            authenticateMiddleware([{"deploy-secret":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackReleaseController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackReleaseController.prototype.markRelease)),
+
+            async function FeedbackReleaseController_markRelease(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackReleaseController_markRelease, request, response });
+
+                const controller = new FeedbackReleaseController();
+
+              await templateService.apiHandler({
+                methodName: 'markRelease',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
               });
             } catch (err) {
                 return next(err);

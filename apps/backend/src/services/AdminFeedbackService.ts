@@ -3,9 +3,10 @@ import {
   FEEDBACK_REPORT_TEXT_MAX_LENGTH,
   FEEDBACK_REPORT_STATUS_RULES,
   FEEDBACK_REPORT_KIND_RULES,
-  FEEDBACK_RELEASE_TAG_PATTERN,
+  FEEDBACK_RELEASE_TAG_REFUSAL_MESSAGE,
   TRACKING_ISSUE_LINKED_STATUS,
   isFeedbackReportStatus,
+  parseReleaseTag,
   isFeedbackReportKind,
   FeedbackReportStatus,
   FeedbackReportKind,
@@ -718,14 +719,13 @@ export class AdminFeedbackService {
     const report = reportResult.body;
 
     // Validate and parse the release tag
-    const releaseTag = trimString(input.releaseTag);
-    if (!releaseTag || !FEEDBACK_RELEASE_TAG_PATTERN.test(releaseTag)) {
+    const releaseTag = parseReleaseTag(input.releaseTag);
+    if (releaseTag === null) {
       return {
         ok: false,
         status: 400,
         body: {
-          message:
-            'Name the release this shipped in, such as v1.4.0 or mobile-v1.4.0.',
+          message: FEEDBACK_RELEASE_TAG_REFUSAL_MESSAGE,
         },
       };
     }

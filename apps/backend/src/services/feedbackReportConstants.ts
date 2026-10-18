@@ -208,6 +208,21 @@ export const FEEDBACK_REPORT_RATE_WINDOW_MS =
 export const FEEDBACK_RELEASE_TAG_PATTERN =
   /^(?:mobile-)?v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
+/** The refusal an admin or the Production deploy gets for a missing or malformed Release tag. */
+export const FEEDBACK_RELEASE_TAG_REFUSAL_MESSAGE =
+  'Name the release this shipped in, such as v1.4.0 or mobile-v1.4.0.';
+
+/**
+ * Trims a Release tag and returns it when it matches FEEDBACK_RELEASE_TAG_PATTERN,
+ * or null when it is missing, not a string, or malformed.
+ */
+export function parseReleaseTag(value: unknown): string | null {
+  const releaseTag = typeof value === 'string' ? value.trim() : '';
+  return releaseTag && FEEDBACK_RELEASE_TAG_PATTERN.test(releaseTag)
+    ? releaseTag
+    : null;
+}
+
 /**
  * The Report Status a report transitions to when an admin links a Tracking
  * Issue (PRD #1206).

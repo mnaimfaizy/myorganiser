@@ -130,6 +130,7 @@ GOOGLE_CLIENT_SECRET=<oauth-client-secret>
 GOOGLE_REDIRECT_URI=<frontend origin>/dashboard/youtube/callback
 YOUTUBE_TOKEN_ENCRYPTION_KEY=<64-char-hex>
 YOUTUBE_CRON_SECRET=<shared-secret>
+FEEDBACK_RELEASE_SECRET=<deploy-secret>
 ```
 
 `.env.example` in the repository has the full list.
@@ -143,6 +144,11 @@ YOUTUBE_CRON_SECRET=<shared-secret>
   variables. `YOUTUBE_API_BASE_URL` belongs only in that file, never here. The
   mailbox, SPF/DKIM, and crontab steps live in
   [YouTube integration](../features/youtube-integration.md#cpanel-cron-configuration).
+- `FEEDBACK_RELEASE_SECRET` is the Production deploy's credential for
+  `POST /feedback/releases/mark`, sent as `X-Deploy-Secret`
+  ([ADR 0133](../adr/0133-a-feedback-report-becomes-fixed-when-the-production-deploy-ships-its-tracking-issue.md)).
+  Use a value distinct from `YOUTUBE_CRON_SECRET`. While it is unset, the
+  endpoint refuses every request.
 - YouTube is unavailable in production until its Cloud project is verified
   ([ADR 0091](../adr/0091-a-google-cloud-project-is-split-by-verification-not-by-environment.md)).
   Leave `YOUTUBE_AVAILABLE` unset or `false` until then. When it is `true` in

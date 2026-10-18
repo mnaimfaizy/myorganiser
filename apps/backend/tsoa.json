@@ -31,6 +31,12 @@
         "in": "header",
         "name": "X-Cron-Secret",
         "description": "Shared secret for cron-triggered endpoints"
+      },
+      "deploy-secret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Deploy-Secret",
+        "description": "Production deploy credential for Release marking (FEEDBACK_RELEASE_SECRET)"
       }
     }
   },

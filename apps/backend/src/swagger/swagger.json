@@ -1295,6 +1295,58 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"FeedbackReleaseMarkCounts": {
+				"description": "Counts returned to the Production deploy once a Release has been marked.",
+				"properties": {
+					"reportsMarked": {
+						"type": "number",
+						"format": "double"
+					},
+					"fixNoticesSent": {
+						"type": "number",
+						"format": "double"
+					},
+					"fixNoticesSkipped": {
+						"type": "number",
+						"format": "double"
+					},
+					"fixNoticesFailed": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"reportsMarked",
+					"fixNoticesSent",
+					"fixNoticesSkipped",
+					"fixNoticesFailed"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"MarkFeedbackReleaseRequest": {
+				"description": "Request body the Production deploy sends to mark a Release's Planned\nFeedback Reports delivered (ADR 0133).",
+				"properties": {
+					"releaseTag": {
+						"type": "string",
+						"description": "The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fixes shipped in."
+					},
+					"issueNumbers": {
+						"items": {
+							"type": "number",
+							"format": "double"
+						},
+						"type": "array",
+						"description": "The Tracking Issue numbers the Release shipped, at most 500."
+					}
+				},
+				"required": [
+					"releaseTag",
+					"issueNumbers"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"FixNoticeUnsubscribeResponse": {
 				"properties": {
 					"ok": {
@@ -2071,7 +2123,7 @@
 				"properties": {
 					"releaseTag": {
 						"type": "string",
-						"description": "The Release tag (e.g., v1.4.0 or mobile-v1.4.0)."
+						"description": "The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fix shipped in."
 					}
 				},
 				"required": [
@@ -2154,6 +2206,12 @@
 				"in": "header",
 				"name": "X-Cron-Secret",
 				"description": "Shared secret for cron-triggered endpoints"
+			},
+			"deploy-secret": {
+				"type": "apiKey",
+				"in": "header",
+				"name": "X-Deploy-Secret",
+				"description": "Production deploy credential for Release marking (FEEDBACK_RELEASE_SECRET)"
 			}
 		}
 	},
@@ -3851,6 +3909,70 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/UserDeletionBody"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/feedback/releases/mark": {
+			"post": {
+				"operationId": "MarkRelease",
+				"responses": {
+					"200": {
+						"description": "Release marked",
+						"content": {
+							"application/json": {
+								"schema": {
+									"anyOf": [
+										{
+											"$ref": "#/components/schemas/FeedbackReleaseMarkCounts"
+										},
+										{
+											"$ref": "#/components/schemas/ErrorResponse"
+										}
+									]
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid Release tag or issue list",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Missing or wrong deploy credential",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Marks every Planned Feedback Report on the named Tracking Issues as Fixed\n(Bug Report) or Shipped (Suggestion), sends each newly marked report its\nFix Notice, and returns counts only.",
+				"tags": [
+					"Feedback"
+				],
+				"security": [
+					{
+						"deploy-secret": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/MarkFeedbackReleaseRequest"
 							}
 						}
 					}
