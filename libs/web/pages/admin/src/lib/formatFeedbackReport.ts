@@ -21,14 +21,14 @@ export interface FeedbackReportKindRule {
 const FEEDBACK_REPORT_STATUS_RULES = {
   received: {
     label: 'Received',
-    variant: 'default',
+    variant: 'secondary',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
   },
   under_review: {
     label: 'Under review',
-    variant: 'default',
+    variant: 'secondary',
     adminSettable: true,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
@@ -42,14 +42,14 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   fixed: {
     label: 'Fixed',
-    variant: 'secondary',
+    variant: 'default',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['bug_report'],
   },
   shipped: {
     label: 'Shipped',
-    variant: 'secondary',
+    variant: 'default',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['suggestion'],

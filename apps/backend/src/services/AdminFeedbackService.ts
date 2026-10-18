@@ -27,6 +27,8 @@ export interface AdminFeedbackReportListItemDto {
   trackingIssueNumber: number | null;
   /** Null once the sender has been removed by User Deletion. */
   reporterUserId: string | null;
+  /** Sender identity for the inbox. Null once the sender has been removed by User Deletion. */
+  reporter: AdminFeedbackReporterDto | null;
   statusChangedAt: string | null;
   createdAt: string;
 }
@@ -155,6 +157,22 @@ function refuseWhenFinal(report: {
 }
 
 /**
+ * Map a reporter row from REPORT_WITH_REPORTER to the reporter DTO. Shared by
+ * the list and detail mappers so both endpoints expose the same identity.
+ */
+function toReporterDto(
+  reporter: { id: string; name: string | null; email: string } | null,
+): AdminFeedbackReporterDto | null {
+  return reporter
+    ? {
+        id: reporter.id,
+        name: reporter.name,
+        email: reporter.email,
+      }
+    : null;
+}
+
+/**
  * Convert a database feedback_report row to an admin list item DTO.
  */
 function toListItemDto(row: {
@@ -167,6 +185,7 @@ function toListItemDto(row: {
   reporter_user_id: string | null;
   status_changed_at: Date | null;
   created_at: Date;
+  reporter: { id: string; name: string | null; email: string } | null;
 }): AdminFeedbackReportListItemDto {
   return {
     id: row.id,
@@ -176,6 +195,7 @@ function toListItemDto(row: {
     platform: row.context_platform,
     trackingIssueNumber: row.tracking_issue_number,
     reporterUserId: row.reporter_user_id,
+    reporter: toReporterDto(row.reporter),
     statusChangedAt: row.status_changed_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
   };
@@ -231,13 +251,7 @@ function toDetailDto(row: {
     reporterUserId: row.reporter_user_id,
     statusChangedAt: row.status_changed_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
-    reporter: row.reporter
-      ? {
-          id: row.reporter.id,
-          name: row.reporter.name,
-          email: row.reporter.email,
-        }
-      : null,
+    reporter: toReporterDto(row.reporter),
   };
 }
 
@@ -394,6 +408,7 @@ export class AdminFeedbackService {
         reporter_user_id: true,
         status_changed_at: true,
         created_at: true,
+        reporter: REPORT_WITH_REPORTER.reporter,
       },
     });
 

@@ -158,7 +158,7 @@ export function FeedbackReportDetailPageClient() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <Button variant="outline" asChild>
+      <Button variant="outline" asChild className="self-start">
         <Link href="/admin/feedback">Back to Feedback</Link>
       </Button>
 
@@ -182,7 +182,9 @@ export function FeedbackReportDetailPageClient() {
               <h1 className="text-2xl font-semibold tracking-tight">
                 {report.title}
               </h1>
-              <Badge>{formatFeedbackReportKind(report.kind)}</Badge>
+              <Badge variant="outline">
+                {formatFeedbackReportKind(report.kind)}
+              </Badge>
               <Badge variant={getStatusLabelVariant(report.status)}>
                 {formatFeedbackReportStatus(report.status)}
               </Badge>

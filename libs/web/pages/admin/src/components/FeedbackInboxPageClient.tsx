@@ -127,7 +127,7 @@ function FeedbackFilters({
           </Label>
           <Input
             id="platform-filter"
-            placeholder="web"
+            placeholder="Any platform"
             value={platformFilter}
             onChange={(e) => onPlatformFilterChange(e.target.value)}
           />
@@ -150,7 +150,7 @@ function FeedbackFilters({
       <Button
         variant="outline"
         onClick={onClearFilters}
-        className="w-full sm:w-auto"
+        className="w-full self-start sm:w-auto"
       >
         Clear filters
       </Button>
@@ -285,13 +285,20 @@ export function FeedbackInboxPageClient() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {report.reporterUserId ? (
-                    <Link
-                      href={`/admin/users/${report.reporterUserId}`}
-                      className="text-primary hover:underline"
-                    >
-                      {report.reporterUserId}
-                    </Link>
+                  {report.reporter ? (
+                    <div className="grid">
+                      <Link
+                        href={`/admin/users/${report.reporter.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {report.reporter.name || report.reporter.email}
+                      </Link>
+                      {report.reporter.name ? (
+                        <span className="text-xs text-muted-foreground">
+                          {report.reporter.email}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">Deleted</span>
                   )}

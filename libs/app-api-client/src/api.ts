@@ -106,6 +106,10 @@ export interface AdminFeedbackReportDetailDto {
      * Null once the sender has been removed by User Deletion.
      */
     'reporterUserId': string | null;
+    /**
+     * Null means the sender was removed by User Deletion — every report is sent by a signed-in User.
+     */
+    'reporter': AdminFeedbackReporterDto | null;
     'statusChangedAt': string | null;
     'createdAt': string;
     'description': string;
@@ -115,10 +119,6 @@ export interface AdminFeedbackReportDetailDto {
     'statusNote': string | null;
     'releaseTag': string | null;
     'fixNoticeOptIn': boolean;
-    /**
-     * Null means the sender was removed by User Deletion — every report is sent by a signed-in User.
-     */
-    'reporter': AdminFeedbackReporterDto | null;
 }
 
 
@@ -139,6 +139,10 @@ export interface AdminFeedbackReportListItemDto {
      * Null once the sender has been removed by User Deletion.
      */
     'reporterUserId': string | null;
+    /**
+     * Sender identity for the inbox. Null once the sender has been removed by User Deletion.
+     */
+    'reporter': AdminFeedbackReporterDto | null;
     'statusChangedAt': string | null;
     'createdAt': string;
 }

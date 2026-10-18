@@ -9,7 +9,13 @@ jest.mock('../lib/apiClient', () => ({
 Element.prototype.scrollIntoView = jest.fn();
 
 import type { AdminFeedbackReportListItemDto } from '@myorganiser/app-api-client';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
@@ -31,6 +37,7 @@ const sampleReports: AdminFeedbackReportListItemDto[] = [
     platform: 'web',
     trackingIssueNumber: null,
     reporterUserId: 'user-123',
+    reporter: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
     statusChangedAt: null,
     createdAt: '2026-10-17T10:00:00.000Z',
   },
@@ -42,6 +49,7 @@ const sampleReports: AdminFeedbackReportListItemDto[] = [
     platform: 'mobile',
     trackingIssueNumber: 42,
     reporterUserId: 'user-456',
+    reporter: { id: 'user-456', name: null, email: 'another@example.com' },
     statusChangedAt: null,
     createdAt: '2026-10-16T15:30:00.000Z',
   },
@@ -53,6 +61,7 @@ const sampleReports: AdminFeedbackReportListItemDto[] = [
     platform: 'web',
     trackingIssueNumber: null,
     reporterUserId: null,
+    reporter: null,
     statusChangedAt: null,
     createdAt: '2026-10-15T08:45:00.000Z',
   },
@@ -180,7 +189,7 @@ describe('FeedbackInboxPageClient', () => {
     });
 
     const platformInput = screen.getByPlaceholderText(
-      'web',
+      'Any platform',
     ) as HTMLInputElement;
     fireEvent.change(platformInput, { target: { value: 'web' } });
 
@@ -241,7 +250,7 @@ describe('FeedbackInboxPageClient', () => {
 
     // Set a platform filter
     const platformFilterInput = screen.getByPlaceholderText(
-      'web',
+      'Any platform',
     ) as HTMLInputElement;
     fireEvent.change(platformFilterInput, { target: { value: 'mobile' } });
 
@@ -260,25 +269,58 @@ describe('FeedbackInboxPageClient', () => {
     });
   });
 
-  it('renders report with reporterUserId as a link to /admin/users/<id>', async () => {
+  it('renders the sender name as a link to /admin/users/<id> and shows the email in the same cell', async () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
       expect(screen.getByText('App crashes on login')).toBeInTheDocument();
     });
 
-    const userLink = screen.getByRole('link', { name: 'user-123' });
-    expect(userLink).toHaveAttribute('href', '/admin/users/user-123');
+    const row = screen.getByText('App crashes on login').closest('tr');
+    expect(row).not.toBeNull();
+    const senderLink = within(row as HTMLElement).getByRole('link', {
+      name: 'Test User',
+    });
+    expect(senderLink).toHaveAttribute('href', '/admin/users/user-123');
+    expect(
+      within(row as HTMLElement).getByText('test@example.com'),
+    ).toBeInTheDocument();
   });
 
-  it('renders report with null reporterUserId as "Deleted"', async () => {
+  it('renders the sender email as the link text when the reporter has no name', async () => {
+    render(<FeedbackInboxPageClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Add dark mode')).toBeInTheDocument();
+    });
+
+    const row = screen.getByText('Add dark mode').closest('tr');
+    expect(row).not.toBeNull();
+    const senderLink = within(row as HTMLElement).getByRole('link', {
+      name: 'another@example.com',
+    });
+    expect(senderLink).toHaveAttribute('href', '/admin/users/user-456');
+    expect(
+      within(row as HTMLElement).getAllByText('another@example.com'),
+    ).toHaveLength(1);
+  });
+
+  it('renders a null reporter as "Deleted" with no link to a user', async () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
       expect(screen.getByText('Lost data after sync')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Deleted')).toBeInTheDocument();
+    const row = screen.getByText('Lost data after sync').closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText('Deleted')).toBeInTheDocument();
+    // The only link left in the row is the report title.
+    expect(
+      within(row as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/admin/feedback/report-3']);
   });
 
   it('shows empty state when API returns no reports', async () => {

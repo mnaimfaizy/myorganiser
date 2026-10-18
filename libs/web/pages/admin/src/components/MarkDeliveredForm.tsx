@@ -13,7 +13,7 @@ import {
   Input,
 } from '@myorganiser/web-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -44,8 +44,16 @@ export function MarkDeliveredForm({
   report,
   onUpdated,
 }: MarkDeliveredFormProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  // Scoped to the report it was produced against, so a sibling update hides it.
+  const [errorResult, setErrorResult] = useState<{
+    report: AdminFeedbackReportDetailDto;
+    value: string;
+  } | null>(null);
+  const error = errorResult?.report === report ? errorResult.value : null;
+  // The report this form's own submit produced. The success message shows only
+  // while the parent still holds that report; a sibling update hides it.
+  const [savedReport, setSavedReport] =
+    useState<AdminFeedbackReportDetailDto | null>(null);
 
   const form = useForm<MarkDeliveredFormValues>({
     resolver: zodResolver(markDeliveredSchema),
@@ -54,10 +62,15 @@ export function MarkDeliveredForm({
     },
   });
 
+  // Any report update, own or sibling, drops stale errors and validation
+  // messages. The own success message is report-scoped, so it survives.
+  useEffect(() => {
+    form.clearErrors();
+  }, [report, form]);
+
   const onSubmit = useCallback(
     async (values: MarkDeliveredFormValues) => {
-      setError(null);
-      setSuccess(false);
+      setErrorResult(null);
 
       try {
         const api = createPlatformAdminApi();
@@ -67,14 +80,14 @@ export function MarkDeliveredForm({
             releaseTag: values.releaseTag,
           },
         });
+        setSavedReport(response.data);
         onUpdated(response.data);
-        setSuccess(true);
         form.reset();
       } catch (err) {
-        setError(getApiErrorMessage(err));
+        setErrorResult({ report, value: getApiErrorMessage(err) });
       }
     },
-    [report.id, onUpdated, form],
+    [report, onUpdated, form],
   );
 
   // Get the button label based on report kind
@@ -90,11 +103,11 @@ export function MarkDeliveredForm({
             <FormItem>
               <FormLabel>Release</FormLabel>
               <FormControl>
-                <Input placeholder="v1.4.0" {...field} />
+                <Input placeholder="Release tag" {...field} />
               </FormControl>
               <FormDescription>
-                Use this for a fix with no tracking issue, and for a Mobile
-                Release.
+                A Release tag such as v1.4.0. Use this for a fix with no
+                tracking issue, and for a Mobile Release.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -102,15 +115,11 @@ export function MarkDeliveredForm({
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && (
+        {savedReport === report && (
           <p className="text-sm text-muted-foreground">Release recorded.</p>
         )}
 
-        <Button
-          type="submit"
-          disabled={form.formState.isSubmitting}
-          className="w-full"
-        >
+        <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? 'Processing…' : buttonLabel}
         </Button>
       </form>

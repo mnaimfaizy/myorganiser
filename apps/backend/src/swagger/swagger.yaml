@@ -1243,6 +1243,22 @@ components:
             - youtubeDisconnect
           type: object
       description: Identity after a YouTube Access withdrawal, with the disconnect outcome.
+    AdminFeedbackReporterDto:
+      description: Admin Feedback Reporter identity.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+      required:
+        - id
+        - name
+        - email
+      type: object
+      additionalProperties: false
     AdminFeedbackReportListItemDto:
       description: "Admin Feedback Report list item: header view without description."
       properties:
@@ -1265,6 +1281,12 @@ components:
           type: string
           nullable: true
           description: Null once the sender has been removed by User Deletion.
+        reporter:
+          allOf:
+            - $ref: "#/components/schemas/AdminFeedbackReporterDto"
+          nullable: true
+          description: Sender identity for the inbox. Null once the sender has been
+            removed by User Deletion.
         statusChangedAt:
           type: string
           nullable: true
@@ -1278,6 +1300,7 @@ components:
         - platform
         - trackingIssueNumber
         - reporterUserId
+        - reporter
         - statusChangedAt
         - createdAt
       type: object
@@ -1317,22 +1340,6 @@ components:
         - sentAt
       type: object
       additionalProperties: false
-    AdminFeedbackReporterDto:
-      description: Admin Feedback Reporter identity.
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-          nullable: true
-        email:
-          type: string
-      required:
-        - id
-        - name
-        - email
-      type: object
-      additionalProperties: false
     AdminFeedbackReportDetailDto:
       description: "Admin Feedback Report detail: full report with all fields and
         reporter info."
@@ -1356,6 +1363,12 @@ components:
           type: string
           nullable: true
           description: Null once the sender has been removed by User Deletion.
+        reporter:
+          allOf:
+            - $ref: "#/components/schemas/AdminFeedbackReporterDto"
+          nullable: true
+          description: Null means the sender was removed by User Deletion — every report
+            is sent by a signed-in User.
         statusChangedAt:
           type: string
           nullable: true
@@ -1379,12 +1392,6 @@ components:
           nullable: true
         fixNoticeOptIn:
           type: boolean
-        reporter:
-          allOf:
-            - $ref: "#/components/schemas/AdminFeedbackReporterDto"
-          nullable: true
-          description: Null means the sender was removed by User Deletion — every report
-            is sent by a signed-in User.
       required:
         - id
         - kind
@@ -1393,6 +1400,7 @@ components:
         - platform
         - trackingIssueNumber
         - reporterUserId
+        - reporter
         - statusChangedAt
         - createdAt
         - description
@@ -1402,7 +1410,6 @@ components:
         - statusNote
         - releaseTag
         - fixNoticeOptIn
-        - reporter
       type: object
       additionalProperties: false
     ChangeFeedbackReportStatusRequest:

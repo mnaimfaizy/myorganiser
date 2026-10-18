@@ -1754,6 +1754,28 @@
 				],
 				"description": "Identity after a YouTube Access withdrawal, with the disconnect outcome."
 			},
+			"AdminFeedbackReporterDto": {
+				"description": "Admin Feedback Reporter identity.",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string",
+						"nullable": true
+					},
+					"email": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"email"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AdminFeedbackReportListItemDto": {
 				"description": "Admin Feedback Report list item: header view without description.",
 				"properties": {
@@ -1783,6 +1805,15 @@
 						"nullable": true,
 						"description": "Null once the sender has been removed by User Deletion."
 					},
+					"reporter": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AdminFeedbackReporterDto"
+							}
+						],
+						"nullable": true,
+						"description": "Sender identity for the inbox. Null once the sender has been removed by User Deletion."
+					},
 					"statusChangedAt": {
 						"type": "string",
 						"nullable": true
@@ -1799,6 +1830,7 @@
 					"platform",
 					"trackingIssueNumber",
 					"reporterUserId",
+					"reporter",
 					"statusChangedAt",
 					"createdAt"
 				],
@@ -1854,28 +1886,6 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"AdminFeedbackReporterDto": {
-				"description": "Admin Feedback Reporter identity.",
-				"properties": {
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string",
-						"nullable": true
-					},
-					"email": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"id",
-					"name",
-					"email"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"AdminFeedbackReportDetailDto": {
 				"description": "Admin Feedback Report detail: full report with all fields and reporter info.",
 				"properties": {
@@ -1904,6 +1914,15 @@
 						"type": "string",
 						"nullable": true,
 						"description": "Null once the sender has been removed by User Deletion."
+					},
+					"reporter": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AdminFeedbackReporterDto"
+							}
+						],
+						"nullable": true,
+						"description": "Null means the sender was removed by User Deletion — every report is sent by a signed-in User."
 					},
 					"statusChangedAt": {
 						"type": "string",
@@ -1936,15 +1955,6 @@
 					},
 					"fixNoticeOptIn": {
 						"type": "boolean"
-					},
-					"reporter": {
-						"allOf": [
-							{
-								"$ref": "#/components/schemas/AdminFeedbackReporterDto"
-							}
-						],
-						"nullable": true,
-						"description": "Null means the sender was removed by User Deletion — every report is sent by a signed-in User."
 					}
 				},
 				"required": [
@@ -1955,6 +1965,7 @@
 					"platform",
 					"trackingIssueNumber",
 					"reporterUserId",
+					"reporter",
 					"statusChangedAt",
 					"createdAt",
 					"description",
@@ -1963,8 +1974,7 @@
 					"followUp",
 					"statusNote",
 					"releaseTag",
-					"fixNoticeOptIn",
-					"reporter"
+					"fixNoticeOptIn"
 				],
 				"type": "object",
 				"additionalProperties": false

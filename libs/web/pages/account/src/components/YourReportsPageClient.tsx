@@ -29,11 +29,11 @@ const DELIVERED_STATUS_BY_KIND = {
 } as const satisfies Record<FeedbackReportKind, FeedbackReportStatus>;
 
 const REPORT_STATUS_CONFIG = {
-  received: { label: 'Received', variant: 'default' },
-  under_review: { label: 'Under review', variant: 'default' },
+  received: { label: 'Received', variant: 'secondary' },
+  under_review: { label: 'Under review', variant: 'secondary' },
   planned: { label: 'Planned', variant: 'default' },
-  fixed: { label: 'Fixed', variant: 'secondary' },
-  shipped: { label: 'Shipped', variant: 'secondary' },
+  fixed: { label: 'Fixed', variant: 'default' },
+  shipped: { label: 'Shipped', variant: 'default' },
   wont_do: { label: "Won't do", variant: 'destructive' },
   cannot_reproduce: { label: "Can't reproduce", variant: 'outline' },
 } as const satisfies Record<

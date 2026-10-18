@@ -13,7 +13,7 @@ import {
   Input,
 } from '@myorganiser/web-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -38,12 +38,27 @@ const linkIssueSchema = z.object({
 
 type LinkIssueFormValues = z.infer<typeof linkIssueSchema>;
 
+type TrackingIssueMessage =
+  | { kind: 'linked'; issueNumber: number }
+  | { kind: 'unlinked' };
+
+// Each message and error is scoped to the report it was produced against.
+// Once the parent passes a different report (a sibling form updated it), the
+// scoped value no longer matches and stops rendering, with no effect needed.
+interface ScopedMessage<T> {
+  report: AdminFeedbackReportDetailDto;
+  value: T;
+}
+
 export function TrackingIssueForm({
   report,
   onUpdated,
 }: TrackingIssueFormProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [errorResult, setErrorResult] = useState<ScopedMessage<string> | null>(
+    null,
+  );
+  const [messageResult, setMessageResult] =
+    useState<ScopedMessage<TrackingIssueMessage> | null>(null);
   const [isUnlinking, setIsUnlinking] = useState(false);
 
   const form = useForm<LinkIssueFormValues>({
@@ -53,9 +68,17 @@ export function TrackingIssueForm({
     },
   });
 
+  // Validation errors are react-hook-form state, so they are cleared here
+  // when the report changes, own or sibling.
+  useEffect(() => {
+    form.clearErrors();
+  }, [report, form]);
+
+  const error = errorResult?.report === report ? errorResult.value : null;
+  const message = messageResult?.report === report ? messageResult.value : null;
+
   const handleUnlink = useCallback(async () => {
-    setError(null);
-    setSuccess(false);
+    setErrorResult(null);
     setIsUnlinking(true);
 
     try {
@@ -63,36 +86,42 @@ export function TrackingIssueForm({
       const response = await api.unlinkFeedbackReportTrackingIssue({
         reportId: report.id,
       });
+      setMessageResult({
+        report: response.data,
+        value: { kind: 'unlinked' },
+      });
       onUpdated(response.data);
-      setSuccess(true);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      setErrorResult({ report, value: getApiErrorMessage(err) });
     } finally {
       setIsUnlinking(false);
     }
-  }, [report.id, onUpdated]);
+  }, [report, onUpdated]);
 
   const onSubmit = useCallback(
     async (values: LinkIssueFormValues) => {
-      setError(null);
-      setSuccess(false);
+      setErrorResult(null);
 
       try {
+        const issueNumber = Number(values.trackingIssueNumber);
         const api = createPlatformAdminApi();
         const response = await api.linkFeedbackReportTrackingIssue({
           reportId: report.id,
           linkFeedbackReportTrackingIssueRequest: {
-            trackingIssueNumber: Number(values.trackingIssueNumber),
+            trackingIssueNumber: issueNumber,
           },
         });
+        setMessageResult({
+          report: response.data,
+          value: { kind: 'linked', issueNumber },
+        });
         onUpdated(response.data);
-        setSuccess(true);
         form.reset();
       } catch (err) {
-        setError(getApiErrorMessage(err));
+        setErrorResult({ report, value: getApiErrorMessage(err) });
       }
     },
-    [report.id, onUpdated, form],
+    [report, onUpdated, form],
   );
 
   if (report.trackingIssueNumber) {
@@ -111,16 +140,13 @@ export function TrackingIssueForm({
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && (
-          <p className="text-sm text-muted-foreground">Issue unlinked.</p>
+        {message?.kind === 'linked' && (
+          <p className="text-sm text-muted-foreground">
+            Issue #{message.issueNumber} linked. The report is now Planned.
+          </p>
         )}
 
-        <Button
-          variant="outline"
-          onClick={handleUnlink}
-          disabled={isUnlinking}
-          className="w-full"
-        >
+        <Button variant="outline" onClick={handleUnlink} disabled={isUnlinking}>
           {isUnlinking ? 'Unlinking…' : 'Unlink'}
         </Button>
       </div>
@@ -148,14 +174,14 @@ export function TrackingIssueForm({
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && (
-          <p className="text-sm text-muted-foreground">Issue linked.</p>
+        {message?.kind === 'unlinked' && (
+          <p className="text-sm text-muted-foreground">Issue unlinked.</p>
         )}
 
         <Button
           type="submit"
+          variant="outline"
           disabled={form.formState.isSubmitting}
-          className="w-full"
         >
           {form.formState.isSubmitting ? 'Linking…' : 'Link issue'}
         </Button>

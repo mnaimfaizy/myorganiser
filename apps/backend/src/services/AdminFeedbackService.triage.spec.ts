@@ -315,11 +315,14 @@ describe('AdminFeedbackService — triage paths', () => {
       // Verify ordering is newest-first
       expect(findManyCall.orderBy).toEqual({ created_at: 'desc' });
 
-      // Verify select does not request description, expected_outcome, or reporter
+      // Verify select does not request description or expected_outcome, and
+      // requests only the reporter identity fields
       expect(findManyCall.select).toBeDefined();
       expect(findManyCall.select).not.toHaveProperty('description');
       expect(findManyCall.select).not.toHaveProperty('expected_outcome');
-      expect(findManyCall.select).not.toHaveProperty('reporter');
+      expect(findManyCall.select.reporter).toEqual({
+        select: { id: true, name: true, email: true },
+      });
 
       jest.clearAllMocks();
       prisma.feedbackReport.findMany.mockResolvedValue([]);
@@ -345,6 +348,40 @@ describe('AdminFeedbackService — triage paths', () => {
       const kindBody = kindResult.body as any;
       expect(kindBody.message).toContain('Invalid report kind');
       expect(prisma.feedbackReport.findMany).not.toHaveBeenCalled();
+    });
+
+    test('listReports item carries the reporter identity (id, name, email) and keeps reporterUserId', async () => {
+      prisma.feedbackReport.findMany.mockResolvedValue([makeDetailRow()]);
+
+      const result = await service.listReports({});
+
+      expect(result.ok).toBe(true);
+      const body = result.body as { items: any[] };
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].reporterUserId).toBe('user-1');
+      expect(body.items[0].reporter).toEqual({
+        id: 'user-1',
+        name: 'Test User',
+        email: 'user@example.com',
+      });
+    });
+
+    test('listReports item for a removed sender (reporter_user_id null) lists reporter: null', async () => {
+      prisma.feedbackReport.findMany.mockResolvedValue([
+        makeDetailRow({
+          id: 'report-deleted-sender',
+          reporter_user_id: null,
+          reporter: null,
+        }),
+      ]);
+
+      const result = await service.listReports({});
+
+      expect(result.ok).toBe(true);
+      const body = result.body as { items: any[] };
+      expect(body.items[0].id).toBe('report-deleted-sender');
+      expect(body.items[0].reporterUserId).toBeNull();
+      expect(body.items[0].reporter).toBeNull();
     });
 
     test('listReports with absent filters does not include them in where clause', async () => {

@@ -11,6 +11,7 @@ Element.prototype.scrollIntoView = jest.fn();
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { useState } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
 import { formatFeedbackReportStatus } from '../lib/formatFeedbackReport';
@@ -90,6 +91,25 @@ function createAxiosError(message: string) {
     isAxiosError: true,
     response: { status: 400, data: { message } },
   });
+}
+
+// Mirrors FeedbackReportDetailPageClient: the parent holds the report in state
+// and hands each returned report back down, so report-scoped messages render.
+function TriageHarness({
+  initialReport,
+}: {
+  initialReport: AdminFeedbackReportDetailDto;
+}) {
+  const [report, setReport] = useState(initialReport);
+  return (
+    <FeedbackReportTriageActions
+      report={report}
+      onUpdated={(updated) => {
+        mockOnUpdated(updated);
+        setReport(updated);
+      }}
+    />
+  );
 }
 
 describe('FeedbackReportTriageActions', () => {
@@ -373,6 +393,61 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(mockOnUpdated).not.toHaveBeenCalled();
     });
+
+    it('keeps the status success message after the parent re-renders with the updated report', async () => {
+      mockChangeFeedbackReportStatus.mockResolvedValue({
+        data: { ...bugReportFixture, status: 'planned' as const },
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      const plannedOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('planned'),
+      });
+      fireEvent.click(plannedOption);
+      fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+
+      expect(await screen.findByText('Status updated.')).toBeInTheDocument();
+    });
+
+    it('clears the status note error and resets the status when a sibling link updates the report', async () => {
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: {
+          ...bugReportFixture,
+          trackingIssueNumber: 42,
+          status: 'planned' as const,
+        },
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      const wontDoOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('wont_do'),
+      });
+      fireEvent.click(wontDoOption);
+      fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+
+      expect(
+        await screen.findByText('Write a status note explaining why.'),
+      ).toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(
+        await screen.findByText('Issue #42 linked. The report is now Planned.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Write a status note explaining why.'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('combobox', { name: 'Status' }),
+      ).toHaveTextContent(formatFeedbackReportStatus('under_review'));
+    });
   });
 
   describe('TrackingIssueForm', () => {
@@ -458,6 +533,106 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
     });
+
+    it('shows the linked message once the parent re-renders with the returned report', async () => {
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: {
+          ...bugReportFixture,
+          trackingIssueNumber: 42,
+          status: 'planned' as const,
+        },
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(
+        await screen.findByText('Issue #42 linked. The report is now Planned.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Issue unlinked.')).not.toBeInTheDocument();
+    });
+
+    it('shows the unlinked message once the parent re-renders with the returned report', async () => {
+      const reportWithIssue = { ...bugReportFixture, trackingIssueNumber: 42 };
+      mockUnlinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: { ...reportWithIssue, trackingIssueNumber: null },
+      });
+
+      render(<TriageHarness initialReport={reportWithIssue} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+
+      expect(await screen.findByText('Issue unlinked.')).toBeInTheDocument();
+      expect(
+        screen.queryByText(/The report is now Planned/),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the server error and does not call onUpdated when linking fails', async () => {
+      const serverMessage =
+        'Tracking issue #42 is already linked to another report';
+      mockLinkFeedbackReportTrackingIssue.mockRejectedValue(
+        createAxiosError(serverMessage),
+      );
+
+      render(
+        <FeedbackReportTriageActions
+          report={bugReportFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(await screen.findByText(serverMessage)).toBeInTheDocument();
+      expect(mockOnUpdated).not.toHaveBeenCalled();
+    });
+
+    it('shows the server error and does not call onUpdated when unlinking fails', async () => {
+      const serverMessage = 'Tracking issue #42 cannot be unlinked right now';
+      mockUnlinkFeedbackReportTrackingIssue.mockRejectedValue(
+        createAxiosError(serverMessage),
+      );
+      const reportWithIssue = { ...bugReportFixture, trackingIssueNumber: 42 };
+
+      render(
+        <FeedbackReportTriageActions
+          report={reportWithIssue}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+
+      expect(await screen.findByText(serverMessage)).toBeInTheDocument();
+      expect(mockOnUpdated).not.toHaveBeenCalled();
+    });
+
+    it('rejects an issue number of zero without calling the API', async () => {
+      render(
+        <FeedbackReportTriageActions
+          report={bugReportFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '0' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(
+        await screen.findByText('Enter the tracking issue number.'),
+      ).toBeInTheDocument();
+      expect(mockLinkFeedbackReportTrackingIssue).not.toHaveBeenCalled();
+    });
   });
 
   describe('MarkDeliveredForm', () => {
@@ -467,18 +642,13 @@ describe('FeedbackReportTriageActions', () => {
         data: updatedReport,
       });
 
-      render(
-        <FeedbackReportTriageActions
-          report={bugReportFixture}
-          onUpdated={mockOnUpdated}
-        />,
-      );
+      render(<TriageHarness initialReport={bugReportFixture} />);
 
       const markButton = screen.getByRole('button', { name: 'Mark fixed' });
       expect(markButton).toBeInTheDocument();
 
       const releaseInput = screen.getByPlaceholderText(
-        'v1.4.0',
+        'Release tag',
       ) as HTMLInputElement;
       fireEvent.change(releaseInput, { target: { value: 'v1.4.0' } });
 
@@ -494,6 +664,7 @@ describe('FeedbackReportTriageActions', () => {
       });
 
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
+      expect(await screen.findByText('Release recorded.')).toBeInTheDocument();
     });
 
     it('shows "Mark shipped" button for suggestion and submits with release tag', async () => {
@@ -516,7 +687,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(markButton).toBeInTheDocument();
 
       const releaseInput = screen.getByPlaceholderText(
-        'v1.4.0',
+        'Release tag',
       ) as HTMLInputElement;
       fireEvent.change(releaseInput, { target: { value: 'mobile-v2.0.0' } });
 
@@ -532,6 +703,177 @@ describe('FeedbackReportTriageActions', () => {
       });
 
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
+    });
+
+    it('clears the release validation error when a sibling link updates the report', async () => {
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: {
+          ...bugReportFixture,
+          trackingIssueNumber: 42,
+          status: 'planned' as const,
+        },
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mark fixed' }));
+
+      expect(
+        await screen.findByText(
+          'Name the release this shipped in, such as v1.4.0 or mobile-v1.4.0.',
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(
+        await screen.findByText('Issue #42 linked. The report is now Planned.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'Name the release this shipped in, such as v1.4.0 or mobile-v1.4.0.',
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the server error and does not call onUpdated when marking delivered fails', async () => {
+      const serverMessage =
+        'This release tag was already recorded for another report';
+      mockMarkFeedbackReportDelivered.mockRejectedValue(
+        createAxiosError(serverMessage),
+      );
+
+      render(
+        <FeedbackReportTriageActions
+          report={bugReportFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText('Release tag'), {
+        target: { value: 'v1.4.0' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Mark fixed' }));
+
+      expect(await screen.findByText(serverMessage)).toBeInTheDocument();
+      expect(mockOnUpdated).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('report-scoped messages', () => {
+    const linkedReport = {
+      ...bugReportFixture,
+      trackingIssueNumber: 42,
+      status: 'planned' as const,
+    };
+    const linkedMessage = 'Issue #42 linked. The report is now Planned.';
+
+    it('hides the linked message after a sibling status change updates the report', async () => {
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: linkedReport,
+      });
+      mockChangeFeedbackReportStatus.mockResolvedValue({
+        data: { ...linkedReport },
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+      expect(await screen.findByText(linkedMessage)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      const plannedOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('planned'),
+      });
+      fireEvent.click(plannedOption);
+      fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+
+      expect(await screen.findByText('Status updated.')).toBeInTheDocument();
+      expect(screen.queryByText(linkedMessage)).not.toBeInTheDocument();
+    });
+
+    it('hides the status message after a sibling link updates the report', async () => {
+      mockChangeFeedbackReportStatus.mockResolvedValue({
+        data: { ...bugReportFixture, status: 'planned' as const },
+      });
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: linkedReport,
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      const plannedOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('planned'),
+      });
+      fireEvent.click(plannedOption);
+      fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+      expect(await screen.findByText('Status updated.')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(await screen.findByText(linkedMessage)).toBeInTheDocument();
+      expect(screen.queryByText('Status updated.')).not.toBeInTheDocument();
+    });
+
+    it('hides the release message after a sibling link updates the report', async () => {
+      mockMarkFeedbackReportDelivered.mockResolvedValue({
+        data: { ...bugReportFixture, status: 'fixed' as const },
+      });
+      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: linkedReport,
+      });
+
+      render(<TriageHarness initialReport={bugReportFixture} />);
+
+      fireEvent.change(screen.getByPlaceholderText('Release tag'), {
+        target: { value: 'v1.4.0' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Mark fixed' }));
+      expect(await screen.findByText('Release recorded.')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
+        target: { value: '42' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
+
+      expect(await screen.findByText(linkedMessage)).toBeInTheDocument();
+      expect(screen.queryByText('Release recorded.')).not.toBeInTheDocument();
+    });
+
+    it('hides the unlinked message after a sibling status change updates the report', async () => {
+      const reportWithIssue = { ...bugReportFixture, trackingIssueNumber: 42 };
+      const unlinkedReport = { ...reportWithIssue, trackingIssueNumber: null };
+      mockUnlinkFeedbackReportTrackingIssue.mockResolvedValue({
+        data: unlinkedReport,
+      });
+      mockChangeFeedbackReportStatus.mockResolvedValue({
+        data: { ...unlinkedReport, status: 'planned' as const },
+      });
+
+      render(<TriageHarness initialReport={reportWithIssue} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+      expect(await screen.findByText('Issue unlinked.')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      const plannedOption = await screen.findByRole('option', {
+        name: formatFeedbackReportStatus('planned'),
+      });
+      fireEvent.click(plannedOption);
+      fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+
+      expect(await screen.findByText('Status updated.')).toBeInTheDocument();
+      expect(screen.queryByText('Issue unlinked.')).not.toBeInTheDocument();
     });
   });
 });
