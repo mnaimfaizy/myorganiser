@@ -81,7 +81,9 @@ export function DeleteAccountDialog({
               <DialogTitle>Confirm account deletion</DialogTitle>
               <DialogDescription>
                 This cannot be undone. Your account, its Sessions, and your
-                encrypted vault will be removed from our servers.
+                encrypted vault will be removed from our servers. Feedback
+                Reports you've sent stay on our servers, but with your name and
+                email removed — you won't be contacted about them again.
               </DialogDescription>
             </DialogHeader>
             <DeleteAccountConfirmForm onBack={handleBack} />

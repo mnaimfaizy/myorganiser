@@ -146,6 +146,9 @@ describe('DeleteAccountSection', () => {
     expect(
       screen.getByRole('heading', { name: 'Confirm account deletion' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Feedback Reports you've sent stay on our servers/),
+    ).toBeInTheDocument();
   });
 
   it('shows both required messages and does not call the API when submitted empty', async () => {
