@@ -123,6 +123,67 @@ describe('FeedbackReportTriageActions', () => {
     });
   });
 
+  describe('final reports', () => {
+    it('shows the release in the note and renders none of the triage controls for a fixed report', () => {
+      const fixedReport = {
+        ...bugReportFixture,
+        status: 'fixed' as const,
+        releaseTag: 'v1.4.0',
+      };
+
+      render(
+        <FeedbackReportTriageActions
+          report={fixedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'Triage' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'This report is fixed in v1.4.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Change status' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Tracking issue' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('combobox', { name: 'Status' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Mark fixed' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText('Issue number'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText('Release tag'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('omits the release clause from the note when a final report has no release tag', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{
+            ...suggestionFixture,
+            status: 'shipped' as const,
+            releaseTag: null,
+          }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(
+        screen.getByText('This report is shipped and can no longer change.'),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('ChangeStatusForm', () => {
     it('shows validation error when wont_do status is submitted without a note', async () => {
       render(
@@ -637,7 +698,11 @@ describe('FeedbackReportTriageActions', () => {
 
   describe('MarkDeliveredForm', () => {
     it('shows "Mark fixed" button for bug_report and submits with release tag', async () => {
-      const updatedReport = { ...bugReportFixture, status: 'fixed' as const };
+      const updatedReport = {
+        ...bugReportFixture,
+        status: 'fixed' as const,
+        releaseTag: 'v1.4.0',
+      };
       mockMarkFeedbackReportDelivered.mockResolvedValue({
         data: updatedReport,
       });
@@ -664,24 +729,27 @@ describe('FeedbackReportTriageActions', () => {
       });
 
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
-      expect(await screen.findByText('Release recorded.')).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          'This report is fixed in v1.4.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Mark fixed' }),
+      ).not.toBeInTheDocument();
     });
 
     it('shows "Mark shipped" button for suggestion and submits with release tag', async () => {
       const updatedReport = {
         ...suggestionFixture,
         status: 'shipped' as const,
+        releaseTag: 'mobile-v2.0.0',
       };
       mockMarkFeedbackReportDelivered.mockResolvedValue({
         data: updatedReport,
       });
 
-      render(
-        <FeedbackReportTriageActions
-          report={suggestionFixture}
-          onUpdated={mockOnUpdated}
-        />,
-      );
+      render(<TriageHarness initialReport={suggestionFixture} />);
 
       const markButton = screen.getByRole('button', { name: 'Mark shipped' });
       expect(markButton).toBeInTheDocument();
@@ -703,6 +771,11 @@ describe('FeedbackReportTriageActions', () => {
       });
 
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
+      expect(
+        await screen.findByText(
+          'This report is shipped in mobile-v2.0.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
     });
 
     it('clears the release validation error when a sibling link updates the report', async () => {
@@ -823,31 +896,6 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(await screen.findByText(linkedMessage)).toBeInTheDocument();
       expect(screen.queryByText('Status updated.')).not.toBeInTheDocument();
-    });
-
-    it('hides the release message after a sibling link updates the report', async () => {
-      mockMarkFeedbackReportDelivered.mockResolvedValue({
-        data: { ...bugReportFixture, status: 'fixed' as const },
-      });
-      mockLinkFeedbackReportTrackingIssue.mockResolvedValue({
-        data: linkedReport,
-      });
-
-      render(<TriageHarness initialReport={bugReportFixture} />);
-
-      fireEvent.change(screen.getByPlaceholderText('Release tag'), {
-        target: { value: 'v1.4.0' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Mark fixed' }));
-      expect(await screen.findByText('Release recorded.')).toBeInTheDocument();
-
-      fireEvent.change(screen.getByPlaceholderText('Issue number'), {
-        target: { value: '42' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Link issue' }));
-
-      expect(await screen.findByText(linkedMessage)).toBeInTheDocument();
-      expect(screen.queryByText('Release recorded.')).not.toBeInTheDocument();
     });
 
     it('hides the unlinked message after a sibling status change updates the report', async () => {

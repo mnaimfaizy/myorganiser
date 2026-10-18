@@ -5,6 +5,7 @@ import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 import {
   deliveredStatusForKind,
   formatFeedbackReportStatus,
+  isFinalStatus,
 } from '../lib/formatFeedbackReport';
 import { ChangeStatusForm } from './ChangeStatusForm';
 import { MarkDeliveredForm } from './MarkDeliveredForm';
@@ -19,6 +20,21 @@ export function FeedbackReportTriageActions({
   report,
   onUpdated,
 }: FeedbackReportTriageActionsProps) {
+  if (isFinalStatus(report.status)) {
+    const statusLabel = formatFeedbackReportStatus(report.status).toLowerCase();
+    const releaseClause = report.releaseTag ? ` in ${report.releaseTag}` : '';
+
+    return (
+      <section className="max-w-2xl space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">Triage</h2>
+        <p className="text-sm text-muted-foreground">
+          This report is {statusLabel}
+          {releaseClause} and can no longer change.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="max-w-2xl space-y-8">
       <div className="space-y-4">

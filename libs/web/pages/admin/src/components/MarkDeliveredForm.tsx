@@ -50,10 +50,6 @@ export function MarkDeliveredForm({
     value: string;
   } | null>(null);
   const error = errorResult?.report === report ? errorResult.value : null;
-  // The report this form's own submit produced. The success message shows only
-  // while the parent still holds that report; a sibling update hides it.
-  const [savedReport, setSavedReport] =
-    useState<AdminFeedbackReportDetailDto | null>(null);
 
   const form = useForm<MarkDeliveredFormValues>({
     resolver: zodResolver(markDeliveredSchema),
@@ -62,8 +58,9 @@ export function MarkDeliveredForm({
     },
   });
 
-  // Any report update, own or sibling, drops stale errors and validation
-  // messages. The own success message is report-scoped, so it survives.
+  // Any report update drops stale validation messages. A successful submit
+  // leaves the report Fixed or Shipped, and the parent then replaces this form
+  // with the final-report note, so no success message is needed here.
   useEffect(() => {
     form.clearErrors();
   }, [report, form]);
@@ -80,7 +77,6 @@ export function MarkDeliveredForm({
             releaseTag: values.releaseTag,
           },
         });
-        setSavedReport(response.data);
         onUpdated(response.data);
         form.reset();
       } catch (err) {
@@ -115,9 +111,6 @@ export function MarkDeliveredForm({
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {savedReport === report && (
-          <p className="text-sm text-muted-foreground">Release recorded.</p>
-        )}
 
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? 'Processing…' : buttonLabel}

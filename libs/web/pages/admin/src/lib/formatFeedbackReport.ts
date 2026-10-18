@@ -9,6 +9,8 @@ export interface FeedbackReportStatusRule {
   label: string;
   variant: 'default' | 'secondary' | 'destructive' | 'outline';
   adminSettable: boolean;
+  /** A final status cannot be changed again; the backend refuses every admin action on it. */
+  isFinal: boolean;
   requiresStatusNote: boolean;
   kinds: readonly FeedbackReportKind[];
 }
@@ -21,6 +23,7 @@ export interface FeedbackReportKindRule {
 const FEEDBACK_REPORT_STATUS_RULES = {
   received: {
     label: 'Received',
+    isFinal: false,
     variant: 'secondary',
     adminSettable: false,
     requiresStatusNote: false,
@@ -28,6 +31,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   under_review: {
     label: 'Under review',
+    isFinal: false,
     variant: 'secondary',
     adminSettable: true,
     requiresStatusNote: false,
@@ -35,6 +39,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   planned: {
     label: 'Planned',
+    isFinal: false,
     variant: 'default',
     adminSettable: true,
     requiresStatusNote: false,
@@ -42,6 +47,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   fixed: {
     label: 'Fixed',
+    isFinal: true,
     variant: 'default',
     adminSettable: false,
     requiresStatusNote: false,
@@ -49,6 +55,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   shipped: {
     label: 'Shipped',
+    isFinal: true,
     variant: 'default',
     adminSettable: false,
     requiresStatusNote: false,
@@ -56,6 +63,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   wont_do: {
     label: "Won't do",
+    isFinal: false,
     variant: 'destructive',
     adminSettable: true,
     requiresStatusNote: true,
@@ -63,6 +71,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   },
   cannot_reproduce: {
     label: "Can't reproduce",
+    isFinal: false,
     variant: 'outline',
     adminSettable: true,
     requiresStatusNote: true,
@@ -143,6 +152,14 @@ export function adminSettableStatusesForKind(
  */
 export function statusRequiresNote(status: FeedbackReportStatus): boolean {
   return FEEDBACK_REPORT_STATUS_RULES[status].requiresStatusNote;
+}
+
+/**
+ * Returns whether a status is final (Fixed and Shipped). The backend refuses
+ * every admin action on a final report. Derived from the status table (ADR 0053).
+ */
+export function isFinalStatus(status: FeedbackReportStatus): boolean {
+  return FEEDBACK_REPORT_STATUS_RULES[status].isFinal;
 }
 
 /**
