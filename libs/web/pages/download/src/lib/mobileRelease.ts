@@ -6,7 +6,7 @@
 // declaration on one line in this shape; the command finds it by its name.
 
 /** The newest Mobile Release, `X.Y.Z`, or `null` before the first one. */
-export const CURRENT_MOBILE_RELEASE: string | null = null;
+export const CURRENT_MOBILE_RELEASE: string | null = '1.0.0';
 
 const REPOSITORY_URL = 'https://github.com/mnaimfaizy/myorganiser';
 
