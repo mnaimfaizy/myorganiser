@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import { ExternalLink } from 'lucide-react';
 
 import {
   type FeedbackReportListItemDto,
@@ -102,9 +103,11 @@ function FeedbackReportListItem({ report }: FeedbackReportListItemProps) {
               href={currentReport.changelogUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-block text-xs text-primary underline"
+              className="inline-flex items-center gap-1 text-xs text-primary underline"
             >
               {deliveryWord} {currentReport.releaseTag} → View CHANGELOG
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />{' '}
+              <span className="sr-only">(opens in a new tab)</span>
             </a>
           )}
 

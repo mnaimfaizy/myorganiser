@@ -13,6 +13,7 @@ import {
   Input,
 } from '@myorganiser/web-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -133,9 +134,11 @@ export function TrackingIssueForm({
             href={trackingIssueUrl(report.trackingIssueNumber)}
             target="_blank"
             rel="noreferrer"
-            className="text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
           >
             #{report.trackingIssueNumber}
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />{' '}
+            <span className="sr-only">(opens in a new tab)</span>
           </a>
         </div>
 
