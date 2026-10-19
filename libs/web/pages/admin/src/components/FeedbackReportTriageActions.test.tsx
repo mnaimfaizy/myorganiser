@@ -9,6 +9,10 @@ jest.mock('../lib/apiClient', () => ({
 Element.prototype.scrollIntoView = jest.fn();
 
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
+import {
+  FEEDBACK_REPORT_TEXT_MAX_LENGTH,
+  formatFeedbackReportCap,
+} from '@myorganiser/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { useState } from 'react';
@@ -22,6 +26,7 @@ const mockChangeFeedbackReportStatus = jest.fn();
 const mockLinkFeedbackReportTrackingIssue = jest.fn();
 const mockUnlinkFeedbackReportTrackingIssue = jest.fn();
 const mockMarkFeedbackReportDelivered = jest.fn();
+const mockReopenFeedbackReport = jest.fn();
 const mockOnUpdated = jest.fn();
 
 const bugReportFixture: AdminFeedbackReportDetailDto = {
@@ -120,6 +125,7 @@ describe('FeedbackReportTriageActions', () => {
       linkFeedbackReportTrackingIssue: mockLinkFeedbackReportTrackingIssue,
       unlinkFeedbackReportTrackingIssue: mockUnlinkFeedbackReportTrackingIssue,
       markFeedbackReportDelivered: mockMarkFeedbackReportDelivered,
+      reopenFeedbackReport: mockReopenFeedbackReport,
     });
   });
 
@@ -922,6 +928,228 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(await screen.findByText('Status updated.')).toBeInTheDocument();
       expect(screen.queryByText('Issue unlinked.')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('reopen', () => {
+    const reopenPlaceholder = 'Explain why this report is being reopened...';
+    const reopenedMessage = 'Report reopened. It is back in Under review.';
+    const fixedReport = {
+      ...bugReportFixture,
+      status: 'fixed' as const,
+      releaseTag: 'v1.2.0',
+    };
+    const reopenedReport = {
+      ...fixedReport,
+      status: 'under_review' as const,
+      releaseTag: null,
+    };
+
+    it('hides the reopen form for a report that is not final', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{ ...bugReportFixture, status: 'under_review' as const }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'Change status' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Reopen' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Reopen report' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText(reopenPlaceholder),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the unchanged final note and the reopen form for a fixed report', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={fixedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          'This report is fixed in v1.2.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Reopen' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Status note')).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText(reopenPlaceholder),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Reopen report' }),
+      ).toBeInTheDocument();
+    });
+
+    it.each(['', '   '])(
+      'blocks a status note of %j without calling the API',
+      async (note) => {
+        render(
+          <FeedbackReportTriageActions
+            report={fixedReport}
+            onUpdated={mockOnUpdated}
+          />,
+        );
+
+        fireEvent.change(screen.getByPlaceholderText(reopenPlaceholder), {
+          target: { value: note },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Reopen report' }));
+
+        expect(
+          await screen.findByText('Write a status note explaining why.'),
+        ).toBeInTheDocument();
+        expect(mockReopenFeedbackReport).not.toHaveBeenCalled();
+        expect(mockOnUpdated).not.toHaveBeenCalled();
+      },
+    );
+
+    it('blocks a status note one character over the cap without calling the API', async () => {
+      render(
+        <FeedbackReportTriageActions
+          report={fixedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText(reopenPlaceholder), {
+        target: { value: 'x'.repeat(FEEDBACK_REPORT_TEXT_MAX_LENGTH + 1) },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reopen report' }));
+
+      expect(
+        await screen.findByText(
+          `The status note must be ${formatFeedbackReportCap(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
+        ),
+      ).toBeInTheDocument();
+      expect(mockReopenFeedbackReport).not.toHaveBeenCalled();
+      expect(mockOnUpdated).not.toHaveBeenCalled();
+    });
+
+    it('reopens the report and swaps the final view for the triage forms once the parent re-renders', async () => {
+      mockReopenFeedbackReport.mockResolvedValue({ data: reopenedReport });
+
+      render(<TriageHarness initialReport={fixedReport} />);
+
+      fireEvent.change(screen.getByPlaceholderText(reopenPlaceholder), {
+        target: { value: 'Reproduced on the latest build' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reopen report' }));
+
+      expect(
+        await screen.findByRole('heading', { name: 'Change status' }),
+      ).toBeInTheDocument();
+      expect(mockReopenFeedbackReport).toHaveBeenCalledWith({
+        reportId: fixedReport.id,
+        reopenFeedbackReportRequest: {
+          statusNote: 'Reproduced on the latest build',
+        },
+      });
+      expect(mockOnUpdated).toHaveBeenCalledWith(reopenedReport);
+      expect(
+        screen.queryByText(
+          'This report is fixed in v1.2.0 and can no longer change.',
+        ),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText(reopenedMessage)).toBeInTheDocument();
+    });
+
+    it('hides the reopened confirmation once a later update replaces the report', async () => {
+      mockReopenFeedbackReport.mockResolvedValue({ data: reopenedReport });
+
+      const { rerender } = render(
+        <FeedbackReportTriageActions
+          report={fixedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText(reopenPlaceholder), {
+        target: { value: 'Reproduced on the latest build' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reopen report' }));
+
+      await waitFor(() => {
+        expect(mockOnUpdated).toHaveBeenCalledWith(reopenedReport);
+      });
+
+      // The parent hands back the same object the API returned.
+      rerender(
+        <FeedbackReportTriageActions
+          report={reopenedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+      expect(screen.getByText(reopenedMessage)).toBeInTheDocument();
+
+      // A sibling update delivers a new report object, so the confirmation drops.
+      rerender(
+        <FeedbackReportTriageActions
+          report={{ ...reopenedReport }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+      expect(screen.queryByText(reopenedMessage)).not.toBeInTheDocument();
+    });
+
+    it('shows the server error inline and keeps the final view when reopening fails', async () => {
+      const serverMessage = 'This report can no longer be reopened';
+      mockReopenFeedbackReport.mockRejectedValue(
+        createAxiosError(serverMessage),
+      );
+
+      render(
+        <FeedbackReportTriageActions
+          report={fixedReport}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText(reopenPlaceholder), {
+        target: { value: 'Still reproducible' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reopen report' }));
+
+      expect(await screen.findByText(serverMessage)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'This report is fixed in v1.2.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
+      expect(mockOnUpdated).not.toHaveBeenCalled();
+    });
+
+    it('shows the reopen form for a shipped suggestion', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{
+            ...suggestionFixture,
+            status: 'shipped' as const,
+            releaseTag: 'mobile-v2.0.0',
+          }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          'This report is shipped in mobile-v2.0.0 and can no longer change.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Reopen report' }),
+      ).toBeInTheDocument();
     });
   });
 });
