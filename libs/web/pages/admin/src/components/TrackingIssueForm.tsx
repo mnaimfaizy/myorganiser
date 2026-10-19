@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
   Input,
+  NewTabLink,
 } from '@myorganiser/web-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useState } from 'react';
@@ -115,14 +116,12 @@ export function TrackingIssueForm({
       <div className="space-y-3">
         <div className="text-sm">
           <p className="font-medium">Tracking Issue:</p>
-          <a
+          <NewTabLink
             href={trackingIssueUrl(report.trackingIssueNumber)}
-            target="_blank"
-            rel="noreferrer"
             className="text-primary hover:underline"
           >
             #{report.trackingIssueNumber}
-          </a>
+          </NewTabLink>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

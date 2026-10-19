@@ -149,7 +149,7 @@ describe('FeedbackReportTriageActions', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          'This report is fixed in v1.4.0 and can no longer change.',
+          'This report is fixed in v1.4.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
       expect(
@@ -185,7 +185,9 @@ describe('FeedbackReportTriageActions', () => {
       );
 
       expect(
-        screen.getByText('This report is shipped and can no longer change.'),
+        screen.getByText(
+          'This report is shipped. It stays final unless you reopen it.',
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -561,7 +563,7 @@ describe('FeedbackReportTriageActions', () => {
         />,
       );
 
-      const issueLink = screen.getByRole('link', { name: '#42' });
+      const issueLink = screen.getByRole('link', { name: /^#42\b/ });
       expect(issueLink).toHaveAttribute(
         'href',
         'https://github.com/mnaimfaizy/myorganiser/issues/42',
@@ -737,7 +739,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
       expect(
         await screen.findByText(
-          'This report is fixed in v1.4.0 and can no longer change.',
+          'This report is fixed in v1.4.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
       expect(
@@ -779,7 +781,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(mockOnUpdated).toHaveBeenCalledWith(updatedReport);
       expect(
         await screen.findByText(
-          'This report is shipped in mobile-v2.0.0 and can no longer change.',
+          'This report is shipped in mobile-v2.0.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
     });
@@ -977,7 +979,7 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(
         screen.getByText(
-          'This report is fixed in v1.2.0 and can no longer change.',
+          'This report is fixed in v1.2.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
       expect(
@@ -1059,7 +1061,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(mockOnUpdated).toHaveBeenCalledWith(reopenedReport);
       expect(
         screen.queryByText(
-          'This report is fixed in v1.2.0 and can no longer change.',
+          'This report is fixed in v1.2.0. It stays final unless you reopen it.',
         ),
       ).not.toBeInTheDocument();
       expect(screen.getByText(reopenedMessage)).toBeInTheDocument();
@@ -1124,7 +1126,7 @@ describe('FeedbackReportTriageActions', () => {
       expect(await screen.findByText(serverMessage)).toBeInTheDocument();
       expect(
         screen.getByText(
-          'This report is fixed in v1.2.0 and can no longer change.',
+          'This report is fixed in v1.2.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
       expect(mockOnUpdated).not.toHaveBeenCalled();
@@ -1144,7 +1146,7 @@ describe('FeedbackReportTriageActions', () => {
 
       expect(
         screen.getByText(
-          'This report is shipped in mobile-v2.0.0 and can no longer change.',
+          'This report is shipped in mobile-v2.0.0. It stays final unless you reopen it.',
         ),
       ).toBeInTheDocument();
       expect(

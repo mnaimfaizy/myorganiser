@@ -17,6 +17,7 @@ export * from './lib/components/Form/Form';
 export * from './lib/components/Input/Input';
 export * from './lib/components/InstallAppInstructions/InstallAppInstructions';
 export * from './lib/components/Label/Label';
+export * from './lib/components/NewTabLink/NewTabLink';
 export * from './lib/components/Popover/Popover';
 export * from './lib/components/RetryableGate/RetryableGate';
 export * from './lib/components/Select/Select';

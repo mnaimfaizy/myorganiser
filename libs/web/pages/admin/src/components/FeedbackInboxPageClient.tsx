@@ -10,6 +10,7 @@ import {
   Button,
   Input,
   Label,
+  NewTabLink,
   Select,
   SelectContent,
   SelectItem,
@@ -272,14 +273,12 @@ export function FeedbackInboxPageClient() {
                 <TableCell>{report.platform}</TableCell>
                 <TableCell>
                   {report.trackingIssueNumber ? (
-                    <a
+                    <NewTabLink
                       href={trackingIssueUrl(report.trackingIssueNumber)}
-                      target="_blank"
-                      rel="noreferrer"
                       className="text-primary hover:underline"
                     >
                       {report.trackingIssueNumber}
-                    </a>
+                    </NewTabLink>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

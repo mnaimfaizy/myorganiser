@@ -45,7 +45,7 @@ export function FeedbackReportTriageActions({
         <h2 className="text-lg font-semibold tracking-tight">Triage</h2>
         <p className="text-sm text-muted-foreground">
           This report is {statusLabel}
-          {releaseClause} and can no longer change.
+          {releaseClause}. It stays final unless you reopen it.
         </p>
 
         <div className="space-y-4">
