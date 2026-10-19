@@ -41,7 +41,7 @@ export interface FeedbackReportStatusRule {
   kinds: readonly FeedbackReportKind[];
   /** Whether the status change always carries a Status Note for the reporter. */
   requiresStatusNote: boolean;
-  /** Whether the status is final — re-marking it for the same Release is a no-op. */
+  /** Whether the status is final — re-marking it for the same Release is a no-op, and only a Reopen leaves it. */
   isFinal: boolean;
 }
 
@@ -78,7 +78,8 @@ export const FEEDBACK_REPORT_KIND_RULES = {
  * - Fixed applies only to a Bug Report, Shipped only to a Suggestion, and
  *   Can't reproduce only to a Bug Report;
  * - Won't do and Can't reproduce always carry a Status Note;
- * - Fixed and Shipped are final, set by the Release-marking path or an admin.
+ * - Fixed and Shipped are final, set by the Release-marking path or an admin;
+ *   only an admin Reopen (issue #1228) moves a report out of them.
  *
  * Later slices (the reporter's own list, the Platform Admin inbox, the
  * Release-marking endpoint) read this table rather than re-enumerating it.
@@ -228,3 +229,9 @@ export function parseReleaseTag(value: unknown): string | null {
  * Issue (PRD #1206).
  */
 export const TRACKING_ISSUE_LINKED_STATUS: FeedbackReportStatus = 'planned';
+
+/**
+ * The Report Status a wrongly Fixed or Shipped report returns to when an admin
+ * Reopens it (issue #1228): back to triage, not straight to Planned.
+ */
+export const REOPENED_STATUS: FeedbackReportStatus = 'under_review';

@@ -191,8 +191,12 @@ Where a Feedback Report stands as its reporter sees it — Received, Under revie
 _Avoid_: state, ticket status, resolution
 
 **Status Note**:
-A short message an admin attaches to a Report Status change for the reporter to read. Won't do and Can't reproduce always carry one.
+A short message an admin attaches to a Report Status change for the reporter to read. Won't do, Can't reproduce, and a Reopen always carry one.
 _Avoid_: admin comment, reply, response, resolution note
+
+**Reopen** (of a Feedback Report):
+An admin's correction of a report wrongly marked Fixed or Shipped: it returns to Under review with a Status Note, loses its Release, keeps its Tracking Issue, and may send one new Fix Notice when it is really fixed. It is the one way out of Fixed or Shipped.
+_Avoid_: undo, revert, unfix
 
 **Follow-up**:
 The one extra message a reporter may add to their own Bug Report while it is Can't reproduce; sending it returns the report to Under review. There is no conversation beyond it.

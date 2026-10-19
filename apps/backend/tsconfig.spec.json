@@ -4,13 +4,22 @@
     "outDir": "../../dist/out-tsc",
     "module": "commonjs",
     "types": ["jest", "node", "passport"],
-    "composite": false
+    "composite": false,
+    // ts-jest reads this file. With isolatedModules it transpiles each file on
+    // its own instead of type-checking it through a language service. That
+    // service held about 1.9 GB per jest worker for a suite that loads the
+    // generated routes (versionFloor.int.test.ts), and ran out of memory under
+    // the sandcastle gate's 2 GB heap. Types are still checked: CI's
+    // `typecheck:check` compiles this config, and the flag makes tsc reject code
+    // that per-file transpiling would get wrong.
+    "isolatedModules": true
   },
   "include": [
     "jest.config.ts",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
     "src/**/*.d.ts",
+    "src/testing/**/*.ts",
     "src/main.test.ts",
     "src/swagger/**/*.json"
   ]

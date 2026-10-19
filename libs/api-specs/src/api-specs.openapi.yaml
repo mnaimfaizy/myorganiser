@@ -1524,6 +1524,16 @@ components:
         - releaseTag
       type: object
       additionalProperties: false
+    ReopenFeedbackReportRequest:
+      description: Request body for reopening a wrongly Fixed or Shipped Feedback Report.
+      properties:
+        statusNote:
+          type: string
+          description: Required note explaining why the report is being reopened.
+      required:
+        - statusNote
+      type: object
+      additionalProperties: false
     AdminAuditAction:
       type: string
       enum:
@@ -1539,6 +1549,7 @@ components:
         - feedback_tracking_issue_link
         - feedback_tracking_issue_unlink
         - feedback_manual_delivery
+        - feedback_reopen
     AdminAuditLogEntry:
       description: Platform Admin Audit Log entry returned by list APIs.
       properties:
@@ -3933,6 +3944,58 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/MarkFeedbackReportDeliveredRequest"
+  /admin/feedback/reports/{reportId}/reopen:
+    post:
+      operationId: ReopenFeedbackReport
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "400":
+          description: Report is not Fixed or Shipped, or the note is missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: >-
+        Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It
+
+        returns to Under review, clears its Release, and may send a new Fix
+        Notice
+
+        on a later genuine delivery. Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReopenFeedbackReportRequest"
   /admin/audit-logs:
     get:
       operationId: ListAuditLogs

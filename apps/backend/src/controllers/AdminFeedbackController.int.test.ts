@@ -55,6 +55,7 @@ jest.mock('../services/AdminFeedbackService', () => {
       linkTrackingIssue: jest.fn(),
       unlinkTrackingIssue: jest.fn(),
       markDelivered: jest.fn(),
+      reopenReport: jest.fn(),
     },
   };
 });
@@ -122,7 +123,6 @@ import {
 import bodyParser from 'body-parser';
 import express from 'express';
 import request from 'supertest';
-import { ValidateError } from 'tsoa';
 
 jest.setTimeout(30_000);
 
@@ -130,6 +130,9 @@ function makeApp() {
   jest.resetModules();
 
   const { RegisterRoutes } = require('../routes/routes');
+  // Load tsoa after resetModules so instanceof matches the ValidateError the
+  // freshly required routes throw.
+  const { ValidateError } = require('tsoa');
 
   const app = express();
   app.use(bodyParser.json({ limit: '2mb' }));
@@ -144,7 +147,7 @@ function makeApp() {
     if (err instanceof ValidateError) {
       return res.status(422).json({
         message: 'Validation Failed',
-        details: err?.fields,
+        details: (err as { fields?: unknown }).fields,
       });
     }
 
@@ -178,7 +181,7 @@ describe('AdminFeedbackController (HTTP integration)', () => {
     jest.resetAllMocks();
   });
 
-  describe('non-admin rejection across all routes (6 tests)', () => {
+  describe('non-admin rejection across all routes (7 tests)', () => {
     const routes = [
       { method: 'get', path: '/admin/feedback/reports', body: undefined },
       {
@@ -206,6 +209,11 @@ describe('AdminFeedbackController (HTTP integration)', () => {
         path: '/admin/feedback/reports/report-1/delivery',
         body: { releaseTag: 'v1.4.0' },
       },
+      {
+        method: 'post',
+        path: '/admin/feedback/reports/report-1/reopen',
+        body: { statusNote: 'Closed in error' },
+      },
     ];
 
     routes.forEach((route, idx) => {
@@ -232,6 +240,7 @@ describe('AdminFeedbackController (HTTP integration)', () => {
         expect(svc.linkTrackingIssue).not.toHaveBeenCalled();
         expect(svc.unlinkTrackingIssue).not.toHaveBeenCalled();
         expect(svc.markDelivered).not.toHaveBeenCalled();
+        expect(svc.reopenReport).not.toHaveBeenCalled();
       });
     });
   });
@@ -475,6 +484,153 @@ describe('AdminFeedbackController (HTTP integration)', () => {
       expect(res.body).toEqual({
         message: 'That feedback report does not exist.',
       });
+    });
+  });
+
+  describe('reopen feedback report (6 tests)', () => {
+    const reopenedDetail = {
+      id: 'report-1',
+      kind: 'bug_report',
+      status: 'under_review',
+      title: 'App crashes on tasks page',
+      description: 'Every time I click on tasks, app crashes',
+      expectedOutcome: 'App should load normally',
+      platform: 'web',
+      trackingIssueNumber: 42,
+      reporterUserId: 'user-1',
+      statusChangedAt: '2026-10-17T12:00:00.000Z',
+      createdAt: '2026-10-15T10:00:00.000Z',
+      context: {
+        platform: 'web',
+        appVersion: '1.0.0',
+        browser: 'Chrome 120',
+        operatingSystem: 'macOS 14',
+        path: '/dashboard/tasks',
+        sentAt: '2026-10-15T09:50:00.000Z',
+      },
+      followUp: null,
+      statusNote: 'Closed in error',
+      releaseTag: null,
+      fixNoticeOptIn: true,
+      reporter: {
+        id: 'user-1',
+        name: 'Alice Example',
+        email: 'alice@example.com',
+      },
+    };
+
+    test('POST /admin/feedback/reports/{reportId}/reopen with admin token returns 200 with detail and calls reopenReport with admin id, reportId, and body', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      svc.reopenReport.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: reopenedDetail,
+      });
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/report-1/reopen')
+        .set('Authorization', 'Bearer admin')
+        .send({ statusNote: 'Closed in error' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(reopenedDetail);
+      expect(svc.reopenReport).toHaveBeenCalledWith('admin-1', 'report-1', {
+        statusNote: 'Closed in error',
+      });
+    });
+
+    test('service refusal for a report that is not Fixed or Shipped reaches client as 400 with message', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      svc.reopenReport.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        body: {
+          message: 'Only a report marked Fixed or Shipped can be reopened.',
+        },
+      });
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/report-1/reopen')
+        .set('Authorization', 'Bearer admin')
+        .send({ statusNote: 'Closed in error' });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        message: 'Only a report marked Fixed or Shipped can be reopened.',
+      });
+    });
+
+    test('blank status note is forwarded to the service and its 400 refusal reaches client', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      svc.reopenReport.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        body: { message: 'Write a status note explaining why.' },
+      });
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/report-1/reopen')
+        .set('Authorization', 'Bearer admin')
+        .send({ statusNote: '   ' });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        message: 'Write a status note explaining why.',
+      });
+      expect(svc.reopenReport).toHaveBeenCalledWith('admin-1', 'report-1', {
+        statusNote: '   ',
+      });
+    });
+
+    test('service not-found refusal reaches client as 404 with message', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      svc.reopenReport.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        body: { message: 'That feedback report does not exist.' },
+      });
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/nonexistent/reopen')
+        .set('Authorization', 'Bearer admin')
+        .send({ statusNote: 'Closed in error' });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({
+        message: 'That feedback report does not exist.',
+      });
+      expect(svc.reopenReport).toHaveBeenCalledWith('admin-1', 'nonexistent', {
+        statusNote: 'Closed in error',
+      });
+    });
+
+    test('body missing statusNote fails tsoa validation with 422 and never reaches the service', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/report-1/reopen')
+        .set('Authorization', 'Bearer admin')
+        .send({});
+
+      expect(res.status).toBe(422);
+      expect(res.body.message).toBe('Validation Failed');
+      expect(svc.reopenReport).not.toHaveBeenCalled();
+    });
+
+    test('POST /admin/feedback/reports/{reportId}/reopen without auth returns 401 and never reaches the service', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+
+      const res = await request(app)
+        .post('/admin/feedback/reports/report-1/reopen')
+        .send({ statusNote: 'Closed in error' });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Unauthorized' });
+      expect(svc.reopenReport).not.toHaveBeenCalled();
     });
   });
 });

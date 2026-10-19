@@ -77,6 +77,7 @@ export const AdminAuditAction = {
     FeedbackTrackingIssueLink: 'feedback_tracking_issue_link',
     FeedbackTrackingIssueUnlink: 'feedback_tracking_issue_unlink',
     FeedbackManualDelivery: 'feedback_manual_delivery',
+    FeedbackReopen: 'feedback_reopen',
 } as const;
 
 export type AdminAuditAction = typeof AdminAuditAction[keyof typeof AdminAuditAction];
@@ -757,6 +758,15 @@ export interface RefreshTokenBody {
 export interface RegisterUserResponse {
     'message': string;
     'user'?: FilteredUserInterface;
+}
+/**
+ * Request body for reopening a wrongly Fixed or Shipped Feedback Report.
+ */
+export interface ReopenFeedbackReportRequest {
+    /**
+     * Required note explaining why the report is being reopened.
+     */
+    'statusNote': string;
 }
 /**
  * The Report Context the sender saw before sending. It never carries screenshots, logs, or anything read from the Vault, and `path` is the page path alone — no query string and no fragment.
@@ -2902,6 +2912,48 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It returns to Under review, clears its Release, and may send a new Fix Notice on a later genuine delivery. Platform Admin only.
+         * @param {string} reportId 
+         * @param {ReopenFeedbackReportRequest} reopenFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reopenFeedbackReport: async (reportId: string, reopenFeedbackReportRequest: ReopenFeedbackReportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('reopenFeedbackReport', 'reportId', reportId)
+            // verify required parameter 'reopenFeedbackReportRequest' is not null or undefined
+            assertParamExists('reopenFeedbackReport', 'reopenFeedbackReportRequest', reopenFeedbackReportRequest)
+            const localVarPath = `/admin/feedback/reports/{reportId}/reopen`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(reopenFeedbackReportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Resend verification email for an unverified User (existing cooldown rules).
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -3208,6 +3260,19 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It returns to Under review, clears its Release, and may send a new Fix Notice on a later genuine delivery. Platform Admin only.
+         * @param {string} reportId 
+         * @param {ReopenFeedbackReportRequest} reopenFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async reopenFeedbackReport(reportId: string, reopenFeedbackReportRequest: ReopenFeedbackReportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.reopenFeedbackReport(reportId, reopenFeedbackReportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.reopenFeedbackReport']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Resend verification email for an unverified User (existing cooldown rules).
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -3387,6 +3452,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.promoteUser(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
+         * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It returns to Under review, clears its Release, and may send a new Fix Notice on a later genuine delivery. Platform Admin only.
+         * @param {PlatformAdminApiReopenFeedbackReportRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        reopenFeedbackReport(requestParameters: PlatformAdminApiReopenFeedbackReportRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.reopenFeedbackReport(requestParameters.reportId, requestParameters.reopenFeedbackReportRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
          * Resend verification email for an unverified User (existing cooldown rules).
          * @param {PlatformAdminApiResendVerificationRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -3526,6 +3600,15 @@ export interface PlatformAdminApiMarkFeedbackReportDeliveredRequest {
  */
 export interface PlatformAdminApiPromoteUserRequest {
     readonly userId: string
+}
+
+/**
+ * Request parameters for reopenFeedbackReport operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiReopenFeedbackReportRequest {
+    readonly reportId: string
+
+    readonly reopenFeedbackReportRequest: ReopenFeedbackReportRequest
 }
 
 /**
@@ -3700,6 +3783,16 @@ export class PlatformAdminApi extends BaseAPI {
      */
     public promoteUser(requestParameters: PlatformAdminApiPromoteUserRequest, options?: RawAxiosRequestConfig) {
         return PlatformAdminApiFp(this.configuration).promoteUser(requestParameters.userId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It returns to Under review, clears its Release, and may send a new Fix Notice on a later genuine delivery. Platform Admin only.
+     * @param {PlatformAdminApiReopenFeedbackReportRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public reopenFeedbackReport(requestParameters: PlatformAdminApiReopenFeedbackReportRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).reopenFeedbackReport(requestParameters.reportId, requestParameters.reopenFeedbackReportRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
