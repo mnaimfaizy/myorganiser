@@ -1,6 +1,5 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
 import type {
   AdminFeedbackReportListItemDto,
   FeedbackReportKind,
@@ -11,6 +10,7 @@ import {
   Button,
   Input,
   Label,
+  NewTabLink,
   Select,
   SelectContent,
   SelectItem,
@@ -273,19 +273,12 @@ export function FeedbackInboxPageClient() {
                 <TableCell>{report.platform}</TableCell>
                 <TableCell>
                   {report.trackingIssueNumber ? (
-                    <a
+                    <NewTabLink
                       href={trackingIssueUrl(report.trackingIssueNumber)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {report.trackingIssueNumber}
-                      <ExternalLink
-                        className="h-3.5 w-3.5"
-                        aria-hidden="true"
-                      />{' '}
-                      <span className="sr-only">(opens in a new tab)</span>
-                    </a>
+                    </NewTabLink>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

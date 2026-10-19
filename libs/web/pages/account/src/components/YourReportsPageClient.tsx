@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { ExternalLink } from 'lucide-react';
 
 import {
   type FeedbackReportListItemDto,
   type FeedbackReportKind,
   type FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
-import { Badge, Card, CardTitle } from '@myorganiser/web-ui';
+import { Badge, Card, CardTitle, NewTabLink } from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../lib/apiClient';
 import { FollowUpForm } from './FollowUpForm';
@@ -99,16 +98,13 @@ function FeedbackReportListItem({ report }: FeedbackReportListItemProps) {
         {isDelivered &&
           currentReport.changelogUrl &&
           currentReport.releaseTag && (
-            <a
+            <NewTabLink
               href={currentReport.changelogUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-primary underline"
+              className="text-xs text-primary underline"
+              iconClassName="h-3 w-3"
             >
               {deliveryWord} {currentReport.releaseTag} → View CHANGELOG
-              <ExternalLink className="h-3 w-3" aria-hidden="true" />{' '}
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
+            </NewTabLink>
           )}
 
         <p className="text-xs text-muted-foreground">
