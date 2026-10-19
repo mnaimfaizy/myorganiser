@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { useReportScoped } from '../hooks/use-report-scoped';
 import { createPlatformAdminApi } from '../lib/apiClient';
 import { getApiErrorMessage } from '../lib/apiErrorMessage';
 import { trackingIssueUrl } from '../lib/formatFeedbackReport';
@@ -43,23 +44,17 @@ type TrackingIssueMessage =
   | { kind: 'linked'; issueNumber: number }
   | { kind: 'unlinked' };
 
-// Each message and error is scoped to the report it was produced against.
-// Once the parent passes a different report (a sibling form updated it), the
-// scoped value no longer matches and stops rendering, with no effect needed.
-interface ScopedMessage<T> {
-  report: AdminFeedbackReportDetailDto;
-  value: T;
-}
-
 export function TrackingIssueForm({
   report,
   onUpdated,
 }: TrackingIssueFormProps) {
-  const [errorResult, setErrorResult] = useState<ScopedMessage<string> | null>(
-    null,
-  );
-  const [messageResult, setMessageResult] =
-    useState<ScopedMessage<TrackingIssueMessage> | null>(null);
+  const {
+    value: error,
+    set: setError,
+    clear: clearError,
+  } = useReportScoped<string>(report);
+  const { value: message, set: setMessage } =
+    useReportScoped<TrackingIssueMessage>(report);
   const [isUnlinking, setIsUnlinking] = useState(false);
 
   const form = useForm<LinkIssueFormValues>({
@@ -75,11 +70,8 @@ export function TrackingIssueForm({
     form.clearErrors();
   }, [report, form]);
 
-  const error = errorResult?.report === report ? errorResult.value : null;
-  const message = messageResult?.report === report ? messageResult.value : null;
-
   const handleUnlink = useCallback(async () => {
-    setErrorResult(null);
+    clearError();
     setIsUnlinking(true);
 
     try {
@@ -87,21 +79,18 @@ export function TrackingIssueForm({
       const response = await api.unlinkFeedbackReportTrackingIssue({
         reportId: report.id,
       });
-      setMessageResult({
-        report: response.data,
-        value: { kind: 'unlinked' },
-      });
+      setMessage({ kind: 'unlinked' }, response.data);
       onUpdated(response.data);
     } catch (err) {
-      setErrorResult({ report, value: getApiErrorMessage(err) });
+      setError(getApiErrorMessage(err));
     } finally {
       setIsUnlinking(false);
     }
-  }, [report, onUpdated]);
+  }, [report, onUpdated, clearError, setError, setMessage]);
 
   const onSubmit = useCallback(
     async (values: LinkIssueFormValues) => {
-      setErrorResult(null);
+      clearError();
 
       try {
         const issueNumber = Number(values.trackingIssueNumber);
@@ -112,17 +101,14 @@ export function TrackingIssueForm({
             trackingIssueNumber: issueNumber,
           },
         });
-        setMessageResult({
-          report: response.data,
-          value: { kind: 'linked', issueNumber },
-        });
+        setMessage({ kind: 'linked', issueNumber }, response.data);
         onUpdated(response.data);
         form.reset();
       } catch (err) {
-        setErrorResult({ report, value: getApiErrorMessage(err) });
+        setError(getApiErrorMessage(err));
       }
     },
-    [report, onUpdated, form],
+    [report, onUpdated, form, clearError, setError, setMessage],
   );
 
   if (report.trackingIssueNumber) {

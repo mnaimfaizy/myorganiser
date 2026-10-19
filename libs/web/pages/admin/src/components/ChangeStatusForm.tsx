@@ -21,10 +21,11 @@ import {
 } from '@myorganiser/web-ui';
 import { FEEDBACK_REPORT_TEXT_MAX_LENGTH } from '@myorganiser/core';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { useReportScoped } from '../hooks/use-report-scoped';
 import { createPlatformAdminApi } from '../lib/apiClient';
 import { getApiErrorMessage } from '../lib/apiErrorMessage';
 import {
@@ -70,16 +71,14 @@ const changeStatusSchema = z
   );
 
 export function ChangeStatusForm({ report, onUpdated }: ChangeStatusFormProps) {
-  // Scoped to the report it was produced against, so a sibling update hides it.
-  const [errorResult, setErrorResult] = useState<{
-    report: AdminFeedbackReportDetailDto;
-    value: string;
-  } | null>(null);
-  const error = errorResult?.report === report ? errorResult.value : null;
-  // The report this form's own submit produced. The success message shows only
-  // while the parent still holds that report; a sibling update hides it.
-  const [savedReport, setSavedReport] =
-    useState<AdminFeedbackReportDetailDto | null>(null);
+  const {
+    value: error,
+    set: setError,
+    clear: clearError,
+  } = useReportScoped<string>(report);
+  // Keyed to the report this form's own submit returned. The success message
+  // shows only while the parent still holds that report.
+  const { value: saved, set: setSaved } = useReportScoped<true>(report);
 
   const settableStatuses = useMemo(
     () => adminSettableStatusesForKind(report.kind),
@@ -110,7 +109,7 @@ export function ChangeStatusForm({ report, onUpdated }: ChangeStatusFormProps) {
 
   const onSubmit = useCallback(
     async (values: ChangeStatusFormValues) => {
-      setErrorResult(null);
+      clearError();
 
       try {
         const api = createPlatformAdminApi();
@@ -121,17 +120,17 @@ export function ChangeStatusForm({ report, onUpdated }: ChangeStatusFormProps) {
             statusNote: values.statusNote || undefined,
           },
         });
-        setSavedReport(response.data);
+        setSaved(true, response.data);
         onUpdated(response.data);
         form.reset({
           status: defaultStatus,
           statusNote: '',
         });
       } catch (err) {
-        setErrorResult({ report, value: getApiErrorMessage(err) });
+        setError(getApiErrorMessage(err));
       }
     },
-    [report, onUpdated, form, defaultStatus],
+    [report, clearError, setError, setSaved, onUpdated, form, defaultStatus],
   );
 
   return (
@@ -177,7 +176,7 @@ export function ChangeStatusForm({ report, onUpdated }: ChangeStatusFormProps) {
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {savedReport === report && (
+        {saved && (
           <p className="text-sm text-muted-foreground">Status updated.</p>
         )}
 
