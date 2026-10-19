@@ -845,9 +845,17 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReopenFeedbackReportRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "statusNote": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminAuditAction": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["disable"]},{"dataType":"enum","enums":["enable"]},{"dataType":"enum","enums":["force_logout"]},{"dataType":"enum","enums":["resend_verification"]},{"dataType":"enum","enums":["promote"]},{"dataType":"enum","enums":["demote"]},{"dataType":"enum","enums":["youtube_access_grant"]},{"dataType":"enum","enums":["youtube_access_withdraw"]},{"dataType":"enum","enums":["feedback_status_change"]},{"dataType":"enum","enums":["feedback_tracking_issue_link"]},{"dataType":"enum","enums":["feedback_tracking_issue_unlink"]},{"dataType":"enum","enums":["feedback_manual_delivery"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["disable"]},{"dataType":"enum","enums":["enable"]},{"dataType":"enum","enums":["force_logout"]},{"dataType":"enum","enums":["resend_verification"]},{"dataType":"enum","enums":["promote"]},{"dataType":"enum","enums":["demote"]},{"dataType":"enum","enums":["youtube_access_grant"]},{"dataType":"enum","enums":["youtube_access_withdraw"]},{"dataType":"enum","enums":["feedback_status_change"]},{"dataType":"enum","enums":["feedback_tracking_issue_link"]},{"dataType":"enum","enums":["feedback_tracking_issue_unlink"]},{"dataType":"enum","enums":["feedback_manual_delivery"]},{"dataType":"enum","enums":["feedback_reopen"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminAuditLogEntry": {
@@ -2919,6 +2927,39 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'markFeedbackReportDelivered',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_reopenFeedbackReport: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"ReopenFeedbackReportRequest"},
+        };
+        app.post('/admin/feedback/reports/:reportId/reopen',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.reopenFeedbackReport)),
+
+            async function AdminFeedbackController_reopenFeedbackReport(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_reopenFeedbackReport, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'reopenFeedbackReport',
                 controller,
                 response,
                 next,

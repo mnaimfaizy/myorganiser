@@ -74,7 +74,8 @@ export type AdminAuditAction =
   | 'feedback_status_change'
   | 'feedback_tracking_issue_link'
   | 'feedback_tracking_issue_unlink'
-  | 'feedback_manual_delivery';
+  | 'feedback_manual_delivery'
+  | 'feedback_reopen';
 
 /** Platform Admin Audit Log entry returned by list APIs. */
 export interface AdminAuditLogEntry {
