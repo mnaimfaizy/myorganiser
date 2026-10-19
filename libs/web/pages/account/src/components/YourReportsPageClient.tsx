@@ -8,7 +8,7 @@ import {
   type FeedbackReportKind,
   type FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
-import { Badge, Card, CardTitle } from '@myorganiser/web-ui';
+import { Badge, Card, CardTitle, NewTabLink } from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../lib/apiClient';
 import { FollowUpForm } from './FollowUpForm';
@@ -98,14 +98,13 @@ function FeedbackReportListItem({ report }: FeedbackReportListItemProps) {
         {isDelivered &&
           currentReport.changelogUrl &&
           currentReport.releaseTag && (
-            <a
+            <NewTabLink
               href={currentReport.changelogUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block text-xs text-primary underline"
+              className="text-xs text-primary underline"
+              iconClassName="h-3 w-3"
             >
               {deliveryWord} {currentReport.releaseTag} → View CHANGELOG
-            </a>
+            </NewTabLink>
           )}
 
         <p className="text-xs text-muted-foreground">

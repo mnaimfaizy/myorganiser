@@ -561,7 +561,7 @@ describe('FeedbackReportTriageActions', () => {
         />,
       );
 
-      const issueLink = screen.getByRole('link', { name: '#42' });
+      const issueLink = screen.getByRole('link', { name: /^#42\b/ });
       expect(issueLink).toHaveAttribute(
         'href',
         'https://github.com/mnaimfaizy/myorganiser/issues/42',
