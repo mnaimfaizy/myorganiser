@@ -1,5 +1,6 @@
 import {
   Configuration,
+  FeedbackApi,
   UsersApi,
   type ConfigurationParameters,
 } from '@myorganiser/app-api-client';
@@ -18,4 +19,8 @@ export function createApiConfiguration(
 
 export function createUsersApi(): UsersApi {
   return new UsersApi(createApiConfiguration(), undefined, getAuthAxios());
+}
+
+export function createFeedbackApi(): FeedbackApi {
+  return new FeedbackApi(createApiConfiguration(), undefined, getAuthAxios());
 }

@@ -135,4 +135,14 @@ describe('AdminSidebar', () => {
     expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     expect(sidebar.setOpen).not.toHaveBeenCalled();
   });
+
+  it('should render Feedback nav link with correct href', () => {
+    stubSidebar(false);
+
+    renderAdminSidebar();
+    const feedbackLink = screen.getByRole('link', { name: 'Feedback' });
+
+    expect(feedbackLink).toBeInTheDocument();
+    expect(feedbackLink).toHaveAttribute('href', '/admin/feedback');
+  });
 });

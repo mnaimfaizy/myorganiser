@@ -12520,7 +12520,11 @@
               "promote",
               "demote",
               "youtube_access_grant",
-              "youtube_access_withdraw"
+              "youtube_access_withdraw",
+              "feedback_status_change",
+              "feedback_tracking_issue_link",
+              "feedback_tracking_issue_unlink",
+              "feedback_manual_delivery"
             ],
             "routerPrecedence": { "authRouterBeforeTsoaRoutes": false },
             "assertableFrom": {
@@ -12565,7 +12569,7 @@
       "start": "      process.env.REFRESH_JWT_SECRET,",
       "end": "      process.env.REFRESH_JWT_SECRET,"
     },
-    "AuthController.int.test.ts:449-450": {
+    "AuthController.int.test.ts:454-455": {
       "file": "apps/backend/src/controllers/AuthController.int.test.ts",
       "start": "      expect(mainSource).not.toMatch(/use\\(['\"]\\/auth['\"]/);",
       "end": "      expect(mainSource).not.toMatch(/from ['\"]\\.\\/routes\\/auth['\"]/);"
@@ -14485,7 +14489,7 @@ data:  { password: hash, reset_password_token: null }
                   contract the frontend is generated against. ADR 0089 (PR #823)
                   deleted the router, so <code>AuthController</code> is the only
                   handler. What holds it shut: a backend test,
-                  <code>AuthController.int.test.ts:449-450</code>, which fails
+                  <code>AuthController.int.test.ts:454-455</code>, which fails
                   if <code>main.ts</code> mounts an Express router on
                   <code>/auth</code> or imports <code>./routes/auth</code>.
                 </p>

@@ -70,7 +70,11 @@ export type AdminAuditAction =
   | 'promote'
   | 'demote'
   | 'youtube_access_grant'
-  | 'youtube_access_withdraw';
+  | 'youtube_access_withdraw'
+  | 'feedback_status_change'
+  | 'feedback_tracking_issue_link'
+  | 'feedback_tracking_issue_unlink'
+  | 'feedback_manual_delivery';
 
 /** Platform Admin Audit Log entry returned by list APIs. */
 export interface AdminAuditLogEntry {

@@ -12,11 +12,19 @@ import { VaultBackupController } from './../controllers/VaultBackupController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { UserDeletionController } from './../controllers/UserDeletionController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { FeedbackReleaseController } from './../controllers/FeedbackReleaseController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { FeedbackPublicController } from './../controllers/FeedbackPublicController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { FeedbackController } from './../controllers/FeedbackController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AuthController } from './../controllers/AuthController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminYouTubeAccessController } from './../controllers/AdminYouTubeAccessController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminUsersController } from './../controllers/AdminUsersController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { AdminFeedbackController } from './../controllers/AdminFeedbackController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminAuditLogController } from './../controllers/AdminAuditLogController';
 import { expressAuthentication } from './../middleware/authentication';
@@ -490,6 +498,142 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReleaseMarkCounts": {
+        "dataType": "refObject",
+        "properties": {
+            "reportsMarked": {"dataType":"double","required":true},
+            "fixNoticesSent": {"dataType":"double","required":true},
+            "fixNoticesSkipped": {"dataType":"double","required":true},
+            "fixNoticesFailed": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MarkFeedbackReleaseRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "releaseTag": {"dataType":"string","required":true},
+            "issueNumbers": {"dataType":"array","array":{"dataType":"double"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FixNoticeUnsubscribeResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "ok": {"dataType":"enum","enums":[true],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FixNoticeUnsubscribeBody": {
+        "dataType": "refObject",
+        "properties": {
+            "token": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportKind": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["bug_report"]},{"dataType":"enum","enums":["suggestion"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["received"]},{"dataType":"enum","enums":["under_review"]},{"dataType":"enum","enums":["planned"]},{"dataType":"enum","enums":["fixed"]},{"dataType":"enum","enums":["shipped"]},{"dataType":"enum","enums":["wont_do"]},{"dataType":"enum","enums":["cannot_reproduce"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "kind": {"ref":"FeedbackReportKind","required":true},
+            "status": {"ref":"FeedbackReportStatus","required":true},
+            "title": {"dataType":"string","required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CreateFeedbackReportResponse": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"ref":"FeedbackReportDto"},{"ref":"ErrorResponse"}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReportContextRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "platform": {"dataType":"string","required":true},
+            "appVersion": {"dataType":"string","required":true},
+            "browser": {"dataType":"string","required":true},
+            "operatingSystem": {"dataType":"string","required":true},
+            "path": {"dataType":"string","required":true},
+            "sentAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CreateFeedbackReportRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "kind": {"ref":"FeedbackReportKind","required":true},
+            "title": {"dataType":"string","required":true},
+            "description": {"dataType":"string","required":true},
+            "expectedOutcome": {"dataType":"string"},
+            "context": {"ref":"ReportContextRequest","required":true},
+            "fixNoticeOptIn": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportListItemDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "kind": {"ref":"FeedbackReportKind","required":true},
+            "status": {"ref":"FeedbackReportStatus","required":true},
+            "title": {"dataType":"string","required":true},
+            "statusNote": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "releaseTag": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "changelogUrl": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "statusChangedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "createdAt": {"dataType":"string","required":true},
+            "followUp": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ListFeedbackReportsResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "items": {"dataType":"array","array":{"dataType":"refObject","ref":"FeedbackReportListItemDto"},"required":true},
+            "hasChangedSinceLastSeen": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MarkReportSeenResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "seenAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AddFollowUpResponse": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"ref":"FeedbackReportListItemDto"},{"ref":"ErrorResponse"}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AddFollowUpRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "followUp": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "UserRole": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["user"]},{"dataType":"enum","enums":["platform_admin"]}],"validators":{}},
@@ -604,9 +748,106 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"intersection","subSchemas":[{"ref":"AdminUserIdentity"},{"dataType":"nestedObjectLiteral","nestedProperties":{"youtubeDisconnect":{"ref":"YouTubeDisconnectOutcome","required":true}}}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminFeedbackReporterDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "name": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "email": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminFeedbackReportListItemDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "kind": {"ref":"FeedbackReportKind","required":true},
+            "status": {"ref":"FeedbackReportStatus","required":true},
+            "title": {"dataType":"string","required":true},
+            "platform": {"dataType":"string","required":true},
+            "trackingIssueNumber": {"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},
+            "reporterUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "reporter": {"dataType":"union","subSchemas":[{"ref":"AdminFeedbackReporterDto"},{"dataType":"enum","enums":[null]}],"required":true},
+            "statusChangedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "createdAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ListAdminFeedbackReportsResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "items": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminFeedbackReportListItemDto"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminFeedbackReportContextDto": {
+        "dataType": "refObject",
+        "properties": {
+            "platform": {"dataType":"string","required":true},
+            "appVersion": {"dataType":"string","required":true},
+            "browser": {"dataType":"string","required":true},
+            "operatingSystem": {"dataType":"string","required":true},
+            "path": {"dataType":"string","required":true},
+            "sentAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminFeedbackReportDetailDto": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "kind": {"ref":"FeedbackReportKind","required":true},
+            "status": {"ref":"FeedbackReportStatus","required":true},
+            "title": {"dataType":"string","required":true},
+            "platform": {"dataType":"string","required":true},
+            "trackingIssueNumber": {"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},
+            "reporterUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "reporter": {"dataType":"union","subSchemas":[{"ref":"AdminFeedbackReporterDto"},{"dataType":"enum","enums":[null]}],"required":true},
+            "statusChangedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "createdAt": {"dataType":"string","required":true},
+            "description": {"dataType":"string","required":true},
+            "expectedOutcome": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "context": {"ref":"AdminFeedbackReportContextDto","required":true},
+            "followUp": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "statusNote": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "releaseTag": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "fixNoticeOptIn": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ChangeFeedbackReportStatusRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "status": {"ref":"FeedbackReportStatus","required":true},
+            "statusNote": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinkFeedbackReportTrackingIssueRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "trackingIssueNumber": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MarkFeedbackReportDeliveredRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "releaseTag": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminAuditAction": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["disable"]},{"dataType":"enum","enums":["enable"]},{"dataType":"enum","enums":["force_logout"]},{"dataType":"enum","enums":["resend_verification"]},{"dataType":"enum","enums":["promote"]},{"dataType":"enum","enums":["demote"]},{"dataType":"enum","enums":["youtube_access_grant"]},{"dataType":"enum","enums":["youtube_access_withdraw"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["disable"]},{"dataType":"enum","enums":["enable"]},{"dataType":"enum","enums":["force_logout"]},{"dataType":"enum","enums":["resend_verification"]},{"dataType":"enum","enums":["promote"]},{"dataType":"enum","enums":["demote"]},{"dataType":"enum","enums":["youtube_access_grant"]},{"dataType":"enum","enums":["youtube_access_withdraw"]},{"dataType":"enum","enums":["feedback_status_change"]},{"dataType":"enum","enums":["feedback_tracking_issue_link"]},{"dataType":"enum","enums":["feedback_tracking_issue_unlink"]},{"dataType":"enum","enums":["feedback_manual_delivery"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminAuditLogEntry": {
@@ -1657,6 +1898,194 @@ export function RegisterRoutes(app: Router) {
             }
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackReleaseController_markRelease: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"MarkFeedbackReleaseRequest"},
+        };
+        app.post('/feedback/releases/mark',
+            authenticateMiddleware([{"deploy-secret":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackReleaseController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackReleaseController.prototype.markRelease)),
+
+            async function FeedbackReleaseController_markRelease(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackReleaseController_markRelease, request, response });
+
+                const controller = new FeedbackReleaseController();
+
+              await templateService.apiHandler({
+                methodName: 'markRelease',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackPublicController_unsubscribeFromFixNotices: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"FixNoticeUnsubscribeBody"},
+        };
+        app.post('/feedback/fix-notice/unsubscribe',
+            ...(fetchMiddlewares<RequestHandler>(FeedbackPublicController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackPublicController.prototype.unsubscribeFromFixNotices)),
+
+            async function FeedbackPublicController_unsubscribeFromFixNotices(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackPublicController_unsubscribeFromFixNotices, request, response });
+
+                const controller = new FeedbackPublicController();
+
+              await templateService.apiHandler({
+                methodName: 'unsubscribeFromFixNotices',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackController_createReport: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                body: {"in":"body","name":"body","required":true,"ref":"CreateFeedbackReportRequest"},
+        };
+        app.post('/feedback/reports',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.createReport)),
+
+            async function FeedbackController_createReport(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackController_createReport, request, response });
+
+                const controller = new FeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'createReport',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 201,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackController_listReports: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+        };
+        app.get('/feedback/reports',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.listReports)),
+
+            async function FeedbackController_listReports(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackController_listReports, request, response });
+
+                const controller = new FeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'listReports',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackController_markReportsSeen: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+        };
+        app.post('/feedback/reports/seen',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.markReportsSeen)),
+
+            async function FeedbackController_markReportsSeen(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackController_markReportsSeen, request, response });
+
+                const controller = new FeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'markReportsSeen',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsFeedbackController_addFollowUp: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"AddFollowUpRequest"},
+        };
+        app.post('/feedback/reports/:reportId/follow-up',
+            authenticateMiddleware([{"jwt":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(FeedbackController.prototype.addFollowUp)),
+
+            async function FeedbackController_addFollowUp(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsFeedbackController_addFollowUp, request, response });
+
+                const controller = new FeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'addFollowUp',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAuthController_login: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
                 requestBody: {"in":"body","name":"requestBody","required":true,"ref":"UserLoginBody"},
@@ -2291,6 +2720,205 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'withdrawYouTubeAccess',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_listFeedbackReports: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                status: {"in":"query","name":"status","ref":"FeedbackReportStatus"},
+                kind: {"in":"query","name":"kind","ref":"FeedbackReportKind"},
+                platform: {"in":"query","name":"platform","dataType":"string"},
+                trackingIssueNumber: {"in":"query","name":"trackingIssueNumber","dataType":"double"},
+                limit: {"in":"query","name":"limit","dataType":"double"},
+        };
+        app.get('/admin/feedback/reports',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.listFeedbackReports)),
+
+            async function AdminFeedbackController_listFeedbackReports(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_listFeedbackReports, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'listFeedbackReports',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_getFeedbackReport: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+        };
+        app.get('/admin/feedback/reports/:reportId',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.getFeedbackReport)),
+
+            async function AdminFeedbackController_getFeedbackReport(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_getFeedbackReport, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'getFeedbackReport',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_changeFeedbackReportStatus: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"ChangeFeedbackReportStatusRequest"},
+        };
+        app.patch('/admin/feedback/reports/:reportId/status',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.changeFeedbackReportStatus)),
+
+            async function AdminFeedbackController_changeFeedbackReportStatus(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_changeFeedbackReportStatus, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'changeFeedbackReportStatus',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_linkFeedbackReportTrackingIssue: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"LinkFeedbackReportTrackingIssueRequest"},
+        };
+        app.put('/admin/feedback/reports/:reportId/tracking-issue',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.linkFeedbackReportTrackingIssue)),
+
+            async function AdminFeedbackController_linkFeedbackReportTrackingIssue(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_linkFeedbackReportTrackingIssue, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'linkFeedbackReportTrackingIssue',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_unlinkFeedbackReportTrackingIssue: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+        };
+        app.delete('/admin/feedback/reports/:reportId/tracking-issue',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.unlinkFeedbackReportTrackingIssue)),
+
+            async function AdminFeedbackController_unlinkFeedbackReportTrackingIssue(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_unlinkFeedbackReportTrackingIssue, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'unlinkFeedbackReportTrackingIssue',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminFeedbackController_markFeedbackReportDelivered: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+                reportId: {"in":"path","name":"reportId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"MarkFeedbackReportDeliveredRequest"},
+        };
+        app.post('/admin/feedback/reports/:reportId/delivery',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminFeedbackController.prototype.markFeedbackReportDelivered)),
+
+            async function AdminFeedbackController_markFeedbackReportDelivered(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminFeedbackController_markFeedbackReportDelivered, request, response });
+
+                const controller = new AdminFeedbackController();
+
+              await templateService.apiHandler({
+                methodName: 'markFeedbackReportDelivered',
                 controller,
                 response,
                 next,

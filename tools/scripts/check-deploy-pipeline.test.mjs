@@ -255,7 +255,19 @@ test('fails when a deploy job loses its production environment', (t) => {
   const workspace = createWorkspace(t);
   // The approval gate is the page's hero and lives in one line of YAML. Removing
   // it from deploy-frontend leaves every other line of the workflow unchanged.
-  editLast(workspace, PRODUCTION, '    environment: production\n', '');
+  // Anchored on deploy-frontend's own block: the mark job is now the last job
+  // that declares `environment: production`, so editLast would miss it.
+  edit(
+    workspace,
+    PRODUCTION,
+    '    needs: [validate, prepare-dependencies, deploy-backend]\n' +
+      '    runs-on: ubuntu-24.04\n' +
+      '    timeout-minutes: 45\n' +
+      '    environment: production\n',
+    '    needs: [validate, prepare-dependencies, deploy-backend]\n' +
+      '    runs-on: ubuntu-24.04\n' +
+      '    timeout-minutes: 45\n',
+  );
 
   const result = runChecker(workspace);
 
@@ -345,4 +357,58 @@ test('reads manifest values containing /* without masking them away', (t) => {
   // the design-hygiene gate to this very block, so this checker must not.
   assert.equal(result.status, 0, result.stderr);
   assert.match(readFixture(workspace, PAGE), /refs\/heads\/release\/\*/);
+});
+
+// ===== mark-feedback-release Job =====
+
+// The job is appended last in the production workflow. Its `needs:` line is
+// unique in the file, and so is its `timeout-minutes: 10`.
+const MARK_NEEDS = '    needs: [validate, host-apply, deploy-frontend]\n';
+const MARK_TIMEOUT = '    timeout-minutes: 10\n';
+
+test('fails when the mark-feedback-release job skips deploy-frontend in its needs', (t) => {
+  const workspace = createWorkspace(t);
+  edit(
+    workspace,
+    PRODUCTION,
+    MARK_NEEDS,
+    '    needs: [validate, host-apply]\n',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /productionReleaseMarkNeeds/);
+});
+
+test('fails when the page drops deploy-frontend from the mark job needs', (t) => {
+  const workspace = createWorkspace(t);
+  editManifest(workspace, (m) => {
+    // Without this check a missing key would still "fail" below and prove
+    // nothing about the needs list, so the key is asserted present first.
+    assert.deepEqual(m.productionReleaseMarkNeeds, [
+      'validate',
+      'host-apply',
+      'deploy-frontend',
+    ]);
+    m.productionReleaseMarkNeeds = ['validate', 'host-apply'];
+  });
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /productionReleaseMarkNeeds/);
+});
+
+test('fails when the mark job timeout moves, without touching the deploy timeout', (t) => {
+  const workspace = createWorkspace(t);
+  edit(workspace, PRODUCTION, MARK_TIMEOUT, '    timeout-minutes: 15\n');
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /productionReleaseMarkTimeoutMinutes/);
+  // The mark job is approval-gated but is not a deploy job, so the 45-minute
+  // deploy-timeout key must not read it.
+  assert.doesNotMatch(result.stderr, /productionDeployTimeoutMinutes/);
 });

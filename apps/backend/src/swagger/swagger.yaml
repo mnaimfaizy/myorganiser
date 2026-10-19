@@ -907,6 +907,241 @@ components:
         - confirmation
       type: object
       additionalProperties: false
+    FeedbackReleaseMarkCounts:
+      description: Counts returned to the Production deploy once a Release has been marked.
+      properties:
+        reportsMarked:
+          type: number
+          format: double
+        fixNoticesSent:
+          type: number
+          format: double
+        fixNoticesSkipped:
+          type: number
+          format: double
+        fixNoticesFailed:
+          type: number
+          format: double
+      required:
+        - reportsMarked
+        - fixNoticesSent
+        - fixNoticesSkipped
+        - fixNoticesFailed
+      type: object
+      additionalProperties: false
+    MarkFeedbackReleaseRequest:
+      description: |-
+        Request body the Production deploy sends to mark a Release's Planned
+        Feedback Reports delivered (ADR 0133).
+      properties:
+        releaseTag:
+          type: string
+          description: The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the
+            fixes shipped in.
+        issueNumbers:
+          items:
+            type: number
+            format: double
+          type: array
+          description: The Tracking Issue numbers the Release shipped, at most 500.
+      required:
+        - releaseTag
+        - issueNumbers
+      type: object
+      additionalProperties: false
+    FixNoticeUnsubscribeResponse:
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+          nullable: false
+      required:
+        - ok
+      type: object
+      additionalProperties: false
+    FixNoticeUnsubscribeBody:
+      properties:
+        token:
+          type: string
+      required:
+        - token
+      type: object
+      additionalProperties: false
+    FeedbackReportKind:
+      type: string
+      enum:
+        - bug_report
+        - suggestion
+      description: "A Feedback Report is a Bug Report or a Suggestion (CONTEXT.md:
+        Feedback)."
+    FeedbackReportStatus:
+      type: string
+      enum:
+        - received
+        - under_review
+        - planned
+        - fixed
+        - shipped
+        - wont_do
+        - cannot_reproduce
+      description: Where a Feedback Report stands as its reporter sees it. There is no
+        Duplicate status.
+    FeedbackReportDto:
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - createdAt
+      type: object
+      additionalProperties: false
+    CreateFeedbackReportResponse:
+      anyOf:
+        - $ref: "#/components/schemas/FeedbackReportDto"
+        - $ref: "#/components/schemas/ErrorResponse"
+    ReportContextRequest:
+      description: >-
+        The Report Context the sender saw before sending. It never carries
+
+        screenshots, logs, or anything read from the Vault, and `path` is the
+        page
+
+        path alone — no query string and no fragment.
+      properties:
+        platform:
+          type: string
+          description: Which app sent the report — `web` for the dashboard.
+        appVersion:
+          type: string
+        browser:
+          type: string
+        operatingSystem:
+          type: string
+        path:
+          type: string
+        sentAt:
+          type: string
+          description: ISO 8601 instant shown in the Report Context preview.
+      required:
+        - platform
+        - appVersion
+        - browser
+        - operatingSystem
+        - path
+        - sentAt
+      type: object
+      additionalProperties: false
+    CreateFeedbackReportRequest:
+      properties:
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        title:
+          type: string
+        description:
+          type: string
+        expectedOutcome:
+          type: string
+          description: Bug Report only — what the sender expected to happen.
+        context:
+          $ref: "#/components/schemas/ReportContextRequest"
+        fixNoticeOptIn:
+          type: boolean
+          description: Fix Notice opt-in. The dialog ticks it by default.
+      required:
+        - kind
+        - title
+        - description
+        - context
+        - fixNoticeOptIn
+      type: object
+      additionalProperties: false
+    FeedbackReportListItemDto:
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        statusNote:
+          type: string
+          nullable: true
+        releaseTag:
+          type: string
+          nullable: true
+        changelogUrl:
+          type: string
+          nullable: true
+          description: Only set when releaseTag is present and status is 'fixed' or
+            'shipped'.
+        statusChangedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        followUp:
+          type: string
+          nullable: true
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - statusNote
+        - releaseTag
+        - changelogUrl
+        - statusChangedAt
+        - createdAt
+        - followUp
+      type: object
+      additionalProperties: false
+    ListFeedbackReportsResponse:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/FeedbackReportListItemDto"
+          type: array
+        hasChangedSinceLastSeen:
+          type: boolean
+      required:
+        - items
+        - hasChangedSinceLastSeen
+      type: object
+      additionalProperties: false
+    MarkReportSeenResponse:
+      properties:
+        seenAt:
+          type: string
+      required:
+        - seenAt
+      type: object
+      additionalProperties: false
+    AddFollowUpResponse:
+      anyOf:
+        - $ref: "#/components/schemas/FeedbackReportListItemDto"
+        - $ref: "#/components/schemas/ErrorResponse"
+    AddFollowUpRequest:
+      properties:
+        followUp:
+          type: string
+      required:
+        - followUp
+      type: object
+      additionalProperties: false
     UserRole:
       type: string
       enum:
@@ -1085,6 +1320,210 @@ components:
             - youtubeDisconnect
           type: object
       description: Identity after a YouTube Access withdrawal, with the disconnect outcome.
+    AdminFeedbackReporterDto:
+      description: Admin Feedback Reporter identity.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+      required:
+        - id
+        - name
+        - email
+      type: object
+      additionalProperties: false
+    AdminFeedbackReportListItemDto:
+      description: "Admin Feedback Report list item: header view without description."
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        platform:
+          type: string
+          description: Report Context platform, the inbox filters on it.
+        trackingIssueNumber:
+          type: number
+          format: double
+          nullable: true
+        reporterUserId:
+          type: string
+          nullable: true
+          description: Null once the sender has been removed by User Deletion.
+        reporter:
+          allOf:
+            - $ref: "#/components/schemas/AdminFeedbackReporterDto"
+          nullable: true
+          description: Sender identity for the inbox. Null once the sender has been
+            removed by User Deletion.
+        statusChangedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - platform
+        - trackingIssueNumber
+        - reporterUserId
+        - reporter
+        - statusChangedAt
+        - createdAt
+      type: object
+      additionalProperties: false
+    ListAdminFeedbackReportsResponse:
+      description: Response body for list feedback reports endpoint.
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/AdminFeedbackReportListItemDto"
+          type: array
+      required:
+        - items
+      type: object
+      additionalProperties: false
+    AdminFeedbackReportContextDto:
+      description: Admin Feedback Report Context details.
+      properties:
+        platform:
+          type: string
+        appVersion:
+          type: string
+        browser:
+          type: string
+        operatingSystem:
+          type: string
+        path:
+          type: string
+        sentAt:
+          type: string
+      required:
+        - platform
+        - appVersion
+        - browser
+        - operatingSystem
+        - path
+        - sentAt
+      type: object
+      additionalProperties: false
+    AdminFeedbackReportDetailDto:
+      description: "Admin Feedback Report detail: full report with all fields and
+        reporter info."
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/FeedbackReportKind"
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        title:
+          type: string
+        platform:
+          type: string
+          description: Report Context platform, the inbox filters on it.
+        trackingIssueNumber:
+          type: number
+          format: double
+          nullable: true
+        reporterUserId:
+          type: string
+          nullable: true
+          description: Null once the sender has been removed by User Deletion.
+        reporter:
+          allOf:
+            - $ref: "#/components/schemas/AdminFeedbackReporterDto"
+          nullable: true
+          description: Null means the sender was removed by User Deletion — every report
+            is sent by a signed-in User.
+        statusChangedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        description:
+          type: string
+        expectedOutcome:
+          type: string
+          nullable: true
+        context:
+          $ref: "#/components/schemas/AdminFeedbackReportContextDto"
+        followUp:
+          type: string
+          nullable: true
+        statusNote:
+          type: string
+          nullable: true
+        releaseTag:
+          type: string
+          nullable: true
+        fixNoticeOptIn:
+          type: boolean
+      required:
+        - id
+        - kind
+        - status
+        - title
+        - platform
+        - trackingIssueNumber
+        - reporterUserId
+        - reporter
+        - statusChangedAt
+        - createdAt
+        - description
+        - expectedOutcome
+        - context
+        - followUp
+        - statusNote
+        - releaseTag
+        - fixNoticeOptIn
+      type: object
+      additionalProperties: false
+    ChangeFeedbackReportStatusRequest:
+      description: Request body for changing a Feedback Report's status.
+      properties:
+        status:
+          $ref: "#/components/schemas/FeedbackReportStatus"
+        statusNote:
+          type: string
+          description: Optional note explaining why the status changed.
+      required:
+        - status
+      type: object
+      additionalProperties: false
+    LinkFeedbackReportTrackingIssueRequest:
+      description: Request body for linking a Tracking Issue to a Feedback Report.
+      properties:
+        trackingIssueNumber:
+          type: number
+          format: double
+          description: The GitHub issue number to link.
+      required:
+        - trackingIssueNumber
+      type: object
+      additionalProperties: false
+    MarkFeedbackReportDeliveredRequest:
+      description: Request body for marking a Feedback Report as delivered (Fixed or
+        Shipped).
+      properties:
+        releaseTag:
+          type: string
+          description: The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the
+            fix shipped in.
+      required:
+        - releaseTag
+      type: object
+      additionalProperties: false
     AdminAuditAction:
       type: string
       enum:
@@ -1096,6 +1535,10 @@ components:
         - demote
         - youtube_access_grant
         - youtube_access_withdraw
+        - feedback_status_change
+        - feedback_tracking_issue_link
+        - feedback_tracking_issue_unlink
+        - feedback_manual_delivery
     AdminAuditLogEntry:
       description: Platform Admin Audit Log entry returned by list APIs.
       properties:
@@ -1140,6 +1583,12 @@ components:
       in: header
       name: X-Cron-Secret
       description: Shared secret for cron-triggered endpoints
+    deploy-secret:
+      type: apiKey
+      in: header
+      name: X-Deploy-Secret
+      description: Production deploy credential for Release marking
+        (FEEDBACK_RELEASE_SECRET)
 info:
   title: "@myorganiser/source"
   version: 1.1.0
@@ -2163,6 +2612,204 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UserDeletionBody"
+  /feedback/releases/mark:
+    post:
+      operationId: MarkRelease
+      responses:
+        "200":
+          description: Release marked
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: "#/components/schemas/FeedbackReleaseMarkCounts"
+                  - $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Invalid Release tag or issue list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or wrong deploy credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      description: >-
+        Marks every Planned Feedback Report on the named Tracking Issues as
+        Fixed
+
+        (Bug Report) or Shipped (Suggestion), sends each newly marked report its
+
+        Fix Notice, and returns counts only.
+      tags:
+        - Feedback
+      security:
+        - deploy-secret: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkFeedbackReleaseRequest"
+  /feedback/fix-notice/unsubscribe:
+    post:
+      operationId: UnsubscribeFromFixNotices
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: "#/components/schemas/FixNoticeUnsubscribeResponse"
+                  - $ref: "#/components/schemas/ErrorResponse"
+      description: |-
+        Turns Fix Notices off for the User the token belongs to. Unauthenticated
+        by design — the opaque token is the only credential a mail client can
+        present (mirrors YouTubeController.unsubscribeFromDigest).
+      tags:
+        - Feedback
+      security: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FixNoticeUnsubscribeBody"
+  /feedback/reports:
+    post:
+      operationId: CreateReport
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateFeedbackReportResponse"
+        "400":
+          description: Invalid Feedback Report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+        "429":
+          description: Too many Feedback Reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      description: Store a Feedback Report for the signed-in User with Report Status
+        Received.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeedbackReportRequest"
+    get:
+      operationId: ListReports
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFeedbackReportsResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: List the signed-in User's own Feedback Reports, newest first.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
+  /feedback/reports/seen:
+    post:
+      operationId: MarkReportsSeen
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReportSeenResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Mark the signed-in User's Feedback Reports as seen (clears the badge).
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters: []
+  /feedback/reports/{reportId}/follow-up:
+    post:
+      operationId: AddFollowUp
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddFollowUpResponse"
+        "400":
+          description: Invalid Follow-up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Feedback Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Add the one Follow-up a reporter may send while their Bug Report is
+        Can't reproduce; it returns the report to Under review.
+      tags:
+        - Feedback
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFollowUpRequest"
   /auth/login:
     post:
       operationId: Login
@@ -3007,6 +3654,285 @@ paths:
           required: true
           schema:
             type: string
+  /admin/feedback/reports:
+    get:
+      operationId: ListFeedbackReports
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAdminFeedbackReportsResponse"
+        "400":
+          description: Invalid filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: |-
+        List Feedback Reports with optional filters (status, kind, platform,
+        trackingIssueNumber, limit). Newest first. Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: "#/components/schemas/FeedbackReportStatus"
+        - in: query
+          name: kind
+          required: false
+          schema:
+            $ref: "#/components/schemas/FeedbackReportKind"
+        - in: query
+          name: platform
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: trackingIssueNumber
+          required: false
+          schema:
+            format: double
+            type: number
+        - in: query
+          name: limit
+          required: false
+          schema:
+            format: double
+            type: number
+  /admin/feedback/reports/{reportId}:
+    get:
+      operationId: GetFeedbackReport
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: |-
+        Get a single Feedback Report by id with full details and reporter info.
+        Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+  /admin/feedback/reports/{reportId}/status:
+    patch:
+      operationId: ChangeFeedbackReportStatus
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "400":
+          description: Invalid status or note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: >-
+        Change a Feedback Report's status with an optional status note.
+
+        Status transitions are guarded by the pinned rules table. Platform Admin
+        only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeFeedbackReportStatusRequest"
+  /admin/feedback/reports/{reportId}/tracking-issue:
+    put:
+      operationId: LinkFeedbackReportTrackingIssue
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "400":
+          description: Invalid issue number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: |-
+        Link a GitHub issue to a Feedback Report, transitioning it to Planned.
+        Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkFeedbackReportTrackingIssueRequest"
+    delete:
+      operationId: UnlinkFeedbackReportTrackingIssue
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "400":
+          description: No tracking issue to unlink
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Unlink a GitHub issue from a Feedback Report. Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+  /admin/feedback/reports/{reportId}/delivery:
+    post:
+      operationId: MarkFeedbackReportDelivered
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeedbackReportDetailDto"
+        "400":
+          description: Invalid release tag or status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: |-
+        Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for
+        Suggestions) by naming the Release. Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkFeedbackReportDeliveredRequest"
   /admin/audit-logs:
     get:
       operationId: ListAuditLogs

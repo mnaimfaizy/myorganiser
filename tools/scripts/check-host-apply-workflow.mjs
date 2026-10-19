@@ -11,7 +11,10 @@
 // pins the hardening the wiring depends on: ssh verifies the host against
 // pinned keys, the SSH secrets are validated before use, the two HTTP probes
 // keep their shape, and the captured output passes the redaction scrubber
-// before anything prints it.
+// before anything prints it. In Production, Release marking (ADR 0133, issue
+// #1215) runs only after both `host-apply` and `deploy-frontend` succeed: the
+// `mark-feedback-release` job needs both, never uses `always()`, and runs the
+// marking script.
 //
 // Direction: one way, workflow to contract. Each check reads a shape out of
 // the workflow text and fails when it is gone; the secret allowlist alone
@@ -379,6 +382,46 @@ function checkNoDatabaseUrlSecret(path) {
   }
 }
 
+/**
+ * ADR 0133: reports are marked Fixed only once the Release is live, so the
+ * marking job waits for Host Apply and the frontend deploy. `always()` would
+ * run it after either failed or was skipped.
+ */
+function checkReleaseMarkJob(path) {
+  const job = 'mark-feedback-release';
+  if (!new RegExp(`^ {2}${job}:\\s*$`, 'm').test(read(path))) {
+    findings.push(`${path}: has no ${job} job (ADR 0133 Release marking)`);
+    return;
+  }
+  const block = jobBlock(path, job);
+  const needs = block.match(/^\s*needs:\s*(.+)$/m)?.[1] ?? '';
+  const needed = needs
+    .replace(/[[\]]/g, '')
+    .split(',')
+    .map((id) => id.trim());
+  for (const upstream of ['host-apply', 'deploy-frontend']) {
+    if (!needed.includes(upstream)) {
+      findings.push(
+        `${path}: ${job}'s needs (${needs.trim() || 'none'}) does not include ${upstream}`,
+      );
+    }
+  }
+  if (/always\(\)/.test(ifLineOf(path, job) ?? '')) {
+    findings.push(
+      `${path}: ${job}'s if: uses always(), so it could mark after a failed deploy`,
+    );
+  }
+  if (
+    !/^\s*run:\s*node tools\/scripts\/mark-feedback-release\.mjs\s*$/m.test(
+      block,
+    )
+  ) {
+    findings.push(
+      `${path}: ${job} does not run node tools/scripts/mark-feedback-release.mjs`,
+    );
+  }
+}
+
 checkEnvironment(STAGING, 'staging');
 checkEnvironment(PRODUCTION, 'production');
 checkNeedsBackendUpload(STAGING);
@@ -405,6 +448,7 @@ checkSecretAllowlist(STAGING);
 checkSecretAllowlist(PRODUCTION);
 checkNoDatabaseUrlSecret(STAGING);
 checkNoDatabaseUrlSecret(PRODUCTION);
+checkReleaseMarkJob(PRODUCTION);
 
 if (findings.length > 0) {
   console.error(

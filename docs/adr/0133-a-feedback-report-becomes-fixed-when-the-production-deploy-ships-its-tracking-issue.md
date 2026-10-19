@@ -28,4 +28,5 @@ The repository already makes every fix traceable to an issue. A branch or its fi
 ## Consequences
 
 - Production deploys gain a step that writes to the backend. If it fails, the Release stays live and the reports stay Planned, so the step is safe to re-run for the same tag.
+- A Fix Notice is sent at most once per report. It is claimed in a per-report ledger before anything reaches SMTP, the same trade the Weekly Digest makes ([ADR 0016](0016-digest-period-claimed-before-smtp.md)). A notice that fails after its report is marked is not sent again: a re-run marks only Planned reports, and the ledger already holds that report's row. Losing one notice is the deliberate price of never mailing a reporter twice; the outcome still shows on their Your reports page, and the deploy reports the failure as `fixNoticesFailed`.
 - An issue closed by mistake in a Release range marks its reports Fixed. Reopening the issue does not undo that; an admin corrects the report by hand.

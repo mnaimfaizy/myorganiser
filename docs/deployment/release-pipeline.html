@@ -977,7 +977,7 @@
   <section class="panel" aria-labelledby="hero-h">
     <div class="phead">
       <h2 id="hero-h">One gate, and it is not a box on this page</h2>
-      <span class="src">deploy-production.yml:130, :183, :295</span>
+      <span class="src">deploy-production.yml:130, :183, :295, :373</span>
     </div>
     <div class="pbody">
       <p class="small muted">
@@ -1025,7 +1025,7 @@
                are the `#tip` popover. -->
           <svg
             class="fig hero"
-            viewBox="0 0 1180 1246"
+            viewBox="0 0 1180 1356"
             role="img"
             aria-label="The release pipeline from a commit on main to a published GitHub Release, forking once when a release branch is pushed and halting once at environment: production"
             aria-describedby="pipelineDesc"
@@ -1504,21 +1504,64 @@
             <path
               data-step="12"
               class="fl x"
-              d="M 640 976 L 640 1000"
+              d="M 640 976 L 640 996"
+              marker-end="url(#arrow)"
+            />
+            <!-- Second edge: mark-feedback-release needs host-apply AND
+                 deploy-frontend (:369). host-apply sits directly above
+                 deploy-frontend, so its edge runs down the right margin. -->
+            <path
+              data-step="12"
+              class="fl x"
+              d="M 1020 874 L 1070 874 L 1070 1034 L 1024 1034"
+              marker-end="url(#arrow)"
+            />
+            <g
+              data-step="12"
+              class="n human"
+              data-tip="markrelease"
+              tabindex="0"
+              role="button"
+              aria-label="mark-feedback-release &#8212; after the Release is live, a second approval-gated job marks Feedback Reports Fixed"
+              aria-describedby="note-markrelease"
+            >
+              <rect class="box" x="260" y="1000" width="760" height="72" rx="5" />
+              <circle class="tipdot" cx="267" cy="1008" r="3" />
+              <text class="nl mono" x="272" y="1022">
+                mark-feedback-release &#8594; Feedback Reports marked Fixed
+              </text>
+              <text class="nc" x="272" y="1038">
+                after the Release is live &#183; environment: production
+                (:373) &#8212; a second approval
+              </text>
+              <text class="nc" x="272" y="1054">
+                needs host-apply and deploy-frontend (:369) &#183;
+                deploy-production.yml:365-367
+              </text>
+            </g>
+            <g data-step="12" class="mk mk-halt" transform="translate(900,992)">
+              <rect class="pill" x="-48" y="0" width="96" height="15" rx="3" />
+              <text x="0" y="10.6">SECOND HALT</text>
+            </g>
+
+            <path
+              data-step="13"
+              class="fl x"
+              d="M 640 1072 L 640 1110"
               marker-end="url(#arrow)"
             />
 
             <!-- ── Section E: the receipt ─────────────────────────────────── -->
             <g class="sec">
-              <line x1="20" y1="1014" x2="1160" y2="1014" />
-              <rect x="20" y="1004" width="470" height="20" />
-              <text x="26" y="1018">
+              <line x1="20" y1="1124" x2="1160" y2="1124" />
+              <rect x="20" y="1114" width="470" height="20" />
+              <text x="26" y="1128">
                 A MAINTAINER CONFIRMS, THEN RECORDS
               </text>
             </g>
 
             <g
-              data-step="12"
+              data-step="13"
               class="n human"
               data-tip="tag"
               tabindex="0"
@@ -1526,28 +1569,28 @@
               aria-label="yarn release:tag --version vX.Y.Z --push &#8212; a receipt, not a build step"
               aria-describedby="note-tag"
             >
-              <rect class="box" x="260" y="1032" width="760" height="66" rx="5" />
-              <circle class="tipdot" cx="267" cy="1040" r="3" />
-              <text class="nl mono" x="272" y="1054">
+              <rect class="box" x="260" y="1142" width="760" height="66" rx="5" />
+              <circle class="tipdot" cx="267" cy="1150" r="3" />
+              <text class="nl mono" x="272" y="1164">
                 yarn release:tag --version vX.Y.Z --push
               </text>
-              <text class="nc" x="272" y="1070">
+              <text class="nc" x="272" y="1180">
                 no commit, no files &#8212; asserts branch state first &#183;
                 release.mjs:757-765
               </text>
-              <text class="nc" x="272" y="1084">
+              <text class="nc" x="272" y="1194">
                 package.json:27
               </text>
             </g>
 
             <path
-              data-step="13"
+              data-step="14"
               class="fl x"
-              d="M 640 1098 L 640 1118"
+              d="M 640 1208 L 640 1228"
               marker-end="url(#arrow)"
             />
             <g
-              data-step="13"
+              data-step="14"
               class="n auto"
               data-tip="publish"
               tabindex="0"
@@ -1555,12 +1598,12 @@
               aria-label="push of the tag publishes the GitHub Release, idempotently"
               aria-describedby="note-publish"
             >
-              <rect class="box" x="260" y="1122" width="760" height="52" rx="5" />
-              <circle class="tipdot" cx="267" cy="1130" r="3" />
-              <text class="nl mono" x="272" y="1144">
+              <rect class="box" x="260" y="1232" width="760" height="52" rx="5" />
+              <circle class="tipdot" cx="267" cy="1240" r="3" />
+              <text class="nl mono" x="272" y="1254">
                 push of v*.*.* &#8594; Publish GitHub Release
               </text>
-              <text class="nc" x="272" y="1160">
+              <text class="nc" x="272" y="1270">
                 idempotent &#183; publish-github-release.yml:6-8, :97-118
               </text>
             </g>
@@ -1714,13 +1757,16 @@
           <code>deploy-backend</code> (<code>deploy-production.yml:130</code>),
           <code>host-apply</code> (<code>:183</code>), and
           <code>deploy-frontend</code> (<code>:295</code>) all declare
-          <code>environment: production</code> &mdash; three jobs, one
-          approval batch. Any job you add that declares
-          <code>environment: production</code> joins this same batch; nothing
-          else marks a job as gated. Everything upstream of this box happened
-          without anyone deciding anything; everything downstream needs the
-          sign-off this box represents. Choose an outcome below to continue
-          the walkthrough.
+          <code>environment: production</code> &mdash; three deploy jobs, one
+          approval batch. A fourth job, <code>mark-feedback-release</code>
+          (<code>:373</code>), also declares it but does not join the batch:
+          it needs <code>host-apply</code> and <code>deploy-frontend</code>
+          (<code>:369</code>), so it only becomes ready after both succeed
+          and raises its own, second approval prompt. Nothing else marks a
+          job as gated. Everything upstream of this box happened without
+          anyone deciding anything; everything downstream needs the sign-off
+          this box represents. Choose an outcome below to continue the
+          walkthrough.
         </dd>
         <dt>deploybackend</dt>
         <dd id="note-deploybackend">
@@ -1771,6 +1817,33 @@
           <code>needs:</code> lists <code>deploy-backend</code>, not
           <code>host-apply</code> (<code>:292</code>), since neither job needs
           the other.
+        </dd>
+        <dt>markrelease</dt>
+        <dd id="note-markrelease">
+          Added after the deploy jobs, as the comment above it says
+          (<code>deploy-production.yml:365-367</code>): once the Release is
+          live, mark the Feedback Reports its commits fixed. It
+          <code>needs:</code> <code>validate</code>, <code>host-apply</code>
+          and <code>deploy-frontend</code> (<code>:369</code>), so it runs only
+          after both succeed; it is skipped on an <code>apply_only</code> run
+          (<code>:370</code>); it declares <code>environment: production</code>
+          (<code>:373</code>), so approving the first batch does not approve
+          it &mdash; a second prompt appears once the deploys are done.
+          Timeout 10&nbsp;minutes (<code>:372</code>). It collects the issues
+          closed by <code>Closes</code>, <code>Fixes</code> or
+          <code>Resolves #N</code> in the commits since the previous
+          <code>vX.Y.Z</code> tag and POSTs them to the backend, which marks
+          each Planned Feedback Report on those issues Fixed or Shipped and
+          sends Fix Notices
+          (<a href="../adr/0133-a-feedback-report-becomes-fixed-when-the-production-deploy-ships-its-tracking-issue.md"
+            >ADR&nbsp;0133</a
+          >). If it fails, the Release stays live and the reports stay
+          Planned; <q>Re-run failed jobs</q> retries it alone and marks
+          nothing twice. It needs <code>FEEDBACK_RELEASE_SECRET</code> on the
+          <code>production</code> GitHub Environment (<a
+            href="CI_CD_AND_RELEASE_PROCESS.md"
+            >CI_CD_AND_RELEASE_PROCESS.md</a
+          >, section <q>Release marking (Production)</q>).
         </dd>
         <dt>tag</dt>
         <dd id="note-tag">
@@ -1865,7 +1938,7 @@
               <code>Deploy Production (manual)</code> &mdash; halts at
               approval
             </td>
-            <td class="cite">deploy-production.yml:5-6, :130, :183, :295</td>
+            <td class="cite">deploy-production.yml:5-6, :130, :183, :295, :373</td>
           </tr>
           <tr>
             <td>6</td>
@@ -2099,10 +2172,12 @@
             30&nbsp;min (<code>deploy-staging.yml:79</code>, <code>:149</code>,
             <code>:189</code>, <code>:284</code>, <code>:402</code>) &mdash;
             five now, including <code>select</code> and
-            <code>host-apply</code>; production's three approval-gated jobs
+            <code>host-apply</code>; production's three deploy jobs
             45&nbsp;min each (<code>deploy-production.yml:129</code>,
             <code>:182</code>, <code>:294</code>) &mdash; three now, also
-            including <code>host-apply</code>; dispatcher, release-PR and
+            including <code>host-apply</code> &mdash; and the fourth
+            approval-gated job, <code>mark-feedback-release</code>,
+            10&nbsp;min (<code>:372</code>); dispatcher, release-PR and
             publish 10&nbsp;min each.
           </p>
         </div>
@@ -2189,10 +2264,10 @@
           <span class="cite">:674</span>
         </li>
         <li>
-          Build Backend <span class="cite">:1301</span>, only when
-          <code>backend</code> is affected <span class="cite">:1305</span>, and
-          Build Frontend <span class="cite">:1347</span>,
-          <span class="cite">:1351</span>
+          Build Backend <span class="cite">:1304</span>, only when
+          <code>backend</code> is affected <span class="cite">:1308</span>, and
+          Build Frontend <span class="cite">:1350</span>,
+          <span class="cite">:1354</span>
         </li>
       </ol>
       <p class="small muted">
@@ -2473,8 +2548,9 @@
       9: 'Only after approval: deploy-backend ships over FTP to cPanel.',
       10: 'host-apply then installs, migrates, generates, and restarts over SSH, and verifies with two HTTP probes. It fails closed — one failing step stops everything after it, with no rollback and no Tag.',
       11: 'deploy-frontend ships over FTP to cPanel too. It runs beside host-apply, not after it.',
-      12: 'A maintainer confirms production is live, then records it: no commit, no files, just a tag.',
-      13: 'The tag push publishes the GitHub Release. Re-running this step is safe.',
+      12: 'THE SECOND WALL. The deploys are done, but mark-feedback-release declares environment: production too and needs host-apply and deploy-frontend, so it asks for its own approval. The walkthrough will not advance past it until you use a control.',
+      13: 'A maintainer confirms production is live, then records it: no commit, no files, just a tag.',
+      14: 'The tag push publishes the GitHub Release. Re-running this step is safe.',
     };
 
     /* The one halt. Modelled on the code: `environment: production` refuses
@@ -2484,19 +2560,38 @@
       8: {
         title: 'Approval gate — environment: production',
         body:
-          'The run has reached deploy-backend, host-apply, and deploy-frontend, all gated on the production GitHub Environment. The rule that enforces this wall is required reviewers, set in repository settings — not in any file you can grep. If you add a job that declares environment: production, it joins this same approval batch — nothing else marks a job as gated. Before you approve: the run may have been queued when the branch was created, before CI finished on release/vX.Y.Z. Check CI on that branch yourself — nothing in this pipeline checks it for you.',
+          'The run has reached deploy-backend, host-apply, and deploy-frontend, all gated on the production GitHub Environment. The rule that enforces this wall is required reviewers, set in repository settings — not in any file you can grep. This approval covers those three deploy jobs only. A fourth job, mark-feedback-release, also declares environment: production but needs host-apply and deploy-frontend, so it raises a second, later prompt once they succeed — approving here does not approve it. Nothing else marks a job as gated. Before you approve: the run may have been queued when the branch was created, before CI finished on release/vX.Y.Z. Check CI on that branch yourself — nothing in this pipeline checks it for you.',
         actions: [
           {
             label: 'APPROVE — hand off to deploy-backend, host-apply, and deploy-frontend',
             cls: 'go',
             outcome:
-              'Approved. deploy-backend packages and ships over FTP to cPanel, then host-apply applies that upload on the host over SSH and verifies it with two HTTP probes, and deploy-frontend ships the frontend the same way over FTP. None of the three re-checks CI — approving is the only gate any of them has. If host-apply fails, the workflow fails closed: no rollback, no migrate-down, no "restart anyway," and no Tag.',
+              'Approved. deploy-backend packages and ships over FTP to cPanel, then host-apply applies that upload on the host over SSH and verifies it with two HTTP probes, and deploy-frontend ships the frontend the same way over FTP. None of the three re-checks CI — approving is the only gate any of them has. If host-apply fails, the workflow fails closed: no rollback, no migrate-down, no "restart anyway," and no Tag. When both deploys succeed, a second approval prompt follows for mark-feedback-release.',
           },
           {
             label: 'REJECT — the run stops here',
             cls: 'danger',
             outcome:
               'Rejected. None of deploy-backend, host-apply, or deploy-frontend runs. Nothing was packaged, nothing was shipped, nothing was applied on the host, and release:tag has nothing to record — production was never touched.',
+          },
+        ],
+      },
+      12: {
+        title: 'Second approval gate — mark-feedback-release',
+        body:
+          'The deploys are done, but this is not the end of the approvals. mark-feedback-release also declares environment: production and needs host-apply and deploy-frontend, so it only becomes ready now and asks again. It collects the issues closed by Closes, Fixes or Resolves #N in the commits since the previous vX.Y.Z tag and POSTs them to the backend, which marks the Planned Feedback Reports on them Fixed or Shipped and sends Fix Notices. It is skipped on an apply_only run. Approve it, or the reports stay Planned.',
+        actions: [
+          {
+            label: 'APPROVE — run mark-feedback-release',
+            cls: 'go',
+            outcome:
+              'Approved. mark-feedback-release marks the Feedback Reports on the issues this Release closed and sends Fix Notices. If it fails, the Release stays live and the reports stay Planned; Re-run failed jobs retries it alone and marks nothing twice.',
+          },
+          {
+            label: 'REJECT — leave the reports Planned',
+            cls: 'danger',
+            outcome:
+              'Rejected. The Release is already live and stays live, but no Feedback Report is marked and no Fix Notice is sent; the reports stay Planned until the job is re-run and approved.',
           },
         ],
       },
@@ -2708,10 +2803,10 @@
       "ci.yml:544": { "file": ".github/workflows/ci.yml", "start": "setup:" },
       "ci.yml:622": { "file": ".github/workflows/ci.yml", "start": "lint:" },
       "ci.yml:674": { "file": ".github/workflows/ci.yml", "start": "test:" },
-      "ci.yml:1301": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1305": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1347": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1351": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:1304": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1308": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1350": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1354": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },
@@ -2743,6 +2838,11 @@
       "deploy-production.yml:295": { "file": ".github/workflows/deploy-production.yml", "start": "environment: production" },
       "deploy-production.yml:302": { "file": ".github/workflows/deploy-production.yml", "start": "ref: ${{ needs.validate.outputs.release_ref }}" },
       "deploy-production.yml:346-363": { "file": ".github/workflows/deploy-production.yml", "start": "- name: Package frontend (cPanel)", "end": "timeout: 300000" },
+      "deploy-production.yml:365-367": { "file": ".github/workflows/deploy-production.yml", "start": "# ADR 0133: once the Release is live, mark the Feedback Reports its commits", "end": "# reports Planned; \"Re-run failed jobs\" retries this job alone." },
+      "deploy-production.yml:369": { "file": ".github/workflows/deploy-production.yml", "start": "needs: [validate, host-apply, deploy-frontend]" },
+      "deploy-production.yml:370": { "file": ".github/workflows/deploy-production.yml", "start": "if: ${{ startsWith(github.ref, 'refs/heads/release/') && !inputs.apply_only }}" },
+      "deploy-production.yml:372": { "file": ".github/workflows/deploy-production.yml", "start": "timeout-minutes: 10" },
+      "deploy-production.yml:373": { "file": ".github/workflows/deploy-production.yml", "start": "environment: production" },
       "deploy-production.yml:355": { "file": ".github/workflows/deploy-production.yml", "start": "- name: Deploy frontend to cPanel (production)" },
       "deploy-production.yml:361": { "file": ".github/workflows/deploy-production.yml", "start": "local-dir: ./dist/deploy/web/" },
       "deploy-production.yml:363": { "file": ".github/workflows/deploy-production.yml", "start": "timeout: 300000" },
@@ -2819,12 +2919,14 @@
     "stagingWebUploadExcludesHtaccess": true,
     "stagingEnvironmentName": "staging",
     "productionEnvironmentName": "production",
-    "productionApprovalGatedJobs": ["deploy-backend", "host-apply", "deploy-frontend"],
+    "productionApprovalGatedJobs": ["deploy-backend", "host-apply", "deploy-frontend", "mark-feedback-release"],
     "stagingApplyCancelInProgress": false,
     "stagingFrontendCancelInProgress": false,
     "productionConcurrencyCancelInProgress": false,
     "productionValidateTimeoutMinutes": 5,
     "productionDeployTimeoutMinutes": 45,
+    "productionReleaseMarkTimeoutMinutes": 10,
+    "productionReleaseMarkNeeds": ["validate", "host-apply", "deploy-frontend"],
     "stagingDeployTimeoutMinutes": 30,
     "ftpDeployTimeoutMs": 300000,
     "productionRefGuardPattern": "refs/heads/release/*",

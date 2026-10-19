@@ -41,6 +41,28 @@ export const AcknowledgementRequiredResponseCodeEnum = {
 
 export type AcknowledgementRequiredResponseCodeEnum = typeof AcknowledgementRequiredResponseCodeEnum[keyof typeof AcknowledgementRequiredResponseCodeEnum];
 
+export interface AddFollowUpRequest {
+    'followUp': string;
+}
+export interface AddFollowUpResponse {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'statusNote': string | null;
+    'releaseTag': string | null;
+    /**
+     * Only set when releaseTag is present and status is \'fixed\' or \'shipped\'.
+     */
+    'changelogUrl': string | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+    'followUp': string | null;
+    'message': string;
+    'details'?: any;
+}
+
+
 
 export const AdminAuditAction = {
     Disable: 'disable',
@@ -51,6 +73,10 @@ export const AdminAuditAction = {
     Demote: 'demote',
     YoutubeAccessGrant: 'youtube_access_grant',
     YoutubeAccessWithdraw: 'youtube_access_withdraw',
+    FeedbackStatusChange: 'feedback_status_change',
+    FeedbackTrackingIssueLink: 'feedback_tracking_issue_link',
+    FeedbackTrackingIssueUnlink: 'feedback_tracking_issue_unlink',
+    FeedbackManualDelivery: 'feedback_manual_delivery',
 } as const;
 
 export type AdminAuditAction = typeof AdminAuditAction[keyof typeof AdminAuditAction];
@@ -75,6 +101,84 @@ export interface AdminAuditLogEntry {
 
 
 /**
+ * Admin Feedback Report Context details.
+ */
+export interface AdminFeedbackReportContextDto {
+    'platform': string;
+    'appVersion': string;
+    'browser': string;
+    'operatingSystem': string;
+    'path': string;
+    'sentAt': string;
+}
+/**
+ * Admin Feedback Report detail: full report with all fields and reporter info.
+ */
+export interface AdminFeedbackReportDetailDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    /**
+     * Report Context platform, the inbox filters on it.
+     */
+    'platform': string;
+    'trackingIssueNumber': number | null;
+    /**
+     * Null once the sender has been removed by User Deletion.
+     */
+    'reporterUserId': string | null;
+    /**
+     * Null means the sender was removed by User Deletion — every report is sent by a signed-in User.
+     */
+    'reporter': AdminFeedbackReporterDto | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+    'description': string;
+    'expectedOutcome': string | null;
+    'context': AdminFeedbackReportContextDto;
+    'followUp': string | null;
+    'statusNote': string | null;
+    'releaseTag': string | null;
+    'fixNoticeOptIn': boolean;
+}
+
+
+/**
+ * Admin Feedback Report list item: header view without description.
+ */
+export interface AdminFeedbackReportListItemDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    /**
+     * Report Context platform, the inbox filters on it.
+     */
+    'platform': string;
+    'trackingIssueNumber': number | null;
+    /**
+     * Null once the sender has been removed by User Deletion.
+     */
+    'reporterUserId': string | null;
+    /**
+     * Sender identity for the inbox. Null once the sender has been removed by User Deletion.
+     */
+    'reporter': AdminFeedbackReporterDto | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+}
+
+
+/**
+ * Admin Feedback Reporter identity.
+ */
+export interface AdminFeedbackReporterDto {
+    'id': string;
+    'name': string | null;
+    'email': string;
+}
+/**
  * Identity-only User projection for Platform Admin directory APIs.
  */
 export interface AdminUserIdentity {
@@ -97,6 +201,18 @@ export interface AdminUserIdentity {
 export interface AuthUrlResponse {
     'url': string;
 }
+/**
+ * Request body for changing a Feedback Report\'s status.
+ */
+export interface ChangeFeedbackReportStatusRequest {
+    'status': FeedbackReportStatus;
+    /**
+     * Optional note explaining why the status changed.
+     */
+    'statusNote'?: string;
+}
+
+
 export interface ChannelCarouselResponse {
     'channelId': string;
     'channelTitle': string;
@@ -115,6 +231,33 @@ export interface ConfirmResetPasswordBody {
     'password': string;
     'confirm_password': string;
 }
+export interface CreateFeedbackReportRequest {
+    'kind': FeedbackReportKind;
+    'title': string;
+    'description': string;
+    /**
+     * Bug Report only — what the sender expected to happen.
+     */
+    'expectedOutcome'?: string;
+    'context': ReportContextRequest;
+    /**
+     * Fix Notice opt-in. The dialog ticks it by default.
+     */
+    'fixNoticeOptIn': boolean;
+}
+
+
+export interface CreateFeedbackReportResponse {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'createdAt': string;
+    'message': string;
+    'details'?: any;
+}
+
+
 export interface CronDigest200Response {
     'ran': boolean;
     'processed': number;
@@ -215,6 +358,70 @@ export const ExportVaultResponseExportVersionEnum = {
 
 export type ExportVaultResponseExportVersionEnum = typeof ExportVaultResponseExportVersionEnum[keyof typeof ExportVaultResponseExportVersionEnum];
 
+/**
+ * Counts returned to the Production deploy once a Release has been marked.
+ */
+export interface FeedbackReleaseMarkCounts {
+    'reportsMarked': number;
+    'fixNoticesSent': number;
+    'fixNoticesSkipped': number;
+    'fixNoticesFailed': number;
+}
+export interface FeedbackReportDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'createdAt': string;
+}
+
+
+/**
+ * A Feedback Report is a Bug Report or a Suggestion (CONTEXT.md: Feedback).
+ */
+
+export const FeedbackReportKind = {
+    BugReport: 'bug_report',
+    Suggestion: 'suggestion',
+} as const;
+
+export type FeedbackReportKind = typeof FeedbackReportKind[keyof typeof FeedbackReportKind];
+
+
+export interface FeedbackReportListItemDto {
+    'id': string;
+    'kind': FeedbackReportKind;
+    'status': FeedbackReportStatus;
+    'title': string;
+    'statusNote': string | null;
+    'releaseTag': string | null;
+    /**
+     * Only set when releaseTag is present and status is \'fixed\' or \'shipped\'.
+     */
+    'changelogUrl': string | null;
+    'statusChangedAt': string | null;
+    'createdAt': string;
+    'followUp': string | null;
+}
+
+
+/**
+ * Where a Feedback Report stands as its reporter sees it. There is no Duplicate status.
+ */
+
+export const FeedbackReportStatus = {
+    Received: 'received',
+    UnderReview: 'under_review',
+    Planned: 'planned',
+    Fixed: 'fixed',
+    Shipped: 'shipped',
+    WontDo: 'wont_do',
+    CannotReproduce: 'cannot_reproduce',
+} as const;
+
+export type FeedbackReportStatus = typeof FeedbackReportStatus[keyof typeof FeedbackReportStatus];
+
+
 export interface FilteredUserInterface {
     'id': string;
     'name': string;
@@ -227,6 +434,12 @@ export interface FilteredUserInterface {
 }
 
 
+export interface FixNoticeUnsubscribeBody {
+    'token': string;
+}
+export interface FixNoticeUnsubscribeResponse {
+    'ok': boolean;
+}
 export interface GetAuthUrl200Response {
     'url': string;
     'message': string;
@@ -365,6 +578,25 @@ export interface ImportVaultResponse {
 export interface ImportVaultResponseAnyOf {
     'ok': boolean;
 }
+/**
+ * Request body for linking a Tracking Issue to a Feedback Report.
+ */
+export interface LinkFeedbackReportTrackingIssueRequest {
+    /**
+     * The GitHub issue number to link.
+     */
+    'trackingIssueNumber': number;
+}
+/**
+ * Response body for list feedback reports endpoint.
+ */
+export interface ListAdminFeedbackReportsResponse {
+    'items': Array<AdminFeedbackReportListItemDto>;
+}
+export interface ListFeedbackReportsResponse {
+    'items': Array<FeedbackReportListItemDto>;
+    'hasChangedSinceLastSeen': boolean;
+}
 export interface ListVaultBackupsResponse {
     'items': Array<VaultBackupRecordDto>;
     'nextCursor': string | null;
@@ -379,6 +611,39 @@ export interface Login200Response {
 }
 export interface Login401Response {
     'message': string;
+}
+/**
+ * Request body the Production deploy sends to mark a Release\'s Planned Feedback Reports delivered (ADR 0133).
+ */
+export interface MarkFeedbackReleaseRequest {
+    /**
+     * The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fixes shipped in.
+     */
+    'releaseTag': string;
+    /**
+     * The Tracking Issue numbers the Release shipped, at most 500.
+     */
+    'issueNumbers': Array<number>;
+}
+/**
+ * Request body for marking a Feedback Report as delivered (Fixed or Shipped).
+ */
+export interface MarkFeedbackReportDeliveredRequest {
+    /**
+     * The Release tag (vX.Y.Z) or Mobile Release tag (mobile-vX.Y.Z) the fix shipped in.
+     */
+    'releaseTag': string;
+}
+export interface MarkRelease200Response {
+    'reportsMarked': number;
+    'fixNoticesSent': number;
+    'fixNoticesSkipped': number;
+    'fixNoticesFailed': number;
+    'message': string;
+    'details'?: any;
+}
+export interface MarkReportSeenResponse {
+    'seenAt': string;
 }
 export interface NotificationSettingsBody {
     'enabled'?: boolean;
@@ -493,6 +758,23 @@ export interface RegisterUserResponse {
     'message': string;
     'user'?: FilteredUserInterface;
 }
+/**
+ * The Report Context the sender saw before sending. It never carries screenshots, logs, or anything read from the Vault, and `path` is the page path alone — no query string and no fragment.
+ */
+export interface ReportContextRequest {
+    /**
+     * Which app sent the report — `web` for the dashboard.
+     */
+    'platform': string;
+    'appVersion': string;
+    'browser': string;
+    'operatingSystem': string;
+    'path': string;
+    /**
+     * ISO 8601 instant shown in the Report Context preview.
+     */
+    'sentAt': string;
+}
 export interface ResendVerificationEmailByEmailRequest {
     'email': string;
 }
@@ -582,6 +864,11 @@ export interface UnsubscribeBody {
 export interface UnsubscribeFromDigest200Response {
     'ok': boolean;
     'message': string;
+}
+export interface UnsubscribeFromFixNotices200Response {
+    'ok': boolean;
+    'message': string;
+    'details'?: any;
 }
 export interface UnsubscribeResponse {
     'ok': boolean;
@@ -1560,10 +1847,513 @@ export class AuthenticationApi extends BaseAPI {
 
 
 /**
+ * FeedbackApi - axios parameter creator
+ */
+export const FeedbackApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {string} reportId 
+         * @param {AddFollowUpRequest} addFollowUpRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addFollowUp: async (reportId: string, addFollowUpRequest: AddFollowUpRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('addFollowUp', 'reportId', reportId)
+            // verify required parameter 'addFollowUpRequest' is not null or undefined
+            assertParamExists('addFollowUp', 'addFollowUpRequest', addFollowUpRequest)
+            const localVarPath = `/feedback/reports/{reportId}/follow-up`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(addFollowUpRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createReport: async (createFeedbackReportRequest: CreateFeedbackReportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'createFeedbackReportRequest' is not null or undefined
+            assertParamExists('createReport', 'createFeedbackReportRequest', createFeedbackReportRequest)
+            const localVarPath = `/feedback/reports`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createFeedbackReportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listReports: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/feedback/reports`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {MarkFeedbackReleaseRequest} markFeedbackReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markRelease: async (markFeedbackReleaseRequest: MarkFeedbackReleaseRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'markFeedbackReleaseRequest' is not null or undefined
+            assertParamExists('markRelease', 'markFeedbackReleaseRequest', markFeedbackReleaseRequest)
+            const localVarPath = `/feedback/releases/mark`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication deploy-secret required
+            await setApiKeyToObject(localVarHeaderParameter, "X-Deploy-Secret", configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(markFeedbackReleaseRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markReportsSeen: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/feedback/reports/seen`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FixNoticeUnsubscribeBody} fixNoticeUnsubscribeBody 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unsubscribeFromFixNotices: async (fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'fixNoticeUnsubscribeBody' is not null or undefined
+            assertParamExists('unsubscribeFromFixNotices', 'fixNoticeUnsubscribeBody', fixNoticeUnsubscribeBody)
+            const localVarPath = `/feedback/fix-notice/unsubscribe`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(fixNoticeUnsubscribeBody, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * FeedbackApi - functional programming interface
+ */
+export const FeedbackApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = FeedbackApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {string} reportId 
+         * @param {AddFollowUpRequest} addFollowUpRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async addFollowUp(reportId: string, addFollowUpRequest: AddFollowUpRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AddFollowUpResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.addFollowUp(reportId, addFollowUpRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.addFollowUp']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {CreateFeedbackReportRequest} createFeedbackReportRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createReport(createFeedbackReportRequest: CreateFeedbackReportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreateFeedbackReportResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createReport(createFeedbackReportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.createReport']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listReports(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ListFeedbackReportsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listReports(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.listReports']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {MarkFeedbackReleaseRequest} markFeedbackReleaseRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async markRelease(markFeedbackReleaseRequest: MarkFeedbackReleaseRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MarkRelease200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.markRelease(markFeedbackReleaseRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.markRelease']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async markReportsSeen(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MarkReportSeenResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.markReportsSeen(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.markReportsSeen']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FixNoticeUnsubscribeBody} fixNoticeUnsubscribeBody 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async unsubscribeFromFixNotices(fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UnsubscribeFromFixNotices200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.unsubscribeFromFixNotices(fixNoticeUnsubscribeBody, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['FeedbackApi.unsubscribeFromFixNotices']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * FeedbackApi - factory interface
+ */
+export const FeedbackApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = FeedbackApiFp(configuration)
+    return {
+        /**
+         * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+         * @param {FeedbackApiAddFollowUpRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        addFollowUp(requestParameters: FeedbackApiAddFollowUpRequest, options?: RawAxiosRequestConfig): AxiosPromise<AddFollowUpResponse> {
+            return localVarFp.addFollowUp(requestParameters.reportId, requestParameters.addFollowUpRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Store a Feedback Report for the signed-in User with Report Status Received.
+         * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig): AxiosPromise<CreateFeedbackReportResponse> {
+            return localVarFp.createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * List the signed-in User\'s own Feedback Reports, newest first.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listReports(options?: RawAxiosRequestConfig): AxiosPromise<ListFeedbackReportsResponse> {
+            return localVarFp.listReports(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+         * @param {FeedbackApiMarkReleaseRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markRelease(requestParameters: FeedbackApiMarkReleaseRequest, options?: RawAxiosRequestConfig): AxiosPromise<MarkRelease200Response> {
+            return localVarFp.markRelease(requestParameters.markFeedbackReleaseRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markReportsSeen(options?: RawAxiosRequestConfig): AxiosPromise<MarkReportSeenResponse> {
+            return localVarFp.markReportsSeen(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+         * @param {FeedbackApiUnsubscribeFromFixNoticesRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unsubscribeFromFixNotices(requestParameters: FeedbackApiUnsubscribeFromFixNoticesRequest, options?: RawAxiosRequestConfig): AxiosPromise<UnsubscribeFromFixNotices200Response> {
+            return localVarFp.unsubscribeFromFixNotices(requestParameters.fixNoticeUnsubscribeBody, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * Request parameters for addFollowUp operation in FeedbackApi.
+ */
+export interface FeedbackApiAddFollowUpRequest {
+    readonly reportId: string
+
+    readonly addFollowUpRequest: AddFollowUpRequest
+}
+
+/**
+ * Request parameters for createReport operation in FeedbackApi.
+ */
+export interface FeedbackApiCreateReportRequest {
+    readonly createFeedbackReportRequest: CreateFeedbackReportRequest
+}
+
+/**
+ * Request parameters for markRelease operation in FeedbackApi.
+ */
+export interface FeedbackApiMarkReleaseRequest {
+    readonly markFeedbackReleaseRequest: MarkFeedbackReleaseRequest
+}
+
+/**
+ * Request parameters for unsubscribeFromFixNotices operation in FeedbackApi.
+ */
+export interface FeedbackApiUnsubscribeFromFixNoticesRequest {
+    readonly fixNoticeUnsubscribeBody: FixNoticeUnsubscribeBody
+}
+
+/**
+ * FeedbackApi - object-oriented interface
+ */
+export class FeedbackApi extends BaseAPI {
+    /**
+     * Add the one Follow-up a reporter may send while their Bug Report is Can\'t reproduce; it returns the report to Under review.
+     * @param {FeedbackApiAddFollowUpRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public addFollowUp(requestParameters: FeedbackApiAddFollowUpRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).addFollowUp(requestParameters.reportId, requestParameters.addFollowUpRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Store a Feedback Report for the signed-in User with Report Status Received.
+     * @param {FeedbackApiCreateReportRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public createReport(requestParameters: FeedbackApiCreateReportRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).createReport(requestParameters.createFeedbackReportRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * List the signed-in User\'s own Feedback Reports, newest first.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listReports(options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).listReports(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Marks every Planned Feedback Report on the named Tracking Issues as Fixed (Bug Report) or Shipped (Suggestion), sends each newly marked report its Fix Notice, and returns counts only.
+     * @param {FeedbackApiMarkReleaseRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public markRelease(requestParameters: FeedbackApiMarkReleaseRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).markRelease(requestParameters.markFeedbackReleaseRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Mark the signed-in User\'s Feedback Reports as seen (clears the badge).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public markReportsSeen(options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).markReportsSeen(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Turns Fix Notices off for the User the token belongs to. Unauthenticated by design — the opaque token is the only credential a mail client can present (mirrors YouTubeController.unsubscribeFromDigest).
+     * @param {FeedbackApiUnsubscribeFromFixNoticesRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public unsubscribeFromFixNotices(requestParameters: FeedbackApiUnsubscribeFromFixNoticesRequest, options?: RawAxiosRequestConfig) {
+        return FeedbackApiFp(this.configuration).unsubscribeFromFixNotices(requestParameters.fixNoticeUnsubscribeBody, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
  * PlatformAdminApi - axios parameter creator
  */
 export const PlatformAdminApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * Change a Feedback Report\'s status with an optional status note. Status transitions are guarded by the pinned rules table. Platform Admin only.
+         * @param {string} reportId 
+         * @param {ChangeFeedbackReportStatusRequest} changeFeedbackReportStatusRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        changeFeedbackReportStatus: async (reportId: string, changeFeedbackReportStatusRequest: ChangeFeedbackReportStatusRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('changeFeedbackReportStatus', 'reportId', reportId)
+            // verify required parameter 'changeFeedbackReportStatusRequest' is not null or undefined
+            assertParamExists('changeFeedbackReportStatus', 'changeFeedbackReportStatusRequest', changeFeedbackReportStatusRequest)
+            const localVarPath = `/admin/feedback/reports/{reportId}/status`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(changeFeedbackReportStatusRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
          * @param {string} userId 
@@ -1713,6 +2503,43 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
+         * @param {string} reportId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getFeedbackReport: async (reportId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('getFeedbackReport', 'reportId', reportId)
+            const localVarPath = `/admin/feedback/reports/{reportId}`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Get a User by id (identity fields only). Platform Admin only.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -1820,6 +2647,48 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Link a GitHub issue to a Feedback Report, transitioning it to Planned. Platform Admin only.
+         * @param {string} reportId 
+         * @param {LinkFeedbackReportTrackingIssueRequest} linkFeedbackReportTrackingIssueRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        linkFeedbackReportTrackingIssue: async (reportId: string, linkFeedbackReportTrackingIssueRequest: LinkFeedbackReportTrackingIssueRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('linkFeedbackReportTrackingIssue', 'reportId', reportId)
+            // verify required parameter 'linkFeedbackReportTrackingIssueRequest' is not null or undefined
+            assertParamExists('linkFeedbackReportTrackingIssue', 'linkFeedbackReportTrackingIssueRequest', linkFeedbackReportTrackingIssueRequest)
+            const localVarPath = `/admin/feedback/reports/{reportId}/tracking-issue`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(linkFeedbackReportTrackingIssueRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * List recent Admin Audit Log entries (newest first). Platform Admin only.
          * @param {number} [limit] 
          * @param {*} [options] Override http request option.
@@ -1841,6 +2710,64 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             // authentication jwt required
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (limit !== undefined) {
+                localVarQueryParameter['limit'] = limit;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] 
+         * @param {FeedbackReportKind} [kind] 
+         * @param {string} [platform] 
+         * @param {number} [trackingIssueNumber] 
+         * @param {number} [limit] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listFeedbackReports: async (status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/admin/feedback/reports`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (kind !== undefined) {
+                localVarQueryParameter['kind'] = kind;
+            }
+
+            if (platform !== undefined) {
+                localVarQueryParameter['platform'] = platform;
+            }
+
+            if (trackingIssueNumber !== undefined) {
+                localVarQueryParameter['trackingIssueNumber'] = trackingIssueNumber;
+            }
 
             if (limit !== undefined) {
                 localVarQueryParameter['limit'] = limit;
@@ -1889,6 +2816,48 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
+         * @param {string} reportId 
+         * @param {MarkFeedbackReportDeliveredRequest} markFeedbackReportDeliveredRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markFeedbackReportDelivered: async (reportId: string, markFeedbackReportDeliveredRequest: MarkFeedbackReportDeliveredRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('markFeedbackReportDelivered', 'reportId', reportId)
+            // verify required parameter 'markFeedbackReportDeliveredRequest' is not null or undefined
+            assertParamExists('markFeedbackReportDelivered', 'markFeedbackReportDeliveredRequest', markFeedbackReportDeliveredRequest)
+            const localVarPath = `/admin/feedback/reports/{reportId}/delivery`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(markFeedbackReportDeliveredRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -1970,6 +2939,43 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Unlink a GitHub issue from a Feedback Report. Platform Admin only.
+         * @param {string} reportId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unlinkFeedbackReportTrackingIssue: async (reportId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'reportId' is not null or undefined
+            assertParamExists('unlinkFeedbackReportTrackingIssue', 'reportId', reportId)
+            const localVarPath = `/admin/feedback/reports/{reportId}/tracking-issue`
+                .replace('{reportId}', encodeURIComponent(String(reportId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Withdraw YouTube Access from a User. A connected User is disconnected from YouTube in the same operation; a live Sync Run leaves the disconnect pending.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -2015,6 +3021,19 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
 export const PlatformAdminApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = PlatformAdminApiAxiosParamCreator(configuration)
     return {
+        /**
+         * Change a Feedback Report\'s status with an optional status note. Status transitions are guarded by the pinned rules table. Platform Admin only.
+         * @param {string} reportId 
+         * @param {ChangeFeedbackReportStatusRequest} changeFeedbackReportStatusRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async changeFeedbackReportStatus(reportId: string, changeFeedbackReportStatusRequest: ChangeFeedbackReportStatusRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.changeFeedbackReportStatus(reportId, changeFeedbackReportStatusRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.changeFeedbackReportStatus']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
         /**
          * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
          * @param {string} userId 
@@ -2064,6 +3083,18 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
+         * @param {string} reportId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getFeedbackReport(reportId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getFeedbackReport(reportId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.getFeedbackReport']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Get a User by id (identity fields only). Platform Admin only.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -2099,6 +3130,19 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Link a GitHub issue to a Feedback Report, transitioning it to Planned. Platform Admin only.
+         * @param {string} reportId 
+         * @param {LinkFeedbackReportTrackingIssueRequest} linkFeedbackReportTrackingIssueRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async linkFeedbackReportTrackingIssue(reportId: string, linkFeedbackReportTrackingIssueRequest: LinkFeedbackReportTrackingIssueRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.linkFeedbackReportTrackingIssue(reportId, linkFeedbackReportTrackingIssueRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.linkFeedbackReportTrackingIssue']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * List recent Admin Audit Log entries (newest first). Platform Admin only.
          * @param {number} [limit] 
          * @param {*} [options] Override http request option.
@@ -2111,6 +3155,22 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] 
+         * @param {FeedbackReportKind} [kind] 
+         * @param {string} [platform] 
+         * @param {number} [trackingIssueNumber] 
+         * @param {number} [limit] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listFeedbackReports(status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ListAdminFeedbackReportsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listFeedbackReports(status, kind, platform, trackingIssueNumber, limit, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listFeedbackReports']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * List/search Users (identity fields only). Platform Admin only.
          * @param {string} [q] 
          * @param {*} [options] Override http request option.
@@ -2120,6 +3180,19 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.listUsers(q, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listUsers']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
+         * @param {string} reportId 
+         * @param {MarkFeedbackReportDeliveredRequest} markFeedbackReportDeliveredRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async markFeedbackReportDelivered(reportId: string, markFeedbackReportDeliveredRequest: MarkFeedbackReportDeliveredRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.markFeedbackReportDelivered(reportId, markFeedbackReportDeliveredRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.markFeedbackReportDelivered']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -2147,6 +3220,18 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Unlink a GitHub issue from a Feedback Report. Platform Admin only.
+         * @param {string} reportId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async unlinkFeedbackReportTrackingIssue(reportId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportDetailDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.unlinkFeedbackReportTrackingIssue(reportId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.unlinkFeedbackReportTrackingIssue']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Withdraw YouTube Access from a User. A connected User is disconnected from YouTube in the same operation; a live Sync Run leaves the disconnect pending.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
@@ -2167,6 +3252,15 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
 export const PlatformAdminApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
     const localVarFp = PlatformAdminApiFp(configuration)
     return {
+        /**
+         * Change a Feedback Report\'s status with an optional status note. Status transitions are guarded by the pinned rules table. Platform Admin only.
+         * @param {PlatformAdminApiChangeFeedbackReportStatusRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        changeFeedbackReportStatus(requestParameters: PlatformAdminApiChangeFeedbackReportStatusRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.changeFeedbackReportStatus(requestParameters.reportId, requestParameters.changeFeedbackReportStatusRequest, options).then((request) => request(axios, basePath));
+        },
         /**
          * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
          * @param {PlatformAdminApiDemoteUserRequest} requestParameters Request parameters.
@@ -2204,6 +3298,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.forceLogoutUser(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
+         * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
+         * @param {PlatformAdminApiGetFeedbackReportRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getFeedbackReport(requestParameters: PlatformAdminApiGetFeedbackReportRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.getFeedbackReport(requestParameters.reportId, options).then((request) => request(axios, basePath));
+        },
+        /**
          * Get a User by id (identity fields only). Platform Admin only.
          * @param {PlatformAdminApiGetUserByIdRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -2230,6 +3333,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.grantYouTubeAccess(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
+         * Link a GitHub issue to a Feedback Report, transitioning it to Planned. Platform Admin only.
+         * @param {PlatformAdminApiLinkFeedbackReportTrackingIssueRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        linkFeedbackReportTrackingIssue(requestParameters: PlatformAdminApiLinkFeedbackReportTrackingIssueRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.linkFeedbackReportTrackingIssue(requestParameters.reportId, requestParameters.linkFeedbackReportTrackingIssueRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
          * List recent Admin Audit Log entries (newest first). Platform Admin only.
          * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -2239,6 +3351,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.listAuditLogs(requestParameters.limit, options).then((request) => request(axios, basePath));
         },
         /**
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+         * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ListAdminFeedbackReportsResponse> {
+            return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(axios, basePath));
+        },
+        /**
          * List/search Users (identity fields only). Platform Admin only.
          * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -2246,6 +3367,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
          */
         listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<Array<AdminUserIdentity>> {
             return localVarFp.listUsers(requestParameters.q, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
+         * @param {PlatformAdminApiMarkFeedbackReportDeliveredRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        markFeedbackReportDelivered(requestParameters: PlatformAdminApiMarkFeedbackReportDeliveredRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.markFeedbackReportDelivered(requestParameters.reportId, requestParameters.markFeedbackReportDeliveredRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * Promote a User to Platform Admin.
@@ -2266,6 +3396,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.resendVerification(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
+         * Unlink a GitHub issue from a Feedback Report. Platform Admin only.
+         * @param {PlatformAdminApiUnlinkFeedbackReportTrackingIssueRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        unlinkFeedbackReportTrackingIssue(requestParameters: PlatformAdminApiUnlinkFeedbackReportTrackingIssueRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportDetailDto> {
+            return localVarFp.unlinkFeedbackReportTrackingIssue(requestParameters.reportId, options).then((request) => request(axios, basePath));
+        },
+        /**
          * Withdraw YouTube Access from a User. A connected User is disconnected from YouTube in the same operation; a live Sync Run leaves the disconnect pending.
          * @param {PlatformAdminApiWithdrawYouTubeAccessRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -2276,6 +3415,15 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
         },
     };
 };
+
+/**
+ * Request parameters for changeFeedbackReportStatus operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiChangeFeedbackReportStatusRequest {
+    readonly reportId: string
+
+    readonly changeFeedbackReportStatusRequest: ChangeFeedbackReportStatusRequest
+}
 
 /**
  * Request parameters for demoteUser operation in PlatformAdminApi.
@@ -2306,6 +3454,13 @@ export interface PlatformAdminApiForceLogoutUserRequest {
 }
 
 /**
+ * Request parameters for getFeedbackReport operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiGetFeedbackReportRequest {
+    readonly reportId: string
+}
+
+/**
  * Request parameters for getUserById operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiGetUserByIdRequest {
@@ -2320,9 +3475,33 @@ export interface PlatformAdminApiGrantYouTubeAccessRequest {
 }
 
 /**
+ * Request parameters for linkFeedbackReportTrackingIssue operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiLinkFeedbackReportTrackingIssueRequest {
+    readonly reportId: string
+
+    readonly linkFeedbackReportTrackingIssueRequest: LinkFeedbackReportTrackingIssueRequest
+}
+
+/**
  * Request parameters for listAuditLogs operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListAuditLogsRequest {
+    readonly limit?: number
+}
+
+/**
+ * Request parameters for listFeedbackReports operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiListFeedbackReportsRequest {
+    readonly status?: FeedbackReportStatus
+
+    readonly kind?: FeedbackReportKind
+
+    readonly platform?: string
+
+    readonly trackingIssueNumber?: number
+
     readonly limit?: number
 }
 
@@ -2331,6 +3510,15 @@ export interface PlatformAdminApiListAuditLogsRequest {
  */
 export interface PlatformAdminApiListUsersRequest {
     readonly q?: string
+}
+
+/**
+ * Request parameters for markFeedbackReportDelivered operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiMarkFeedbackReportDeliveredRequest {
+    readonly reportId: string
+
+    readonly markFeedbackReportDeliveredRequest: MarkFeedbackReportDeliveredRequest
 }
 
 /**
@@ -2348,6 +3536,13 @@ export interface PlatformAdminApiResendVerificationRequest {
 }
 
 /**
+ * Request parameters for unlinkFeedbackReportTrackingIssue operation in PlatformAdminApi.
+ */
+export interface PlatformAdminApiUnlinkFeedbackReportTrackingIssueRequest {
+    readonly reportId: string
+}
+
+/**
  * Request parameters for withdrawYouTubeAccess operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiWithdrawYouTubeAccessRequest {
@@ -2358,6 +3553,16 @@ export interface PlatformAdminApiWithdrawYouTubeAccessRequest {
  * PlatformAdminApi - object-oriented interface
  */
 export class PlatformAdminApi extends BaseAPI {
+    /**
+     * Change a Feedback Report\'s status with an optional status note. Status transitions are guarded by the pinned rules table. Platform Admin only.
+     * @param {PlatformAdminApiChangeFeedbackReportStatusRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public changeFeedbackReportStatus(requestParameters: PlatformAdminApiChangeFeedbackReportStatusRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).changeFeedbackReportStatus(requestParameters.reportId, requestParameters.changeFeedbackReportStatusRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
      * @param {PlatformAdminApiDemoteUserRequest} requestParameters Request parameters.
@@ -2399,6 +3604,16 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
+     * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
+     * @param {PlatformAdminApiGetFeedbackReportRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getFeedbackReport(requestParameters: PlatformAdminApiGetFeedbackReportRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).getFeedbackReport(requestParameters.reportId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
      * Get a User by id (identity fields only). Platform Admin only.
      * @param {PlatformAdminApiGetUserByIdRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -2428,6 +3643,16 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
+     * Link a GitHub issue to a Feedback Report, transitioning it to Planned. Platform Admin only.
+     * @param {PlatformAdminApiLinkFeedbackReportTrackingIssueRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public linkFeedbackReportTrackingIssue(requestParameters: PlatformAdminApiLinkFeedbackReportTrackingIssueRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).linkFeedbackReportTrackingIssue(requestParameters.reportId, requestParameters.linkFeedbackReportTrackingIssueRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
      * List recent Admin Audit Log entries (newest first). Platform Admin only.
      * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -2438,6 +3663,16 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
+     * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+     * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
      * List/search Users (identity fields only). Platform Admin only.
      * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -2445,6 +3680,16 @@ export class PlatformAdminApi extends BaseAPI {
      */
     public listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig) {
         return PlatformAdminApiFp(this.configuration).listUsers(requestParameters.q, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
+     * @param {PlatformAdminApiMarkFeedbackReportDeliveredRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public markFeedbackReportDelivered(requestParameters: PlatformAdminApiMarkFeedbackReportDeliveredRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).markFeedbackReportDelivered(requestParameters.reportId, requestParameters.markFeedbackReportDeliveredRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2465,6 +3710,16 @@ export class PlatformAdminApi extends BaseAPI {
      */
     public resendVerification(requestParameters: PlatformAdminApiResendVerificationRequest, options?: RawAxiosRequestConfig) {
         return PlatformAdminApiFp(this.configuration).resendVerification(requestParameters.userId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Unlink a GitHub issue from a Feedback Report. Platform Admin only.
+     * @param {PlatformAdminApiUnlinkFeedbackReportTrackingIssueRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public unlinkFeedbackReportTrackingIssue(requestParameters: PlatformAdminApiUnlinkFeedbackReportTrackingIssueRequest, options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).unlinkFeedbackReportTrackingIssue(requestParameters.reportId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

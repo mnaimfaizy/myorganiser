@@ -16,10 +16,15 @@ jest.mock('@myorganiser/web-ui', () => ({
   useSidebar: jest.fn(),
 }));
 
+jest.mock('../hooks/use-feedback-dialog', () => ({
+  openFeedbackDialog: jest.fn(),
+}));
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { logout } from '@myorganiser/auth';
 import { SidebarProvider, useSidebar } from '@myorganiser/web-ui';
+import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { NavUser } from './nav-user';
 
 const user = {
@@ -128,6 +133,47 @@ describe('NavUser', () => {
     expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
+
+  describe('Send feedback menu item', () => {
+    it('should open the feedback dialog when Send feedback is chosen', async () => {
+      stubSidebar(true);
+
+      renderNavUser();
+      openUserMenu();
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Send feedback' }),
+      );
+
+      expect(openFeedbackDialog).toHaveBeenCalledTimes(1);
+    });
+
+    it('should close the mobile drawer when Send feedback is chosen', async () => {
+      const sidebar = stubSidebar(true);
+
+      renderNavUser();
+      const trigger = openUserMenu();
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Send feedback' }),
+      );
+
+      expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      });
+    });
+
+    it('should not close the drawer on desktop when Send feedback is chosen', async () => {
+      const sidebar = stubSidebar(false);
+
+      renderNavUser();
+      openUserMenu();
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Send feedback' }),
+      );
+
+      expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     });
   });
 });

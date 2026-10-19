@@ -10,6 +10,7 @@ import {
   DashboardGuard,
   DashboardSidebar,
   DynamicBreadcrumb,
+  FeedbackDialog,
   OfflineNotice,
 } from '@myorganiser/web-pages/dashboard';
 
@@ -74,6 +75,9 @@ export default function DashboardLayout({
               <OfflineNotice />
               {children}
             </SidebarInset>
+            {/* Feedback Dialog is mounted once here because both the sidebar
+                footer and the user menu open it. */}
+            <FeedbackDialog />
             <Toaster />
           </VaultMountSettleProvider>
         </VaultSessionProvider>

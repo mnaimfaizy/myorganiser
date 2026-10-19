@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'crypto';
 import * as express from 'express';
 import { JwtPayload } from 'jsonwebtoken';
 import { decodeToken } from '../helpers/jwtHelper';
@@ -42,6 +43,28 @@ function authenticateCronSecret(request: express.Request): Promise<void> {
   return Promise.resolve();
 }
 
+/**
+ * The Production deploy's credential for Release marking (ADR 0133). Separate
+ * from cron-secret so neither secret opens the other's endpoints. Both sides
+ * are hashed first so timingSafeEqual always compares equal-length buffers:
+ * the compare is constant time and leaks nothing about the secret's length.
+ */
+function authenticateDeploySecret(request: express.Request): Promise<void> {
+  const secret = request.headers['x-deploy-secret'];
+  const expectedSecret = process.env.FEEDBACK_RELEASE_SECRET;
+
+  if (!expectedSecret || typeof secret !== 'string') {
+    return Promise.reject(unauthorized());
+  }
+
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  if (!timingSafeEqual(digest(secret), digest(expectedSecret))) {
+    return Promise.reject(unauthorized());
+  }
+
+  return Promise.resolve();
+}
+
 export function expressAuthentication(
   request: express.Request,
   securityName: string,
@@ -49,6 +72,10 @@ export function expressAuthentication(
 ): Promise<any> {
   if (securityName === 'cron-secret') {
     return authenticateCronSecret(request);
+  }
+
+  if (securityName === 'deploy-secret') {
+    return authenticateDeploySecret(request);
   }
 
   if (securityName !== 'jwt') {

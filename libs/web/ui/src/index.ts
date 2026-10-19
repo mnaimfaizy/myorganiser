@@ -26,6 +26,7 @@ export * from './lib/components/Sheet/Sheet';
 export * from './lib/components/Sidebar/Sidebar';
 export * from './lib/components/Skeleton/Skeleton';
 export * from './lib/components/Table/Table';
+export * from './lib/components/Textarea/Textarea';
 export * from './lib/components/Toast/Toast';
 export * from './lib/components/Toaster/Toaster';
 export * from './lib/components/Tooltip/Tooltip';
