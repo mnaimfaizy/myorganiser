@@ -2,9 +2,11 @@ import { PrismaClient, createPrismaClient } from '../prisma';
 import {
   FEEDBACK_REPORT_TEXT_MAX_LENGTH,
   FEEDBACK_REPORT_STATUS_RULES,
+  FEEDBACK_REPORT_STATUSES,
   FEEDBACK_REPORT_KIND_RULES,
   FEEDBACK_RELEASE_TAG_REFUSAL_MESSAGE,
   TRACKING_ISSUE_LINKED_STATUS,
+  REOPENED_STATUS,
   isFeedbackReportStatus,
   parseReleaseTag,
   isFeedbackReportKind,
@@ -113,8 +115,46 @@ interface MarkDeliveredInput {
   releaseTag: unknown;
 }
 
+/**
+ * Input for reopening a wrongly delivered report.
+ */
+interface ReopenReportInput {
+  statusNote?: unknown;
+}
+
 function trimString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Read a Status Note from admin input. Required notes refuse when blank; every
+ * note refuses when over the text cap. Shared by changeStatus and reopenReport.
+ */
+function parseStatusNote(
+  raw: unknown,
+  required: boolean,
+): AdminServiceResult<{ note: string }> {
+  const note = trimString(raw);
+
+  if (required && !note) {
+    return {
+      ok: false,
+      status: 400,
+      body: { message: 'Write a status note explaining why.' },
+    };
+  }
+
+  if (note.length > FEEDBACK_REPORT_TEXT_MAX_LENGTH) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        message: `The status note must be ${FEEDBACK_REPORT_TEXT_MAX_LENGTH.toLocaleString('en-US')} characters or fewer.`,
+      },
+    };
+  }
+
+  return { ok: true, status: 200, body: { note } };
 }
 
 /**
@@ -142,8 +182,8 @@ function statusLabel(status: FeedbackReportStatus): string {
 
 /**
  * Fixed and Shipped are final (PRD #1206): once a Release has delivered a
- * report, no admin action moves it again. Returns the refusal, or null when
- * the report is still open.
+ * report, no triage action moves it again; only reopenReport does. Returns the
+ * refusal, or null when the report is still open.
  */
 function refuseWhenFinal(report: {
   status: FeedbackReportStatus;
@@ -520,26 +560,13 @@ export class AdminFeedbackService {
     const alreadyFinal = refuseWhenFinal(report);
     if (alreadyFinal !== null) return alreadyFinal;
 
-    // Check status note requirement
-    const statusNote = trimString(input.statusNote ?? '');
-    if (rule.requiresStatusNote && !statusNote) {
-      return {
-        ok: false,
-        status: 400,
-        body: { message: 'Write a status note explaining why.' },
-      };
-    }
-
-    // Check status note cap
-    if (statusNote && statusNote.length > FEEDBACK_REPORT_TEXT_MAX_LENGTH) {
-      return {
-        ok: false,
-        status: 400,
-        body: {
-          message: `The status note must be ${FEEDBACK_REPORT_TEXT_MAX_LENGTH.toLocaleString('en-US')} characters or fewer.`,
-        },
-      };
-    }
+    // Check status note requirement and cap
+    const noteResult = parseStatusNote(
+      input.statusNote,
+      rule.requiresStatusNote,
+    );
+    if (noteResult.ok === false) return noteResult;
+    const statusNote = noteResult.body.note;
 
     // Update the report in a transaction
     const updated = await this.updateReportAndAudit(
@@ -781,6 +808,95 @@ export class AdminFeedbackService {
     // Send the Fix Notice after the transaction commits. Never throws per #1212
     // acceptance criteria — a mail failure must not roll back the Report Status change.
     await feedbackFixNoticeService.sendFixNoticeForReport(reportId);
+
+    return {
+      ok: true,
+      status: 200,
+      body: toDetailDto(updated),
+    };
+  }
+
+  /**
+   * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. The
+   * report returns to Under review with a required Status Note, its Release is
+   * cleared, and its Tracking Issue link is kept. Its Fix Notice delivery row is
+   * deleted so a later genuine Fixed or Shipped can send one new notice. No
+   * email is sent. The status change and audit row share one transaction.
+   *
+   * Refuses with 400 if:
+   * - The report is not in a final status (Fixed or Shipped)
+   * - The Status Note is missing or over the text cap
+   *
+   * Refuses with 404 if the report does not exist.
+   */
+  async reopenReport(
+    actorUserId: string,
+    reportId: string,
+    input: ReopenReportInput,
+  ): Promise<AdminServiceResult<AdminFeedbackReportDetailDto>> {
+    const reportResult = await this.loadReportOr404(reportId);
+
+    if (reportResult.ok === false) {
+      return reportResult as unknown as AdminServiceResult<AdminFeedbackReportDetailDto>;
+    }
+
+    const report = reportResult.body;
+
+    // Only a final report can be reopened. The rules table decides which
+    // statuses are final, so the refusal names them from the table too.
+    if (!FEEDBACK_REPORT_STATUS_RULES[report.status].isFinal) {
+      const finalLabels = FEEDBACK_REPORT_STATUSES.filter(
+        (status) => FEEDBACK_REPORT_STATUS_RULES[status].isFinal,
+      )
+        .map(statusLabel)
+        .join(' or ');
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          message: `Only a report marked ${finalLabels} can be reopened.`,
+        },
+      };
+    }
+
+    const noteResult = parseStatusNote(input.statusNote, true);
+    if (noteResult.ok === false) return noteResult;
+    const statusNote = noteResult.body.note;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.feedbackReport.update({
+        where: { id: reportId },
+        data: {
+          status: REOPENED_STATUS,
+          status_note: statusNote,
+          release_tag: null,
+          status_changed_at: new Date(),
+        },
+        include: REPORT_WITH_REPORTER,
+      });
+
+      // deleteMany because the delivery row may not exist. Deleting it lets a
+      // later genuine Fixed or Shipped send one new Fix Notice.
+      await tx.feedbackFixNoticeDelivery.deleteMany({
+        where: { report_id: reportId },
+      });
+
+      await this.writeFeedbackAuditLog(
+        tx,
+        actorUserId,
+        report,
+        'feedback_reopen',
+        {
+          reportId,
+          from: report.status,
+          to: REOPENED_STATUS,
+          releaseTag: report.release_tag,
+          statusNote,
+        },
+      );
+
+      return row;
+    });
 
     return {
       ok: true,

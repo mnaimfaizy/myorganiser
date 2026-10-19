@@ -13,6 +13,7 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   feedback_tracking_issue_link: 'Link Tracking Issue',
   feedback_tracking_issue_unlink: 'Unlink Tracking Issue',
   feedback_manual_delivery: 'Mark Feedback Report Delivered',
+  feedback_reopen: 'Reopen Feedback Report',
 };
 
 export function formatAuditAction(action: AdminAuditAction): string {

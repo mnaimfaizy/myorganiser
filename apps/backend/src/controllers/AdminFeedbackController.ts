@@ -52,6 +52,14 @@ export interface MarkFeedbackReportDeliveredRequest {
 }
 
 /**
+ * Request body for reopening a wrongly Fixed or Shipped Feedback Report.
+ */
+export interface ReopenFeedbackReportRequest {
+  /** Required note explaining why the report is being reopened. */
+  statusNote: string;
+}
+
+/**
  * Response body for list feedback reports endpoint.
  */
 interface ListAdminFeedbackReportsResponse {
@@ -193,6 +201,34 @@ export class AdminFeedbackController extends PlatformAdminControllerBase {
     const admin = this.assertPlatformAdmin(req);
 
     const result = await adminFeedbackService.markDelivered(
+      admin.id,
+      reportId,
+      body,
+    );
+
+    this.setStatus(result.status);
+    return result.body as AdminFeedbackReportDetailDto;
+  }
+
+  /**
+   * Reopen a Feedback Report that was wrongly marked Fixed or Shipped. It
+   * returns to Under review, clears its Release, and may send a new Fix Notice
+   * on a later genuine delivery. Platform Admin only.
+   */
+  @Post('{reportId}/reopen')
+  @Response<ErrorResponse>(
+    400,
+    'Report is not Fixed or Shipped, or the note is missing',
+  )
+  @Response<ErrorResponse>(404, 'Report not found')
+  async reopenFeedbackReport(
+    @Request() req: ExRequest,
+    @Path() reportId: string,
+    @Body() body: ReopenFeedbackReportRequest,
+  ): Promise<AdminFeedbackReportDetailDto> {
+    const admin = this.assertPlatformAdmin(req);
+
+    const result = await adminFeedbackService.reopenReport(
       admin.id,
       reportId,
       body,
