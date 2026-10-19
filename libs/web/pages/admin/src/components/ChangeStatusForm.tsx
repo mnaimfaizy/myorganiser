@@ -19,10 +19,7 @@ import {
   SelectValue,
   Textarea,
 } from '@myorganiser/web-ui';
-import {
-  FEEDBACK_REPORT_TEXT_MAX_LENGTH,
-  formatFeedbackReportCap,
-} from '@myorganiser/core';
+import { FEEDBACK_REPORT_TEXT_MAX_LENGTH } from '@myorganiser/core';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -36,6 +33,10 @@ import {
   statusRequiresNote,
   FEEDBACK_REPORT_STATUS_VALUES,
 } from '../lib/formatFeedbackReport';
+import {
+  STATUS_NOTE_REQUIRED_MESSAGE,
+  STATUS_NOTE_TOO_LONG_MESSAGE,
+} from '../lib/statusNoteSchema';
 
 interface ChangeStatusFormProps {
   report: AdminFeedbackReportDetailDto;
@@ -52,10 +53,7 @@ const changeStatusSchema = z
     status: z.enum(FEEDBACK_REPORT_STATUS_VALUES),
     statusNote: z
       .string()
-      .max(
-        FEEDBACK_REPORT_TEXT_MAX_LENGTH,
-        `The status note must be ${formatFeedbackReportCap(FEEDBACK_REPORT_TEXT_MAX_LENGTH)} characters or fewer.`,
-      )
+      .max(FEEDBACK_REPORT_TEXT_MAX_LENGTH, STATUS_NOTE_TOO_LONG_MESSAGE)
       .optional(),
   })
   .refine(
@@ -66,7 +64,7 @@ const changeStatusSchema = z
       return true;
     },
     {
-      message: 'Write a status note explaining why.',
+      message: STATUS_NOTE_REQUIRED_MESSAGE,
       path: ['statusNote'],
     },
   );
