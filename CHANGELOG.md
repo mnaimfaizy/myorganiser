@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.1.0 - 2026-10-19
+
+Date: 2026-10-19
+
+## Changes since v2.0.0
+
+Compare: https://github.com/mnaimfaizy/myorganiser/compare/v2.0.0...v2.1.0
+
+### Features
+
+- **download**: publish mobile release 1.0.0 on download page (bd86d2a)
+
+### Fixes
+
+- **mobile**: order cmake configure after reanimated prefab (3569b62)
+
 ## v2.0.0 - 2026-10-19
 
 Date: 2026-10-19
