@@ -19,3 +19,19 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// From a clean tree (`yarn mobile:release:build` runs `clean`), Gradle can
+// configure a module's CMake build before Reanimated and Worklets have written
+// the prefab packages it imports (the app and Gesture Handler both do), and
+// prefab fails with "is not readable". Make every other module's configure
+// wait for those packages.
+def prefabLibraries = [':react-native-reanimated', ':react-native-worklets']
+subprojects { project ->
+    if (project.path in prefabLibraries) return
+    project.tasks.matching { it.name.startsWith('configureCMake') }.configureEach { task ->
+        def variant = task.name.startsWith('configureCMakeDebug') ? 'Debug' : 'Release'
+        prefabLibraries.findAll { rootProject.findProject(it) != null }.each { path ->
+            task.dependsOn("${path}:prefab${variant}Package")
+        }
+    }
+}
