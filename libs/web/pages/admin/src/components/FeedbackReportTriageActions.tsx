@@ -1,8 +1,9 @@
 'use client';
 
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
+import { useReportScoped } from '../hooks/use-report-scoped';
 import {
   deliveredStatusForKind,
   formatFeedbackReportStatus,
@@ -23,17 +24,16 @@ export function FeedbackReportTriageActions({
   onUpdated,
 }: FeedbackReportTriageActionsProps) {
   // The reopen confirmation must outlive the reopen form, which unmounts once
-  // the parent swaps the final-report view for the triage forms. Scoped to the
-  // report it was produced from, so a later sibling update hides it.
-  const [reopenedReport, setReopenedReport] =
-    useState<AdminFeedbackReportDetailDto | null>(null);
+  // the parent swaps the final-report view for the triage forms. Keyed to the
+  // reopened report, so a later sibling update hides it.
+  const { value: reopened, set: setReopened } = useReportScoped<true>(report);
 
   const handleReopened = useCallback(
     (updated: AdminFeedbackReportDetailDto) => {
-      setReopenedReport(updated);
+      setReopened(true, updated);
       onUpdated(updated);
     },
-    [onUpdated],
+    [setReopened, onUpdated],
   );
 
   if (isFinalStatus(report.status)) {
@@ -62,7 +62,7 @@ export function FeedbackReportTriageActions({
 
   return (
     <section className="max-w-2xl space-y-8">
-      {reopenedReport === report && (
+      {reopened && (
         <p className="text-sm text-muted-foreground">
           Report reopened. It is back in Under review.
         </p>

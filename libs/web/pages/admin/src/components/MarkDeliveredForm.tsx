@@ -13,10 +13,11 @@ import {
   Input,
 } from '@myorganiser/web-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { useReportScoped } from '../hooks/use-report-scoped';
 import { createPlatformAdminApi } from '../lib/apiClient';
 import { getApiErrorMessage } from '../lib/apiErrorMessage';
 import {
@@ -44,12 +45,11 @@ export function MarkDeliveredForm({
   report,
   onUpdated,
 }: MarkDeliveredFormProps) {
-  // Scoped to the report it was produced against, so a sibling update hides it.
-  const [errorResult, setErrorResult] = useState<{
-    report: AdminFeedbackReportDetailDto;
-    value: string;
-  } | null>(null);
-  const error = errorResult?.report === report ? errorResult.value : null;
+  const {
+    value: error,
+    set: setError,
+    clear: clearError,
+  } = useReportScoped<string>(report);
 
   const form = useForm<MarkDeliveredFormValues>({
     resolver: zodResolver(markDeliveredSchema),
@@ -67,7 +67,7 @@ export function MarkDeliveredForm({
 
   const onSubmit = useCallback(
     async (values: MarkDeliveredFormValues) => {
-      setErrorResult(null);
+      clearError();
 
       try {
         const api = createPlatformAdminApi();
@@ -80,10 +80,10 @@ export function MarkDeliveredForm({
         onUpdated(response.data);
         form.reset();
       } catch (err) {
-        setErrorResult({ report, value: getApiErrorMessage(err) });
+        setError(getApiErrorMessage(err));
       }
     },
-    [report, onUpdated, form],
+    [report, onUpdated, form, clearError, setError],
   );
 
   // Get the button label based on report kind
