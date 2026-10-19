@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import test from 'node:test';
+import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -247,4 +247,139 @@ test('--print lists the migrations and both providers', (t) => {
   assert.match(result.stdout, /20260101000000_init/);
   assert.match(result.stdout, /migration_lock\.toml: postgresql/);
   assert.match(result.stdout, /schema datasource: postgres/);
+});
+
+describe('enum value migrations (ADR 0134)', () => {
+  test('fails a migration that adds two enum values', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20260808000000_two_enum_values',
+      `ALTER TYPE "Role" ADD VALUE 'EDITOR';\nALTER TYPE "Role" ADD VALUE 'VIEWER';\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /20260808000000_two_enum_values\/migration\.sql\n\s+adds an enum value .* in a migration of 2 statements/,
+    );
+  });
+
+  test('fails a migration that adds an enum value beside an ALTER TABLE', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20260909000000_enum_value_and_column',
+      `ALTER TYPE "Role" ADD VALUE 'EDITOR';\nALTER TABLE "User" ADD "x" TEXT;\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /20260909000000_enum_value_and_column\/migration\.sql\n\s+adds an enum value .* in a migration of 2 statements/,
+    );
+  });
+
+  test('passes a single enum value preceded by comments that mention ADD VALUE', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20261010000000_enum_value_after_comments',
+      `-- AlterEnum\n-- ALTER TYPE "Role" ADD VALUE; another;\nALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'EDITOR';\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('passes a single enum value with no trailing semicolon', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20261111000000_enum_value_no_semicolon',
+      `ALTER TYPE "Role" ADD VALUE 'EDITOR'`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('passes a multi-statement migration that adds no enum value', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20261212000000_multi_statement',
+      `CREATE TABLE "Note" ("id" TEXT NOT NULL);\nCREATE INDEX "Note_id_idx" ON "Note"("id");\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('does not split an enum value on a semicolon inside a quoted literal', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20270101000000_semicolon_in_literal',
+      `ALTER TYPE "Role" ADD VALUE 'a;b';\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('does not count a dollar-quoted function body as statements', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20270202000000_function_body',
+      `CREATE FUNCTION f() RETURNS void AS $$ BEGIN PERFORM 1; ALTER TYPE "Role" ADD VALUE 'v'; END $$ LANGUAGE plpgsql;\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('matches ALTER TYPE ... ADD VALUE case-insensitively', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20270303000000_lowercase_keywords',
+      `alter type "Role" add value 'EDITOR';\nalter table "User" add "x" text;\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /20270303000000_lowercase_keywords\/migration\.sql\n\s+adds an enum value/,
+    );
+  });
+
+  test('reports each offending migration', (t) => {
+    const workspace = scaffold(t);
+    const offending = `ALTER TYPE "Role" ADD VALUE 'A';\nALTER TYPE "Role" ADD VALUE 'B';\n`;
+    writeMigration(workspace, '20270404000000_enum_a', offending);
+    writeMigration(workspace, '20270405000000_enum_b', offending);
+    const result = run(workspace);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /20270404000000_enum_a\/migration\.sql/);
+    assert.match(result.stderr, /20270405000000_enum_b\/migration\.sql/);
+  });
+
+  test('does not split an enum value on a semicolon inside a block comment', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20270505000000_enum_value_with_block_comment',
+      `ALTER TYPE "Role" ADD VALUE /* ; */ 'EDITOR';\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
+
+  test('does not split an enum value on a semicolon inside a double-quoted identifier', (t) => {
+    const workspace = scaffold(t);
+    writeMigration(
+      workspace,
+      '20270606000000_semicolon_in_identifier',
+      `ALTER TYPE "Role ADD VALUE;x" ADD VALUE 'EDITOR';\n`,
+    );
+    const result = run(workspace);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  });
 });

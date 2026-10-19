@@ -78,7 +78,7 @@ The on-demand command catalogue for the root [Agent Guide](../../AGENTS.md#comma
 ## Local data and Prisma
 
 - QA Accounts: `yarn qa:accounts:seed` creates the local database's QA Accounts as verified users with unlockable vaults, or puts their password and vault meta back (`--restore` also empties the vault; `--account <id>` picks one); `yarn qa:accounts` prints their sign-in values, Recovery Key included. It refuses any database that is not local, and `yarn qa:accounts:test` covers that. See [ADR 0122](../adr/0122-a-qa-accounts-credentials-are-public-fixtures-in-tracked-source.md).
-- Prisma migration history check: `yarn prisma:migrations:check` (asserts migration directory naming, no duplicate timestamps, a non-empty `migration.sql`, no stray `.sql` file, and lock-file/schema provider agreement; `yarn prisma:migrations:test` covers it). See [ADR 0094](../adr/0094-a-prisma-migration-is-gated-on-the-tree-and-against-a-database.md) (the same-timestamp hazard is [ADR 0042](../adr/0042-adr-numbers-are-claims-until-merged.md)'s, one layer down).
+- Prisma migration history check: `yarn prisma:migrations:check` (asserts migration directory naming, no duplicate timestamps, a non-empty `migration.sql`, no stray `.sql` file, lock-file/schema provider agreement, and that a migration adding an enum value holds only that statement; `yarn prisma:migrations:test` covers it). The enum rule is [ADR 0134](../adr/0134-an-enum-value-is-added-in-a-migration-of-its-own.md). See [ADR 0094](../adr/0094-a-prisma-migration-is-gated-on-the-tree-and-against-a-database.md) (the same-timestamp hazard is [ADR 0042](../adr/0042-adr-numbers-are-claims-until-merged.md)'s, one layer down).
 
 ## Web app manifest and icons
 

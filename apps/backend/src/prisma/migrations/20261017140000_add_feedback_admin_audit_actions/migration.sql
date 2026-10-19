@@ -1,12 +1,6 @@
 -- AlterEnum
--- This migration adds more than one value to an enum.
--- With PostgreSQL versions 11 and earlier, this is not possible
--- in a single migration. This can be worked around by creating
--- multiple migrations, each migration adding only one value to
--- the enum.
-
-
-ALTER TYPE "AdminAuditAction" ADD VALUE 'feedback_status_change';
-ALTER TYPE "AdminAuditAction" ADD VALUE 'feedback_tracking_issue_link';
-ALTER TYPE "AdminAuditAction" ADD VALUE 'feedback_tracking_issue_unlink';
-ALTER TYPE "AdminAuditAction" ADD VALUE 'feedback_manual_delivery';
+-- One enum value per migration: PostgreSQL 11 and earlier refuse
+-- ALTER TYPE ... ADD VALUE alongside other statements (see ADR 0134).
+-- IF NOT EXISTS keeps it safe on databases that applied the older,
+-- combined form of this migration.
+ALTER TYPE "AdminAuditAction" ADD VALUE IF NOT EXISTS 'feedback_status_change';

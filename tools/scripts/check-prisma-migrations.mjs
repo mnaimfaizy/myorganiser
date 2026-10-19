@@ -28,6 +28,14 @@
 //   - no other .sql file sits in a migration directory, because the engine
 //     reads migration.sql and nothing else, so a second file is SQL somebody
 //     wrote that will never run;
+//   - a migration.sql that adds an enum value (`ALTER TYPE ... ADD VALUE`)
+//     holds that one statement and nothing else, because PostgreSQL 11 and
+//     earlier — which the shared host runs — refuse ADD VALUE beside any
+//     other statement, while the Postgres CI and local development use
+//     accepts it, so only a deploy would find out (ADR 0134). Only
+//     top-level statements count: an ADD VALUE inside a dollar-quoted
+//     function body runs when the function is called, not when the
+//     migration is applied;
 //   - migration_lock.toml exists and its provider agrees with the schema's
 //     datasource provider, since a mismatch makes the engine refuse the whole
 //     history at deploy time. `postgres` and `postgresql` are the same
@@ -74,6 +82,54 @@ if (!existsSync(SCHEMA)) fail(`${SCHEMA} not found`);
 /** Strips `-- line` and block comments so a comment-only file reads as empty. */
 const stripSqlComments = (sql) =>
   sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+
+/**
+ * Splits SQL into its statements, ignoring a `;` inside a comment, a quoted
+ * string or identifier, or a dollar-quoted body. Returns each statement's
+ * text with comments and literal contents removed, so a keyword quoted in a
+ * string is not read as SQL either.
+ */
+function sqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let i = 0;
+  while (i < sql.length) {
+    const rest = sql.slice(i);
+    const dollar = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(rest);
+    if (rest.startsWith('--')) {
+      const end = sql.indexOf('\n', i);
+      i = end === -1 ? sql.length : end;
+    } else if (rest.startsWith('/*')) {
+      const end = sql.indexOf('*/', i + 2);
+      i = end === -1 ? sql.length : end + 2;
+    } else if (sql[i] === "'" || sql[i] === '"') {
+      const quote = sql[i];
+      let j = i + 1;
+      while (j < sql.length) {
+        if (sql[j] === quote && sql[j + 1] === quote) j += 2;
+        else if (sql[j] === quote) break;
+        else j += 1;
+      }
+      current += `${quote}${quote}`;
+      i = j + 1;
+    } else if (dollar) {
+      const end = sql.indexOf(dollar[0], i + dollar[0].length);
+      current += '$$';
+      i = end === -1 ? sql.length : end + dollar[0].length;
+    } else if (sql[i] === ';') {
+      if (current.trim()) statements.push(current.trim());
+      current = '';
+      i += 1;
+    } else {
+      current += sql[i];
+      i += 1;
+    }
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
+const ADD_ENUM_VALUE = /^ALTER\s+TYPE\b[\s\S]*\bADD\s+VALUE\b/i;
 
 /**
  * Prisma spells the same provider two ways: the schema's datasource accepts
@@ -148,6 +204,14 @@ for (const entry of readdirSync(MIGRATIONS, { withFileTypes: true }).sort(
   if (!stripSqlComments(sql).trim()) {
     problems.push(
       `${sqlPath}\n    holds no statement once SQL comments are stripped; it would record itself as applied having done nothing`,
+    );
+  }
+
+  const statements = sqlStatements(sql);
+  const addsEnumValue = statements.filter((s) => ADD_ENUM_VALUE.test(s));
+  if (addsEnumValue.length && statements.length > 1) {
+    problems.push(
+      `${sqlPath}\n    adds an enum value (ALTER TYPE ... ADD VALUE) in a migration of ${statements.length} statements; PostgreSQL 11 and earlier, which the shared host runs, refuse ADD VALUE beside any other statement, so give each enum value a migration of its own (ADR 0134)`,
     );
   }
 
