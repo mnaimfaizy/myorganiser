@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@config "../tailwind.config.js";
 
 /*
  * The same token stylesheets the web application imports (apps/web/src/app/
@@ -11,6 +10,9 @@
  */
 @import '../../../design-tokens/src/generated/tokens.css';
 @import '../../../design-tokens/src/generated/roles.css';
+
+/* After every @import: CSS drops an @import that follows any other rule. */
+@config "../tailwind.config.js";
 
 @layer base {
   * {

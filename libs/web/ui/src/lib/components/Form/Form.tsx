@@ -12,6 +12,8 @@ import {
   useFormContext,
 } from 'react-hook-form';
 
+import { CircleAlert } from 'lucide-react';
+
 import { Label } from '../Label/Label';
 import { cn } from '../../utils';
 
@@ -80,7 +82,7 @@ const FormItem = React.forwardRef<
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div ref={ref} className={cn('space-y-2', className)} {...props} />
+      <div ref={ref} className={cn('space-y-1.5', className)} {...props} />
     </FormItemContext.Provider>
   );
 });
@@ -90,15 +92,12 @@ const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => {
-  const { error, formItemId } = useFormField();
+  // The label keeps its foreground colour on error. The colour is not the only
+  // cue: FormMessage carries the error text and the alert icon.
+  const { formItemId } = useFormField();
 
   return (
-    <Label
-      ref={ref}
-      className={cn(error && 'text-destructive', className)}
-      htmlFor={formItemId}
-      {...props}
-    />
+    <Label ref={ref} className={className} htmlFor={formItemId} {...props} />
   );
 });
 FormLabel.displayName = 'FormLabel';
@@ -136,7 +135,7 @@ const FormDescription = React.forwardRef<
     <p
       ref={ref}
       id={formDescriptionId}
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-caption text-muted-foreground', className)}
       {...props}
     />
   );
@@ -154,13 +153,20 @@ const FormMessage = React.forwardRef<
     return null;
   }
 
+  // The alert icon signals an error only. Plain children (helper copy with no
+  // error) render without it, so the icon never claims a failure that is not
+  // there.
   return (
     <p
       ref={ref}
       id={formMessageId}
-      className={cn('text-sm font-medium text-destructive', className)}
+      className={cn(
+        'inline-flex items-start gap-1.5 text-caption text-destructive-text',
+        className,
+      )}
       {...props}
     >
+      {error && <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />}
       {body}
     </p>
   );

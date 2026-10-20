@@ -73,8 +73,9 @@ The typography strategy uses a dual-font approach to differentiate between "Disp
 **The named type scale.** There are seven reading steps — `display`,
 `title-lg`, `title`, `body`, `body-sm`, `label-caps`, `caption` — and four
 control steps the Web v2.0 design adds: `label-sm` (a row pill), `control-sm`
-(a 36px control), `input` (text in a field, 16px so iOS does not zoom) and
-`value` (a copyable field value). Each carries a size, a line height, a weight,
+(a 36px control), `input` (text in a field, 16px so iOS does not zoom; its
+Tailwind utility is `text-field`, because `text-input` is the `input` colour)
+and `value` (a copyable field value). Each carries a size, a line height, a weight,
 and a letter-spacing, pinned in [`src/tokens.json`](src/tokens.json) under
 `type`, and each is used **whole**: a step assembled from three tokens and a
 fourth value chosen at the call site is not a scale, it is a suggestion. The one

@@ -9,6 +9,9 @@
  * that a new role is wired once. A role missing from one copy compiled to no
  * CSS there, silently — the failure ADR 0065 describes.
  *
+ * Type: the `input` step is the utility `text-field`, because `text-input` is
+ * already the colour of the `input` role and Tailwind resolves it to the colour.
+ *
  * Radius: Tailwind's own rounded-xl, rounded-2xl and rounded-full resolve to
  * the token scale (16, 24, pill), because generated/tokens.css redefines
  * --radius-xl and --radius-2xl. rounded-sm/md/lg are the shadcn steps each
@@ -229,7 +232,7 @@ module.exports = {
         fontWeight: 'var(--type-control-sm-weight)',
       },
     ],
-    input: [
+    field: [
       'var(--type-input-size)',
       {
         lineHeight: 'var(--type-input-line-height)',
