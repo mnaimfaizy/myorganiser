@@ -10,7 +10,12 @@ import { cn } from './../../utils';
 import { Button } from './../Button/Button';
 import { Input } from './../Input/Input';
 import { Separator } from './../Separator/Separator';
-import { Sheet, SheetContent } from './../Sheet/Sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from './../Sheet/Sheet';
 import { Skeleton } from './../Skeleton/Skeleton';
 import {
   Tooltip,
@@ -214,6 +219,10 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">
+              Main navigation for the dashboard
+            </SheetDescription>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
