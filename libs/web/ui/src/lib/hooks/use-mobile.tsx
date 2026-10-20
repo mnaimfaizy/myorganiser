@@ -8,6 +8,11 @@ export function useIsMobile() {
   );
 
   React.useEffect(() => {
+    // jsdom has no matchMedia: read the width once, which is desktop there.
+    if (typeof window.matchMedia !== 'function') {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+      return;
+    }
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const onChange = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);

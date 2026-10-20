@@ -1,103 +1,43 @@
-'use client';
-
 import * as React from 'react';
-import { useCallback, useState } from 'react';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../Dialog/Dialog';
-import { Button } from '../Button/Button';
+import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog';
 
 interface ConfirmDeleteDialogProps {
   /** Controlled open state, owned by the caller. */
   open: boolean;
-  /** Called when the dialog wants to change its open state (cancel, Escape, overlay click, close button). Never called as a side effect of confirming. */
+  /** Called when the dialog wants to change its open state (cancel, Escape, close button). Never called as a side effect of confirming. Outside clicks do not dismiss. */
   onOpenChange: (open: boolean) => void;
   /** Dialog title, e.g. "Delete this address?" */
   title: string;
   /** Description of exactly what will be destroyed. Accepts ReactNode so callers can bold an item name, etc. */
   description: React.ReactNode;
-  /** Invoked when the user activates the confirm control. May return a Promise; the dialog disables the confirm control and shows a pending state until it resolves/rejects, then re-enables it. */
+  /** Invoked when the user activates the confirm control. May return a Promise; the confirm control shows a pending state until it settles. A rejection keeps the dialog open. */
   onConfirm: () => void | Promise<void>;
-  /** Optional content to render between the header (title + description) and the footer buttons. Useful for additional interactive controls or content blocks. */
+  /** Optional content to render between the header (title + description) and the footer buttons. */
   children?: React.ReactNode;
-  /** Confirm button label. Defaults to "Delete" / "Delete…" while pending. */
+  /** Confirm button label. Defaults to "Delete". */
   confirmLabel?: string;
 }
 
+/**
+ * A destructive confirmation.
+ *
+ * @deprecated Use `ConfirmDialog` with `tone="destructive"` and a named
+ * `confirmLabel` that states the action and the object, for example
+ * "Delete list". This wrapper keeps the bare "Delete" default for existing
+ * callers and forwards everything to `ConfirmDialog`.
+ */
 const ConfirmDeleteDialog = React.forwardRef<
   HTMLDivElement,
   ConfirmDeleteDialogProps
->(
-  (
-    {
-      open,
-      onOpenChange,
-      title,
-      description,
-      onConfirm,
-      children,
-      confirmLabel,
-    },
-    ref,
-  ) => {
-    const [isPending, setIsPending] = useState(false);
-    const confirmButtonLabel = confirmLabel ?? 'Delete';
-
-    const handleConfirm = useCallback(async () => {
-      setIsPending(true);
-      try {
-        await onConfirm();
-      } catch (error) {
-        console.error('ConfirmDeleteDialog: onConfirm rejected:', error);
-      } finally {
-        setIsPending(false);
-      }
-    }, [onConfirm]);
-
-    const handleCancel = useCallback(() => {
-      onOpenChange(false);
-    }, [onOpenChange]);
-
-    const handleOpenChange = useCallback(
-      (newOpen: boolean) => {
-        if (!newOpen) {
-          onOpenChange(false);
-        }
-      },
-      [onOpenChange],
-    );
-
-    return (
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent ref={ref}>
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
-          </DialogHeader>
-          {children}
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirm}
-              disabled={isPending}
-            >
-              {isPending ? `${confirmButtonLabel}…` : confirmButtonLabel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  },
-);
+>(({ confirmLabel = 'Delete', ...props }, ref) => (
+  <ConfirmDialog
+    ref={ref}
+    tone="destructive"
+    confirmLabel={confirmLabel}
+    {...props}
+  />
+));
 
 ConfirmDeleteDialog.displayName = 'ConfirmDeleteDialog';
 
