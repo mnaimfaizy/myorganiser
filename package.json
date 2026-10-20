@@ -551,6 +551,8 @@
     "@react-native/babel-preset": "~0.87.1",
     "@react-native/jest-preset": "~0.87.1",
     "@react-native/metro-config": "~0.87.1",
+    "@storybook/addon-essentials": "8.6.17",
+    "@storybook/addon-interactions": "8.6.17",
     "@storybook/core-server": "8.6.17",
     "@storybook/jest": "0.2.3",
     "@storybook/react": "8.6.17",
