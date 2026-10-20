@@ -14,6 +14,7 @@ export * from './lib/components/DatePicker/DatePicker';
 export * from './lib/components/Dialog/Dialog';
 export * from './lib/components/DropdownMenu/DropdownMenu';
 export * from './lib/components/Form/Form';
+export * from './lib/components/Illustration/Illustration';
 export * from './lib/components/Input/Input';
 export * from './lib/components/InstallAppInstructions/InstallAppInstructions';
 export * from './lib/components/Label/Label';
