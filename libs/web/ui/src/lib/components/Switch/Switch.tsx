@@ -70,13 +70,13 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         disabled={disabled}
         onClick={handleClick}
         className={cn(
-          'peer relative inline-flex h-8 w-[52px] shrink-0 cursor-pointer items-center rounded-full p-0.75 transition-colors motion-safe:duration-200 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[""] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 data-[state=checked]:bg-primary data-[state=unchecked]:bg-inactive disabled:cursor-not-allowed disabled:opacity-45',
+          'peer relative inline-flex h-8 w-switch-width shrink-0 cursor-pointer items-center rounded-full p-0.75 transition-colors motion-safe:duration-200 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[""] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 data-[state=checked]:bg-primary data-[state=unchecked]:bg-inactive disabled:cursor-not-allowed disabled:opacity-45',
           className,
         )}
       >
         <span
           data-state={state}
-          className="pointer-events-none block size-[26px] translate-x-0 rounded-full bg-raised-surface transition-transform motion-safe:duration-200 data-[state=checked]:translate-x-5"
+          className="pointer-events-none block size-switch-thumb translate-x-0 rounded-full bg-raised-surface transition-transform motion-safe:duration-200 data-[state=checked]:translate-x-5"
         />
       </button>
     );

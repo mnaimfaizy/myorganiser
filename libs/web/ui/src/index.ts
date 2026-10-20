@@ -22,6 +22,7 @@ export * from './lib/components/Label/Label';
 export * from './lib/components/NewTabLink/NewTabLink';
 export * from './lib/components/Popover/Popover';
 export * from './lib/components/RadioCard/RadioCard';
+export * from './lib/components/RadioGroup/RadioGroup';
 export * from './lib/components/RetryableGate/RetryableGate';
 export * from './lib/components/Select/Select';
 export * from './lib/components/Separator/Separator';

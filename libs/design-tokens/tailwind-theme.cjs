@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The Tailwind theme every web config shares: each Semantic Role, the named
- * type scale, the off-scale radii, every shadow and the two font stacks, read
+ * type scale, the named sizes, the off-scale radii, every shadow and the two font stacks, read
  * from the CSS variables in generated/tokens.css and generated/roles.css. See
  * ADR 0065.
  *
@@ -142,6 +142,15 @@ module.exports = {
       DEFAULT: 'hsl(var(--card))',
       foreground: 'hsl(var(--card-foreground))',
     },
+  },
+  // Named sizes, for padding and dimensions alike: px-control-x, size-icon,
+  // w-switch-width. They sit beside Tailwind's numeric spacing scale.
+  spacing: {
+    'control-x': 'var(--space-control-x)',
+    icon: 'var(--size-icon)',
+    'icon-fab': 'var(--size-icon-fab)',
+    'switch-width': 'var(--size-switch-width)',
+    'switch-thumb': 'var(--size-switch-thumb)',
   },
   borderRadius: {
     control: 'var(--radius-lg)',

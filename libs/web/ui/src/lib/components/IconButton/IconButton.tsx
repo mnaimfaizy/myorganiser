@@ -34,7 +34,7 @@ const iconButtonVariants = cva('', {
     },
     size: {
       default: '',
-      fab: 'size-14 rounded-fab [&_svg]:size-[22px]',
+      fab: 'size-14 rounded-fab [&_svg]:size-icon-fab',
     },
   },
   defaultVariants: {

@@ -306,6 +306,21 @@ export const spaceMarginMobile = "16px";
 export const spaceMarginMobileVar = 'var(--space-margin-mobile)';
 export const spaceMarginDesktop = "24px";
 export const spaceMarginDesktopVar = 'var(--space-margin-desktop)';
+/** 18px. Horizontal padding of a 44px or 48px button; off the 4px grid, as the Buttons sheet draws it. */
+export const spaceControlX = "18px";
+export const spaceControlXVar = 'var(--space-control-x)';
+/** An icon inside a button, an icon button or a field. */
+export const sizeIcon = "18px";
+export const sizeIconVar = 'var(--size-icon)';
+/** The icon in the 56px floating action button. */
+export const sizeIconFab = "22px";
+export const sizeIconFabVar = 'var(--size-icon-fab)';
+/** The width of a switch track; its height is 32px, spacing step 8. */
+export const sizeSwitchWidth = "52px";
+export const sizeSwitchWidthVar = 'var(--size-switch-width)';
+/** The switch thumb, inset 3px inside the 32px track. */
+export const sizeSwitchThumb = "26px";
+export const sizeSwitchThumbVar = 'var(--size-switch-thumb)';
 /** Ambient card shadow per Secure Modernism spec. */
 export const shadowCard = "0px 1px 3px rgba(15, 23, 42, 0.05)";
 export const shadowCardVar = 'var(--shadow-card)';
@@ -466,6 +481,11 @@ export const tokens = {
   'space-gutter': { value: "16px", cssVar: 'var(--space-gutter)' },
   'space-margin-mobile': { value: "16px", cssVar: 'var(--space-margin-mobile)' },
   'space-margin-desktop': { value: "24px", cssVar: 'var(--space-margin-desktop)' },
+  'space-control-x': { value: "18px", cssVar: 'var(--space-control-x)' },
+  'size-icon': { value: "18px", cssVar: 'var(--size-icon)' },
+  'size-icon-fab': { value: "22px", cssVar: 'var(--size-icon-fab)' },
+  'size-switch-width': { value: "52px", cssVar: 'var(--size-switch-width)' },
+  'size-switch-thumb': { value: "26px", cssVar: 'var(--size-switch-thumb)' },
   'shadow-card': { value: "0px 1px 3px rgba(15, 23, 42, 0.05)", cssVar: 'var(--shadow-card)' },
   'shadow-popover': { value: "0 12px 24px rgba(15, 23, 42, 0.08)", cssVar: 'var(--shadow-popover)' },
   'shadow-dialog': { value: "0 24px 48px rgba(15, 23, 42, 0.14)", cssVar: 'var(--shadow-dialog)' },

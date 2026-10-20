@@ -1,5 +1,11 @@
 import * as path from 'path';
-import { cn, RADIUS_STEPS, SHADOW_STEPS, TYPE_SCALE_STEPS } from './utils';
+import {
+  cn,
+  RADIUS_STEPS,
+  SHADOW_STEPS,
+  SPACING_STEPS,
+  TYPE_SCALE_STEPS,
+} from './utils';
 
 describe('cn', () => {
   it('keeps a colour class and a type-scale class together', () => {
@@ -24,6 +30,16 @@ describe('cn', () => {
   it('lets a later named shadow override an earlier Tailwind shadow', () => {
     expect(cn('shadow-sm', 'shadow-dialog')).toBe('shadow-dialog');
   });
+
+  it('lets a later named size override an earlier one in the same arbitrary-variant group', () => {
+    expect(cn('[&_svg]:size-icon', '[&_svg]:size-icon-fab')).toBe(
+      '[&_svg]:size-icon-fab',
+    );
+  });
+
+  it('lets a numeric padding override a named control padding, as the Button link variant relies on', () => {
+    expect(cn('px-control-x', 'px-1')).toBe('px-1');
+  });
 });
 
 describe('shared theme sync', () => {
@@ -40,6 +56,7 @@ describe('shared theme sync', () => {
     fontSize: Record<string, unknown>;
     borderRadius: Record<string, unknown>;
     boxShadow: Record<string, unknown>;
+    spacing: Record<string, unknown>;
   };
 
   it('matches the fontSize keys of the shared Tailwind theme', () => {
@@ -52,5 +69,9 @@ describe('shared theme sync', () => {
 
   it('matches the boxShadow keys of the shared Tailwind theme', () => {
     expect([...SHADOW_STEPS]).toEqual(Object.keys(theme.boxShadow));
+  });
+
+  it('matches the spacing keys of the shared Tailwind theme', () => {
+    expect([...SPACING_STEPS]).toEqual(Object.keys(theme.spacing));
   });
 });

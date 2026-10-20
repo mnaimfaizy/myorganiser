@@ -1,7 +1,7 @@
 # `@myorganiser/design-tokens`
 
 Single source of truth for the MyOrganiser design system (colors, spacing,
-typography, radius, shadow). Based on the **Secure Modernism** spec in
+sizes, typography, radius, shadow). Based on the **Secure Modernism** spec in
 [DESIGN.md](DESIGN.md).
 
 ## Files
@@ -48,8 +48,10 @@ avatar ground, which a component reads as a TS constant.
 Both Tailwind configs spread one shared theme,
 [`tailwind-theme.cjs`](tailwind-theme.cjs), so a role is wired once. It exposes
 every role, the type scale (`text-body-sm`), the 12px control radius
-(`rounded-control`) and the off-scale radii (`rounded-panel`), every shadow
-(`shadow-dialog`) and the two font stacks (`font-display`) by token name.
+(`rounded-control`) and the off-scale radii (`rounded-panel`), the named sizes
+(`size-icon`, `px-control-x`), every shadow (`shadow-dialog`) and the two font
+stacks (`font-display`) by token name. The `input` type step is `text-field`,
+because `text-input` is the colour of the `input` role.
 
 The Neutral Ramp is deliberately **not** exposed as Tailwind utilities. Dark mode
 cannot be expressed without an ordered greyscale, but a second elevation vocabulary

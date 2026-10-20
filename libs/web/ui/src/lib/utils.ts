@@ -24,6 +24,15 @@ export const TYPE_SCALE_STEPS = [
   'value',
 ] as const;
 
+/** The named sizes: `spacing` in the shared theme. */
+export const SPACING_STEPS = [
+  'control-x',
+  'icon',
+  'icon-fab',
+  'switch-width',
+  'switch-thumb',
+] as const;
+
 /** The off-scale radii: `borderRadius` in the shared theme. */
 export const RADIUS_STEPS = [
   'control',
@@ -46,6 +55,7 @@ export const SHADOW_STEPS = [
 
 const twMerge = extendTailwindMerge({
   extend: {
+    theme: { spacing: [...SPACING_STEPS] },
     classGroups: {
       'font-size': [{ text: [...TYPE_SCALE_STEPS] }],
       rounded: [{ rounded: [...RADIUS_STEPS] }],

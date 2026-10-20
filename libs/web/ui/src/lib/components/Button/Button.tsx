@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '../../utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-45 aria-busy:cursor-progress aria-busy:opacity-100 [&_svg]:pointer-events-none [&_svg]:size-[18px] [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-45 aria-busy:cursor-progress aria-busy:opacity-100 [&_svg]:pointer-events-none [&_svg]:size-icon [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -28,8 +28,8 @@ const buttonVariants = cva(
         // font-semibold is repeated beside each type step: the tuple's own
         // weight (400 for input and body-sm) would otherwise win.
         default:
-          'h-12 md:h-11 px-[18px] rounded-control text-field font-semibold md:text-body-sm md:font-semibold',
-        lg: 'h-12 px-[18px] rounded-control text-field font-semibold',
+          'h-12 md:h-11 px-control-x rounded-control text-field font-semibold md:text-body-sm md:font-semibold',
+        lg: 'h-12 px-control-x rounded-control text-field font-semibold',
         // 36px visual height. after: extends the hit area to 44px without
         // changing the drawn size.
         sm: "relative h-9 px-3.5 rounded-control-sm text-control-sm font-semibold after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']",

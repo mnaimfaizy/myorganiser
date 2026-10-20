@@ -140,6 +140,11 @@
   --space-gutter: 16px;
   --space-margin-mobile: 16px;
   --space-margin-desktop: 24px;
+  --space-control-x: 18px;
+  --size-icon: 18px;
+  --size-icon-fab: 22px;
+  --size-switch-width: 52px;
+  --size-switch-thumb: 26px;
   --shadow-card: 0px 1px 3px rgba(15, 23, 42, 0.05);
   --shadow-popover: 0 12px 24px rgba(15, 23, 42, 0.08);
   --shadow-dialog: 0 24px 48px rgba(15, 23, 42, 0.14);
