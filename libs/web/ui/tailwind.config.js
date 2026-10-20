@@ -11,12 +11,13 @@ const theme = require(
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   // Every source the Storybook in .storybook/main.ts loads stories from. A
-  // class used only in a vault-ui or page-library story generates no CSS
-  // otherwise, and the story renders unstyled.
+  // class used only in a vault-ui, usage-locations or page-library story
+  // generates no CSS otherwise, and the story renders unstyled.
   content: [
     './src/**/*.{ts,tsx,js,jsx,html}',
     './.storybook/**/*.{ts,tsx,js,jsx,html}',
     '../vault-ui/src/**/*.{ts,tsx,js,jsx,html}',
+    '../usage-locations/src/**/*.{ts,tsx,js,jsx,html}',
     '../pages/*/src/**/*.{ts,tsx,js,jsx,html}',
   ],
   theme: {

@@ -42,12 +42,14 @@ const USER_KINDS = ILLUSTRATION_KINDS.filter(
   (kind) => kind !== 'more' && !ADMIN_KINDS.includes(kind),
 );
 
-/** Size captions from the design sheet. The sheet names only these four sizes. */
+/** Size captions from the design sheet, plus the empty-state sizes. */
 const SIZE_CAPTIONS: Partial<Record<IllustrationSize, string>> = {
   28: '28 · tab bar',
   36: '36 · sidebar',
   64: '64 · cards',
+  112: '112 · empty screen',
   140: '140 · hero',
+  168: '168 · empty page',
 };
 
 function sizeCaption(size: IllustrationSize): string {

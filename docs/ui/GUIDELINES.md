@@ -332,11 +332,12 @@ const MyForm = ({ onSubmit }: { onSubmit: (name: string) => void }) => {
 
 ### 5.3 Zod schema placement
 
-| Scenario                          | Where the schema lives                                                 |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| One form only, not reused         | Inline in the component file, above the component                      |
-| Shared between add and edit forms | `libs/web/pages/<route>/src/schemas/<feature>.ts`                      |
-| Shared across routes              | `libs/core/src/` or `libs/app-api-client/` (discuss before doing this) |
+| Scenario                                | Where the schema lives                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| One form only, not reused               | Inline in the component file, above the component                                            |
+| Shared between add and edit forms       | `libs/web/pages/<route>/src/schemas/<feature>.ts`                                            |
+| Shared across routes                    | `libs/core/src/` or `libs/app-api-client/` (discuss before doing this)                       |
+| Shared with the feature UI it validates | The feature library that holds that UI, e.g. `libs/web/usage-locations/src/lib/placeForm.ts` |
 
 ### 5.4 Props interface
 

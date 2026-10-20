@@ -19,7 +19,7 @@ export type IllustrationKind =
   | 'more';
 
 /** The sizes the Web v2.0 design uses: tab bar 28, 32, sidebar 36, 48, cards 64, 96, hero 140. */
-export type IllustrationSize = 28 | 32 | 36 | 48 | 64 | 96 | 140;
+export type IllustrationSize = 28 | 32 | 36 | 48 | 64 | 96 | 112 | 140 | 168;
 
 export interface IllustrationProps {
   kind: IllustrationKind;
@@ -562,7 +562,7 @@ export const ILLUSTRATION_KINDS = Object.keys(
 
 /** Every size the Web v2.0 design uses. */
 export const ILLUSTRATION_SIZES = [
-  28, 32, 36, 48, 64, 96, 140,
+  28, 32, 36, 48, 64, 96, 112, 140, 168,
 ] as const satisfies readonly IllustrationSize[];
 
 /**
