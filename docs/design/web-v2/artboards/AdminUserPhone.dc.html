@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone admin user</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 44px; font-size: 17px; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>Users</a>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 20px 'Plus Jakarta Sans', sans-serif">AC</span>
+      <span style="display: flex; flex-direction: column; gap: 4px"><h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -0.02em">Ana Costa</h1><span style="display: flex; gap: 6px"><span style="padding: 3px 9px; border-radius: 999px; background: #CCFBF1; color: #115E59; font-size: 11px; font-weight: 600; letter-spacing: 0.02em">ACTIVE</span><span style="padding: 3px 9px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; font-size: 11px; font-weight: 600; letter-spacing: 0.02em">YOUTUBE</span></span></span>
+    </div>
+    <span style="font-size: 14px; color: #64748B">ana.costa@example.com · Joined 16 Oct</span>
+    <h2 style="margin: 6px 0 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">ACCESS</h2>
+    <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px 8px 16px; border-bottom: 1px solid #F1F5F9;"><span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 16px">YouTube Access</span><span style="font-size: 13px; color: #64748B">Granted 16 Oct by Sam Miller</span></span><button type="button" style="min-height: 44px; padding: 0 6px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #5B21B6">Withdraw</button></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px 8px 16px;"><span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 16px">Platform admin</span><span style="font-size: 13px; color: #64748B">Not an admin</span></span><button type="button" style="min-height: 44px; padding: 0 6px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #5B21B6">Promote</button></div>
+    </div>
+    <h2 style="margin: 6px 0 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SIGN-IN</h2>
+    <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #FCA5A5; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px 8px 16px; border-bottom: 1px solid #F1F5F9;"><span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 16px">Force logout</span><span style="font-size: 13px; color: #64748B">Ends every session</span></span><button type="button" style="min-height: 44px; padding: 0 6px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #B91C1C">Log out</button></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px 8px 16px;"><span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 16px">Disable account</span><span style="font-size: 13px; color: #64748B">Blocks sign-in</span></span><button type="button" style="min-height: 44px; padding: 0 6px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #B91C1C">Disable</button></div>
+    </div>
+    <h2 style="margin: 6px 0 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">RECENT ACTIVITY</h2>
+    <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+      <sc-for list="{{events}}" as="e" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid #F1F5F9"><span style="{{e.pillStyle}}">{{e.action}}</span><span style="flex-grow: 1; font-size: 14px; color: #475569">{{e.actor}}</span><span style="font-size: 13px; color: #64748B">{{e.when}}</span></div>
+      </sc-for>
+    </div>
+  </main>
+  <nav aria-label="Admin sections" style="width: 390px; height: 88px; box-sizing: border-box; padding: 8px 8px 18px; display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #E2E8F0">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <a href="#" aria-current="{{t.current}}" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 72px; min-height: 60px; text-decoration: none">
+        <span style="{{t.pillStyle}}">
+          <sc-if value="{{t.isApp}}" hint-placeholder-val="{{false}}">
+            <svg width="28" height="28" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+          </sc-if>
+          <sc-if value="{{t.isSection}}" hint-placeholder-val="{{true}}">
+            <dc-import name="Illustration" kind="{{t.kind}}" size="28" hint-size="28px,28px"></dc-import>
+          </sc-if>
+        </span>
+        <span style="{{t.labelStyle}}">{{t.label}}</span>
+      </a>
+    </sc-for>
+  </nav>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tabs = [
+      { kind: 'admin', label: 'Overview' },
+      { kind: 'users', label: 'Users' },
+      { kind: 'audit', label: 'Audit log' },
+      { kind: 'inbox', label: 'Feedback' },
+      { kind: 'app', label: 'My app' }
+    ].map((t) => {
+      const on = t.kind === 'users';
+      return {
+        kind: t.kind,
+        label: t.label,
+        isApp: t.kind === 'app',
+        isSection: t.kind !== 'app',
+        current: on ? 'page' : 'false',
+        pillStyle: 'display:flex;align-items:center;justify-content:center;width:56px;height:36px;border-radius:999px;background:' + (on ? '#EDE9FE' : 'transparent'),
+        labelStyle: 'font-size:12px;line-height:16px;font-weight:' + (on ? 600 : 500) + ';color:' + (on ? '#5B21B6' : '#475569')
+      };
+    });
+    const pill = (bg, fg) => 'flex-shrink:0;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.02em;background:' + bg + ';color:' + fg;
+    const events = [
+      { action: 'GRANT YOUTUBE', pillStyle: pill('#EDE9FE', '#5B21B6'), actor: 'Sam Miller', when: '10:42' },
+      { action: 'VERIFIED', pillStyle: pill('#CCFBF1', '#115E59'), actor: 'Ana Costa', when: '16 Oct' },
+      { action: 'RESEND EMAIL', pillStyle: pill('#F1F5F9', '#334155'), actor: 'Jo Park', when: '16 Oct' }
+    ];
+    return { tabs, events };
+  }
+}
+</script>
+</body>
+</html>

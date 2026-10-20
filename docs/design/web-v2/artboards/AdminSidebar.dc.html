@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin sidebar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<aside aria-label="Admin navigation" style="width: 272px; min-height: {{minh}}; height: 100%; box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 18px; background: #0F172A; font-family: 'Inter', system-ui, sans-serif">
+  <div style="display: flex; align-items: center; gap: 10px; padding: 4px 6px">
+    <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+    <span style="display: flex; flex-direction: column">
+      <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; line-height: 22px; color: #FFFFFF">My<span style="font-weight: 800">Organiser</span></span>
+      <span style="align-self: flex-start; margin-top: 2px; padding: 1px 8px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em">ADMIN PORTAL</span>
+    </span>
+  </div>
+  <nav aria-label="Admin sections" style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1">
+    <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #94A3B8; padding: 12px 10px 4px">PLATFORM</span>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+      <a href="#" aria-current="{{n.current}}" style="{{n.row}}">
+        <dc-import name="Illustration" kind="{{n.kind}}" size="36" hint-size="36px,36px"></dc-import>
+        <span style="{{n.labelStyle}}">{{n.label}}</span>
+        <sc-if value="{{n.hasBadge}}" hint-placeholder-val="{{false}}"><span style="{{n.badgeStyle}}">{{n.badge}}</span></sc-if>
+      </a>
+    </sc-for>
+  </nav>
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #1D283A">
+    <span style="font-size: 13px; line-height: 18px; color: #94A3B8">Admin actions are recorded in the audit log. Vault data is never visible here.</span>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 10px; border: 1px solid #334155; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600">Back to MyOrganiser</a>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["admin","users","audit","inbox"],"default":"admin"},"minHeight":{"editor":"int","min":600,"max":3000,"default":900},"$preview":{"width":272,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'admin';
+    const raw = [
+      { k: 'admin', l: 'Overview' },
+      { k: 'users', l: 'Users', b: '12' },
+      { k: 'audit', l: 'Audit log' },
+      { k: 'inbox', l: 'Feedback', b: '5' }
+    ];
+    const nav = raw.map((r) => {
+      const a = r.k === active;
+      return {
+        kind: r.k, label: r.l,
+        current: a ? 'page' : 'false',
+        hasBadge: !!r.b, badge: r.b,
+        row: 'display:flex;align-items:center;gap:12px;min-height:46px;box-sizing:border-box;padding:4px 10px 4px 4px;border-radius:14px;text-decoration:none;border:1px solid ' + (a ? '#7C3AED' : 'transparent') + ';background:' + (a ? 'rgba(124,58,237,0.24)' : 'transparent'),
+        labelStyle: 'flex-grow:1;font-size:15px;line-height:20px;font-weight:' + (a ? 600 : 500) + ';color:' + (a ? '#FFFFFF' : '#CBD5E1'),
+        badgeStyle: 'min-width:24px;text-align:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:#B45309;color:#FFFFFF'
+      };
+    });
+    const mh = Number(this.props.minHeight ?? 900) || 900;
+    return { nav, minh: mh + 'px' };
+  }
+}
+</script>
+</body>
+</html>

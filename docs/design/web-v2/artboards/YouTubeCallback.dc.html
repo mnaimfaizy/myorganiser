@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YouTube connecting</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="youtube" min-height="900" hint-size="272px,900px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="YouTube" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="flex-grow: 1; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 24px; padding: 56px 32px">
+      <section role="status" style="flex: 0 1 420px; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 36px 28px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; text-align: center">
+        <dc-import name="Illustration" kind="youtube" size="96" hint-size="96px,96px"></dc-import>
+        <svg width="28" height="28" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="2" r="1.6" fill="#7C3AED"></circle><circle cx="12.2" cy="3.8" r="1.6" fill="#7C3AED" opacity="0.8"></circle><circle cx="14" cy="8" r="1.6" fill="#7C3AED" opacity="0.6"></circle><circle cx="12.2" cy="12.2" r="1.6" fill="#7C3AED" opacity="0.45"></circle><circle cx="8" cy="14" r="1.6" fill="#7C3AED" opacity="0.3"></circle><circle cx="3.8" cy="12.2" r="1.6" fill="#7C3AED" opacity="0.2"></circle></svg>
+        <p style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Connecting your YouTube account…</p>
+      </section>
+      <section role="alert" style="flex: 0 1 420px; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 36px 28px; border-radius: 24px; background: #FFFFFF; border: 1px solid #FCA5A5; text-align: center">
+        <dc-import name="Illustration" kind="youtube" size="96" hint-size="96px,96px"></dc-import>
+        <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700; color: #B91C1C">Connection Failed</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 22px; color: #475569">No authorization code received from Google.</p>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Back to Dashboard</button>
+        <span style="font-size: 12px; line-height: 17px; color: #94A3B8">Other messages: “You must be logged in to connect YouTube.” · “Failed to connect YouTube.” · “Something went wrong while connecting YouTube.”</span>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

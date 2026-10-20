@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your reports</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1400px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="none" min-height="1400" hint-size="272px,1400px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Your reports" crumb="Account" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 880px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="feedback" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Your reports</h1>
+          <span style="font-size: 15px; color: #64748B">See the status of every Bug Report and Suggestion you've sent.</span>
+        </span>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Send feedback</button>
+      </div>
+
+      <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+        <section style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 56px 24px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; text-align: center">
+          <dc-import name="Illustration" kind="feedback" size="120" hint-size="120px,120px"></dc-import>
+          <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">You haven't sent any feedback yet.</h2>
+          <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Send feedback</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{hasReports}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <sc-for list="{{reports}}" as="r" hint-placeholder-count="6">
+            <article style="display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                <h2 style="margin: 0; flex: 1 1 320px; font-size: 17px; line-height: 22px; font-weight: 600">{{r.title}}</h2>
+                <span style="font-size: 13px; color: #64748B">{{r.kind}}</span>
+                <span style="{{r.badge}}">{{r.status}}</span>
+              </div>
+              <sc-if value="{{r.hasNote}}" hint-placeholder-val="{{false}}">
+                <p style="margin: 0; padding: 10px 12px; border-radius: 10px; background: #F8FAFC; font-size: 14px; line-height: 20px; color: #475569">{{r.note}}</p>
+              </sc-if>
+              <sc-if value="{{r.canFollowUp}}" hint-placeholder-val="{{false}}">
+                <form style="display: flex; flex-direction: column; gap: 6px; padding-top: 4px">
+                  <label for="yr-fu" style="font-size: 15px; font-weight: 600">Follow-up</label>
+                  <textarea id="yr-fu" rows="3" placeholder="Add more detail…" style="box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 16px 'Inter', sans-serif; resize: none"></textarea>
+                  <button type="submit" style="align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Send follow-up</button>
+                </form>
+              </sc-if>
+              <sc-if value="{{r.hasFollowUp}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 3px solid #DDD6FE">
+                  <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">YOUR FOLLOW-UP</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #334155">{{r.followUp}}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{r.hasRelease}}" hint-placeholder-val="{{false}}">
+                <a href="#" style="align-self: flex-start; font-size: 14px; font-weight: 600; text-decoration: none">{{r.release}} → View CHANGELOG ↗</a>
+              </sc-if>
+              <span style="font-size: 13px; color: #64748B">{{r.date}}</span>
+            </article>
+          </sc-for>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","options":["reports","empty"],"default":"reports","section":"State"},"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const empty = this.props.view === 'empty';
+    const pill = (bg, fg, border) => 'flex-shrink:0;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + fg + (border ? ';border:1px solid ' + border : '');
+    const S = {
+      'Received': pill('#F1F5F9', '#334155'),
+      'Under review': pill('#E0F2FE', '#075985'),
+      'Planned': pill('#EDE9FE', '#5B21B6'),
+      'Fixed': pill('#CCFBF1', '#115E59'),
+      'Shipped': pill('#CCFBF1', '#115E59'),
+      "Won't do": pill('#FEE2E2', '#B91C1C'),
+      "Can't reproduce": pill('#FFFFFF', '#92400E', '#FCD34D')
+    };
+    const r = (o) => ({ note: '', followUp: '', release: '', ...o, badge: S[o.status], hasNote: !!o.note, hasFollowUp: !!o.followUp, hasRelease: !!o.release, canFollowUp: !!o.canFollowUp });
+    const reports = [
+      r({ title: 'Uncheck All skips the last item', kind: 'Bug report', status: "Can't reproduce", note: 'We tried lists of 5 to 40 items on Chrome and Firefox and every item unchecked. Which list size and browser were you using?', canFollowUp: true, date: 'Oct 18, 2026' }),
+      r({ title: 'Renewal date shows a day early', kind: 'Bug report', status: 'Fixed', release: 'Fixed in v2.1.0', date: 'Oct 2, 2026' }),
+      r({ title: 'Share a Grocery List with family', kind: 'Suggestion', status: 'Planned', note: 'On the roadmap for the next release.', date: 'Sep 28, 2026' }),
+      r({ title: 'Task reminders arrive twice', kind: 'Bug report', status: 'Under review', followUp: 'It happens only on the installed app, on Android 14.', date: 'Sep 20, 2026' }),
+      r({ title: 'Dark mode for the Vault page', kind: 'Suggestion', status: 'Shipped', release: 'Shipped in v2.0.0', date: 'Aug 30, 2026' }),
+      r({ title: 'Import from another app', kind: 'Suggestion', status: "Won't do", note: "Each app stores data differently, so we can't import it safely. Export and Import of your own vault stay supported.", date: 'Aug 12, 2026' }),
+      r({ title: 'Address form loses the suburb', kind: 'Bug report', status: 'Received', date: 'Aug 2, 2026' })
+    ];
+    return { empty, hasReports: !empty, reports };
+  }
+}
+</script>
+</body>
+</html>

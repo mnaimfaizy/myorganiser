@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Grocery Lists</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1100px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="groceries" min-height="1100" hint-size="272px,1100px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Groceries" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+          <dc-import name="Illustration" kind="groceries" size="64" hint-size="64px,64px"></dc-import>
+          <span style="display: flex; flex-direction: column; flex-grow: 1">
+            <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Groceries</h1>
+            <span style="font-size: 15px; line-height: 20px; color: #64748B">4 lists · <span style="font-variant-numeric: tabular-nums">$86.40</span> known spend · 2 items unpriced</span>
+          </span>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>New list</button>
+        </div>
+        <div role="tablist" aria-label="Groceries" style="display: flex; gap: 24px; border-bottom: 1px solid #E2E8F0">
+          <a href="#" role="tab" aria-selected="true" style="display: inline-flex; align-items: center; height: 44px; padding: 0 2px; border-bottom: 3px solid #7C3AED; font-size: 15px; font-weight: 600; color: #0F172A; text-decoration: none">Lists · 4</a>
+          <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; padding: 0 2px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Catalog · 42</a>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px">
+        <sc-for list="{{lists}}" as="l" hint-placeholder-count="4">
+          <article style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0px 1px 3px rgba(15, 23, 42, 0.05)">
+            <div style="display: flex; align-items: flex-start; gap: 8px">
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0">
+                <a href="#" style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; color: #0F172A; text-decoration: none">{{l.name}}</a>
+                <span style="font-size: 13px; line-height: 18px; color: #64748B">{{l.updated}}</span>
+              </span>
+              <button type="button" aria-label="Actions for {{l.name}}" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="3.5" r="1.8" fill="#334155"></circle><circle cx="9" cy="9" r="1.8" fill="#334155"></circle><circle cx="9" cy="14.5" r="1.8" fill="#334155"></circle></svg></button>
+            </div>
+
+            <sc-if value="{{l.hasItems}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; align-items: baseline; justify-content: space-between">
+                <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">{{l.amount}}</span>
+                <span style="{{l.pricedStyle}}">{{l.priced}}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <div role="progressbar" aria-valuenow="{{l.done}}" aria-valuemin="0" aria-valuemax="{{l.total}}" aria-label="{{l.name}} progress" style="height: 8px; border-radius: 999px; background: #ECEEF0; overflow: hidden"><div style="{{l.bar}}"></div></div>
+                <span style="font-size: 13px; line-height: 18px; color: #334155">{{l.progress}}</span>
+              </div>
+              <sc-if value="{{l.hasOpen}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; flex-direction: column; gap: 6px">
+                  <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">STILL TO BUY</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                    <sc-for list="{{l.open}}" as="o" hint-placeholder-count="4">
+                      <span style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; background: #F1F5F9; font-size: 13px; color: #334155"><dc-import name="CategoryIllustration" category="{{o.cat}}" size="20" hint-size="20px,20px"></dc-import>{{o.name}}</span>
+                    </sc-for>
+                    <sc-if value="{{l.hasMore}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; height: 28px; padding: 0 6px; font-size: 13px; color: #64748B">{{l.more}}</span></sc-if>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{l.allBought}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #F0FDF4">
+                  <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#15803D"></path></svg>
+                  <span style="flex-grow: 1; font-size: 13px; line-height: 18px; color: #166534">All bought. Uncheck All to use it again.</span>
+                  <button type="button" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #86EFAC; background: #FFFFFF; font: 600 13px 'Inter', sans-serif; color: #166534">Uncheck All</button>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{l.isEmpty}}" hint-placeholder-val="{{false}}">
+              <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border-radius: 14px; border: 1px dashed #CBD5E1">
+                <span style="font-size: 15px; line-height: 20px; font-weight: 600">Nothing on this list yet</span>
+                <span style="font-size: 13px; line-height: 18px; color: #64748B">Add what you need, or pick from your Catalog.</span>
+                <button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Add items</button>
+              </div>
+            </sc-if>
+
+            <a href="#" style="margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; text-decoration: none">Open list<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#5B21B6"></path></svg></a>
+          </article>
+        </sc-for>
+        <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 260px; border-radius: 20px; border: 2px dashed #CBD5E1; background: transparent; font-family: 'Inter', sans-serif; color: #475569">
+          <span aria-hidden="true" style="width: 48px; height: 48px; border-radius: 14px; background: #EDE9FE; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 18 18"><rect x="8" y="2" width="2" height="14" rx="1" fill="#5B21B6"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#5B21B6"></rect></svg></span>
+          <span style="font-size: 15px; font-weight: 600; color: #0F172A">New list</span>
+          <span style="font-size: 13px">For the next shop or an occasion</span>
+        </button>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const cat = { produce: '#16A34A', dairy: '#0EA5E9', meat: '#DC2626', bakery: '#D97706', frozen: '#6366F1', household: '#64748B', snacks: '#DB2777', beverages: '#0891B2' };
+    const dot = (c) => 'width:8px;height:8px;border-radius:999px;background:' + cat[c];
+    const mk = (name, updated, done, total, amount, unpriced, open) => {
+      const hasItems = total > 0;
+      const allBought = hasItems && done === total;
+      const pct = hasItems ? Math.round((done / total) * 100) : 0;
+      return {
+        name, updated, done, total, amount,
+        hasItems, isEmpty: !hasItems, allBought,
+        priced: unpriced ? unpriced + ' unpriced' : 'all priced',
+        pricedStyle: 'font-size:13px;font-weight:600;color:' + (unpriced ? '#92400E' : '#64748B'),
+        progress: done + ' of ' + total + ' checked · ' + (total - done) + ' left',
+        bar: 'height:8px;border-radius:999px;width:' + pct + '%;background:' + (allBought ? '#15803D' : '#7C3AED'),
+        hasOpen: !allBought && open.length > 0,
+        open: open.slice(0, 4).map(([n, c]) => ({ name: n, cat: c })),
+        hasMore: open.length > 4,
+        more: '+' + (open.length - 4) + ' more'
+      };
+    };
+    const lists = [
+      mk('Weekly shop', 'Updated 2 hours ago', 8, 12, '$42.10', 0, [['Bananas', 'produce'], ['Oat milk', 'dairy'], ['Sourdough', 'bakery'], ['Chicken thighs', 'meat']]),
+      mk('Costco run', 'Updated yesterday', 3, 20, '$31.80', 2, [['Paper towels', 'household'], ['Sparkling water', 'beverages'], ['Frozen berries', 'frozen'], ['Trail mix', 'snacks'], ['Olive oil', 'household'], ['Eggs', 'dairy']]),
+      mk('Party supplies', 'Created 3 days ago', 0, 0, '$0.00', 0, []),
+      mk('Office snacks', 'Finished yesterday', 5, 5, '$12.50', 0, [])
+    ];
+    return { lists };
+  }
+}
+</script>
+</body>
+</html>

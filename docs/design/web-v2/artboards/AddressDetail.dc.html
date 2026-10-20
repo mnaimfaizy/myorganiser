@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Address detail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1250px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="addresses" min-height="1250" hint-size="272px,1250px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Home" crumb="Addresses" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+        <dc-import name="Illustration" kind="addresses" size="56" hint-size="56px,56px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <span style="display: flex; align-items: center; gap: 10px"><h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Home</h1><span style="display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; background: #CCFBF1; color: #115E59; font-size: 12px; font-weight: 600; letter-spacing: 0.02em">CURRENT</span></span>
+          <span style="font-size: 15px; line-height: 20px; color: #64748B">Updated 3 Oct · encrypted on this device</span>
+        </span>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif">Mark as old</button>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Edit address</button>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <div style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; color: #64748B">Click a line to copy it</span>
+          <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+            <sc-for list="{{fields}}" as="f" hint-placeholder-count="6">
+              <button type="button" aria-label="Copy {{f.label}}: {{f.value}}" style="display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 0 6px 0 16px; border: 0; border-bottom: 1px solid #F1F5F9; background: #FFFFFF; text-align: left; font-family: 'Inter', sans-serif">
+                <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 13px; line-height: 18px; color: #64748B">{{f.label}}</span><span style="font-size: 17px; line-height: 24px; font-weight: 500; color: #0F172A; font-variant-numeric: tabular-nums">{{f.value}}</span></span>
+                <span aria-hidden="true" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18"><rect x="5" y="5" width="10" height="11" rx="2" fill="#334155"></rect><rect x="2" y="2" width="10" height="11" rx="2" fill="#94A3B8"></rect></svg></span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+            <button type="button" style="height: 44px; border-radius: 12px; border: 0; background: #ECEEF0; font: 600 15px 'Inter', sans-serif; color: #0F172A">Copy all</button>
+            <a href="#" style="display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A; text-decoration: none">Open in Maps</a>
+          </div>
+          <div role="status" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 12px; background: #0F172A; color: #FFFFFF; font-size: 14px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#22D3EE"></path></svg>Postcode copied — clears in 60 s</div>
+          <section style="display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 16px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Delete this address</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Its 5 places go with it, on every device.</span></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #FCA5A5; background: #FFFFFF; color: #B91C1C; font: 600 14px 'Inter', sans-serif">Delete…</button>
+          </section>
+        </div>
+
+        <section aria-labelledby="places" style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border-bottom: 1px solid #E2E8F0">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span style="display: flex; flex-direction: column; flex-grow: 1"><h2 id="places" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Places to update</h2><span style="font-size: 13px; color: #64748B">Everyone who needs to know about this address</span></span>
+              <button type="button" style="display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px 0 10px; border-radius: 10px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 14px 'Inter', sans-serif"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>Add place</button>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 15px"><span><b style="font-variant-numeric: tabular-nums">3 of 5</b> <span style="color: #64748B">updated</span></span><span style="font-size: 13px; color: #92400E; font-weight: 600">2 to go</span></div>
+            <div role="progressbar" aria-valuenow="3" aria-valuemin="0" aria-valuemax="5" aria-label="Places updated" style="height: 8px; border-radius: 999px; background: #ECEEF0; overflow: hidden"><div style="width: 60%; height: 8px; border-radius: 999px; background: #7C3AED"></div></div>
+            <div style="display: flex; gap: 8px"><button type="button" aria-pressed="true" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 14px 'Inter', sans-serif">All · 5</button><button type="button" aria-pressed="false" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 14px 'Inter', sans-serif">To do · 2</button></div>
+          </div>
+          <sc-for list="{{places}}" as="p" hint-placeholder-count="5">
+            <div style="{{p.rowStyle}}">
+              <input type="checkbox" checked="{{p.done}}" aria-label="Updated at {{p.org}}" style="width: 22px; height: 22px; accent-color: #15803D; flex-shrink: 0">
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><span style="{{p.nameStyle}}">{{p.org}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{p.meta}}</span></span>
+              <span style="{{p.pillStyle}}">{{p.pill}}</span>
+              <sc-if value="{{p.hasLink}}" hint-placeholder-val="{{false}}"><a href="#" style="display: inline-flex; align-items: center; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid #CBD5E1; font: 600 13px 'Inter', sans-serif; color: #0F172A; text-decoration: none; white-space: nowrap">Update online ↗</a></sc-if>
+              <button type="button" aria-label="More for {{p.org}}" style="width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="3.5" r="1.8" fill="#475569"></circle><circle cx="9" cy="9" r="1.8" fill="#475569"></circle><circle cx="9" cy="14.5" r="1.8" fill="#475569"></circle></svg></button>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1250}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const fields = [['Property number', '14'], ['Street', 'Rose Lane'], ['Suburb', 'Richmond'], ['State', 'VIC'], ['Postcode', '3121'], ['Country', 'Australia']].map(([label, value]) => ({ label, value }));
+    const pill = (bg, fg) => 'flex-shrink:0;display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.02em;background:' + bg + ';color:' + fg;
+    const prio = { high: ['HIGH', pill('#FEE2E2', '#B91C1C')], medium: ['MEDIUM', pill('#FEF3C7', '#92400E')], normal: ['NORMAL', pill('#F1F5F9', '#334155')], low: ['LOW', pill('#F8FAFC', '#64748B')] };
+    const p = (org, meta, pr, done, link) => ({
+      org, meta, done, hasLink: !!link && !done,
+      pill: done ? 'UPDATED' : prio[pr][0],
+      pillStyle: done ? pill('#DCFCE7', '#166534') : prio[pr][1],
+      nameStyle: 'font-size:17px;line-height:24px;' + (done ? 'color:#64748B' : 'color:#0F172A'),
+      rowStyle: 'display:flex;align-items:center;gap:12px;min-height:68px;padding:0 12px 0 20px;border-bottom:1px solid #F1F5F9;' + (done ? 'background:#FCFCFD' : '')
+    });
+    const places = [
+      p('Bank', 'Finance · in person', 'high', false, false),
+      p('Electoral roll', 'Government · online', 'medium', false, true),
+      p('Tax office', 'Government · online · updated 2 Oct', 'high', true, true),
+      p('Car insurance', 'Insurance · phone · updated 4 Oct', 'normal', true, false),
+      p('Gym', 'Membership · online · updated 5 Oct', 'low', true, true)
+    ];
+    return { fields, places };
+  }
+}
+</script>
+</body>
+</html>

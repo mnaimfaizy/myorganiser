@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone sheets and feedback</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 1320px; box-sizing: border-box; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 18px; padding: 20px 0">
+  <h1 style="margin: 0; padding: 0 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Sheets and feedback</h1>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">ACTION SHEET · REPLACES ROW MENUS</h2>
+    <div style="position: relative; height: 400px; overflow: hidden; background: #E2E8F0">
+      <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+      <div role="dialog" aria-labelledby="sh1" style="position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 16px 26px; border-radius: 20px 20px 0 0; background: #FFFFFF; display: flex; flex-direction: column; gap: 4px">
+        <span aria-hidden="true" style="align-self: center; width: 36px; height: 5px; border-radius: 3px; background: #94A3B8; margin: 6px 0 10px"></span>
+        <h3 id="sh1" style="margin: 0 0 6px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Weekly shop</h3>
+        <button type="button" style="min-height: 52px; border: 0; border-radius: 12px; background: transparent; text-align: left; padding: 0 4px; font: 400 17px 'Inter', sans-serif; color: #0F172A">Rename list</button>
+        <button type="button" style="min-height: 52px; border: 0; border-radius: 12px; background: transparent; text-align: left; padding: 0 4px; font: 400 17px 'Inter', sans-serif; color: #0F172A">Uncheck All</button>
+        <button type="button" style="min-height: 52px; border: 0; border-radius: 12px; background: transparent; text-align: left; padding: 0 4px; font: 400 17px 'Inter', sans-serif; color: #0F172A">Remove Checked (4)</button>
+        <button type="button" style="min-height: 52px; border: 0; border-radius: 12px; background: transparent; text-align: left; padding: 0 4px; font: 600 17px 'Inter', sans-serif; color: #B91C1C">Delete Grocery List…</button>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">CONFIRM SHEET · DESTRUCTIVE</h2>
+    <div style="position: relative; height: 320px; overflow: hidden; background: #E2E8F0">
+      <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+      <div role="alertdialog" aria-labelledby="sh2" aria-describedby="sh2d" style="position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 16px 26px; border-radius: 20px 20px 0 0; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+        <span aria-hidden="true" style="align-self: center; width: 36px; height: 5px; border-radius: 3px; background: #94A3B8; margin: 6px 0 6px"></span>
+        <h3 id="sh2" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Delete “Costco run”?</h3>
+        <p id="sh2d" style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Its 20 lines go with it, on every device. Your staples stay.</p>
+        <button type="button" style="height: 48px; margin-top: 6px; border-radius: 12px; border: 0; background: #DC2626; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Delete list</button>
+        <button type="button" autofocus="{{true}}" style="height: 48px; border-radius: 12px; border: 0; background: transparent; color: #0F172A; font: 600 16px 'Inter', sans-serif">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SNACKBAR · ABOVE THE TAB BAR</h2>
+    <div role="status" style="margin: 0 16px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 4px 0 16px; border-radius: 12px; background: #0F172A; color: #FFFFFF">
+      <span style="flex-grow: 1; font-size: 15px; line-height: 20px">Bananas removed from this list</span>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 8px; border: 0; background: transparent; color: #22D3EE; font: 700 15px 'Inter', sans-serif">Undo</button>
+    </div>
+    <div role="status" style="margin: 0 16px; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 16px; border-radius: 12px; background: #0F172A; color: #FFFFFF">
+      <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#22D3EE"></path></svg>
+      <span style="font-size: 15px; line-height: 20px">Copied — clears in 60 s</span>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">OFFLINE BAR · UNDER THE APP BAR</h2>
+    <div role="status" style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; background: #B45309; color: #FFFFFF; font-size: 15px; font-weight: 600">You're offline — changes save on this phone</div>
+    <div role="status" style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; background: #15803D; color: #FFFFFF; font-size: 15px; font-weight: 600">Back online · syncing</div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Addresses</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1050px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="addresses" min-height="1050" hint-size="272px,1050px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Addresses" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="addresses" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Addresses</h1>
+          <span style="font-size: 15px; line-height: 20px; color: #64748B">3 addresses · 1 current · 2 places still to update</span>
+        </span>
+        <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>Add address</button>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; width: 300px; box-sizing: border-box">
+          <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.5" fill="#64748B"></circle><circle cx="7.5" cy="7.5" r="4.6" fill="#FFFFFF"></circle><rect x="11" y="10" width="2.2" height="7" rx="1.1" fill="#64748B" transform="rotate(-45 12.1 13.5)"></rect></svg>
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Filter addresses</span>
+          <input placeholder="Filter by label, street or country" style="border: 0; outline: none; font: 400 15px 'Inter', sans-serif; width: 100%">
+        </label>
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="3">
+          <button type="button" aria-pressed="{{c.pressed}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px">
+        <sc-for list="{{items}}" as="a" hint-placeholder-count="3">
+          <article style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0px 1px 3px rgba(15, 23, 42, 0.05)">
+            <div style="display: flex; align-items: flex-start; gap: 10px">
+              <span style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1; min-width: 0">
+                <span style="display: flex; align-items: center; gap: 8px"><a href="#" style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; color: #0F172A; text-decoration: none">{{a.label}}</a><span style="{{a.pillStyle}}">{{a.status}}</span></span>
+                <span style="font-size: 15px; line-height: 22px; color: #334155; white-space: pre-line">{{a.address}}</span>
+              </span>
+              <button type="button" aria-label="Actions for {{a.label}}" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="3.5" r="1.8" fill="#334155"></circle><circle cx="9" cy="9" r="1.8" fill="#334155"></circle><circle cx="9" cy="14.5" r="1.8" fill="#334155"></circle></svg></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: #334155">{{a.progress}}</span><span style="{{a.leftStyle}}">{{a.left}}</span></div>
+              <div role="progressbar" aria-valuenow="{{a.done}}" aria-valuemin="0" aria-valuemax="{{a.total}}" aria-label="Places updated for {{a.label}}" style="height: 8px; border-radius: 999px; background: #ECEEF0; overflow: hidden"><div style="{{a.bar}}"></div></div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: auto">
+              <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #ECEEF0; font: 600 14px 'Inter', sans-serif; color: #0F172A"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="5" y="5" width="10" height="11" rx="2" fill="#334155"></rect><rect x="2" y="2" width="10" height="11" rx="2" fill="#94A3B8"></rect></svg>Copy address</button>
+              <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; font-size: 14px; font-weight: 600; text-decoration: none">Open<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#5B21B6"></path></svg></a>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1050}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (on) => 'height:36px;padding:0 12px;border-radius:10px;font:500 14px Inter,sans-serif;' + (on ? 'border:1px solid #0F172A;background:#0F172A;color:#FFFFFF' : 'border:1px solid #64748B;background:#FFFFFF;color:#0F172A');
+    const chips = [['All · 3', true], ['Current · 1', false], ['Old · 2', false]].map(([label, on]) => ({ label, pressed: on ? 'true' : 'false', style: chip(on) }));
+    const pill = (cur) => 'display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.02em;' + (cur ? 'background:#CCFBF1;color:#115E59' : 'background:#F1F5F9;color:#475569');
+    const mk = (label, cur, address, done, total) => {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const complete = total > 0 && done === total;
+      return {
+        label, address, done, total,
+        status: cur ? 'CURRENT' : 'OLD', pillStyle: pill(cur),
+        progress: total ? done + ' of ' + total + ' places updated' : 'No places added yet',
+        left: total === 0 ? 'Add places' : complete ? 'All updated' : (total - done) + ' to go',
+        leftStyle: 'font-weight:600;color:' + (complete ? '#15803D' : total === 0 ? '#5B21B6' : '#92400E'),
+        bar: 'height:8px;border-radius:999px;width:' + pct + '%;background:' + (complete ? '#15803D' : '#7C3AED')
+      };
+    };
+    const items = [
+      mk('Home', true, '14 Rose Lane\nRichmond VIC 3121, Australia', 3, 5),
+      mk('Old flat', false, '2/88 Station Street\nFitzroy VIC 3065, Australia', 6, 6),
+      mk('Parents', false, '7 Hill Road\nBallarat VIC 3350, Australia', 0, 0)
+    ];
+    return { chips, items };
+  }
+}
+</script>
+</body>
+</html>

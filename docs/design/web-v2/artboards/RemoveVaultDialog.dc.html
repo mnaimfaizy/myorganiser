@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Remove local vault</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <div role="alertdialog" aria-labelledby="rv-t" aria-describedby="rv-d" style="position: absolute; left: 50%; top: 96px; transform: translateX(-50%); width: 540px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <h2 id="rv-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Remove this Vault from this device?</h2>
+      <p id="rv-d" style="margin: 0; font-size: 15px; line-height: 20px; color: #334155">This device holds changes it has not sent to the server yet, for: Tasks, Addresses. Removing this Vault deletes that Ciphertext from this device, and it does not exist anywhere else.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; padding: 20px 24px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #FFFBEB; border: 1px solid #FCD34D">
+        <span style="flex: 1 1 240px; font-size: 14px; line-height: 20px; color: #78350F">This Vault has no independent backup.</span>
+        <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Export vault JSON first</button>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #64748B">When everything has synced and a backup exists, this reads: “Every part of this Vault has already reached the server…” and “An independent backup of this Vault exists, last made on …”.</span>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #DC2626; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Remove from this device</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

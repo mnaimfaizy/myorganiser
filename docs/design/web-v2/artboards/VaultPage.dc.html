@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vault</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+select{appearance:none}
+code{font-family:'JetBrains Mono',monospace;font-size:13px;padding:1px 6px;border-radius:6px;background:#F1F5F9;color:#0F172A}
+.vp-card{display:flex;flex-direction:column;gap:12px;padding:24px;border-radius:20px;background:#FFFFFF;border:1px solid #E2E8F0;box-sizing:border-box;min-width:0}
+.vp-h3{margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;line-height:24px;font-weight:700}
+.vp-desc{margin:0;font-size:15px;line-height:20px;color:#334155}
+.vp-p{margin:0;font-size:14px;line-height:20px;color:#475569}
+.vp-sec{margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;line-height:26px;font-weight:700}
+.vp-btn{align-self:flex-start;height:44px;padding:0 18px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font:600 15px 'Inter',sans-serif}
+.vp-btn-dark{align-self:flex-start;height:44px;padding:0 18px;border-radius:12px;border:0;background:#0F172A;color:#FFFFFF;font:600 15px 'Inter',sans-serif}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 2400px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="vault" vault-locked="{{locked}}" min-height="2400" hint-size="272px,2400px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Vault" crumb="Dashboard" state="{{headerState}}" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1080px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 28px">
+
+      <sc-if value="{{unlocked}}" hint-placeholder-val="{{true}}">
+        <section aria-label="Vault status" style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 28px; border-radius: 24px; background: #0F172A; color: #FFFFFF">
+          <dc-import name="Illustration" kind="vault" size="112" hint-size="112px,112px"></dc-import>
+          <div style="display: flex; flex-direction: column; gap: 8px; flex: 1 1 360px">
+            <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Your vault is unlocked</h1>
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; color: #CBD5E1"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: #2DD4BF"></span>Unlocked on this device for this session · Synced 2 minutes ago</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
+              <span style="padding: 4px 10px; border-radius: 999px; background: #1D283A; font-size: 12px; font-weight: 600; color: #99F6E4">Linked to Google Drive</span>
+              <span style="padding: 4px 10px; border-radius: 999px; background: #1D283A; font-size: 12px; font-weight: 600; color: #99F6E4">Newest copy 2 days old</span>
+            </div>
+          </div>
+          <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #475569; background: transparent; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Lock vault</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{locked}}" hint-placeholder-val="{{false}}">
+        <section aria-labelledby="vp-unlock" style="display: flex; flex-wrap: wrap; align-items: center; gap: 32px; padding: 32px; border-radius: 24px; background: #0F172A; color: #FFFFFF">
+          <dc-import name="Illustration" kind="vault" size="128" hint-size="128px,128px"></dc-import>
+          <form style="display: flex; flex-direction: column; gap: 14px; flex: 1 1 380px; max-width: 520px">
+            <span style="display: flex; flex-direction: column; gap: 6px">
+              <h1 id="vp-unlock" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Unlock your vault</h1>
+              <span style="font-size: 15px; line-height: 20px; color: #CBD5E1">Enter your passphrase to unlock your vault on this device for this session.</span>
+            </span>
+            <label for="vp-pass" style="font-size: 15px; font-weight: 600">Passphrase</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <input id="vp-pass" type="password" value="" style="flex: 1 1 240px; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #A78BFA; background: #1D283A; color: #FFFFFF; font: 400 17px 'Inter', sans-serif; outline: none">
+              <button type="submit" style="height: 48px; padding: 0 24px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Unlock</button>
+            </div>
+            <span style="font-size: 13px; line-height: 18px; color: #94A3B8">Wrong passphrase shows under the field: “That is not your current passphrase.” Backups, export, import and the reader below work while locked.</span>
+          </form>
+        </section>
+      </sc-if>
+
+      <section aria-labelledby="vp-access" style="display: flex; flex-direction: column; gap: 14px">
+        <span style="display: flex; flex-direction: column; gap: 2px">
+          <h2 id="vp-access" class="vp-sec">Access</h2>
+          <span style="font-size: 14px; color: #64748B">What opens your vault. Both open a dialog with the full steps.</span>
+        </span>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px">
+          <article class="vp-card" style="{{accessCard}}">
+            <h3 class="vp-h3">Change passphrase</h3>
+            <p class="vp-desc">Choose a new passphrase for unlocking your vault on this device.</p>
+            <p class="vp-p">Your data is not re-encrypted and your recovery key keeps working.</p>
+            <sc-if value="{{locked}}" hint-placeholder-val="{{false}}">
+              <p style="{{noticeStyle}}">Unlock your vault to change its passphrase.</p>
+            </sc-if>
+            <button type="button" class="vp-btn" disabled="{{locked}}" style="{{accessBtn}}">Change passphrase…</button>
+          </article>
+          <article class="vp-card" style="{{accessCard}}">
+            <h3 class="vp-h3">Rotate recovery key</h3>
+            <p class="vp-desc">Generate a new recovery key that can open your vault. Your old key stops working after you confirm the new one.</p>
+            <p class="vp-p">Current key saved 12 Mar 2026.</p>
+            <sc-if value="{{locked}}" hint-placeholder-val="{{false}}">
+              <p style="{{noticeStyle}}">Unlock your vault to rotate its recovery key.</p>
+            </sc-if>
+            <button type="button" class="vp-btn" disabled="{{locked}}" style="{{accessBtn}}">Rotate recovery key…</button>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="vp-backups" style="display: flex; flex-direction: column; gap: 14px">
+        <span style="display: flex; flex-direction: column; gap: 2px">
+          <h2 id="vp-backups" class="vp-sec">Backups and moving your vault</h2>
+          <span style="font-size: 14px; color: #64748B">Every copy is ciphertext. Plaintext never leaves this device.</span>
+        </span>
+
+        <article class="vp-card">
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px">
+            <span style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 420px">
+              <h3 class="vp-h3">Encrypted Escape Copy</h3>
+              <p class="vp-desc">Keep an encrypted copy of your vault in your own Google Drive, so it outlives MyOrganiser. Plaintext never leaves this device.</p>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px; background: #CCFBF1; color: #115E59; font-size: 13px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Linked to Google Drive</span>
+            <button type="button" style="height: 32px; padding: 0 10px; border: 0; background: transparent; color: #475569; font: 600 14px 'Inter', sans-serif">Unlink</button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; padding-top: 14px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; gap: 6px">
+              <label for="vp-rem" style="font-size: 14px; font-weight: 600">Remind me when my newest copy is older than</label>
+              <select id="vp-rem" style="height: 44px; width: 220px; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 400 16px 'Inter', sans-serif; color: #0F172A"><option>1 week</option></select>
+            </span>
+            <span style="flex-grow: 1; font-size: 15px; color: #334155; padding-bottom: 12px">Newest copy: <strong>2 days old</strong></span>
+            <button type="button" class="vp-btn">Restore from Google Drive</button>
+            <button type="button" class="vp-btn-dark">Back up now</button>
+          </div>
+        </article>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px">
+          <article class="vp-card">
+            <h3 class="vp-h3">Export encrypted vault</h3>
+            <p class="vp-desc">Download a ciphertext-only JSON bundle. The file never contains plaintext addresses or phone numbers.</p>
+            <p class="vp-p">The exported file is decrypted only on this device using your passphrase or recovery key. The server stores audit metadata only — never the bundle itself.</p>
+            <button type="button" class="vp-btn-dark" style="margin-top: auto">Export vault JSON</button>
+          </article>
+          <article class="vp-card">
+            <h3 class="vp-h3">Import encrypted vault</h3>
+            <p class="vp-desc">Validate and load a previously exported ciphertext bundle. After import, unlock with the backup's passphrase or Recovery Key.</p>
+            <span style="display: flex; flex-direction: column; gap: 6px">
+              <label for="vp-file" style="font-size: 14px; font-weight: 600">Vault export file (.json)</label>
+              <span id="vp-file" style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 6px 0 14px; border-radius: 12px; border: 1px dashed #A78BFA; background: #FAF5FF; font-size: 14px; color: #334155"><span style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">myorganiser-vault-2026-10-16.json · 84 KB</span><button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 13px 'Inter', sans-serif">Change file</button></span>
+            </span>
+            <p class="vp-p">If this device already holds a vault, we show exactly what the file changes before anything is replaced.</p>
+            <button type="button" class="vp-btn" style="margin-top: auto">Import vault JSON</button>
+          </article>
+        </div>
+
+        <article class="vp-card" aria-labelledby="vp-reader">
+          <div style="display: flex; align-items: center; gap: 16px">
+            <dc-import name="Illustration" kind="vault" size="56" hint-size="56px,56px"></dc-import>
+            <span style="display: flex; flex-direction: column; gap: 2px">
+              <h3 id="vp-reader" class="vp-h3">Open your Escape Copy without us</h3>
+              <span style="font-size: 15px; color: #475569">A self-contained reader that works offline and needs no account</span>
+            </span>
+          </div>
+          <div role="status" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #FFFBEB; border: 1px solid #FCD34D; font-size: 14px; line-height: 20px; color: #78350F">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px"><path d="M9 1 L17.5 16 H0.5 Z" fill="#D97706"></path><rect x="8" y="6" width="2" height="5" fill="#FFFFFF"></rect><rect x="8" y="12.5" width="2" height="2" fill="#FFFFFF"></rect></svg>
+            <span>An Escape Copy was just made. Get the reader and keep it with your copy — a copy you cannot open is not a backup.</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 24px">
+            <div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 380px">
+              <p class="vp-p">The Escape Copy reader is one self-contained HTML file. It requires no account, no server, and no Google account. It works completely offline, displays your data on screen only, and never writes decrypted files to disk.</p>
+              <p class="vp-p">Download <code>myorganiser-escape-copy-reader.html</code> from the GitHub Releases page and keep it in the same folder as your Escape Copy. When you need to read your copy, open the reader, select your Escape Copy file, and enter either your passphrase or your recovery key — both open it. Your data appears on screen.</p>
+              <a href="#" style="align-self: flex-start; display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 12px; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; text-decoration: none">Get the reader from GitHub Releases ↗</a>
+            </div>
+            <aside aria-label="Verify the reader" style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 300px; padding: 16px; border-radius: 14px; background: #F5F3FF; border: 1px solid #DDD6FE">
+              <p style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 700; color: #3B0764">Verify the file before opening it with your passphrase. A file that accepts a vault passphrase is exactly what an attacker would want to substitute.</p>
+              <p class="vp-p">After downloading, verify the reader's integrity against the published <code>SHA256SUMS.txt</code> file using:</p>
+              <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #475569">
+                <li><code>sha256sum</code> (Linux/macOS/WSL)</li>
+                <li><code>shasum -a 256</code> (macOS legacy)</li>
+                <li><code>Get-FileHash</code> (Windows PowerShell)</li>
+              </ul>
+            </aside>
+          </div>
+        </article>
+      </section>
+
+      <section aria-labelledby="vp-danger" style="display: flex; flex-direction: column; gap: 14px">
+        <h2 id="vp-danger" class="vp-sec" style="color: #B91C1C">Danger zone</h2>
+        <article class="vp-card" style="border-color: #FCA5A5">
+          <h3 class="vp-h3">Remove local vault</h3>
+          <p class="vp-desc">Delete this device's copy of your Vault. Your account and passphrase are unaffected.</p>
+          <p class="vp-p">This only clears the encrypted copy stored in this browser. It does not delete your account, does not touch any other user's Local Vault on this device, and does not affect a cloud backup if one exists.</p>
+          <button type="button" class="vp-btn" style="border-color: #DC2626; color: #B91C1C">Remove local vault…</button>
+        </article>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2400},"state":{"editor":"enum","options":["unlocked","locked"],"default":"unlocked","section":"State"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const locked = this.props.state === 'locked';
+    return {
+      locked,
+      unlocked: !locked,
+      headerState: locked ? 'locked' : 'synced',
+      accessCard: locked ? 'background:#F8FAFC' : '',
+      accessBtn: locked ? 'opacity:0.45' : '',
+      noticeStyle: 'margin:0;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:#F1F5F9;font-size:14px;color:#475569'
+    };
+  }
+}
+</script>
+</body>
+</html>

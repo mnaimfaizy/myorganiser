@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone confirm account deletion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="alertdialog" aria-labelledby="dp2-t" style="position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 14px; padding: 10px 16px 34px; border-radius: 24px 24px 0 0; background: #FFFFFF">
+    <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 999px; background: #CBD5E1"></span>
+    <span style="font-size: 13px; font-weight: 600; color: #B91C1C">Step 2 of 2</span>
+    <h2 id="dp2-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; line-height: 30px; font-weight: 700">Confirm account deletion</h2>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">This cannot be undone. Your account, its Sessions, and your encrypted vault will be removed from our servers. Feedback Reports you've sent stay on our servers, but with your name and email removed — you won't be contacted about them again.</p>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="dp2-p" style="font-size: 15px; font-weight: 600">Account password</label>
+      <input id="dp2-p" type="password" autocomplete="current-password" value="••••••••••" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 17px 'Inter', sans-serif">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="dp2-c" style="font-size: 15px; font-weight: 600">Type DELETE to confirm</label>
+      <input id="dp2-c" type="text" autocomplete="off" value="DELE" aria-describedby="dp2-e" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #DC2626; font: 600 17px 'Inter', sans-serif; letter-spacing: 0.06em; outline: none">
+      <span id="dp2-e" style="font-size: 13px; color: #B91C1C">Type DELETE to confirm.</span>
+    </div>
+    <button type="submit" style="height: 52px; border-radius: 12px; border: 0; background: #DC2626; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Delete my account</button>
+    <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: transparent; font: 600 16px 'Inter', sans-serif; color: #0F172A">Back</button>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

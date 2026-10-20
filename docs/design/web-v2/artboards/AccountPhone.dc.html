@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone account</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+.cap{margin:6px 0 0;font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.02em;color:#64748B}
+.grp{display:flex;flex-direction:column;border-radius:16px;background:#FFFFFF;border:1px solid #E2E8F0;overflow:hidden}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:0 14px 0 16px;border-bottom:1px solid #F1F5F9;text-decoration:none;color:#0F172A}
+.row:last-child{border-bottom:0}
+.val{display:flex;align-items:center;gap:8px;font-size:16px;color:#64748B}
+</style>
+</helmet>
+<div style="width: 390px; height: 1120px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 24px">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 44px; font-size: 17px; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>More</a>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 20px 'Plus Jakarta Sans', sans-serif">SR</span>
+      <span style="display: flex; flex-direction: column"><h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -0.02em">Sam Rivera</h1><span style="font-size: 14px; color: #64748B">sam@example.com</span></span>
+    </div>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: #F5F3FF; border: 1px solid #DDD6FE; text-decoration: none; color: #0F172A"><dc-import name="Illustration" kind="vault" size="36" hint-size="36px,36px"></dc-import><span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Last backup 2 days ago to Google Drive</span><span style="font-size: 13px; color: #5B21B6">Go to Vault →</span></span></a>
+
+    <h2 class="cap">PREFERENCES</h2>
+    <div class="grp">
+      <a href="#" class="row"><span style="font-size: 17px">Country</span><span class="val">Australia (AU)<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></span></a>
+      <a href="#" class="row"><span style="font-size: 17px">Preferred currency</span><span class="val">AUD<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></span></a>
+    </div>
+    <p style="margin: -4px 4px 0; font-size: 13px; line-height: 18px; color: #64748B">Used for prices in Subscriptions and for address formats.</p>
+
+    <h2 class="cap">WEEKLY YOUTUBE DIGEST</h2>
+    <div class="grp">
+      <div class="row"><span id="apd" style="font-size: 17px">Email me a weekly digest</span><button type="button" role="switch" aria-checked="true" aria-labelledby="apd" style="width: 52px; height: 32px; border-radius: 999px; border: 0; background: #7C3AED; position: relative; flex-shrink: 0"><span aria-hidden="true" style="position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF"></span></button></div>
+      <a href="#" class="row"><span style="font-size: 17px">Send on</span><span class="val">Monday<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></span></a>
+    </div>
+    <p style="margin: -4px 4px 0; font-size: 13px; line-height: 18px; color: #64748B">Digest lists only Cached Uploads that are still New — Watched uploads are left out. Weeks with nothing new are skipped entirely. Sent on your chosen day, in your time zone (Australia/Sydney).</p>
+
+    <h2 class="cap">FEEDBACK</h2>
+    <div class="grp">
+      <a href="#" class="row"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px">Your reports</span><span style="font-size: 13px; color: #64748B">See the status of every Bug Report and Suggestion you've sent.</span></span><span class="val"><b style="padding: 2px 8px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; font-size: 12px; font-weight: 600">Updated</b><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></span></a>
+    </div>
+
+    <h2 class="cap" style="color: #B91C1C">DELETE ACCOUNT</h2>
+    <div class="grp" style="border-color: #FCA5A5">
+      <a href="#" class="row" style="flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 16px"><span style="font-size: 17px; color: #B91C1C">Delete account…</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Deleting your account removes the account itself, its Sessions, and everything stored on the server for it, including your encrypted vault. This cannot be undone.</span></a>
+    </div>
+  </main>
+  <dc-import name="TabBar" active="more" hint-size="390px,88px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

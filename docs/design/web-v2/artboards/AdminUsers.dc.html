@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin users</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+select{appearance:none}
+.row:hover{background:#F8FAFC}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="users" min-height="1000" hint-size="272px,1000px"></dc-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Users" crumb="Admin portal" state="admin" hint-size="100%,76px"></dc-import>
+
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="users" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Users</h1>
+          <span style="font-size: 15px; color: #64748B">148 accounts · 3 platform admins</span>
+        </span>
+      </div>
+
+      <div role="toolbar" aria-label="Filter users" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <span style="font-size: 13px; font-weight: 600; color: #64748B; margin-right: 4px">Status</span>
+        <sc-for list="{{statusChips}}" as="c" hint-placeholder-count="4">
+          <button type="button" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+        <span aria-hidden="true" style="width: 1px; height: 24px; background: #E2E8F0; margin: 0 8px"></span>
+        <span style="font-size: 13px; font-weight: 600; color: #64748B; margin-right: 4px">Role</span>
+        <sc-for list="{{roleChips}}" as="c" hint-placeholder-count="3">
+          <button type="button" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+        <span style="flex-grow: 1"></span>
+        <label for="au-s" style="font-size: 14px; color: #475569">Sort</label>
+        <select id="au-s" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 500 14px 'Inter', sans-serif; color: #0F172A"><option>Newest first</option></select>
+      </div>
+
+      <section aria-label="Users" style="border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 2.4fr) 120px 130px 120px 130px 24px; gap: 16px; padding: 12px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">
+          <span>NAME</span><span>ROLE</span><span>STATUS</span><span>JOINED</span><span>LAST ACTIVE</span><span></span>
+        </div>
+        <sc-for list="{{users}}" as="u" hint-placeholder-count="8">
+          <a href="#" class="row" style="display: grid; grid-template-columns: minmax(0, 2.4fr) 120px 130px 120px 130px 24px; gap: 16px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #F1F5F9; text-decoration: none; color: #0F172A">
+            <span style="display: flex; align-items: center; gap: 12px; min-width: 0">
+              <span aria-hidden="true" style="{{u.avatar}}">{{u.initials}}</span>
+              <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 15px; font-weight: 600">{{u.name}}</span><span style="font-size: 13px; color: #64748B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{u.email}}</span></span>
+            </span>
+            <span style="{{u.roleStyle}}">{{u.role}}</span>
+            <span style="{{u.statusStyle}}">{{u.status}}</span>
+            <span style="font-size: 14px; color: #475569">{{u.joined}}</span>
+            <span style="font-size: 14px; color: #475569">{{u.active}}</span>
+            <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg>
+          </a>
+        </sc-for>
+        <nav aria-label="Pages" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px">
+          <span style="flex-grow: 1; font-size: 14px; color: #475569">Showing 1–8 of 148</span>
+          <button type="button" disabled="{{true}}" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #94A3B8">Previous</button>
+          <button type="button" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Next</button>
+        </nav>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (on) => 'height:36px;padding:0 14px;border-radius:999px;font:600 14px Inter,sans-serif;' + (on ? 'border:0;background:#0F172A;color:#FFFFFF' : 'border:1px solid #CBD5E1;background:#FFFFFF;color:#334155');
+    const mk = (labels, on) => labels.map((l) => ({ label: l, on: l === on ? 'true' : 'false', style: chip(l === on) }));
+    const statusChips = mk(['All', 'Active', 'Unverified', 'Disabled'], 'All');
+    const roleChips = mk(['Any', 'Admin', 'User'], 'Any');
+    const pill = (bg, fg) => 'justify-self:start;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:0.02em;background:' + bg + ';color:' + fg;
+    const roles = { Admin: pill('#EDE9FE', '#5B21B6'), User: pill('#F1F5F9', '#334155') };
+    const statuses = { Active: pill('#CCFBF1', '#115E59'), Unverified: pill('#FEF3C7', '#92400E'), Disabled: pill('#FEE2E2', '#B91C1C') };
+    const tint = ['#7C3AED', '#0F766E', '#0891B2', '#B45309', '#475569'];
+    const raw = [
+      ['Ana Costa', 'ana.costa@example.com', 'User', 'Active', '16 Oct', '10 min ago'],
+      ['Priya Shah', 'priya@example.com', 'User', 'Unverified', '15 Oct', 'Never'],
+      ['Jo Park', 'jo.park@example.com', 'Admin', 'Active', '2 Sep', 'Yesterday'],
+      ['Ben Lee', 'ben.lee@example.com', 'User', 'Active', '28 Aug', '3 days ago'],
+      ['Leo Martin', 'leo.m@example.com', 'User', 'Disabled', '9 Jul', '30 days ago'],
+      ['Mia Wong', 'mia.wong@example.com', 'User', 'Active', '1 Jul', '2 hours ago'],
+      ['Sam Miller', 'sam.miller@example.com', 'Admin', 'Active', '3 Mar', 'Now'],
+      ['Omar Haddad', 'omar@example.com', 'User', 'Unverified', '28 Feb', 'Never']
+    ];
+    const users = raw.map((r, i) => ({
+      name: r[0], email: r[1], role: r[2], status: r[3], joined: r[4], active: r[5],
+      initials: r[0].split(' ').map((w) => w[0]).join(''),
+      avatar: 'width:36px;height:36px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font:700 13px Inter,sans-serif;background:' + tint[i % tint.length],
+      roleStyle: roles[r[2]], statusStyle: statuses[r[3]]
+    }));
+    return { statusChips, roleChips, users };
+  }
+}
+</script>
+</body>
+</html>

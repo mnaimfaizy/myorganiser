@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone save recovery key</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 52px 16px 34px">
+    <span style="font-size: 13px; font-weight: 600; color: #5B21B6">Step 2 of 3</span>
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Save your Recovery Key</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">It's the only way back in if you forget your passphrase. We can't reset it for you.</p>
+    <div style="padding: 14px; border-radius: 14px; background: #FFFFFF; border: 1px dashed #A78BFA; font-family: 'JetBrains Mono', monospace; font-size: 15px; line-height: 24px; letter-spacing: 0.04em; word-break: break-all">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (sample)</div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: #ECEEF0; font: 600 16px 'Inter', sans-serif">Save file</button>
+      <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: #ECEEF0; font: 600 16px 'Inter', sans-serif">Copy</button>
+    </div>
+    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 12px; background: #FFFBEB; border: 1px solid #FCD34D; font-size: 15px; line-height: 20px"><input type="checkbox" checked="{{true}}" style="width: 22px; height: 22px; margin: 0; accent-color: #0F172A; flex-shrink: 0">I've saved it somewhere other than this phone.</label>
+    <button type="button" style="margin-top: auto; height: 52px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Continue</button>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

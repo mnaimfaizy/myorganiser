@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unlock vault</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; overflow: hidden; display: flex; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="tasks" vault-locked="{{true}}" min-height="900" hint-size="272px,900px"></dc-import>
+  </div>
+  <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Tasks" crumb="Dashboard" state="locked" hint-size="100%,76px"></dc-import>
+    <main style="flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; padding: 56px 32px">
+      <form aria-labelledby="ul-h" style="width: 480px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 36px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06)">
+        <dc-import name="Illustration" kind="vault" size="88" hint-size="88px,88px"></dc-import>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h1 id="ul-h" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Unlock your vault</h1>
+          <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Your tasks are encrypted. Enter your passphrase to open them on this device. Locked after 15 minutes away.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="ul-p" style="font-size: 15px; font-weight: 600">Passphrase</label>
+          <div style="display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 0 0 13px; border-radius: 12px; border: 2px solid #DC2626">
+            <input id="ul-p" type="password" value="wrong horse" aria-invalid="true" aria-describedby="ul-e" style="flex-grow: 1; min-width: 0; border: 0; outline: none; font: 400 17px 'Inter', sans-serif">
+            <button type="button" aria-label="Show passphrase" style="width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4 C5 4 2 10 2 10 C2 10 5 16 10 16 C15 16 18 10 18 10 C18 10 15 4 10 4 Z" fill="#64748B"></path><circle cx="10" cy="10" r="3.4" fill="#FFFFFF"></circle><circle cx="10" cy="10" r="1.8" fill="#64748B"></circle></svg></button>
+          </div>
+          <span id="ul-e" style="font-size: 13px; line-height: 18px; color: #B91C1C">That passphrase didn't unlock your vault. Nothing was changed.</span>
+        </div>
+        <button type="submit" style="height: 48px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Unlock</button>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid #E2E8F0">
+          <a href="#" style="font-size: 15px; font-weight: 600; text-decoration: none">Forgot it? Use your Recovery Key</a>
+          <a href="#" style="font-size: 13px; color: #475569; text-decoration: none">I have a Recovery Key for a different vault on this device</a>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

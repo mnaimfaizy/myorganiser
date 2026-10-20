@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add address sheet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="dialog" aria-labelledby="as-t" style="position: absolute; top: 0; right: 0; bottom: 0; width: 560px; box-sizing: border-box; display: flex; flex-direction: column; background: #FFFFFF; box-shadow: -24px 0 48px rgba(15, 23, 42, 0.16)">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+        <h2 id="as-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Add address</h2>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #115E59"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Encrypted on this device before it syncs</span>
+      </span>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(-45 9 9)"></rect></svg></button>
+    </div>
+    <div style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 20px 24px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-l" style="font-size: 15px; font-weight: 600">Label</label><input id="aa-l" value="Old flat" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-c" style="font-size: 15px; font-weight: 600">Country</label><button id="aa-c" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px 0 14px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 16px 'Inter', sans-serif; color: #0F172A">Australia<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-n" style="font-size: 15px; font-weight: 600">Number</label><input id="aa-n" value="2/88" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-s" style="font-size: 15px; font-weight: 600">Street</label><input id="aa-s" value="Station Street" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-sb" style="font-size: 15px; font-weight: 600">Suburb or city</label><input id="aa-sb" value="Fitzroy" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-st" style="font-size: 15px; font-weight: 600">State</label><input id="aa-st" value="VIC" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="aa-p" style="font-size: 15px; font-weight: 600">Postcode</label><input id="aa-p" value="3065" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #0F172A; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+      </div>
+      <div role="status" style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 14px; background: #FFFBEB; border: 1px solid #FCD34D">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex-shrink: 0"><circle cx="10" cy="10" r="9" fill="#B45309"></circle><rect x="9" y="5" width="2" height="6.5" rx="1" fill="#FFFFFF"></rect><circle cx="10" cy="14.5" r="1.3" fill="#FFFFFF"></circle></svg>
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600; color: #92400E">You already have this address</span><span style="font-size: 13px; line-height: 18px; color: #334155">It matches “Old flat”. Save another copy only if you need both.</span></span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: #F8FAFC; border: 1px solid #E2E8F0">
+        <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">PREVIEW</span>
+        <span style="font-size: 17px; line-height: 24px; white-space: pre-line">2/88 Station Street
+Fitzroy VIC 3065, Australia</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif">Cancel</button>
+      <button type="submit" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Save anyway</button>
+    </div>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

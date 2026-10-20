@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edit subscription dialog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="width: 1440px; height: 980px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="dialog" aria-labelledby="sf-t" style="position: absolute; left: 50%; top: 48px; transform: translateX(-50%); width: 640px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1"><h2 id="sf-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Edit subscription</h2><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #115E59"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Encrypted on this device before it syncs</span></span>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(-45 9 9)"></rect></svg></button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 18px; padding: 20px 24px">
+      <fieldset style="border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px">
+        <legend style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B; margin-bottom: 10px">BASICS</legend>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-n" style="font-size: 15px; font-weight: 600">Name</label><input id="sf-n" value="Streaming plan" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-l" style="font-size: 15px; font-weight: 600">Website <span style="font-weight: 400; color: #64748B">· optional</span></label><input id="sf-l" value="https://example.com/account" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"></div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <legend style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B; margin-bottom: 10px">BILLING</legend>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-a" style="font-size: 15px; font-weight: 600">Amount</label><div style="display: flex; align-items: center; height: 44px; box-sizing: border-box; padding: 0 12px 0 13px; border-radius: 12px; border: 2px solid #DC2626"><input id="sf-a" value="-15.49" aria-invalid="true" aria-describedby="sf-ae" style="flex-grow: 1; min-width: 0; border: 0; outline: none; font: 400 16px 'Inter', sans-serif"></div><span id="sf-ae" style="font-size: 13px; color: #B91C1C">Use 0 or more.</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-c" style="font-size: 15px; font-weight: 600">Currency</label><button id="sf-c" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 16px 'Inter', sans-serif; color: #0F172A">AUD<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-cy" style="font-size: 15px; font-weight: 600">Billed</label><button id="sf-cy" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 16px 'Inter', sans-serif; color: #0F172A">Monthly<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <legend style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B; margin-bottom: 10px">DATES</legend>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-s" style="font-size: 15px; font-weight: 600">Started</label><input id="sf-s" value="3 Mar 2024" style="height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; font: 400 15px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-nb" style="font-size: 15px; font-weight: 600">Next billing</label><input id="sf-nb" value="21 Oct 2026" style="height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; font: 400 15px 'Inter', sans-serif; outline: none"></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-e" style="font-size: 15px; font-weight: 600">Ends <span style="font-weight: 400; color: #64748B">· optional</span></label><input id="sf-e" placeholder="No end date" style="height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; font: 400 15px 'Inter', sans-serif; outline: none"></div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px">
+        <legend style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B; margin-bottom: 10px">PLAN</legend>
+        <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 15px; font-weight: 600">Status</span><div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 12px; background: #ECEEF0"><button type="button" aria-pressed="true" style="height: 36px; border: 0; border-radius: 9px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); font: 600 14px 'Inter', sans-serif">Active</button><button type="button" aria-pressed="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; font: 500 14px 'Inter', sans-serif">Pending</button><button type="button" aria-pressed="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; font: 500 14px 'Inter', sans-serif">Inactive</button><button type="button" aria-pressed="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; font: 500 14px 'Inter', sans-serif">Cancelled</button><button type="button" aria-pressed="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; font: 500 14px 'Inter', sans-serif">Expired</button></div></div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-pm" style="font-size: 15px; font-weight: 600">Pays with</label><button id="sf-pm" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 15px 'Inter', sans-serif; color: #0F172A">Credit card<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-r" style="font-size: 15px; font-weight: 600">Renewal</label><button id="sf-r" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 15px 'Inter', sans-serif; color: #0F172A">Auto renew<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="sf-ti" style="font-size: 15px; font-weight: 600">Tier</label><button id="sf-ti" type="button" aria-haspopup="listbox" style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #64748B; background: #FFFFFF; font: 400 15px 'Inter', sans-serif; color: #0F172A">Family<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg></button></div>
+        </div>
+      </fieldset>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif">Cancel</button>
+      <button type="submit" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Save changes</button>
+    </div>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

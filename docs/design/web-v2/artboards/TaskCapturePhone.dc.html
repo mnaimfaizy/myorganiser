@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone quick capture</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex-grow: 1; overflow: hidden; padding: 52px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">Tasks</h1>
+    <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 16px; border-bottom: 1px solid #F1F5F9; background: #F5F3FF">
+        <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #64748B; box-sizing: border-box"></span>
+        <span style="display: flex; flex-direction: column"><span style="font-size: 17px; line-height: 24px">Call the plumber</span><span style="font-size: 13px; line-height: 18px; color: #5B21B6; font-weight: 600">Just added · Today · High</span></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 16px">
+        <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #64748B; box-sizing: border-box"></span>
+        <span style="display: flex; flex-direction: column"><span style="font-size: 17px; line-height: 24px">Book dentist appointment</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Today · Personal</span></span>
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; background: #FFFFFF; border-top: 1px solid #E2E8F0; box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08)">
+    <div style="display: flex; gap: 8px">
+      <label style="flex-grow: 1; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">New task</span><input placeholder="Add a task" value="Renew car insurance" style="flex-grow: 1; height: 48px; box-sizing: border-box; padding: 0 13px; border-radius: 12px; border: 2px solid #0F172A; font: 400 17px 'Inter', sans-serif; outline: none; min-width: 0"></label>
+      <button type="button" aria-label="Save task" style="width: 48px; height: 48px; border-radius: 999px; border: 0; background: #7C3AED; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3 L16 9 L14.6 10.4 L11 6.8 V17 H9 V6.8 L5.4 10.4 L4 9 Z" fill="#FFFFFF"></path></svg></button>
+    </div>
+    <div style="display: flex; gap: 8px; overflow-x: auto">
+      <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Today</button>
+      <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 15px 'Inter', sans-serif">Fri 24 Oct</button>
+      <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">High</button>
+      <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 15px 'Inter', sans-serif">Personal</button>
+      <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Pick date</button>
+    </div>
+    <span style="font-size: 13px; line-height: 18px; color: #64748B">Return saves. The chips reset for the next one.</span>
+  </div>
+  <div aria-hidden="true" style="height: 290px; background: #CBD5E1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #475569">Phone keyboard</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

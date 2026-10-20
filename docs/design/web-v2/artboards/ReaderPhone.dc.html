@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone offline reader</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+code{font-family:'JetBrains Mono',monospace;font-size:12px;padding:1px 5px;border-radius:6px;background:#F1F5F9;color:#0F172A;word-break:break-all}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 12px 16px 34px">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 44px; font-size: 17px; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>Vault</a>
+    <dc-import name="Illustration" kind="vault" size="72" hint-size="72px,72px"></dc-import>
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.02em">Open your Escape Copy without us</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">A self-contained reader that works offline and needs no account</p>
+    <div role="status" style="padding: 12px 14px; border-radius: 12px; background: #FFFBEB; border: 1px solid #FCD34D; font-size: 14px; line-height: 20px; color: #78350F">An Escape Copy was just made. Get the reader and keep it with your copy — a copy you cannot open is not a backup.</div>
+    <p style="margin: 0; font-size: 14px; line-height: 20px; color: #334155">The Escape Copy reader is one self-contained HTML file. It requires no account, no server, and no Google account. It works completely offline, displays your data on screen only, and never writes decrypted files to disk.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 20px; color: #334155">Download <code>myorganiser-escape-copy-reader.html</code> from the GitHub Releases page and keep it in the same folder as your Escape Copy. When you need to read your copy, open the reader, select your Escape Copy file, and enter either your passphrase or your recovery key — both open it. Your data appears on screen.</p>
+    <aside style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #F5F3FF; border: 1px solid #DDD6FE">
+      <p style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 700; color: #3B0764">Verify the file before opening it with your passphrase. A file that accepts a vault passphrase is exactly what an attacker would want to substitute.</p>
+      <p style="margin: 0; font-size: 14px; line-height: 20px; color: #475569">After downloading, verify the reader's integrity against the published <code>SHA256SUMS.txt</code> file using:</p>
+      <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #475569">
+        <li><code>sha256sum</code> (Linux/macOS/WSL)</li>
+        <li><code>shasum -a 256</code> (macOS legacy)</li>
+        <li><code>Get-FileHash</code> (Windows PowerShell)</li>
+      </ul>
+    </aside>
+    <a href="#" style="margin-top: auto; display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 12px; background: #0F172A; color: #FFFFFF; font: 600 16px 'Inter', sans-serif; text-decoration: none">Get the reader from GitHub Releases ↗</a>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

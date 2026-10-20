@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Grocery category illustrations</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 340px; box-sizing: border-box; padding: 32px 48px; background: #FFFFFF; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Grocery categories</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">One illustration per category, shop-walk order. Same soft-3D style as the sections, simpler so it reads at 20 px.</p>
+    </div>
+    <div style="max-width: 460px; padding: 12px 14px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0; font-size: 13px; line-height: 18px; color: #334155"><b>Adding a category:</b> add it to GROCERY_CATEGORY_ORDER, draw one 64 × 64 illustration on its own tinted tile, and register it in the category illustration. Unknown categories show Other.</div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px">
+    <sc-for list="{{cats}}" as="c" hint-placeholder-count="12">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+        <dc-import name="CategoryIllustration" category="{{c.key}}" size="72" hint-size="72px,72px"></dc-import>
+        <span style="font-size: 13px; line-height: 18px; font-weight: 600; text-align: center">{{c.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display: flex; align-items: center; gap: 28px; padding-top: 14px; border-top: 1px solid #E2E8F0">
+    <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SIZES</span>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B"><dc-import name="CategoryIllustration" category="dairy" size="20" hint-size="20px,20px"></dc-import>20 · chips</span>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B"><dc-import name="CategoryIllustration" category="dairy" size="24" hint-size="24px,24px"></dc-import>24 · section headers</span>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B"><dc-import name="CategoryIllustration" category="dairy" size="32" hint-size="32px,32px"></dc-import>32 · picker, rows</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":340}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const cats = [
+      ['produce', 'Produce'], ['dairy', 'Dairy'], ['meat', 'Meat'], ['seafood', 'Seafood'],
+      ['bakery', 'Bakery'], ['frozen', 'Frozen'], ['beverages', 'Beverages'], ['snacks', 'Snacks'],
+      ['condiments', 'Condiments'], ['household', 'Household'], ['personal-care', 'Personal care'], ['other', 'Other']
+    ].map(([key, label]) => ({ key, label }));
+    return { cats };
+  }
+}
+</script>
+</body>
+</html>

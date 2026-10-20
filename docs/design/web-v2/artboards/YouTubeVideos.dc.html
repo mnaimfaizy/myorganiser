@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YouTube videos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1100px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="youtube" min-height="1100" hint-size="272px,1100px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="YouTube" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1240px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+          <dc-import name="Illustration" kind="youtube" size="64" hint-size="64px,64px"></dc-import>
+          <span style="display: flex; flex-direction: column; flex-grow: 1">
+            <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">YouTube</h1>
+            <span style="font-size: 15px; line-height: 20px; color: #64748B">Synced today at 08:12 · 12 channels · 24 new uploads</span>
+          </span>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3 A7 7 0 1 1 3.3 8 H5.4 A5 5 0 1 0 10 5 V7.5 L6.5 4 L10 0.5 Z" fill="#334155"></path></svg>Sync uploads</button>
+        </div>
+        <div role="tablist" aria-label="YouTube" style="display: flex; gap: 24px; border-bottom: 1px solid #E2E8F0">
+          <a href="#" role="tab" aria-selected="true" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid #7C3AED; font-size: 15px; font-weight: 600; color: #0F172A; text-decoration: none">Videos</a>
+          <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Shorts · 12 min left today</a>
+          <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Channels · 12</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <div style="flex: 999 1 540px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <section aria-label="Now playing" style="display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <div style="position: relative; aspect-ratio: 16 / 9; background: #0F172A; display: flex; align-items: center; justify-content: center">
+              <button type="button" aria-label="Play" style="width: 72px; height: 72px; border-radius: 999px; border: 0; background: #F97316; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.5 L11.5 7 L4 11.5 Z" fill="#FFFFFF"></path></svg></button>
+              <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #334155"><div style="width: 38%; height: 4px; background: #F97316"></div></div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 20px">
+              <span style="display: flex; flex-direction: column; flex: 1 1 260px"><span style="font-size: 17px; line-height: 24px; font-weight: 600">Building a weekend workbench</span><span style="font-size: 13px; color: #64748B">Maker Studio · 2 hours ago · 18 min</span></span>
+              <a href="#" style="display: inline-flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; font: 600 14px 'Inter', sans-serif; color: #0F172A; text-decoration: none">Open on YouTube ↗</a>
+              <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Mark watched &amp; next</button>
+            </div>
+          </section>
+
+          <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px">
+            <sc-for list="{{channels}}" as="c" hint-placeholder-count="5">
+              <button type="button" aria-pressed="{{c.pressed}}" style="{{c.style}}">{{c.label}}</button>
+            </sc-for>
+          </div>
+
+          <section aria-label="Uploads" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+            <sc-for list="{{uploads}}" as="u" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 10px 12px 10px 16px; border-bottom: 1px solid #F1F5F9; box-sizing: border-box">
+                <span aria-hidden="true" style="width: 112px; height: 63px; border-radius: 10px; background: #1D283A; flex-shrink: 0; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 14 14"><path d="M4 2.5 L11.5 7 L4 11.5 Z" fill="#FFFFFF"></path></svg></span>
+                <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+                  <a href="#" style="font-size: 15px; line-height: 20px; font-weight: 600; color: #0F172A; text-decoration: none">{{u.title}}</a>
+                  <span style="font-size: 13px; color: #64748B">{{u.meta}}</span>
+                </span>
+                <span style="{{u.pillStyle}}">{{u.pill}}</span>
+                <button type="button" aria-label="Add {{u.title}} to queue" style="display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif">+ Queue</button>
+                <button type="button" aria-label="Play {{u.title}}" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: #FFEDD5; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.5 L11.5 7 L4 11.5 Z" fill="#C2410C"></path></svg></button>
+              </div>
+            </sc-for>
+          </section>
+        </div>
+
+        <aside aria-label="Queue" style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+          <div style="display: flex; align-items: baseline; justify-content: space-between"><h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Queue</h2><span style="font-size: 13px; color: #64748B">3 of 4 · ~42 min</span></div>
+          <sc-for list="{{queue}}" as="q" hint-placeholder-count="3">
+            <div style="{{q.rowStyle}}">
+              <span aria-hidden="true" style="width: 72px; height: 40px; border-radius: 8px; background: #1D283A; flex-shrink: 0"></span>
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><span style="font-size: 14px; line-height: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{q.title}}</span><span style="{{q.metaStyle}}">{{q.meta}}</span></span>
+              <button type="button" aria-label="Remove {{q.title}} from queue" style="width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#64748B" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#64748B" transform="rotate(-45 9 9)"></rect></svg></button>
+            </div>
+          </sc-for>
+          <div style="display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 12px; border: 1px dashed #CBD5E1; font-size: 13px; color: #64748B">1 slot left — four is the point</div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (on) => 'flex-shrink:0;height:36px;padding:0 12px;border-radius:10px;font:500 14px Inter,sans-serif;' + (on ? 'border:1px solid #0F172A;background:#0F172A;color:#FFFFFF' : 'border:1px solid #64748B;background:#FFFFFF;color:#0F172A');
+    const channels = [['All · 24 new', true], ['Maker Studio · 6', false], ['Home Kitchen · 4', false], ['Plot to Plate · 3', false], ['Science Weekly · 2', false]].map(([label, on]) => ({ label, pressed: on ? 'true' : 'false', style: chip(on) }));
+    const pill = (n) => 'flex-shrink:0;display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:600;' + (n ? 'background:#FFEDD5;color:#9A3412' : 'background:#F1F5F9;color:#475569');
+    const u = (title, meta, isNew) => ({ title, meta, pill: isNew ? 'NEW' : 'WATCHED', pillStyle: pill(isNew) });
+    const uploads = [
+      u('Five dinners under 30 minutes', 'Home Kitchen · 5 hours ago · 22 min', true),
+      u('Autumn garden jobs', 'Plot to Plate · yesterday · 15 min', true),
+      u('Sharpening chisels properly', 'Maker Studio · 2 days ago · 11 min', true),
+      u('Why the sky is blue, really', 'Science Weekly · 3 days ago · 9 min', false),
+      u('Batch cooking for the week', 'Home Kitchen · 4 days ago · 26 min', false)
+    ];
+    const qr = (now) => 'display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;' + (now ? 'background:#FFF7ED;border:1px solid #FDBA74' : 'border:1px solid #E2E8F0');
+    const queue = [
+      { title: 'Building a weekend workbench', meta: 'Now playing', metaStyle: 'font-size:12px;font-weight:600;color:#C2410C', rowStyle: qr(true) },
+      { title: 'Five dinners under 30 minutes', meta: 'Home Kitchen · 22 min', metaStyle: 'font-size:12px;color:#64748B', rowStyle: qr(false) },
+      { title: 'Autumn garden jobs', meta: 'Plot to Plate · 15 min', metaStyle: 'font-size:12px;color:#64748B', rowStyle: qr(false) }
+    ];
+    return { channels, uploads, queue };
+  }
+}
+</script>
+</body>
+</html>

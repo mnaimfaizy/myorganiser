@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>App tab bar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<nav aria-label="App sections" style="width: 390px; height: 88px; box-sizing: border-box; padding: 8px 8px 18px; display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #E2E8F0; font-family: 'Inter', system-ui, sans-serif">
+  <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+    <a href="{{t.href}}" aria-current="{{t.current}}" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 72px; min-height: 60px; text-decoration: none">
+      <span style="{{t.pillStyle}}">
+        <dc-import name="Illustration" kind="{{t.kind}}" size="28" hint-size="28px,28px"></dc-import>
+      </span>
+      <span style="{{t.labelStyle}}">{{t.label}}</span>
+    </a>
+  </sc-for>
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["home","tasks","groceries","vault","more"],"default":"home"},"$preview":{"width":390,"height":88}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'home';
+    const raw = [
+      { kind: 'home', label: 'Home', href: '#' },
+      { kind: 'tasks', label: 'Tasks', href: '#' },
+      { kind: 'groceries', label: 'Groceries', href: '#' },
+      { kind: 'vault', label: 'Vault', href: '#' },
+      { kind: 'more', label: 'More', href: '#' }
+    ];
+    const tabs = raw.map((t) => {
+      const on = t.kind === active;
+      return {
+        kind: t.kind,
+        label: t.label,
+        href: t.href,
+        current: on ? 'page' : 'false',
+        pillStyle: 'display:flex;align-items:center;justify-content:center;width:60px;height:36px;border-radius:999px;background:' + (on ? '#EDE9FE' : 'transparent'),
+        labelStyle: 'font-size:12px;line-height:16px;font-weight:' + (on ? 600 : 500) + ';color:' + (on ? '#5B21B6' : '#475569')
+      };
+    });
+    return { tabs };
+  }
+}
+</script>
+</body>
+</html>

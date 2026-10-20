@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone vault</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+.vr{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px 10px 16px;border-bottom:1px solid #F1F5F9;text-decoration:none;color:#0F172A}
+.vr:last-child{border-bottom:0}
+.vt{display:flex;flex-direction:column;gap:2px;flex-grow:1;min-width:0}
+.vt1{font-size:17px}
+.vt2{font-size:13px;line-height:18px;color:#64748B}
+.cap{margin:6px 0 0;font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.02em;color:#64748B}
+.grp{display:flex;flex-direction:column;border-radius:16px;background:#FFFFFF;border:1px solid #E2E8F0;overflow:hidden}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 52px 16px 24px">
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">Vault</h1>
+
+    <sc-if value="{{unlocked}}" hint-placeholder-val="{{true}}">
+      <section style="display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; background: #0F172A; color: #FFFFFF">
+        <dc-import name="Illustration" kind="vault" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 700">Unlocked</span><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #CBD5E1"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: #2DD4BF"></span>For this session · synced 2 min ago</span></span>
+        <button type="button" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #475569; background: transparent; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Lock</button>
+      </section>
+    </sc-if>
+    <sc-if value="{{locked}}" hint-placeholder-val="{{false}}">
+      <form aria-labelledby="vpl-h" style="display: flex; flex-direction: column; gap: 10px; padding: 18px 16px; border-radius: 20px; background: #0F172A; color: #FFFFFF">
+        <span style="display: flex; align-items: center; gap: 12px"><dc-import name="Illustration" kind="vault" size="52" hint-size="52px,52px"></dc-import><h2 id="vpl-h" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Unlock your vault</h2></span>
+        <span style="font-size: 14px; line-height: 20px; color: #CBD5E1">Enter your passphrase to unlock your vault on this device for this session.</span>
+        <label for="vpl-p" style="font-size: 15px; font-weight: 600">Passphrase</label>
+        <input id="vpl-p" type="password" value="" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #A78BFA; background: #1D283A; color: #FFFFFF; font: 400 17px 'Inter', sans-serif; outline: none">
+        <button type="submit" style="height: 52px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Unlock</button>
+      </form>
+    </sc-if>
+
+    <h2 class="cap">ACCESS</h2>
+    <div class="grp">
+      <a href="#" class="vr" style="{{accessRow}}"><span class="vt"><span class="vt1">Change passphrase</span><span class="vt2">{{passLine}}</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+      <a href="#" class="vr" style="{{accessRow}}"><span class="vt"><span class="vt1">Rotate recovery key</span><span class="vt2">{{keyLine}}</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+    </div>
+
+    <h2 class="cap">BACKUPS AND MOVING YOUR VAULT</h2>
+    <div class="grp">
+      <a href="#" class="vr"><span class="vt"><span class="vt1">Encrypted Escape Copy</span><span class="vt2">Linked to Google Drive · newest copy 2 days old</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+      <a href="#" class="vr"><span class="vt"><span class="vt1">Export encrypted vault</span><span class="vt2">Download a ciphertext-only JSON bundle.</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+      <a href="#" class="vr"><span class="vt"><span class="vt1">Import encrypted vault</span><span class="vt2">Load a previously exported ciphertext bundle.</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+      <a href="#" class="vr"><span class="vt"><span class="vt1">Open your Escape Copy without us</span><span class="vt2">A self-contained reader that works offline and needs no account</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+    </div>
+
+    <h2 class="cap" style="color: #B91C1C">DANGER ZONE</h2>
+    <div class="grp" style="border-color: #FCA5A5">
+      <a href="#" class="vr"><span class="vt"><span class="vt1" style="color: #B91C1C">Remove local vault</span><span class="vt2">Delete this device's copy of your Vault. Your account and passphrase are unaffected.</span></span><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+    </div>
+  </main>
+  <dc-import name="TabBar" active="vault" hint-size="390px,88px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["unlocked","locked"],"default":"unlocked","section":"State"},"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const locked = this.props.state === 'locked';
+    return {
+      locked,
+      unlocked: !locked,
+      accessRow: locked ? 'opacity:0.55;pointer-events:none' : '',
+      passLine: locked ? 'Unlock your vault to change its passphrase.' : 'Choose a new passphrase for unlocking your vault on this device.',
+      keyLine: locked ? 'Unlock your vault to rotate its recovery key.' : 'Generate a new recovery key. Current key saved 12 Mar 2026.'
+    };
+  }
+}
+</script>
+</body>
+</html>

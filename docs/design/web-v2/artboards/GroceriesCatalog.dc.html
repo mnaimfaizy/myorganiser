@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Grocery Catalog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="groceries" min-height="1000" hint-size="272px,1000px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Catalog" crumb="Groceries" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+          <dc-import name="Illustration" kind="groceries" size="64" hint-size="64px,64px"></dc-import>
+          <span style="display: flex; flex-direction: column; flex-grow: 1">
+            <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Groceries</h1>
+            <span style="font-size: 15px; line-height: 20px; color: #64748B">Your Catalog keeps names, prices and notes so every list can reuse them.</span>
+          </span>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>New Catalog Item</button>
+        </div>
+        <div role="tablist" aria-label="Groceries" style="display: flex; gap: 24px; border-bottom: 1px solid #E2E8F0">
+          <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; padding: 0 2px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Lists · 4</a>
+          <a href="#" role="tab" aria-selected="true" style="display: inline-flex; align-items: center; height: 44px; padding: 0 2px; border-bottom: 3px solid #7C3AED; font-size: 15px; font-weight: 600; color: #0F172A; text-decoration: none">Catalog · 42</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; width: 260px; box-sizing: border-box">
+          <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.5" fill="#64748B"></circle><circle cx="7.5" cy="7.5" r="4.6" fill="#FFFFFF"></circle><rect x="11" y="10" width="2.2" height="7" rx="1.1" fill="#64748B" transform="rotate(-45 12.1 13.5)"></rect></svg>
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Filter your Catalog</span>
+          <input placeholder="Filter your Catalog" style="border: 0; outline: none; font: 400 15px 'Inter', sans-serif; width: 100%">
+        </label>
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
+          <button type="button" aria-pressed="{{c.pressed}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+        <section aria-label="{{g.name}}" style="display: flex; flex-direction: column; gap: 8px">
+          <h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #475569"><dc-import name="CategoryIllustration" category="{{g.key}}" size="24" hint-size="24px,24px"></dc-import>{{g.label}}</h2>
+          <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+            <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: minmax(0, 2fr) 90px minmax(0, 1fr) auto; gap: 16px; align-items: center; min-height: 64px; padding: 0 12px 0 16px; border-bottom: 1px solid #F1F5F9">
+                <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 17px; line-height: 24px">{{r.name}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.note}}</span></span>
+                <span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right">{{r.price}}</span>
+                <span><span style="{{r.pillStyle}}">{{r.on}}</span></span>
+                <span style="display: flex; gap: 4px">
+                  <button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Add to lists</button>
+                  <button type="button" aria-label="Edit {{r.name}}" style="width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M12.6 2.2 L15.8 5.4 L6.4 14.8 L2.4 15.6 L3.2 11.6 Z" fill="#475569"></path></svg></button>
+                  <button type="button" aria-label="More for {{r.name}}" style="width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="3.5" r="1.8" fill="#475569"></circle><circle cx="9" cy="9" r="1.8" fill="#475569"></circle><circle cx="9" cy="14.5" r="1.8" fill="#475569"></circle></svg></button>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+      <span style="font-size: 13px; line-height: 18px; color: #64748B">"Delete from Catalog" lives in each item's menu and asks for the item's name, because it removes the item from every list.</span>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const colors = { produce: '#16A34A', dairy: '#0EA5E9' };
+    const dot = (c) => 'width:8px;height:8px;border-radius:999px;background:' + colors[c];
+    const chip = (on) => 'height:36px;padding:0 12px;border-radius:10px;font:500 14px Inter,sans-serif;' + (on ? 'border:1px solid #0F172A;background:#0F172A;color:#FFFFFF' : 'border:1px solid #64748B;background:#FFFFFF;color:#0F172A');
+    const chips = [['All · 42', true], ['Produce · 8', false], ['Dairy · 6', false], ['Meat · 4', false], ['Bakery · 3', false], ['Household · 9', false]].map(([label, on]) => ({ label, pressed: on ? 'true' : 'false', style: chip(on) }));
+    const pill = (n) => 'display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;' + (n > 0 ? 'background:#EDE9FE;color:#5B21B6' : 'background:#F1F5F9;color:#475569');
+    const r = (name, note, price, n) => ({ name, note: note || 'No notes', price, on: n === 0 ? 'Not on a list' : n === 1 ? 'On 1 list' : 'On ' + n + ' lists', pillStyle: pill(n) });
+    const groups = [
+      { k: 'produce', name: 'Produce', rows: [r('Avocados', 'Ripe ones', '$1.50', 1), r('Bananas', '', '$2.50', 2), r('Baby spinach', '200 g bag', '$3.99', 0)] },
+      { k: 'dairy', name: 'Dairy', rows: [r('Oat milk', 'Barista edition', '$2.60', 1), r('Greek yoghurt', 'Full fat, 1 kg', '$8.00', 0), r('Eggs', 'Free range, dozen', '$4.20', 0)] }
+    ].map((g) => ({ name: g.name, key: g.k, label: g.name.toUpperCase() + ' · ' + g.rows.length, rows: g.rows }));
+    return { chips, groups };
+  }
+}
+</script>
+</body>
+</html>

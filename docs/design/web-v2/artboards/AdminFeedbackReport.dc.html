@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin feedback report</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+select{appearance:none}
+.card{display:flex;flex-direction:column;gap:10px;padding:20px 22px;border-radius:20px;background:#FFFFFF;border:1px solid #E2E8F0;box-sizing:border-box;min-width:0}
+.h2{margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:17px;line-height:22px;font-weight:700}
+.tx{margin:0;font-size:15px;line-height:22px;color:#334155;white-space:pre-line}
+.mut{margin:0;font-size:13px;line-height:18px;color:#64748B}
+.lab{font-size:14px;font-weight:600}
+.in{box-sizing:border-box;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #CBD5E1;background:#FFFFFF;font:400 15px 'Inter',sans-serif;color:#0F172A;resize:none}
+dl{margin:0;display:grid;grid-template-columns:140px minmax(0,1fr);row-gap:8px;column-gap:12px;font-size:14px}
+dt{color:#64748B}
+dd{margin:0;color:#0F172A}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1300px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="inbox" min-height="1300" hint-size="272px,1300px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="{{title}}" crumb="Feedback" state="admin" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>Back to Feedback</a>
+
+      <header style="display: flex; flex-direction: column; gap: 8px">
+        <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">{{title}}</h1>
+          <span style="padding: 4px 10px; border-radius: 999px; border: 1px solid #CBD5E1; font-size: 12px; font-weight: 600; color: #334155">Bug report</span>
+          <span style="{{statusBadge}}">{{status}}</span>
+        </span>
+        <span style="font-size: 14px; color: #64748B">{{subline}}</span>
+      </header>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; gap: 16px; flex: 1 1 520px; min-width: 0">
+          <section class="card"><h2 class="h2">Description</h2><p class="tx">{{description}}</p></section>
+          <section class="card"><h2 class="h2">What they expected</h2><p class="tx">{{expected}}</p></section>
+          <sc-if value="{{hasFollowUp}}" hint-placeholder-val="{{true}}">
+            <section class="card" style="border-color: #DDD6FE; background: #FAF5FF"><h2 class="h2">Follow-up</h2><p class="tx">It happens on lists with more than 12 items, in Chrome 126 on Windows. Scrolling the list first seems to trigger it.</p></section>
+          </sc-if>
+          <sc-if value="{{hasNote}}" hint-placeholder-val="{{false}}">
+            <section class="card"><h2 class="h2">Status note</h2><p class="tx">{{note}}</p></section>
+          </sc-if>
+          <sc-if value="{{hasRelease}}" hint-placeholder-val="{{false}}">
+            <section class="card"><h2 class="h2">Release</h2><p class="tx">v2.1.0</p></section>
+          </sc-if>
+          <section class="card">
+            <h2 class="h2">Report context</h2>
+            <p class="mut">Captured when the report was sent. It never includes screenshots, logs, or vault contents.</p>
+            <dl>
+              <dt>Platform</dt><dd>web</dd>
+              <dt>App version</dt><dd>2.1.0</dd>
+              <dt>Browser</dt><dd>Chrome 126</dd>
+              <dt>Operating system</dt><dd>Windows</dd>
+              <dt>Path</dt><dd>/dashboard/groceries</dd>
+              <dt>Sent at</dt><dd>18 Oct 2026, 10:42</dd>
+            </dl>
+          </section>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+            <section class="card"><h2 class="h2">Fix notice</h2><p class="tx">The sender asked to be emailed when this is fixed.</p></section>
+            <section class="card">
+              <h2 class="h2">Sender</h2>
+              <dl style="grid-template-columns: 60px minmax(0, 1fr)"><dt>Name</dt><dd><a href="#" style="font-weight: 600; text-decoration: none">Ana Costa</a></dd><dt>Email</dt><dd>ana.costa@example.com</dd></dl>
+            </section>
+          </div>
+        </div>
+
+        <aside aria-labelledby="tri-h" style="display: flex; flex-direction: column; gap: 0; flex: 1 1 340px; max-width: 400px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+          <h2 id="tri-h" style="margin: 0; padding: 16px 20px; background: #0F172A; color: #FFFFFF; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; font-weight: 700">Triage</h2>
+
+          <sc-if value="{{open}}" hint-placeholder-val="{{true}}">
+            <form style="display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-bottom: 1px solid #F1F5F9">
+              <h3 class="h2">Change status</h3>
+              <label for="cs-s" class="lab">Status</label>
+              <select id="cs-s" class="in" style="height: 44px"><option>Can't reproduce</option></select>
+              <label for="cs-n" class="lab">Status note</label>
+              <textarea id="cs-n" class="in" rows="3" placeholder="Explain the decision..." aria-invalid="true" style="border: 2px solid #DC2626"></textarea>
+              <span style="font-size: 13px; color: #B91C1C">Write a status note explaining why.</span>
+              <button type="submit" style="align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Update status</button>
+            </form>
+            <form style="display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-bottom: 1px solid #F1F5F9">
+              <h3 class="h2">Tracking issue</h3>
+              <label for="ti-n" class="lab">Issue number</label>
+              <span style="display: flex; gap: 8px"><input id="ti-n" class="in" type="text" inputmode="numeric" placeholder="Issue number" style="height: 44px"><button type="submit" style="flex-shrink: 0; height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Link issue</button></span>
+              <p class="mut">Linking a tracking issue sets the report to Planned.</p>
+            </form>
+            <form style="display: flex; flex-direction: column; gap: 10px; padding: 18px 20px">
+              <h3 class="h2">Mark fixed</h3>
+              <label for="md-r" class="lab">Release</label>
+              <input id="md-r" class="in" type="text" placeholder="Release tag" style="height: 44px">
+              <p class="mut">A Release tag such as v1.4.0. Use this for a fix with no tracking issue, and for a Mobile Release.</p>
+              <button type="submit" style="align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 10px; border: 0; background: #0F766E; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Mark fixed</button>
+            </form>
+          </sc-if>
+
+          <sc-if value="{{final}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-bottom: 1px solid #F1F5F9">
+              <span style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #F0FDFA; border: 1px solid #99F6E4; font-size: 14px; line-height: 20px; color: #134E4A">This report is fixed in v2.1.0. It stays final unless you reopen it.</span>
+              <span style="font-size: 14px"><b>Tracking Issue:</b> <a href="#" style="font-weight: 600; text-decoration: none">#1187 ↗</a></span>
+            </div>
+            <form style="display: flex; flex-direction: column; gap: 10px; padding: 18px 20px">
+              <h3 class="h2">Reopen</h3>
+              <p class="mut">Reopen a report that was marked by mistake. It goes back to Under review and its Release is cleared.</p>
+              <label for="ro-n" class="lab">Status note</label>
+              <textarea id="ro-n" class="in" rows="3" placeholder="Explain why this report is being reopened..."></textarea>
+              <p class="mut">The reporter reads this note on Your reports.</p>
+              <button type="submit" style="align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #DC2626; background: #FFFFFF; color: #B91C1C; font: 600 14px 'Inter', sans-serif">Reopen report</button>
+            </form>
+          </sc-if>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"status":{"editor":"enum","options":["under-review","fixed"],"default":"under-review","section":"State"},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const fixed = this.props.status === 'fixed';
+    const pill = (bg, fg) => 'padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + fg;
+    return {
+      open: !fixed,
+      final: fixed,
+      title: fixed ? 'Renewal date shows a day early' : 'Uncheck All skips the last item',
+      status: fixed ? 'Fixed' : 'Under review',
+      statusBadge: fixed ? pill('#CCFBF1', '#115E59') : pill('#E0F2FE', '#075985'),
+      subline: fixed ? 'Sent 2 Oct 2026, 08:15 • Status changed 14 Oct 2026, 19:02' : "Sent 18 Oct 2026, 10:42 • Status changed 20 Oct 2026, 09:10",
+      description: fixed
+        ? 'My Netflix renewal says 13 Nov but the bank charges on 14 Nov. Every subscription is one day early.'
+        : 'On a list with 12 items, Uncheck All leaves the bottom item ticked. Happens every time.',
+      expected: fixed ? 'The renewal date should match the date I entered.' : 'Every item on the list is unchecked.',
+      hasFollowUp: !fixed,
+      hasNote: !fixed,
+      note: "We tried lists of 5 to 40 items on Chrome and Firefox and every item unchecked. Which list size and browser were you using?",
+      hasRelease: fixed
+    };
+  }
+}
+</script>
+</body>
+</html>

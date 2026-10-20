@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Section illustration set</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 760px; box-sizing: border-box; padding: 48px; background: #FFFFFF; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Section illustrations</h2>
+    <p style="margin: 0; font-size: 17px; line-height: 24px; color: #64748B">Soft 3D, drawn on the brand palette, each on its own tinted tile. Vault is the only dark tile, so the secure space stands apart.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 14px">
+    <sc-for list="{{set}}" as="i" hint-placeholder-count="8">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px; border-radius: 20px; background: #F8FAFC; border: 1px solid #E2E8F0">
+        <dc-import name="Illustration" kind="{{i.kind}}" size="112" hint-size="112px,112px"></dc-import>
+        <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; line-height: 22px; font-weight: 700; text-align: center">{{i.label}}</span>
+        <span style="font-size: 13px; line-height: 18px; color: #64748B; text-align: center">{{i.motif}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 24px; padding: 16px 20px; border-radius: 20px; background: #F8FAFC; border: 1px solid #E2E8F0">
+    <div style="display: flex; flex-direction: column; gap: 4px; flex: 0 0 240px">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #5B21B6">ADMIN PORTAL</span>
+      <span style="font-size: 15px; line-height: 20px; color: #334155">Slate tiles with navy objects, so admin never reads as a personal space.</span>
+    </div>
+    <sc-for list="{{admin}}" as="i" hint-placeholder-count="3">
+      <div style="display: flex; align-items: center; gap: 14px; flex: 1">
+        <dc-import name="Illustration" kind="{{i.kind}}" size="96" hint-size="96px,96px"></dc-import>
+        <span style="display: flex; flex-direction: column"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; line-height: 22px; font-weight: 700">{{i.label}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{i.motif}}</span></span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; align-items: flex-end; gap: 40px; padding-top: 8px; border-top: 1px solid #E2E8F0">
+    <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 20px; flex: 0 0 260px">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">ONE DRAWING, FOUR SIZES</span>
+      <span style="font-size: 15px; line-height: 20px; color: #334155">The same artwork scales from the tab bar to the hero, so a section looks the same everywhere.</span>
+    </div>
+    <sc-for list="{{sizes}}" as="z" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+        <dc-import name="Illustration" kind="groceries" size="{{z.size}}" hint-size="{{z.hint}}"></dc-import>
+        <span style="font-size: 13px; line-height: 18px; color: #64748B">{{z.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      set: [
+        { kind: 'home', label: 'Home', motif: 'House, teal door' },
+        { kind: 'tasks', label: 'Tasks', motif: 'Clipboard, ticks' },
+        { kind: 'groceries', label: 'Groceries', motif: 'Basket, fresh food' },
+        { kind: 'subscriptions', label: 'Subscriptions', motif: 'Cards, renewal' },
+        { kind: 'addresses', label: 'Addresses', motif: 'Pin on a map' },
+        { kind: 'mobile', label: 'Mobile numbers', motif: 'Phone, message' },
+        { kind: 'youtube', label: 'YouTube', motif: 'Screen, play' },
+        { kind: 'vault', label: 'Vault', motif: 'Safe, trust shield' },
+        { kind: 'feedback', label: 'Feedback', motif: 'Two speech bubbles, heart' }
+      ],
+      admin: [
+        { kind: 'admin', label: 'Overview', motif: 'Dashboard, shield' },
+        { kind: 'users', label: 'Users', motif: 'Two people, verified' },
+        { kind: 'audit', label: 'Audit log', motif: 'Record, magnifier' },
+        { kind: 'inbox', label: 'Feedback inbox', motif: 'Tray, incoming reports' }
+      ],
+      sizes: [
+        { size: 28, hint: '28px,28px', label: '28 · tab bar' },
+        { size: 36, hint: '36px,36px', label: '36 · sidebar' },
+        { size: 64, hint: '64px,64px', label: '64 · cards' },
+        { size: 140, hint: '140px,140px', label: '140 · hero' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

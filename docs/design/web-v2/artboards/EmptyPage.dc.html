@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Empty feature page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; overflow: hidden; display: flex; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="{{active}}" min-height="900" hint-size="272px,900px"></dc-import>
+  </div>
+  <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="{{title}}" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+      <div style="display: flex; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="{{illo}}" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">{{title}}</h1>
+          <span style="font-size: 15px; line-height: 20px; color: #64748B">Nothing saved yet</span>
+        </span>
+      </div>
+      <section style="display: flex; flex-wrap: wrap; align-items: center; gap: 40px; padding: 48px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <dc-import name="Illustration" kind="{{illo}}" size="168" hint-size="168px,168px"></dc-import>
+        <div style="display: flex; flex-direction: column; gap: 14px; flex: 1 1 380px">
+          <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">{{heading}}</h2>
+          <p style="margin: 0; font-size: 17px; line-height: 24px; color: #475569; max-width: 520px">{{line}}</p>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{tips}}" as="t" hint-placeholder-count="3">
+              <li style="display: flex; align-items: center; gap: 10px; font-size: 15px; line-height: 20px; color: #334155"><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: #EDE9FE; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#5B21B6"></path></svg></span>{{t}}</li>
+            </sc-for>
+          </ul>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 6px">
+            <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 20px 0 16px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>{{cta}}</button>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #115E59"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Encrypted on this device before it syncs</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["addresses","mobile","subscriptions"],"default":"addresses"},"title":{"editor":"text","default":"Addresses"},"heading":{"editor":"text","default":"No addresses yet"},"line":{"editor":"text","default":"Save the places you live or have lived."},"cta":{"editor":"text","default":"Add address"},"tips":{"editor":null},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'addresses';
+    return {
+      active,
+      illo: active,
+      title: this.props.title ?? 'Addresses',
+      heading: this.props.heading ?? 'No addresses yet',
+      line: this.props.line ?? 'Save the places you live or have lived.',
+      cta: this.props.cta ?? 'Add address',
+      tips: this.props.tips ?? ['Copy any line in one tap', 'Track who needs your new details', 'Works offline once installed']
+    };
+  }
+}
+</script>
+</body>
+</html>

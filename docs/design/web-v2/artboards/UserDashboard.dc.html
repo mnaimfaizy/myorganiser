@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1500px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="home" vault-locked="{{locked}}" min-height="1500" hint-size="272px,1500px"></dc-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Home" crumb="Dashboard" state="{{headerState}}" hint-size="100%,76px"></dc-import>
+
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 32px">
+
+      <section aria-labelledby="hello" style="position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 32px; border-radius: 24px; background: #0F172A">
+        <div aria-hidden="true" style="position: absolute; width: 320px; height: 320px; border-radius: 999px; background: #312E81; right: -60px; top: -120px"></div>
+        <div style="position: relative; display: flex; flex-direction: column; gap: 12px; flex: 1 1 420px">
+          <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #C4B5FD">SUNDAY, 18 OCTOBER</span>
+          <h1 id="hello" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em; color: #FFFFFF">Good afternoon, Sam</h1>
+          <sc-if value="{{unlocked}}" hint-placeholder-val="{{true}}">
+            <p style="margin: 0; font-size: 17px; line-height: 24px; color: #CBD5E1">4 tasks are due today and 2 subscriptions renew this week.</p>
+            <div style="display: flex; flex-direction: column; gap: 6px; max-width: 420px">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; color: #CBD5E1"><span>Today's tasks</span><span style="font-variant-numeric: tabular-nums">1 of 4 done</span></div>
+              <div role="progressbar" aria-valuenow="1" aria-valuemin="0" aria-valuemax="4" aria-label="Today's tasks done" style="height: 8px; border-radius: 999px; background: #1D283A; overflow: hidden"><div style="width: 25%; height: 8px; border-radius: 999px; background: #22D3EE"></div></div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px">
+              <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>Quick add</button>
+              <a href="#" style="display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #475569; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; text-decoration: none">Open today's tasks</a>
+            </div>
+          </sc-if>
+          <sc-if value="{{locked}}" hint-placeholder-val="{{false}}">
+            <p style="margin: 0; font-size: 17px; line-height: 24px; color: #CBD5E1">Your vault is locked. Unlock it to see what's due, your lists and your spending.</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px">
+              <button type="button" style="height: 44px; padding: 0 20px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Unlock vault</button>
+              <a href="#" style="display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #475569; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; text-decoration: none">Use recovery key</a>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position: relative">
+          <dc-import name="Illustration" kind="{{heroKind}}" size="140" hint-size="140px,140px"></dc-import>
+        </div>
+      </section>
+
+      <section aria-label="Install" style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 16px 16px 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 12px; background: #EDE9FE; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 22 22"><rect x="6" y="2" width="10" height="18" rx="3" fill="#7C3AED"></rect><rect x="8" y="4.5" width="6" height="11" rx="1" fill="#EDE9FE"></rect></svg></span>
+        <span style="display: flex; flex-direction: column; flex: 1 1 280px"><span style="font-size: 15px; line-height: 20px; font-weight: 600">Install MyOrganiser on this device</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Opens full-screen like an app, works offline, and keeps your vault on this device.</span></span>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Install</button>
+        <button type="button" aria-label="Dismiss install suggestion" style="width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#64748B" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#64748B" transform="rotate(-45 9 9)"></rect></svg></button>
+      </section>
+
+      <section aria-labelledby="spaces" style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px">
+          <h2 id="spaces" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.015em">Your spaces</h2>
+          <span style="font-size: 13px; line-height: 18px; color: #64748B">End-to-end encrypted · only you can read them</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px">
+          <sc-for list="{{spaces}}" as="s" hint-placeholder-count="8">
+            <a href="#" style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0px 1px 3px rgba(15, 23, 42, 0.05); text-decoration: none; color: #0F172A">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+                <dc-import name="Illustration" kind="{{s.kind}}" size="64" hint-size="64px,64px"></dc-import>
+                <span style="{{s.pillStyle}}">{{s.pill}}</span>
+              </div>
+              <span style="display: flex; flex-direction: column; gap: 4px">
+                <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.015em">{{s.title}}</span>
+                <span style="font-size: 15px; line-height: 20px; color: #64748B">{{s.summary}}</span>
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 15px; line-height: 20px; font-weight: 600; color: #5B21B6">Open<svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#5B21B6"></path></svg></span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{unlocked}}" hint-placeholder-val="{{true}}">
+        <section aria-label="Coming up" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+          <div style="display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px"><h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Due today</h2><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">All tasks</a></div>
+            <sc-for list="{{due}}" as="t" hint-placeholder-count="3">
+              <label style="display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid #F1F5F9">
+                <input type="checkbox" style="width: 20px; height: 20px; accent-color: #0F172A">
+                <span style="flex-grow: 1; font-size: 15px; line-height: 20px">{{t.title}}</span>
+                <span style="{{t.pillStyle}}">{{t.pill}}</span>
+              </label>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px"><h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Renewing soon</h2><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">All subscriptions</a></div>
+            <sc-for list="{{renewals}}" as="r" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid #F1F5F9">
+                <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; line-height: 20px">{{r.title}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{r.when}}</span></span>
+                <span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums">{{r.amount}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px"><h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">New videos</h2><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">YouTube</a></div>
+            <sc-for list="{{videos}}" as="v" hint-placeholder-count="3">
+              <a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-top: 1px solid #F1F5F9; text-decoration: none; color: #0F172A">
+                <span aria-hidden="true" style="width: 72px; height: 42px; border-radius: 8px; background: #1D283A; flex-shrink: 0; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M4 2.5 L11.5 7 L4 11.5 Z" fill="#FFFFFF"></path></svg></span>
+                <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{v.title}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{v.meta}}</span></span>
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"vault":{"editor":"enum","options":["unlocked","locked"],"default":"unlocked","section":"State"},"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const locked = (this.props.vault ?? 'unlocked') === 'locked';
+    const pill = (bg, fg) => 'padding:4px 10px;border-radius:999px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;background:' + bg + ';color:' + fg;
+    const neutral = pill('#F1F5F9', '#334155');
+    const warn = pill('#FEF3C7', '#92400E');
+    const ok = pill('#CCFBF1', '#115E59');
+    const lockPill = pill('#F1F5F9', '#475569');
+    const open = [
+      { kind: 'tasks', title: 'Tasks', summary: '12 open across Personal and Work', pill: '4 due today', pillStyle: warn },
+      { kind: 'groceries', title: 'Groceries', summary: '4 lists, 9 items left to buy', pill: '$86.40', pillStyle: neutral },
+      { kind: 'subscriptions', title: 'Subscriptions', summary: '6 active, $54.97 a month', pill: '2 renew soon', pillStyle: warn },
+      { kind: 'addresses', title: 'Addresses', summary: '2 saved · 3 of 5 places updated', pill: '2 to update', pillStyle: warn },
+      { kind: 'mobile', title: 'Mobile numbers', summary: '5 saved numbers', pill: '5', pillStyle: neutral },
+      { kind: 'youtube', title: 'YouTube', summary: '12 channels, synced this morning', pill: '24 new', pillStyle: neutral },
+      { kind: 'vault', title: 'Vault', summary: 'Backed up to Google Drive 2 days ago', pill: 'Unlocked', pillStyle: ok }
+    ];
+    const shut = open.map((s) => (s.kind === 'youtube'
+      ? s
+      : s.kind === 'vault'
+        ? { kind: 'vault', title: 'Vault', summary: 'Unlock to use your spaces', pill: 'Locked', pillStyle: warn }
+        : { kind: s.kind, title: s.title, summary: 'Encrypted · unlock to view', pill: 'Locked', pillStyle: lockPill }));
+    const due = [
+      { title: 'Pay council tax', pill: 'Overdue', pillStyle: pill('#FEE2E2', '#B91C1C') },
+      { title: 'Book dentist appointment', pill: '12:30', pillStyle: neutral },
+      { title: 'Send rent receipt', pill: '17:00', pillStyle: neutral }
+    ];
+    const renewals = [
+      { title: 'Streaming plan', when: 'Renews Tue 21 Oct', amount: '$15.49' },
+      { title: 'Cloud storage', when: 'Renews Thu 23 Oct', amount: '$2.99' }
+    ];
+    const videos = [
+      { title: 'Building a weekend workbench', meta: 'Maker Studio · 2h ago' },
+      { title: 'Five dinners under 30 minutes', meta: 'Home Kitchen · 5h ago' },
+      { title: 'Autumn garden jobs', meta: 'Plot to Plate · yesterday' }
+    ];
+    return {
+      locked,
+      unlocked: !locked,
+      headerState: locked ? 'locked' : 'synced',
+      heroKind: locked ? 'vault' : 'home',
+      spaces: locked ? shut : open,
+      due, renewals, videos
+    };
+  }
+}
+</script>
+</body>
+</html>
