@@ -3,10 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { UsageLocationRecord } from '@myorganiser/vault-core';
 import {
-  Alert,
-  AlertDescription,
   Button,
-  Checkbox,
   Dialog,
   DialogClose,
   DialogContent,
@@ -14,21 +11,8 @@ import {
   DialogFooter,
   DialogTitle,
   Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
   Illustration,
   type IllustrationKind,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SegmentedControl,
 } from '@myorganiser/web-ui';
 import { X } from 'lucide-react';
 import {
@@ -47,12 +31,10 @@ import {
   type PlaceFormValues,
   usageLocationRecordToFormValues,
 } from '../placeForm';
-import {
-  isOrganisationType,
-  ORGANISATION_TYPE_OPTIONS,
-  PRIORITY_OPTIONS,
-  UPDATE_METHOD_OPTIONS,
-} from '../labels';
+import { isOrganisationType } from '../labels';
+import { PlaceDialogLinkFields } from './PlaceDialogLinkFields';
+import { PlaceDialogOrganisationFields } from './PlaceDialogOrganisationFields';
+import { PlaceDialogUpdateFields } from './PlaceDialogUpdateFields';
 
 export type PlaceNoun = 'address' | 'number';
 
@@ -237,147 +219,25 @@ export function PlaceDialog({
             </div>
 
             <div className="flex flex-col gap-4 px-6 py-5">
-              <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
-                <FormField
-                  control={form.control}
-                  name="orgName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Organisation</FormLabel>
-                      <FormControl>
-                        <Input
-                          name={field.name}
-                          ref={field.ref}
-                          value={field.value}
-                          onChange={handleOrgNameChange}
-                          autoComplete="off"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="orgType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={handleOrgTypeChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {ORGANISATION_TYPE_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {duplicateLocation ? (
-                <Alert variant="notice" tone="warning">
-                  <AlertDescription>
-                    <span className="font-semibold text-warning-text">
-                      {`“${orgName.trim()}” is already on this ${noun}.`}
-                    </span>{' '}
-                    Add it again only if it&apos;s a different account.
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-
-              <FormField
+              <PlaceDialogOrganisationFields
                 control={form.control}
-                name="updateMethod"
-                render={({ field }) => (
-                  <FormItem>
-                    <SegmentedControl
-                      name={field.name}
-                      value={field.value}
-                      onValueChange={handleUpdateMethodChange}
-                      options={UPDATE_METHOD_OPTIONS}
-                      legend="How to update"
-                    />
-                  </FormItem>
-                )}
+                orgName={orgName}
+                isDuplicate={duplicateLocation !== null}
+                noun={noun}
+                onOrgNameChange={handleOrgNameChange}
+                onOrgTypeChange={handleOrgTypeChange}
               />
 
-              <FormField
+              <PlaceDialogUpdateFields
                 control={form.control}
-                name="priority"
-                render={({ field }) => (
-                  <FormItem>
-                    <SegmentedControl
-                      name={field.name}
-                      value={field.value}
-                      onValueChange={handlePriorityChange}
-                      options={PRIORITY_OPTIONS}
-                      legend="Priority"
-                    />
-                  </FormItem>
-                )}
+                onUpdateMethodChange={handleUpdateMethodChange}
+                onPriorityChange={handlePriorityChange}
               />
 
-              <FormField
+              <PlaceDialogLinkFields
                 control={form.control}
-                name="link"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Where to change it{' '}
-                      <span className="font-normal text-muted-foreground">
-                        · optional
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        name={field.name}
-                        ref={field.ref}
-                        value={field.value ?? ''}
-                        onChange={handleLinkChange}
-                        type="url"
-                        placeholder="https://"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      A link to the page where you update your details.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="changed"
-                render={({ field }) => (
-                  <FormItem className="flex min-h-11 flex-row items-center gap-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={handleChangedChange}
-                      />
-                    </FormControl>
-                    <div className="flex flex-col">
-                      <FormLabel className="text-body-sm font-semibold">
-                        Already updated
-                      </FormLabel>
-                      <FormDescription className="text-caption text-muted-foreground">
-                        Records today&apos;s date
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
+                onLinkChange={handleLinkChange}
+                onChangedChange={handleChangedChange}
               />
             </div>
 
