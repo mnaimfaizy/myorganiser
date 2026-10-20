@@ -3,6 +3,7 @@ import { expect, fn, userEvent, within } from '@storybook/test';
 import { Copy, Plus, Search } from 'lucide-react';
 import type { ButtonProps } from './Button';
 import { Button } from './Button';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 const meta: Meta<typeof Button> = {
   component: Button,
@@ -324,6 +325,8 @@ export const PhoneViewport: Story = {
   },
   render: () => <Button>Save</Button>,
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const button = within(canvasElement).getByRole('button', {
       name: 'Save',
     });

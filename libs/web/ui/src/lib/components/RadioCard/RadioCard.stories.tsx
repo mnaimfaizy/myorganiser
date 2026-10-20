@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { expect, userEvent, waitFor, within } from '@storybook/test';
 
 import { RadioCard } from './RadioCard';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 // RadioCard needs a fieldset and legend from its caller, and a title on every
 // card. Meta is typed against the feedback-kind wrapper, not the primitive, so
@@ -189,6 +190,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const canvas = within(canvasElement);
     const bugCard = cardOf(canvas.getByRole('radio', { name: BUG_TITLE }));
     const suggestionCard = cardOf(

@@ -3,6 +3,7 @@ import { expect, within } from '@storybook/test';
 import * as React from 'react';
 import { Textarea } from './Textarea';
 import { Label } from '../Label/Label';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 const NOTES_LIMIT = 1000;
 
@@ -191,6 +192,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const canvas = within(canvasElement);
     const field = canvas.getByLabelText('Notes');
     await expect(getComputedStyle(field).fontSize).toBe('17px');

@@ -3,6 +3,7 @@ import { expect, userEvent, waitFor, within } from '@storybook/test';
 import { useState } from 'react';
 
 import { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 type ConfirmDialogExampleProps = Omit<
   ConfirmDialogProps,
@@ -80,6 +81,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async () => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     await waitFor(() => {
       expect(
         within(document.body).getByRole('alertdialog', { name: COSTCO_TITLE }),

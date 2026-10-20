@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { RadioCard } from '../RadioCard/RadioCard';
 import { RadioGroup, RadioGroupItem } from './RadioGroup';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 // Meta is typed against the Priority wrapper, not the primitives, because a
 // RadioGroup is a fieldset with items inside it (STORYBOOK-PATTERNS §4). Every
@@ -244,6 +245,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const canvas = within(canvasElement);
     const row = rowOf(canvas.getByRole('radio', { name: HIGH }));
     expect(row.getBoundingClientRect().height).toBe(44);

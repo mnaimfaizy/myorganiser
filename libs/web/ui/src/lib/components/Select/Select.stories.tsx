@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './Select';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 // Fixed ids keep Chromatic snapshots deterministic. The Label htmlFor/id pair
 // gives the trigger its accessible name; aria-describedby points at the helper
@@ -239,6 +240,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const trigger = within(canvasElement).getByRole('combobox');
     expect(getComputedStyle(trigger).height).toBe('48px');
   },

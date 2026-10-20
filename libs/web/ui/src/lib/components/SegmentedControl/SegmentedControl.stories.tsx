@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import type { SegmentedControlOption } from './SegmentedControl';
 import { SegmentedControl } from './SegmentedControl';
+import { isPhoneWidth } from '../../storybook/viewport';
 
 // SegmentedControl is controlled: the caller owns `value`. The harness below
 // holds that state for every story and renders the value as a readout, so a
@@ -194,6 +195,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const canvas = within(canvasElement);
     const radios = canvas.getAllByRole('radio');
     expect(radios).toHaveLength(4);

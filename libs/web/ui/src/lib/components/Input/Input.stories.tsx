@@ -3,6 +3,7 @@ import { expect, within } from '@storybook/test';
 import * as React from 'react';
 import { Input } from './Input';
 import { Label } from '../Label/Label';
+import { isDesktopWidth, isPhoneWidth } from '../../storybook/viewport';
 
 /**
  * Every field in a real page has a visible label (STORYBOOK-PATTERNS §9), and
@@ -171,6 +172,8 @@ export const Phone: Story = {
     chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isPhoneWidth()) return;
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText('List name');
     const style = getComputedStyle(input);
@@ -197,6 +200,8 @@ export const Desktop: Story = {
     chromatic: { viewports: [1280] },
   },
   play: async ({ canvasElement }) => {
+    // The dev Storybook has no viewport addon; see storybook/viewport.ts.
+    if (!isDesktopWidth()) return;
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText('List name');
     const style = getComputedStyle(input);
