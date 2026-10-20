@@ -7,7 +7,7 @@ The approved v2.0 UI/UX design for the web app — user portal, admin portal, an
 | Source           | [Claude Design canvas](https://claude.ai/artifact/59o7kdnAyxfpsNTrPstwBt) (private; needs the owner's login) |
 | Exported version | `1792474123-308c`                                                                                            |
 | Exported         | 2026-10-20                                                                                                   |
-| Approved for     | Web v2.0 PRD (filed next)                                                                                    |
+| Approved for     | [PRD #1241](https://github.com/mnaimfaizy/myorganiser/issues/1241)                                           |
 
 **These files are the design of record.** When the canvas changes after approval, the change is exported here in its own commit; the canvas link is for collaborating on the next version, and the files here are what an issue or pull request builds to.
 
