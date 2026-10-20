@@ -459,6 +459,179 @@ test('a hook beside the components is not inspected as a component', (t) => {
   assert.match(result.stdout, /SKIPPED/);
 });
 
+function writeWebLibraryProject(workspace, lib, tags) {
+  writeFixture(
+    workspace,
+    `libs/web/${lib}/project.json`,
+    `${JSON.stringify({ name: `web-${lib}`, tags }, null, 2)}\n`,
+  );
+}
+
+const FEATURE_LIBRARY_TAGS = ['type:feature', 'scope:web', 'tier:agent'];
+
+test('a component in a type:feature scope:web library is inspected as a Feature Library Component', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'example-places', FEATURE_LIBRARY_TAGS);
+  writeFixture(
+    workspace,
+    'libs/web/example-places/src/index.ts',
+    "export * from './lib/PlaceNotice/PlaceNotice';\n",
+  );
+  const file = writeFixture(
+    workspace,
+    'libs/web/example-places/src/lib/PlaceNotice/PlaceNotice.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export interface PlaceNoticeProps {',
+      '  className?: string;',
+      '}',
+      '',
+      'export function PlaceNotice({ className }: PlaceNoticeProps) {',
+      '  const handleClick = () => {};',
+      '  return <button className={`flex ${className}`} onClick={handleClick}>hi</button>;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+  const report = JSON.parse(result.stdout);
+
+  // The regression this guards: a new shared feature library fell out of
+  // scopeOf() and its components were never inspected. The scope comes from
+  // the project tags, not a hard-coded library name.
+  assert.equal(report.results[0].scope, 'feature-library');
+  const rules = report.results[0].findings.map((finding) => finding.rule);
+  // One primitive rule and one feature rule: the scope takes both sets.
+  assert.ok(rules.includes('classname-not-cn'), rules.join(', '));
+  assert.ok(rules.includes('handler-not-memoized'), rules.join(', '));
+  assert.ok(!rules.includes('missing-barrel-export'), rules.join(', '));
+});
+
+test('a Feature Library compound root missing from its own barrel is reported, a part beside it is not', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'example-places', FEATURE_LIBRARY_TAGS);
+  writeFixture(
+    workspace,
+    'libs/web/example-places/src/index.ts',
+    "export * from './lib/SomethingElse';\n",
+  );
+  const root = writeFixture(
+    workspace,
+    'libs/web/example-places/src/lib/PlaceNotice/PlaceNotice.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function PlaceNotice() {',
+      '  return <div>hi</div>;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+  const part = writeFixture(
+    workspace,
+    'libs/web/example-places/src/lib/PlaceNotice/PlaceNoticeBody.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function PlaceNoticeBody() {',
+      '  return <div>body</div>;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', root, part);
+  const report = JSON.parse(result.stdout);
+  const byFile = Object.fromEntries(
+    report.results.map((entry) => [
+      entry.file,
+      entry.findings.map((finding) => finding.rule),
+    ]),
+  );
+
+  assert.equal(result.status, 1);
+  assert.deepEqual(byFile[root], ['missing-barrel-export']);
+  assert.match(
+    report.results[0].findings[0].message,
+    /libs\/web\/example-places\/src\/index\.ts/,
+  );
+  assert.deepEqual(byFile[part], []);
+});
+
+test('a libs/web library not tagged type:feature + scope:web stays out of scope', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'example-data', [
+    'type:data-access',
+    'scope:web',
+  ]);
+  const file = writeFixture(
+    workspace,
+    'libs/web/example-data/src/lib/DataNotice.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function DataNotice() {',
+      '  return <div>hi</div>;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /SKIPPED/);
+  assert.match(result.stderr, /nothing was checked/i);
+});
+
+test('a .ts module in a Feature Library is not inspected as a component', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'example-places', FEATURE_LIBRARY_TAGS);
+  const file = writeFixture(
+    workspace,
+    'libs/web/example-places/src/lib/placeForm.ts',
+    ['export const PLACE_FORM_DEFAULTS = {};', ''].join('\n'),
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.match(result.stdout, /SKIPPED/);
+});
+
+test('--all collects Feature Library Components', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'example-places', FEATURE_LIBRARY_TAGS);
+  writeFixture(
+    workspace,
+    'libs/web/example-places/src/index.ts',
+    "export * from './lib/PlaceNotice';\n",
+  );
+  writeFixture(
+    workspace,
+    'libs/web/example-places/src/lib/PlaceNotice.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function PlaceNotice() {',
+      '  const handleClick = () => {};',
+      '  return <button onClick={handleClick}>Click</button>;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--all', '--json');
+  const report = JSON.parse(result.stdout);
+
+  assert.deepEqual(
+    report.results.map((entry) => [entry.file, entry.scope]),
+    [['libs/web/example-places/src/lib/PlaceNotice.tsx', 'feature-library']],
+  );
+  assert.equal(report.warnings, 1);
+});
+
 test('an apostrophe in JSX text does not mask the rest of the file', (t) => {
   const workspace = createWorkspace(t);
   const body = Array.from(
