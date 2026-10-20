@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone forms</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; box-sizing: border-box; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 18px; padding: 20px 0">
+  <h1 style="margin: 0; padding: 0 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Forms and controls</h1>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">TALL FORM SHEET · CREATE AND EDIT</h2>
+    <div role="dialog" aria-labelledby="fs1" style="display: flex; flex-direction: column; gap: 14px; padding: 0 16px 20px; border-radius: 20px 20px 0 0; background: #FFFFFF; border-top: 1px solid #E2E8F0">
+      <div style="display: grid; grid-template-columns: 44px 1fr 64px; align-items: center; height: 56px">
+        <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(-45 9 9)"></rect></svg></button>
+        <h3 id="fs1" style="margin: 0; text-align: center; font-size: 17px; line-height: 22px; font-weight: 600">Add item</h3>
+        <button type="button" style="height: 44px; border: 0; background: transparent; color: #5B21B6; font: 700 16px 'Inter', sans-serif">Add</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="p1" style="font-size: 15px; font-weight: 600">Item</label>
+        <input id="p1" value="Oat milk" style="height: 48px; box-sizing: border-box; padding: 0 13px; border-radius: 12px; border: 2px solid #0F172A; font: 400 17px 'Inter', sans-serif; outline: none">
+        <span style="font-size: 13px; line-height: 18px; color: #64748B">From your staples · Dairy · $5.20</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 15px; font-weight: 600">Category</span>
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px">
+          <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Produce</button>
+          <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 15px 'Inter', sans-serif">Dairy</button>
+          <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Bakery</button>
+          <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Frozen</button>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="p2" style="font-size: 15px; font-weight: 600">Amount</label>
+          <div style="display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 12px 0 13px; border-radius: 12px; border: 2px solid #DC2626"><input id="p2" value="two" aria-invalid="true" aria-describedby="p2e" style="flex-grow: 1; min-width: 0; border: 0; font: 400 17px 'Inter', sans-serif; outline: none"></div>
+          <span id="p2e" style="font-size: 13px; line-height: 18px; color: #B91C1C">Use a number, like 2 or 500g</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="p3" style="font-size: 15px; font-weight: 600">Price</label>
+          <div style="display: flex; align-items: center; gap: 6px; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B"><span style="color: #64748B">$</span><input id="p3" value="5.20" inputmode="decimal" style="flex-grow: 1; min-width: 0; border: 0; font: 400 17px 'Inter', sans-serif; outline: none"></div>
+        </div>
+      </div>
+      <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Add to Weekly shop</button>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">QUICK CAPTURE · DOCKED ABOVE THE KEYBOARD</h2>
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; background: #FFFFFF; border-top: 1px solid #E2E8F0; box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08)">
+      <div style="display: flex; gap: 8px">
+        <label style="flex-grow: 1; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">New task</span><input placeholder="Add a task" value="Renew passport" style="flex-grow: 1; height: 48px; box-sizing: border-box; padding: 0 13px; border-radius: 12px; border: 2px solid #0F172A; font: 400 17px 'Inter', sans-serif; outline: none; min-width: 0"></label>
+        <button type="button" aria-label="Save task" style="width: 48px; height: 48px; border-radius: 999px; border: 0; background: #7C3AED; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3 L16 9 L14.6 10.4 L11 6.8 V17 H9 V6.8 L5.4 10.4 L4 9 Z" fill="#FFFFFF"></path></svg></button>
+      </div>
+      <div style="display: flex; gap: 8px; overflow-x: auto">
+        <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Today</button>
+        <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 15px 'Inter', sans-serif">Tomorrow</button>
+        <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 15px 'Inter', sans-serif">High</button>
+        <button type="button" aria-pressed="false" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 15px 'Inter', sans-serif">Work</button>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #64748B">Return saves. The chips reset for the next one.</span>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0; padding: 0 16px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SETTINGS ROWS</h2>
+    <div style="margin: 0 16px; display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 12px 0 16px; border-bottom: 1px solid #F1F5F9">
+        <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 17px; line-height: 24px">Weekly digest</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Email on Sundays</span></span>
+        <button type="button" role="switch" aria-checked="true" aria-label="Weekly digest" style="width: 52px; height: 32px; border-radius: 999px; border: 0; background: #0F172A; position: relative; padding: 0"><span aria-hidden="true" style="position: absolute; top: 3px; left: 23px; width: 26px; height: 26px; border-radius: 999px; background: #FFFFFF"></span></button>
+      </div>
+      <a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 14px 0 16px; text-decoration: none; color: #0F172A">
+        <span style="flex-grow: 1; font-size: 17px; line-height: 24px">Currency</span>
+        <span style="font-size: 15px; color: #64748B">AUD</span>
+        <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg>
+      </a>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

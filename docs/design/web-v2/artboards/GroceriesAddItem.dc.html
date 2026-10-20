@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add item dialog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+input::placeholder,textarea::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <div role="dialog" aria-labelledby="ai-t" aria-describedby="ai-d" style="position: absolute; left: 720px; top: 57px; transform: translateX(-50%); width: 600px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+        <h2 id="ai-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Add item to Weekly shop</h2>
+        <span id="ai-d" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: #115E59"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Encrypted on this device before it syncs</span>
+      </span>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(45 9 9)"></rect><rect x="8" y="1" width="2.2" height="16" rx="1.1" fill="#334155" transform="rotate(-45 9 9)"></rect></svg></button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 18px; padding: 20px 24px">
+      <div style="display: flex; flex-direction: column; gap: 6px; position: relative">
+        <label for="ai-n" style="font-size: 15px; font-weight: 600">Item</label>
+        <input id="ai-n" value="Oat" role="combobox" aria-expanded="true" aria-controls="ai-l" style="height: 44px; box-sizing: border-box; padding: 0 13px; border-radius: 12px; border: 2px solid #0F172A; font: 400 16px 'Inter', sans-serif; outline: none">
+        <div id="ai-l" role="listbox" aria-label="From your Catalog" style="display: flex; flex-direction: column; padding: 6px; border-radius: 14px; border: 1px solid #E2E8F0; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); background: #FFFFFF">
+          <span style="padding: 6px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">FROM YOUR CATALOG</span>
+          <div role="option" aria-selected="true" style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 10px; border-radius: 9px; background: #EDE9FE"><span style="font-size: 15px"><b>Oat</b> milk · Dairy</span><span style="font-size: 14px; color: #475569; font-variant-numeric: tabular-nums">$2.60</span></div>
+          <div role="option" aria-selected="false" style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 10px; border-radius: 9px"><span style="font-size: 15px"><b>Oat</b>s, rolled · Other</span><span style="font-size: 14px; color: #475569; font-variant-numeric: tabular-nums">$3.10</span></div>
+          <div role="option" aria-selected="false" style="display: flex; align-items: center; min-height: 44px; padding: 0 10px; border-radius: 9px; font-size: 15px; color: #5B21B6; font-weight: 600">Add “Oat” as a new Catalog Item</div>
+        </div>
+      </div>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-size: 15px; font-weight: 600; margin-bottom: 8px">Category</legend>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+          <sc-for list="{{cats}}" as="c" hint-placeholder-count="12">
+            <label style="{{c.style}}"><input type="radio" name="cat" checked="{{c.on}}" style="position: absolute; opacity: 0; width: 1px; height: 1px"><dc-import name="CategoryIllustration" category="{{c.key}}" size="28" hint-size="28px,28px"></dc-import>{{c.label}}</label>
+          </sc-for>
+        </div>
+      </fieldset>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="ai-a" style="font-size: 15px; font-weight: 600">Amount</label><input id="ai-a" value="2" style="height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; outline: none"><span style="font-size: 13px; color: #64748B">Like 2, 500g or 1 dozen</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><label for="ai-p" style="font-size: 15px; font-weight: 600">Price each</label><div style="display: flex; align-items: center; gap: 6px; height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #64748B"><span style="color: #64748B">$</span><input id="ai-p" value="2.60" style="flex-grow: 1; min-width: 0; border: 0; outline: none; font: 400 16px 'Inter', sans-serif"></div><span style="font-size: 13px; color: #64748B">Updates the Catalog Item</span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px"><label for="ai-o" style="font-size: 15px; font-weight: 600">Notes</label><textarea id="ai-o" rows="2" placeholder="Brand, size or dietary needs" style="box-sizing: border-box; padding: 10px 14px; border-radius: 12px; border: 1px solid #64748B; font: 400 16px 'Inter', sans-serif; resize: vertical; outline: none">Barista edition</textarea></div>
+      <button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0; border: 0; background: transparent; font: 600 14px 'Inter', sans-serif; color: #5B21B6; align-self: flex-start"><svg width="12" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#5B21B6"></path></svg>Image and links</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <span style="flex-grow: 1; font-size: 13px; line-height: 18px; color: #64748B">Already in your Catalog — this adds it to Weekly shop.</span>
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif">Cancel</button>
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Add to list</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const list = [
+      ['Produce', '#16A34A'], ['Dairy', '#0EA5E9'], ['Meat', '#DC2626'], ['Seafood', '#0891B2'],
+      ['Bakery', '#D97706'], ['Frozen', '#6366F1'], ['Beverages', '#0E7490'], ['Snacks', '#DB2777'],
+      ['Condiments', '#CA8A04'], ['Household', '#64748B'], ['Personal care', '#9333EA'], ['Other', '#94A3B8']
+    ];
+    const cats = list.map(([label, c]) => {
+      const on = label === 'Dairy';
+      return {
+        label, on,
+        key: label.toLowerCase().replace(' ', '-'),
+        style: 'position:relative;display:flex;align-items:center;gap:8px;height:48px;padding:0 8px;border-radius:10px;font-size:14px;cursor:pointer;' + (on ? 'border:2px solid #0F172A;background:#F8FAFC;font-weight:600' : 'border:1px solid #CBD5E1;background:#FFFFFF')
+      };
+    });
+    return { cats };
+  }
+}
+</script>
+</body>
+</html>

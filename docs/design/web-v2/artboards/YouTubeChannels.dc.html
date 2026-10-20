@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YouTube channels</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="youtube" min-height="1000" hint-size="272px,1000px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Channels" crumb="YouTube" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1240px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div role="tablist" aria-label="YouTube" style="display: flex; gap: 24px; border-bottom: 1px solid #E2E8F0">
+        <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Videos</a>
+        <a href="#" role="tab" aria-selected="false" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #475569; text-decoration: none">Shorts</a>
+        <a href="#" role="tab" aria-selected="true" style="display: inline-flex; align-items: center; height: 44px; border-bottom: 3px solid #7C3AED; font-size: 15px; font-weight: 600; color: #0F172A; text-decoration: none">Channels · 12</a>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section aria-label="Channels" style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #E2E8F0">
+            <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; width: 240px; box-sizing: border-box"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Filter channels</span><input placeholder="Filter channels" style="border: 0; outline: none; font: 400 15px 'Inter', sans-serif; width: 100%"></label>
+            <button type="button" aria-pressed="true" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #0F172A; background: #0F172A; color: #FFFFFF; font: 500 14px 'Inter', sans-serif">All · 12</button>
+            <button type="button" aria-pressed="false" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 14px 'Inter', sans-serif">On · 8</button>
+            <button type="button" aria-pressed="false" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; font: 500 14px 'Inter', sans-serif">Off · 4</button>
+            <span style="flex-grow: 1"></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif">Refresh channels</button>
+          </div>
+          <sc-for list="{{channels}}" as="c" hint-placeholder-count="6">
+            <div style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 0 20px; border-bottom: 1px solid #F1F5F9">
+              <span aria-hidden="true" style="{{c.avatar}}">{{c.initial}}</span>
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><a href="#" style="font-size: 15px; line-height: 20px; font-weight: 600; color: #0F172A; text-decoration: none">{{c.name}}</a><span style="{{c.metaStyle}}">{{c.meta}}</span></span>
+              <button type="button" role="switch" aria-checked="{{c.checked}}" aria-label="Sync {{c.name}}" style="{{c.track}}"><span aria-hidden="true" style="{{c.thumb}}"></span></button>
+            </div>
+          </sc-for>
+        </section>
+        <aside style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 16px">
+          <section style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 600">How your YouTube data is kept</h2>
+            <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 18px; color: #334155"><li>Read-only access to your subscriptions</li><li>Only recent uploads are cached</li><li>Stored outside your vault, deleted when you disconnect</li></ul>
+            <a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Read the details</a>
+          </section>
+          <section style="display: flex; align-items: center; gap: 12px; padding: 18px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Weekly digest</span><span style="font-size: 13px; color: #64748B">On · Sundays</span></span>
+            <a href="#" style="font-size: 14px; font-weight: 600; text-decoration: none">Change in Account</a>
+          </section>
+          <section style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 20px; background: #FFFFFF; border: 1px solid #FECACA">
+            <span style="font-size: 15px; font-weight: 600">Disconnect YouTube</span>
+            <span style="font-size: 13px; line-height: 18px; color: #64748B">Deletes cached uploads and Watched marks. Reconnecting starts fresh.</span>
+            <button type="button" style="align-self: flex-start; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #FCA5A5; background: #FFFFFF; color: #B91C1C; font: 600 14px 'Inter', sans-serif">Disconnect…</button>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const colors = ['#7C3AED', '#0F766E', '#C2410C', '#0E7490', '#4F46E5', '#BE123C'];
+    const ch = (name, meta, on, i, bad) => ({
+      name, initial: name.charAt(0), meta, checked: on ? 'true' : 'false',
+      avatar: 'width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font:700 15px Plus Jakarta Sans,sans-serif;flex-shrink:0;background:' + colors[i % colors.length],
+      metaStyle: 'font-size:13px;line-height:18px;color:' + (bad ? '#B91C1C' : '#64748B'),
+      track: 'flex-shrink:0;width:52px;height:32px;border-radius:999px;border:0;padding:0;position:relative;background:' + (on ? '#0F172A' : '#94A3B8'),
+      thumb: 'position:absolute;top:3px;width:26px;height:26px;border-radius:999px;background:#FFFFFF;left:' + (on ? '23px' : '3px')
+    });
+    const channels = [
+      ch('Maker Studio', '42 uploads cached · synced 08:12', true, 0),
+      ch('Home Kitchen', '38 uploads cached · synced 08:12', true, 1),
+      ch('Plot to Plate', 'Last sync failed — will retry tonight', true, 2, true),
+      ch('Science Weekly', '25 uploads cached · synced 08:12', true, 3),
+      ch('City Cycling', 'Off · not synced', false, 4),
+      ch('Daily Jazz', 'Off · not synced', false, 5)
+    ];
+    return { channels };
+  }
+}
+</script>
+</body>
+</html>

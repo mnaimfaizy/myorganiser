@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Change passphrase</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1000px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="dialog" aria-labelledby="cp-t" aria-describedby="cp-d" style="position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: 580px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+        <h2 id="cp-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">{{title}}</h2>
+        <span id="cp-d" style="font-size: 15px; line-height: 20px; color: #334155">{{description}}</span>
+      </span>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(45 8 8)"></rect><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(-45 8 8)"></rect></svg></button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px 24px">
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 14px; background: #F0FDFA; border: 1px solid #99F6E4">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #134E4A">Your data is not re-encrypted and nothing is decrypted on the server — only what unlocks your vault changes. Your recovery key still works and does not need to be written down again.</p>
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #134E4A">Your other devices keep using the old passphrase until you confirm the change on each of them; they will ask the next time they sync.</p>
+      </div>
+      <sc-if value="{{withCurrent}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="cp-c" style="font-size: 15px; font-weight: 600">Current passphrase</label>
+          <input id="cp-c" type="password" value="••••••••••••" aria-invalid="true" aria-describedby="cp-ce" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #DC2626; font: 400 17px 'Inter', sans-serif; outline: none">
+          <span id="cp-ce" style="font-size: 13px; color: #B91C1C">That is not your current passphrase.</span>
+        </div>
+      </sc-if>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="cp-n" style="font-size: 15px; font-weight: 600">New passphrase</label>
+        <input id="cp-n" type="password" value="••••••••••••••••" aria-describedby="cp-nh" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 17px 'Inter', sans-serif">
+        <span id="cp-nh" style="font-size: 13px; color: #64748B">Minimum 10 characters.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="cp-r" style="font-size: 15px; font-weight: 600">Confirm new passphrase</label>
+        <input id="cp-r" type="password" value="••••••••••••••••" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 17px 'Inter', sans-serif">
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="submit" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">{{title}}</button>
+    </div>
+  </form>
+  <aside aria-label="After saving" style="position: absolute; right: 32px; bottom: 32px; width: 380px; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12)">
+    <span style="font-size: 15px; font-weight: 600">Passphrase changed</span>
+    <span style="font-size: 14px; line-height: 20px; color: #475569">Your other devices will ask you to start using it the next time they sync.</span>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["passphrase","recovery-key"],"default":"passphrase","section":"Unlocked with"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rk = this.props.mode === 'recovery-key';
+    return {
+      withCurrent: !rk,
+      title: rk ? 'Set new passphrase' : 'Change passphrase',
+      description: rk
+        ? 'You unlocked with your recovery key. Choose a passphrase you will remember for unlocking your vault on this device.'
+        : 'Choose a new passphrase for unlocking your vault on this device.'
+    };
+  }
+}
+</script>
+</body>
+</html>

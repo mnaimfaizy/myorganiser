@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile numbers</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+input::placeholder{color:#64748B}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="mobile" min-height="900" hint-size="272px,900px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Mobile numbers" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="mobile" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Mobile numbers</h1>
+          <span style="font-size: 15px; line-height: 20px; color: #64748B">4 numbers · 1 place still to update</span>
+        </span>
+        <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>Add mobile number</button>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #64748B; background: #FFFFFF; width: 300px; box-sizing: border-box">
+        <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.5" fill="#64748B"></circle><circle cx="7.5" cy="7.5" r="4.6" fill="#FFFFFF"></circle><rect x="11" y="10" width="2.2" height="7" rx="1.1" fill="#64748B" transform="rotate(-45 12.1 13.5)"></rect></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">Filter mobile numbers</span>
+        <input placeholder="Filter by label or number" style="border: 0; outline: none; font: 400 15px 'Inter', sans-serif; width: 100%">
+      </label>
+      <section aria-label="Mobile numbers" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+        <sc-for list="{{items}}" as="m" hint-placeholder-count="4">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; min-height: 76px; padding: 10px 12px 10px 20px; border-bottom: 1px solid #F1F5F9; box-sizing: border-box">
+            <span style="display: flex; flex-direction: column; flex: 1 1 220px; min-width: 0">
+              <a href="#" style="font-size: 17px; line-height: 24px; font-weight: 600; color: #0F172A; text-decoration: none">{{m.label}}</a>
+              <span style="font-size: 15px; line-height: 22px; color: #334155; font-variant-numeric: tabular-nums; letter-spacing: 0.01em">{{m.number}}</span>
+            </span>
+            <span style="{{m.placeStyle}}">{{m.places}}</span>
+            <span style="display: flex; align-items: center; gap: 6px">
+              <button type="button" aria-label="Copy {{m.label}} number" style="display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: #ECEEF0; font: 600 14px 'Inter', sans-serif; color: #0F172A"><svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><rect x="5" y="5" width="10" height="11" rx="2" fill="#334155"></rect><rect x="2" y="2" width="10" height="11" rx="2" fill="#94A3B8"></rect></svg>Copy</button>
+              <a href="#" aria-label="Call {{m.label}}" style="display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; font: 600 14px 'Inter', sans-serif; color: #0F172A; text-decoration: none">Call</a>
+              <button type="button" aria-label="Delete {{m.label}}" style="width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="4" width="12" height="2" rx="1" fill="#B91C1C"></rect><rect x="7" y="2" width="4" height="2" rx="1" fill="#B91C1C"></rect><path d="M4.5 7 H13.5 L12.8 15 Q12.7 16 11.7 16 H6.3 Q5.3 16 5.2 15 Z" fill="#B91C1C"></path></svg></button>
+              <a href="#" aria-label="Open {{m.label}}" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg></a>
+            </span>
+          </div>
+        </sc-for>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ps = (c, bg) => 'flex-shrink:0;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + c;
+    const items = [
+      { label: 'Personal', number: '+61 412 345 678', places: '1 of 2 places updated', placeStyle: ps('#92400E', '#FEF3C7') },
+      { label: 'Work', number: '+61 498 765 432', places: 'All 3 updated', placeStyle: ps('#166534', '#DCFCE7') },
+      { label: 'Old prepaid', number: '+61 433 222 111', places: 'No places', placeStyle: ps('#475569', '#F1F5F9') },
+      { label: 'UK roaming', number: '+44 7700 900 123', places: 'No places', placeStyle: ps('#475569', '#F1F5F9') }
+    ];
+    return { items };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rotate recovery key</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1100px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="dialog" aria-labelledby="rk-t" aria-describedby="rk-d" style="position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 620px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+        <h2 id="rk-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Rotate recovery key</h2>
+        <span id="rk-d" style="font-size: 15px; line-height: 20px; color: #334155">Generate a new recovery key that can open your vault. Your old key stops working after you confirm the new one.</span>
+      </span>
+      <button type="button" aria-label="Close" style="width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(45 8 8)"></rect><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(-45 8 8)"></rect></svg></button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px 24px">
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0">
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #475569">Generating a new recovery key does not change anything by itself — nothing is written until you confirm you have it.</p>
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #475569">A Vault Export you saved before rotating still opens with your old recovery key — see “Export encrypted vault” on the Vault page.</p>
+      </div>
+
+      <ol aria-label="Steps" style="margin: 0; padding: 0; list-style: none; display: flex; gap: 8px">
+        <li style="display: flex; align-items: center; gap: 8px; flex: 1 1 0; font-size: 13px; font-weight: 600; color: #166534"><span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 999px; background: #15803D; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#FFFFFF"></path></svg></span>Authorise</li>
+        <li aria-current="step" style="display: flex; align-items: center; gap: 8px; flex: 1 1 0; font-size: 13px; font-weight: 600; color: #5B21B6"><span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px">2</span>Save the new key</li>
+        <li style="display: flex; align-items: center; gap: 8px; flex: 1 1 0; font-size: 13px; font-weight: 600; color: #64748B"><span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 999px; background: #E2E8F0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 12px">3</span>Confirm and rotate</li>
+      </ol>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="rk-p" style="font-size: 15px; font-weight: 600">Passphrase to authorize this rotation</label>
+        <div style="display: flex; gap: 10px">
+          <input id="rk-p" type="password" value="••••••••••••" readonly="{{true}}" style="flex-grow: 1; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; background: #F8FAFC; font: 400 17px 'Inter', sans-serif">
+          <button type="button" disabled="{{true}}" style="height: 48px; padding: 0 16px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; opacity: 0.4">Generate recovery key</button>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <label for="rk-k" style="font-size: 15px; font-weight: 600">Recovery key (save this)</label>
+        <div id="rk-k" style="padding: 14px 16px; border-radius: 14px; background: #FAF5FF; border: 1px dashed #A78BFA; font-family: 'JetBrains Mono', monospace; font-size: 16px; line-height: 24px; letter-spacing: 0.04em; word-break: break-all">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (sample)</div>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Download</button>
+          <button type="button" style="height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Copy</button>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="rk-c" style="font-size: 15px; font-weight: 600">Confirm you have the recovery key</label>
+        <input id="rk-c" type="text" placeholder="Paste the recovery key shown above" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #7C3AED; font: 500 15px 'JetBrains Mono', monospace; outline: none">
+        <span style="font-size: 13px; color: #64748B">If it does not match: “Recovery key does not match. Check that you pasted it correctly.”</span>
+      </div>
+
+      <div role="status" style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #FFFBEB; border: 1px solid #FCD34D">
+        <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+          <span style="font-size: 14px; font-weight: 600; color: #78350F">Your other devices cannot be reached right now</span>
+          <span style="font-size: 13px; line-height: 18px; color: #92400E">You can still rotate now — your new key will work on this device immediately. Your old key will keep opening your vault everywhere else until this device reconnects and sends the change.</span>
+        </span>
+        <button type="button" style="align-self: center; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #FCD34D; background: #FFFFFF; font: 600 13px 'Inter', sans-serif; color: #78350F">Check again</button>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="submit" disabled="{{true}}" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; opacity: 0.45">Rotate recovery key</button>
+    </div>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin user detail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1100px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="users" min-height="1100" hint-size="272px,1100px"></dc-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Ana Costa" crumb="Users" state="admin" hint-size="100%,76px"></dc-import>
+
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+      <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>All users</a>
+
+      <section aria-label="Identity" style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 24px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <span aria-hidden="true" style="width: 72px; height: 72px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 26px 'Plus Jakarta Sans', sans-serif">AC</span>
+        <span style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Ana Costa</h1>
+          <span style="font-size: 15px; color: #64748B">ana.costa@example.com · Joined 16 Oct 2026 · Last active 10 min ago</span>
+          <span style="display: flex; gap: 8px; flex-wrap: wrap">
+            <span style="padding: 4px 10px; border-radius: 999px; background: #CCFBF1; color: #115E59; font-size: 12px; font-weight: 600; letter-spacing: 0.02em">ACTIVE</span>
+            <span style="padding: 4px 10px; border-radius: 999px; background: #F1F5F9; color: #334155; font-size: 12px; font-weight: 600; letter-spacing: 0.02em">USER</span>
+            <span style="padding: 4px 10px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; font-size: 12px; font-weight: 600; letter-spacing: 0.02em">YOUTUBE ACCESS</span>
+          </span>
+        </span>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start">
+        <section aria-labelledby="ud-acc" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+          <h2 id="ud-acc" style="margin: 0; padding: 20px 24px 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Access</h2>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">YouTube Access</span><span style="font-size: 13px; color: #64748B">Granted 16 Oct by Sam Miller · 7 of 25 places left</span></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Withdraw…</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Platform admin</span><span style="font-size: 13px; color: #64748B">Can see accounts and the audit log. Never vault contents.</span></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Promote…</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px 20px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Email</span><span style="font-size: 13px; color: #64748B">Verified 16 Oct</span></span>
+            <button type="button" disabled="{{true}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #94A3B8">Resend verification</button>
+          </div>
+        </section>
+
+        <section aria-labelledby="ud-risk" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #FCA5A5">
+          <h2 id="ud-risk" style="margin: 0; padding: 20px 24px 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; color: #B91C1C">Sign-in actions</h2>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Force logout</span><span style="font-size: 13px; color: #64748B">Ends every session. Their data stays.</span></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Log out everywhere…</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px 20px; border-top: 1px solid #F1F5F9">
+            <span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-size: 15px; font-weight: 600">Disable account</span><span style="font-size: 13px; color: #64748B">Blocks sign-in until re-enabled.</span></span>
+            <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #DC2626; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #B91C1C">Disable…</button>
+          </div>
+          <p style="margin: 0; padding: 12px 24px 18px; border-top: 1px solid #F1F5F9; font-size: 13px; line-height: 18px; color: #64748B">On your own account these buttons are disabled: “You can't disable or demote yourself.”</p>
+        </section>
+      </div>
+
+      <section aria-labelledby="ud-act" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <header style="display: flex; align-items: center; padding: 20px 24px 8px">
+          <h2 id="ud-act" style="margin: 0; flex-grow: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Recent activity</h2>
+          <a href="#" style="font-size: 15px; font-weight: 600; text-decoration: none">Full audit log</a>
+        </header>
+        <sc-for list="{{events}}" as="e" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-top: 1px solid #F1F5F9">
+            <span style="{{e.pillStyle}}">{{e.action}}</span>
+            <span style="flex-grow: 1; font-size: 15px">by {{e.actor}}</span>
+            <span style="font-size: 14px; color: #64748B">{{e.when}}</span>
+          </div>
+        </sc-for>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pill = (bg, fg) => 'flex-shrink:0;min-width:120px;text-align:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + fg;
+    const events = [
+      { action: 'Grant YouTube', pillStyle: pill('#EDE9FE', '#5B21B6'), actor: 'Sam Miller', when: 'Today 10:42' },
+      { action: 'Email verified', pillStyle: pill('#CCFBF1', '#115E59'), actor: 'Ana Costa', when: '16 Oct' },
+      { action: 'Resend email', pillStyle: pill('#F1F5F9', '#334155'), actor: 'Jo Park', when: '16 Oct' },
+      { action: 'Account created', pillStyle: pill('#F1F5F9', '#334155'), actor: 'Ana Costa', when: '16 Oct' }
+    ];
+    return { events };
+  }
+}
+</script>
+</body>
+</html>

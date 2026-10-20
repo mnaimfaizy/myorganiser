@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delete account step 1</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <div role="dialog" aria-labelledby="d1-t" aria-describedby="d1-d" style="position: absolute; left: 50%; top: 96px; transform: translateX(-50%); width: 520px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <span style="font-size: 13px; font-weight: 600; color: #B91C1C">Step 1 of 2</span>
+      <h2 id="d1-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Delete account</h2>
+      <p id="d1-d" style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Before you delete your account, decide whether to keep a copy of your vault.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; padding: 20px 24px">
+      <div style="display: flex; gap: 16px; align-items: flex-start; padding: 16px; border-radius: 16px; background: #F5F3FF; border: 1px solid #DDD6FE">
+        <dc-import name="Illustration" kind="vault" size="56" hint-size="56px,56px"></dc-import>
+        <span style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1">
+          <span style="font-size: 15px; line-height: 20px; color: #334155">Deleting your account removes the server copy of your vault. To keep your data, download an Escape Copy first.</span>
+          <sc-if value="{{notDownloaded}}" hint-placeholder-val="{{true}}">
+            <button type="button" style="align-self: flex-start; height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Download an Escape Copy</button>
+          </sc-if>
+          <sc-if value="{{downloaded}}" hint-placeholder-val="{{false}}">
+            <span role="status" style="display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #166534"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#15803D"></path></svg>Escape Copy downloaded.</span>
+          </sc-if>
+        </span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="button" style="{{continueStyle}}">{{continueLabel}}</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"copy":{"editor":"enum","options":["not downloaded","downloaded"],"default":"not downloaded","section":"Escape Copy"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const done = this.props.copy === 'downloaded';
+    const base = 'height:44px;padding:0 18px;border-radius:12px;font:600 15px Inter,sans-serif;';
+    return {
+      downloaded: done,
+      notDownloaded: !done,
+      continueLabel: done ? 'Continue' : 'Continue without a copy',
+      continueStyle: base + (done ? 'border:0;background:#0F172A;color:#FFFFFF' : 'border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A')
+    };
+  }
+}
+</script>
+</body>
+</html>

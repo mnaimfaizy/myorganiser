@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone more</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{margin:6px 0 0;font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.02em;color:#64748B}
+.grp{display:flex;flex-direction:column;border-radius:16px;background:#FFFFFF;border:1px solid #E2E8F0;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:6px 14px 6px 12px;border-bottom:1px solid #F1F5F9;text-decoration:none;color:#0F172A;font-size:17px}
+.row:last-child{border-bottom:0}
+.row span{flex-grow:1}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 52px 16px 0">
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">More</h1>
+    <h2 class="cap">ORGANISE</h2>
+    <div class="grp">
+      <a href="#" class="row"><dc-import name="Illustration" kind="subscriptions" size="32" hint-size="32px,32px"></dc-import><span>Subscriptions</span></a>
+      <a href="#" class="row"><dc-import name="Illustration" kind="addresses" size="32" hint-size="32px,32px"></dc-import><span>Addresses</span></a>
+      <a href="#" class="row"><dc-import name="Illustration" kind="mobile" size="32" hint-size="32px,32px"></dc-import><span>Mobile numbers</span></a>
+      <a href="#" class="row"><dc-import name="Illustration" kind="youtube" size="32" hint-size="32px,32px"></dc-import><span>YouTube</span></a>
+    </div>
+    <h2 class="cap">YOU</h2>
+    <div class="grp">
+      <a href="#" class="row"><span aria-hidden="true" style="flex-grow: 0; width: 32px; height: 32px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 12px 'Inter', sans-serif">SR</span><span>Account</span></a>
+      <a href="#" class="row"><dc-import name="Illustration" kind="feedback" size="32" hint-size="32px,32px"></dc-import><span>Send feedback</span></a>
+      <a href="#" class="row"><dc-import name="Illustration" kind="feedback" size="32" hint-size="32px,32px"></dc-import><span>Your reports</span><b style="flex-grow: 0; padding: 2px 8px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; font-size: 12px; font-weight: 600">Updated</b></a>
+    </div>
+    <div class="grp">
+      <button type="button" class="row" style="border: 0; background: transparent; font: 600 17px 'Inter', sans-serif; color: #B91C1C; width: 100%; text-align: left">Log out</button>
+    </div>
+  </main>
+  <dc-import name="TabBar" active="more" hint-size="390px,88px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

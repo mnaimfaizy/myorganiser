@@ -5,3 +5,4 @@ Approved designs, committed to the repo ([ADR 0110](../adr/0110-an-approved-desi
 | Design                           | Approved for                                                     | Source                                                                    |
 | -------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | [Mobile v1](mobile-v1/README.md) | [PRD #908](https://github.com/mnaimfaizy/myorganiser/issues/908) | [Claude Design canvas](https://claude.ai/artifact/NQEpyQyfkqKrTEBHmm3ehj) |
+| [Web v2.0](web-v2/README.md)     | Web v2.0 PRD (filed next)                                        | [Claude Design canvas](https://claude.ai/artifact/59o7kdnAyxfpsNTrPstwBt) |

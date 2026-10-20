@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Grocery category illustration</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: {{px}}; height: {{px}}; display: block; line-height: 0; flex-shrink: 0">
+
+<sc-if value="{{is.produce}}" hint-placeholder-val="{{true}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#DCFCE7"></rect>
+  <ellipse cx="32" cy="56" rx="13" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="28" y="33" width="8" height="21" rx="3" fill="#15803D"></rect>
+  <circle cx="22" cy="29" r="9" fill="#22C55E"></circle>
+  <circle cx="42" cy="29" r="9" fill="#22C55E"></circle>
+  <circle cx="32" cy="22" r="11" fill="#16A34A"></circle>
+  <circle cx="32" cy="33" r="7" fill="#16A34A"></circle>
+  <circle cx="28" cy="18" r="3.5" fill="#86EFAC"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.dairy}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#E0F2FE"></rect>
+  <ellipse cx="32" cy="56" rx="13" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="20" y="24" width="24" height="30" rx="3" fill="#FFFFFF"></rect>
+  <rect x="36" y="24" width="8" height="30" fill="#BAE6FD"></rect>
+  <path d="M20 24 L26 14 H38 L44 24 Z" fill="#0EA5E9"></path>
+  <rect x="29" y="9" width="6" height="6" rx="1.5" fill="#0369A1"></rect>
+  <rect x="23" y="33" width="11" height="11" rx="2" fill="#0EA5E9"></rect>
+  <circle cx="28.5" cy="38.5" r="2.5" fill="#FFFFFF"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.meat}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#FEE2E2"></rect>
+  <ellipse cx="32" cy="55" rx="15" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <ellipse cx="31" cy="34" rx="19" ry="15" fill="#FCA5A5"></ellipse>
+  <ellipse cx="31" cy="34" rx="15.5" ry="11.5" fill="#DC2626"></ellipse>
+  <path d="M20 30 Q27 27 32 32 Q36 36 42 33" fill="#F87171" opacity="0.9"></path>
+  <circle cx="40" cy="31" r="4.5" fill="#FFF1F2"></circle>
+  <circle cx="40" cy="31" r="2" fill="#FECACA"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.seafood}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#CFFAFE"></rect>
+  <ellipse cx="32" cy="52" rx="14" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <path d="M41 32 L55 22 V42 Z" fill="#0891B2"></path>
+  <path d="M28 23 L33 15 L38 25 Z" fill="#0891B2"></path>
+  <ellipse cx="29" cy="32" rx="16" ry="10" fill="#06B6D4"></ellipse>
+  <ellipse cx="29" cy="36" rx="11" ry="4" fill="#67E8F9" opacity="0.7"></ellipse>
+  <circle cx="20" cy="30" r="2.6" fill="#0F172A"></circle>
+  <circle cx="19.2" cy="29.2" r="0.9" fill="#FFFFFF"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.bakery}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#FEF3C7"></rect>
+  <ellipse cx="32" cy="52" rx="18" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <path d="M11 38 C11 25 20 19 32 19 C44 19 53 25 53 38 V44 Q53 49 48 49 H16 Q11 49 11 44 Z" fill="#D97706"></path>
+  <path d="M15 34 C16 26 23 22 32 22 C38 22 43 24 46 27 C40 25 24 25 15 34 Z" fill="#F59E0B"></path>
+  <rect x="21" y="26" width="4" height="11" rx="2" fill="#FCD34D" transform="rotate(25 23 31.5)"></rect>
+  <rect x="30" y="25" width="4" height="12" rx="2" fill="#FCD34D" transform="rotate(25 32 31)"></rect>
+  <rect x="39" y="26" width="4" height="11" rx="2" fill="#FCD34D" transform="rotate(25 41 31.5)"></rect>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.frozen}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#E0E7FF"></rect>
+  <ellipse cx="32" cy="54" rx="15" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="15" y="17" width="34" height="34" rx="9" fill="#818CF8"></rect>
+  <rect x="15" y="17" width="34" height="34" rx="9" fill="#A5B4FC" transform="translate(-2 -2)"></rect>
+  <rect x="18" y="19" width="13" height="6" rx="3" fill="#E0E7FF"></rect>
+  <rect x="30.7" y="25" width="2.6" height="20" rx="1.3" fill="#FFFFFF"></rect>
+  <rect x="30.7" y="25" width="2.6" height="20" rx="1.3" fill="#FFFFFF" transform="rotate(60 32 35)"></rect>
+  <rect x="30.7" y="25" width="2.6" height="20" rx="1.3" fill="#FFFFFF" transform="rotate(-60 32 35)"></rect>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.beverages}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#CCFBF1"></rect>
+  <ellipse cx="32" cy="56" rx="12" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="28" y="11" width="8" height="10" rx="2" fill="#0F766E"></rect>
+  <rect x="27" y="8" width="10" height="5" rx="2" fill="#134E4A"></rect>
+  <rect x="22" y="19" width="20" height="35" rx="7" fill="#14B8A6"></rect>
+  <rect x="22" y="31" width="20" height="12" fill="#FFFFFF"></rect>
+  <rect x="26" y="35" width="12" height="4" rx="2" fill="#0F766E"></rect>
+  <rect x="25" y="22" width="3" height="8" rx="1.5" fill="#5EEAD4"></rect>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.snacks}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#FCE7F3"></rect>
+  <ellipse cx="32" cy="56" rx="14" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <path d="M18 15 H46 L44 51 H20 Z" fill="#DB2777"></path>
+  <rect x="16" y="11" width="32" height="6" rx="2" fill="#9D174D"></rect>
+  <rect x="18" y="49" width="28" height="5" rx="2" fill="#9D174D"></rect>
+  <circle cx="32" cy="33" r="8.5" fill="#FBCFE8"></circle>
+  <ellipse cx="32" cy="33" rx="5.5" ry="4" fill="#F59E0B" transform="rotate(-20 32 33)"></ellipse>
+  <path d="M21 18 H26 L24 46 H22 Z" fill="#F472B6" opacity="0.6"></path>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.condiments}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#FEF9C3"></rect>
+  <ellipse cx="32" cy="56" rx="11" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="30" y="7" width="4" height="10" rx="1.5" fill="#DC2626"></rect>
+  <path d="M26 16 H38 L41 24 H23 Z" fill="#DC2626"></path>
+  <path d="M22 24 H42 L40 52 Q40 55 37 55 H27 Q24 55 24 52 Z" fill="#CA8A04"></path>
+  <path d="M38 24 H42 L40 52 Q40 55 37 55 H35 Z" fill="#A16207"></path>
+  <rect x="26" y="33" width="12" height="10" rx="2" fill="#FEF08A"></rect>
+  <rect x="25" y="26" width="3" height="6" rx="1.5" fill="#FDE047"></rect>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.household}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#F1F5F9"></rect>
+  <ellipse cx="32" cy="56" rx="12" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="22" y="28" width="20" height="27" rx="5" fill="#64748B"></rect>
+  <rect x="27" y="21" width="10" height="8" fill="#475569"></rect>
+  <path d="M21 12 H40 Q42 12 42 14 V21 H21 Z" fill="#334155"></path>
+  <rect x="13" y="14" width="9" height="4" rx="1" fill="#334155"></rect>
+  <rect x="23" y="21" width="4" height="9" rx="2" fill="#1D283A"></rect>
+  <rect x="25" y="36" width="14" height="10" rx="2" fill="#CBD5E1"></rect>
+  <circle cx="10" cy="13" r="1.5" fill="#94A3B8"></circle>
+  <circle cx="9" cy="18" r="1.2" fill="#94A3B8"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.personal}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#F3E8FF"></rect>
+  <ellipse cx="32" cy="56" rx="12" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="22" y="26" width="20" height="29" rx="6" fill="#A855F7"></rect>
+  <rect x="27" y="20" width="10" height="7" rx="1.5" fill="#7E22CE"></rect>
+  <rect x="30" y="12" width="4" height="9" fill="#7E22CE"></rect>
+  <rect x="25" y="9" width="16" height="4" rx="2" fill="#6B21A8"></rect>
+  <rect x="25" y="34" width="14" height="10" rx="2" fill="#F3E8FF"></rect>
+  <rect x="25" y="29" width="3" height="4" rx="1.5" fill="#D8B4FE"></rect>
+  <circle cx="48" cy="20" r="3.5" fill="#E9D5FF"></circle>
+  <circle cx="51" cy="28" r="2.2" fill="#E9D5FF"></circle>
+</svg>
+</sc-if>
+
+<sc-if value="{{is.other}}" hint-placeholder-val="{{false}}">
+<svg width="{{size}}" height="{{size}}" viewBox="0 0 64 64" aria-hidden="true">
+  <rect width="64" height="64" rx="16" fill="#F1F5F9"></rect>
+  <ellipse cx="32" cy="55" rx="17" ry="2.5" fill="#0F172A" opacity="0.12"></ellipse>
+  <rect x="14" y="24" width="36" height="28" rx="4" fill="#94A3B8"></rect>
+  <rect x="12" y="18" width="40" height="9" rx="3" fill="#64748B"></rect>
+  <rect x="29" y="18" width="6" height="34" fill="#E2E8F0"></rect>
+  <rect x="18" y="34" width="8" height="3" rx="1.5" fill="#CBD5E1"></rect>
+</svg>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"category":{"editor":"enum","options":["produce","dairy","meat","seafood","bakery","frozen","beverages","snacks","condiments","household","personal-care","other"],"default":"produce"},"size":{"editor":"int","min":16,"max":160,"default":64},"$preview":{"width":96,"height":96}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const known = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'beverages', 'snacks', 'condiments', 'household', 'personal-care', 'other'];
+    let c = this.props.category ?? 'produce';
+    if (known.indexOf(c) < 0) c = 'other';
+    const size = Number(this.props.size ?? 64) || 64;
+    return {
+      size,
+      px: size + 'px',
+      is: {
+        produce: c === 'produce', dairy: c === 'dairy', meat: c === 'meat', seafood: c === 'seafood',
+        bakery: c === 'bakery', frozen: c === 'frozen', beverages: c === 'beverages', snacks: c === 'snacks',
+        condiments: c === 'condiments', household: c === 'household', personal: c === 'personal-care', other: c === 'other'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>No addresses yet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px">
+  <dc-import name="EmptyPage" active="addresses" title="Addresses" heading="No addresses yet" line="Save the places you live or have lived. When you move, list everyone who needs your new address and tick them off as you go." cta="Add address" tips="{{tips}}" hint-size="1440px,900px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { tips: ['Copy any line in one click', 'A checklist of who needs your new address', 'Mark old addresses without losing them'] };
+  }
+}
+</script>
+</body>
+</html>

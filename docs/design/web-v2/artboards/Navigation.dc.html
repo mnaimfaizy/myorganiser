@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>v2.0 desktop navigation</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1100px; box-sizing: border-box; padding: 48px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 24px">
+  <header style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Desktop navigation</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Dark illustrated sidebar, grouped. The header carries the page title, sync state and the account menu — no search, no lone bell.</p>
+  </header>
+
+  <div style="display: flex; gap: 24px; align-items: flex-start">
+
+    <aside aria-label="App navigation, expanded" style="width: 272px; flex-shrink: 0; box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 18px; background: #0F172A; border-radius: 20px; min-height: 900px">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 4px 6px">
+        <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+        <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; color: #FFFFFF">My<span style="font-weight: 800">Organiser</span></span>
+      </div>
+      <nav aria-label="Sections" style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1">
+        <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+          <sc-if value="{{n.isHeader}}" hint-placeholder-val="{{false}}">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #94A3B8; padding: 12px 10px 4px">{{n.label}}</span>
+          </sc-if>
+          <sc-if value="{{n.isLink}}" hint-placeholder-val="{{true}}">
+            <a href="#" aria-current="{{n.current}}" style="{{n.row}}">
+              <dc-import name="Illustration" kind="{{n.kind}}" size="36" hint-size="36px,36px"></dc-import>
+              <span style="{{n.labelStyle}}">{{n.label}}</span>
+              <sc-if value="{{n.hasBadge}}" hint-placeholder-val="{{false}}"><span style="{{n.badgeStyle}}">{{n.badge}}</span></sc-if>
+              <sc-if value="{{n.note}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; color: #94A3B8">{{n.note}}</span></sc-if>
+            </a>
+          </sc-if>
+        </sc-for>
+      </nav>
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: #1D283A">
+        <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #FFFFFF"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 999px; background: #14B8A6"></span>Vault unlocked</span>
+        <span style="font-size: 13px; line-height: 18px; color: #94A3B8">Synced 2 minutes ago</span>
+        <button type="button" style="height: 40px; border-radius: 10px; border: 1px solid #334155; background: transparent; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Lock vault</button>
+      </div>
+    </aside>
+
+    <aside aria-label="App navigation, collapsed" style="width: 76px; flex-shrink: 0; box-sizing: border-box; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; background: #0F172A; border-radius: 20px">
+      <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+      <span style="height: 10px"></span>
+      <sc-for list="{{rail}}" as="r" hint-placeholder-count="8">
+        <a href="#" aria-label="{{r.label}}" title="{{r.label}}" aria-current="{{r.current}}" style="{{r.style}}"><dc-import name="Illustration" kind="{{r.kind}}" size="36" hint-size="36px,36px"></dc-import></a>
+      </sc-for>
+    </aside>
+
+    <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+      <div style="position: relative; display: flex; flex-direction: column; border-radius: 20px; overflow: visible; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #E2E8F0">
+          <button type="button" aria-label="Collapse sidebar" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3 H17 Q18 3 18 4 V16 Q18 17 17 17 H3 Q2 17 2 16 V4 Q2 3 3 3 Z M4 5 V15 H7 V5 Z M9 5 V15 H16 V5 Z" fill="#334155"></path></svg></button>
+          <span style="display: flex; flex-direction: column; flex-grow: 1">
+            <nav aria-label="Breadcrumb" style="font-size: 13px; line-height: 18px; color: #64748B"><a href="#" style="color: #64748B; text-decoration: none">Groceries</a> <span aria-hidden="true">/</span> <span aria-current="page">Weekly shop</span></nav>
+            <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Weekly shop</span>
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px; background: #CCFBF1; color: #115E59; font-size: 13px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Synced</span>
+          <button type="button" aria-haspopup="menu" aria-expanded="true" style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid #E2E8F0; background: #F8FAFC; font-family: 'Inter', sans-serif">
+            <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 13px 'Plus Jakarta Sans', sans-serif">SM</span>
+            <span style="display: flex; flex-direction: column; text-align: left"><span style="font-size: 15px; line-height: 20px; font-weight: 600; color: #0F172A">Sam Miller</span><span style="font-size: 12px; line-height: 16px; color: #64748B">sam@example.com</span></span>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4.5 L7 10 L12.5 4.5 L11.1 3.1 L7 7.2 L2.9 3.1 Z" fill="#334155"></path></svg>
+          </button>
+        </div>
+        <div role="menu" aria-label="Account" style="position: absolute; right: 20px; top: 70px; width: 260px; display: flex; flex-direction: column; padding: 6px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12); z-index: 2">
+          <span style="display: flex; flex-direction: column; padding: 10px 10px 12px; border-bottom: 1px solid #E2E8F0; margin-bottom: 6px"><span style="font-size: 15px; font-weight: 600">Sam Miller</span><span style="font-size: 13px; color: #64748B">sam@example.com</span></span>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px; background: #F1F5F9; text-decoration: none; font-size: 15px; color: #0F172A">Account settings</a>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px; text-decoration: none; font-size: 15px; color: #0F172A">Vault and backups</a>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px; text-decoration: none; font-size: 15px; color: #0F172A">Install the app</a>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px; text-decoration: none; font-size: 15px; color: #0F172A">Send feedback</a>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px; text-decoration: none; font-size: 15px; color: #0F172A">Your reports</a>
+          <a href="#" role="menuitem" style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 0 10px; border-radius: 9px; text-decoration: none; font-size: 15px; color: #0F172A">Admin portal<span style="padding: 1px 8px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; font-size: 11px; font-weight: 600">ADMINS</span></a>
+          <span role="separator" style="height: 1px; margin: 6px 4px; background: #E2E8F0"></span>
+          <button type="button" role="menuitem" style="min-height: 40px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; text-align: left; font: 500 15px 'Inter', sans-serif; color: #0F172A">Lock vault</button>
+          <button type="button" role="menuitem" style="min-height: 40px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; text-align: left; font: 600 15px 'Inter', sans-serif; color: #B91C1C">Log out</button>
+        </div>
+        <div style="height: 300px"></div>
+      </div>
+
+      <section aria-label="Page header pattern" style="display: flex; flex-direction: column; gap: 16px; padding: 24px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">PAGE HEADER · EVERY PAGE HAS ONE H1</span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+          <dc-import name="Illustration" kind="youtube" size="56" hint-size="56px,56px"></dc-import>
+          <span style="display: flex; flex-direction: column; flex-grow: 1"><h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">YouTube</h2><span style="font-size: 15px; line-height: 20px; color: #64748B">Last synced today at 08:12 · 12 channels</span></span>
+          <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif">Sync uploads</button>
+        </div>
+        <div role="tablist" aria-label="YouTube" style="display: flex; gap: 24px; border-bottom: 1px solid #E2E8F0">
+          <button type="button" role="tab" aria-selected="true" style="height: 44px; padding: 0 2px; border: 0; border-bottom: 3px solid #7C3AED; background: transparent; font: 600 15px 'Inter', sans-serif; color: #0F172A">Videos</button>
+          <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 2px; border: 0; border-bottom: 3px solid transparent; background: transparent; font: 500 15px 'Inter', sans-serif; color: #475569">Shorts</button>
+          <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 2px; border: 0; border-bottom: 3px solid transparent; background: transparent; font: 500 15px 'Inter', sans-serif; color: #475569">Channels</button>
+        </div>
+      </section>
+
+      <section aria-label="Admin sidebar" style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="border-radius: 20px; overflow: hidden; flex-shrink: 0">
+          <dc-import name="AdminSidebar" active="users" min-height="520" hint-size="272px,520px"></dc-import>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 320px">
+          <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">ADMIN LAYOUT</span>
+          <span style="font-size: 13px; line-height: 18px; color: #334155">Its own chrome: no vault, no sync. It shares the sidebar style, the active pill, the header bar (with a Platform admin chip in place of sync) and the account menu. Slate admin illustrations keep it apart from personal spaces.</span>
+          <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #B45309">BACKEND NEEDED</span>
+          <span style="font-size: 13px; line-height: 18px; color: #334155">Users: paging, sort and role / status filters. Audit log: actor and target names, paging past 50. Overview: a stats endpoint. Each is an API change plus yarn openapi:sync.</span>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const raw = [
+      { h: 'OVERVIEW' }, { k: 'home', l: 'Home' },
+      { h: 'ORGANISE' }, { k: 'tasks', l: 'Tasks', b: '4', hover: true }, { k: 'groceries', l: 'Groceries', b: '3', active: true }, { k: 'subscriptions', l: 'Subscriptions' },
+      { h: 'PEOPLE AND PLACES' }, { k: 'addresses', l: 'Addresses' }, { k: 'mobile', l: 'Mobile numbers' },
+      { h: 'MEDIA' }, { k: 'youtube', l: 'YouTube' },
+      { h: 'SECURITY' }, { k: 'vault', l: 'Vault' }
+    ];
+    const nav = raw.map((r) => {
+      if (r.h) return { isHeader: true, isLink: false, label: r.h };
+      const a = !!r.active;
+      const bg = a ? 'rgba(124,58,237,0.24)' : r.hover ? '#1D283A' : 'transparent';
+      return {
+        isHeader: false, isLink: true, kind: r.k, label: r.l,
+        current: a ? 'page' : 'false',
+        note: r.hover ? 'hover' : '',
+        hasBadge: !!r.b, badge: r.b,
+        row: 'display:flex;align-items:center;gap:12px;min-height:46px;box-sizing:border-box;padding:4px 10px 4px 4px;border-radius:14px;text-decoration:none;border:1px solid ' + (a ? '#7C3AED' : 'transparent') + ';background:' + bg,
+        labelStyle: 'flex-grow:1;font-size:15px;line-height:20px;font-weight:' + (a ? 600 : 500) + ';color:' + (a ? '#FFFFFF' : '#CBD5E1'),
+        badgeStyle: 'min-width:24px;text-align:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:' + (a ? '#7C3AED' : '#1D283A') + ';color:' + (a ? '#FFFFFF' : '#CBD5E1')
+      };
+    });
+    const rail = ['home', 'tasks', 'groceries', 'subscriptions', 'addresses', 'mobile', 'youtube', 'vault'].map((k) => {
+      const a = k === 'groceries';
+      return { kind: k, label: k.charAt(0).toUpperCase() + k.slice(1), current: a ? 'page' : 'false', style: 'display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:14px;border:1px solid ' + (a ? '#7C3AED' : 'transparent') + ';background:' + (a ? 'rgba(124,58,237,0.24)' : 'transparent') };
+    });
+    return { nav, rail };
+  }
+}
+</script>
+</body>
+</html>

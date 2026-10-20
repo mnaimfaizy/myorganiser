@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Withdraw YouTube Access</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <div role="alertdialog" aria-labelledby="aa-t" aria-describedby="aa-d" style="position: absolute; left: 50%; top: 120px; transform: translateX(-50%); width: 500px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; flex-direction: column; gap: 12px; padding: 24px 24px 16px">
+      <dc-import name="Illustration" kind="youtube" size="56" hint-size="56px,56px"></dc-import>
+      <h2 id="aa-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Withdraw YouTube Access from Ana Costa?</h2>
+      <div id="aa-d" style="display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 20px; color: #475569">
+        <span>What happens:</span>
+        <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px">
+          <li>Their YouTube page shows “Connect” again; saved videos stay in their vault.</li>
+          <li>One place frees up: 8 of 25 left.</li>
+          <li>The action is written to the audit log under your name.</li>
+        </ul>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #DC2626; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Withdraw access</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

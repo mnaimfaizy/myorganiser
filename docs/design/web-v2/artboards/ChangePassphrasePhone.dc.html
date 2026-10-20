@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone change passphrase</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+</style>
+</helmet>
+<div style="width: 390px; height: 1000px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 12px 16px 34px">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 44px; font-size: 17px; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>Vault</a>
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.02em">Change passphrase</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #334155">Choose a new passphrase for unlocking your vault on this device.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #F0FDFA; border: 1px solid #99F6E4; font-size: 14px; line-height: 20px; color: #134E4A">
+      <span>Your data is not re-encrypted and nothing is decrypted on the server — only what unlocks your vault changes. Your recovery key still works and does not need to be written down again.</span>
+      <span>Your other devices keep using the old passphrase until you confirm the change on each of them; they will ask the next time they sync.</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="cpp-c" style="font-size: 15px; font-weight: 600">Current passphrase</label>
+      <input id="cpp-c" type="password" value="••••••••••••" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 17px 'Inter', sans-serif">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="cpp-n" style="font-size: 15px; font-weight: 600">New passphrase</label>
+      <input id="cpp-n" type="password" value="••••••••" aria-describedby="cpp-nh" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #7C3AED; font: 400 17px 'Inter', sans-serif; outline: none">
+      <span id="cpp-nh" style="font-size: 13px; color: #64748B">Minimum 10 characters.</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="cpp-r" style="font-size: 15px; font-weight: 600">Confirm new passphrase</label>
+      <input id="cpp-r" type="password" value="" style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; font: 400 17px 'Inter', sans-serif">
+    </div>
+    <button type="submit" style="margin-top: auto; height: 52px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Change passphrase</button>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone admin users</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+.chips::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 52px 16px 0">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <dc-import name="Illustration" kind="users" size="44" hint-size="44px,44px"></dc-import>
+      <span style="display: flex; flex-direction: column; flex-grow: 1"><h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 30px; line-height: 36px; font-weight: 800; letter-spacing: -0.02em">Users</h1><span style="font-size: 13px; color: #64748B">148 accounts</span></span>
+    </div>
+    <div class="chips" role="toolbar" aria-label="Filter users" style="display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+        <button type="button" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+      <sc-for list="{{users}}" as="u" hint-placeholder-count="7">
+        <a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 14px; border-bottom: 1px solid #F1F5F9; text-decoration: none; color: #0F172A">
+          <span aria-hidden="true" style="{{u.avatar}}">{{u.initials}}</span>
+          <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0"><span style="font-size: 16px; font-weight: 600">{{u.name}}</span><span style="font-size: 13px; color: #64748B">{{u.active}}</span></span>
+          <span style="{{u.statusStyle}}">{{u.status}}</span>
+          <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg>
+        </a>
+      </sc-for>
+    </div>
+    <span style="align-self: center; font-size: 13px; color: #64748B">Scroll for more · 7 of 148</span>
+  </main>
+  <nav aria-label="Admin sections" style="width: 390px; height: 88px; box-sizing: border-box; padding: 8px 8px 18px; display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #E2E8F0">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <a href="#" aria-current="{{t.current}}" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 72px; min-height: 60px; text-decoration: none">
+        <span style="{{t.pillStyle}}">
+          <sc-if value="{{t.isApp}}" hint-placeholder-val="{{false}}">
+            <svg width="28" height="28" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+          </sc-if>
+          <sc-if value="{{t.isSection}}" hint-placeholder-val="{{true}}">
+            <dc-import name="Illustration" kind="{{t.kind}}" size="28" hint-size="28px,28px"></dc-import>
+          </sc-if>
+        </span>
+        <span style="{{t.labelStyle}}">{{t.label}}</span>
+      </a>
+    </sc-for>
+  </nav>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tabs = [
+      { kind: 'admin', label: 'Overview' },
+      { kind: 'users', label: 'Users' },
+      { kind: 'audit', label: 'Audit log' },
+      { kind: 'inbox', label: 'Feedback' },
+      { kind: 'app', label: 'My app' }
+    ].map((t) => {
+      const on = t.kind === 'users';
+      return {
+        kind: t.kind,
+        label: t.label,
+        isApp: t.kind === 'app',
+        isSection: t.kind !== 'app',
+        current: on ? 'page' : 'false',
+        pillStyle: 'display:flex;align-items:center;justify-content:center;width:56px;height:36px;border-radius:999px;background:' + (on ? '#EDE9FE' : 'transparent'),
+        labelStyle: 'font-size:12px;line-height:16px;font-weight:' + (on ? 600 : 500) + ';color:' + (on ? '#5B21B6' : '#475569')
+      };
+    });
+    const chip = (on) => 'flex-shrink:0;height:36px;padding:0 14px;border-radius:999px;font:600 14px Inter,sans-serif;' + (on ? 'border:0;background:#0F172A;color:#FFFFFF' : 'border:1px solid #CBD5E1;background:#FFFFFF;color:#334155');
+    const chips = ['All', 'Active', 'Unverified', 'Disabled', 'Admins'].map((l) => ({ label: l, on: l === 'All' ? 'true' : 'false', style: chip(l === 'All') }));
+    const pill = (bg, fg) => 'flex-shrink:0;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.02em;background:' + bg + ';color:' + fg;
+    const st = { ACTIVE: pill('#CCFBF1', '#115E59'), UNVERIFIED: pill('#FEF3C7', '#92400E'), DISABLED: pill('#FEE2E2', '#B91C1C') };
+    const tint = ['#7C3AED', '#0F766E', '#0891B2', '#B45309', '#475569'];
+    const raw = [['Ana Costa', 'ACTIVE', 'Active 10 min ago'], ['Priya Shah', 'UNVERIFIED', 'Joined 15 Oct'], ['Jo Park', 'ACTIVE', 'Admin · yesterday'], ['Ben Lee', 'ACTIVE', 'Active 3 days ago'], ['Leo Martin', 'DISABLED', 'Disabled 30 days ago'], ['Mia Wong', 'ACTIVE', 'Active 2 hours ago'], ['Omar Haddad', 'UNVERIFIED', 'Joined 28 Feb']];
+    const users = raw.map((r, i) => ({ name: r[0], status: r[1], active: r[2], statusStyle: st[r[1]], initials: r[0].split(' ').map((w) => w[0]).join(''), avatar: 'width:40px;height:40px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font:700 14px Inter,sans-serif;background:' + tint[i % tint.length] }));
+    return { tabs, chips, users };
+  }
+}
+</script>
+</body>
+</html>

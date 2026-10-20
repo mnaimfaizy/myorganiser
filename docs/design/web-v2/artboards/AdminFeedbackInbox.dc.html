@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin feedback inbox</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+select{appearance:none}
+.fl{display:flex;flex-direction:column;gap:4px}
+.fl label{font-size:13px;font-weight:600;color:#475569}
+.fc{height:40px;box-sizing:border-box;padding:0 12px;border-radius:10px;border:1px solid #CBD5E1;background:#FFFFFF;font:500 14px 'Inter',sans-serif;color:#0F172A}
+.row:hover{background:#F8FAFC}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="inbox" min-height="1000" hint-size="272px,1000px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Feedback" crumb="Admin portal" state="admin" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="inbox" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Feedback</h1>
+          <span style="font-size: 15px; color: #64748B">Bug Reports and Suggestions, newest first. 5 are Received and waiting for triage.</span>
+        </span>
+      </div>
+
+      <div role="toolbar" aria-label="Filter feedback reports" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <span class="fl"><label for="fi-s">Status</label><select id="fi-s" class="fc" style="min-width: 170px; border: 2px solid #7C3AED"><option>Received</option></select></span>
+        <span class="fl"><label for="fi-k">Kind</label><select id="fi-k" class="fc" style="min-width: 150px"><option>All kinds</option></select></span>
+        <span class="fl"><label for="fi-p">Platform</label><select id="fi-p" class="fc" style="min-width: 150px"><option>Any platform</option><option>Web</option><option>iOS</option><option>Android</option></select></span>
+        <span class="fl"><label for="fi-t">Tracking issue</label><input id="fi-t" class="fc" type="text" inputmode="numeric" placeholder="Issue number" style="width: 140px"></span>
+        <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Clear filters</button>
+      </div>
+
+      <section aria-label="Feedback reports" style="border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 2.2fr) 110px 130px 90px 110px minmax(0, 1.3fr) 150px; gap: 14px; padding: 12px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">
+          <span>REPORT</span><span>KIND</span><span>STATUS</span><span>PLATFORM</span><span>TRACKING ISSUE</span><span>SENDER</span><span>SENT</span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+          <div role="row" class="row" style="display: grid; grid-template-columns: minmax(0, 2.2fr) 110px 130px 90px 110px minmax(0, 1.3fr) 150px; gap: 14px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #F1F5F9">
+            <a href="#" style="font-size: 15px; font-weight: 600; text-decoration: none; color: #0F172A">{{r.title}}</a>
+            <span style="font-size: 14px; color: #475569">{{r.kind}}</span>
+            <span style="{{r.badge}}">{{r.status}}</span>
+            <span style="font-size: 14px; color: #475569">{{r.platform}}</span>
+            <span style="{{r.issueStyle}}">{{r.issue}}</span>
+            <span style="display: flex; flex-direction: column; min-width: 0"><a href="#" style="{{r.senderStyle}}">{{r.sender}}</a><span style="font-size: 12px; color: #64748B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.email}}</span></span>
+            <span style="font-size: 13px; color: #475569">{{r.sent}}</span>
+          </div>
+        </sc-for>
+        <nav aria-label="Pages" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px">
+          <span style="flex-grow: 1; font-size: 14px; color: #475569">Showing 1–5 of 5 matching reports</span>
+          <button type="button" disabled="{{true}}" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #94A3B8">Newer</button>
+          <button type="button" disabled="{{true}}" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #94A3B8">Older</button>
+        </nav>
+      </section>
+      <p style="margin: 0; font-size: 13px; color: #64748B">Empty: “No feedback reports match these filters.” Error: “Unable to load feedback reports. Please try again.”</p>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pill = 'justify-self:start;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#F1F5F9;color:#334155';
+    const raw = [
+      ['Uncheck All skips the last item', 'Bug report', 'web', '', 'Ana Costa', 'ana.costa@example.com', '20 Oct 2026, 10:42'],
+      ['Share a Grocery List with family', 'Suggestion', 'web', '', 'Mia Wong', 'mia.wong@example.com', '19 Oct 2026, 18:05'],
+      ['Reminder sound plays twice', 'Bug report', 'android', '', 'Ben Lee', 'ben.lee@example.com', '19 Oct 2026, 09:31'],
+      ['Sort subscriptions by renewal', 'Suggestion', 'web', '', 'Deleted', '', '17 Oct 2026, 21:12'],
+      ['Address form loses the suburb', 'Bug report', 'web', '', 'Priya Shah', 'priya@example.com', '16 Oct 2026, 14:50']
+    ];
+    const rows = raw.map((r) => ({
+      title: r[0], kind: r[1], status: 'Received', badge: pill, platform: r[2],
+      issue: r[3] || '—', issueStyle: 'font-size:14px;' + (r[3] ? 'font-weight:600;color:#5B21B6' : 'color:#94A3B8'),
+      sender: r[4], email: r[5], sent: r[6],
+      senderStyle: 'font-size:14px;text-decoration:none;' + (r[4] === 'Deleted' ? 'color:#94A3B8;pointer-events:none' : 'font-weight:600;color:#0F172A')
+    }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1567 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "AdminDashboard.dc.html": {
+      "expand": "fill",
+      "h": 1350,
+      "page": "dashboard",
+      "title": "Desktop — Admin overview",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "AdminPhone.dc.html": {
+      "h": 844,
+      "page": "dashboard",
+      "title": "Phone — Admin overview",
+      "w": 390,
+      "x": 940,
+      "y": 1900
+    },
+    "AdminSidebar.dc.html": {
+      "h": 900,
+      "page": "foundations",
+      "title": "Component — admin sidebar",
+      "w": 272,
+      "x": 3392,
+      "y": 440
+    },
+    "AppHeader.dc.html": {
+      "h": 80,
+      "page": "foundations",
+      "title": "Component — page header bar",
+      "w": 1168,
+      "x": 3040,
+      "y": 1660
+    },
+    "AppSidebar.dc.html": {
+      "h": 1100,
+      "page": "foundations",
+      "title": "Component — app sidebar",
+      "w": 272,
+      "x": 3040,
+      "y": 440
+    },
+    "CategoryIllustration.dc.html": {
+      "h": 96,
+      "page": "foundations",
+      "title": "Component — grocery category illustration",
+      "w": 96,
+      "x": 3040,
+      "y": 1820
+    },
+    "GroceryCategories.dc.html": {
+      "h": 340,
+      "page": "foundations",
+      "title": "Grocery category illustrations",
+      "w": 1440,
+      "x": 1520,
+      "y": 840
+    },
+    "Buttons.dc.html": {
+      "h": 900,
+      "page": "foundations",
+      "title": "Actions — buttons, links, icon buttons",
+      "w": 1440,
+      "x": 0,
+      "y": 1200
+    },
+    "Data.dc.html": {
+      "h": 1200,
+      "page": "foundations",
+      "title": "Containers and data",
+      "w": 1440,
+      "x": 1520,
+      "y": 2320
+    },
+    "Feedback.dc.html": {
+      "h": 1100,
+      "page": "foundations",
+      "title": "Status and feedback",
+      "w": 1440,
+      "x": 0,
+      "y": 2320
+    },
+    "GroceriesAddItem.dc.html": {
+      "h": 900,
+      "page": "groceries",
+      "title": "Desktop — Add item dialog",
+      "w": 1440,
+      "x": 4560,
+      "y": 0
+    },
+    "GroceriesAddPhone.dc.html": {
+      "h": 844,
+      "page": "groceries",
+      "title": "Phone — Add to list sheet",
+      "w": 390,
+      "x": 940,
+      "y": 1660
+    },
+    "GroceriesCatalog.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "page": "groceries",
+      "title": "Desktop — Catalog",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "GroceriesList.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "page": "groceries",
+      "title": "Desktop — one Grocery List",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "GroceriesLists.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "page": "groceries",
+      "title": "Desktop — Grocery Lists",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "GroceriesPhone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "groceries",
+      "title": "Phone — Grocery Lists",
+      "w": 390,
+      "x": 0,
+      "y": 1660
+    },
+    "GroceryListEmptyPhone.dc.html": {
+      "h": 844,
+      "page": "groceries",
+      "title": "Phone — empty list",
+      "w": 390,
+      "x": 1410,
+      "y": 1660
+    },
+    "GroceryListPhone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "groceries",
+      "title": "Phone — in the shop",
+      "w": 390,
+      "x": 470,
+      "y": 1660
+    },
+    "HomePhone.dc.html": {
+      "h": 844,
+      "page": "dashboard",
+      "title": "Phone — Home",
+      "w": 390,
+      "x": 0,
+      "y": 1900
+    },
+    "HomePhoneLocked.dc.html": {
+      "h": 844,
+      "page": "dashboard",
+      "title": "Phone — Home, vault locked",
+      "w": 390,
+      "x": 470,
+      "y": 1900
+    },
+    "Illustration.dc.html": {
+      "h": 160,
+      "page": "foundations",
+      "title": "Component — illustration",
+      "w": 160,
+      "x": 3040,
+      "y": 0
+    },
+    "Illustrations.dc.html": {
+      "h": 760,
+      "page": "foundations",
+      "title": "Section illustrations (approved)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Inputs.dc.html": {
+      "h": 1000,
+      "page": "foundations",
+      "title": "Form controls",
+      "w": 1440,
+      "x": 1520,
+      "y": 1200
+    },
+    "Main.dc.html": {
+      "h": 1080,
+      "page": "foundations",
+      "title": "Tokens — colour, type, space",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Navigation.dc.html": {
+      "h": 1100,
+      "page": "foundations",
+      "title": "Desktop navigation and page header",
+      "w": 1440,
+      "x": 0,
+      "y": 3640
+    },
+    "PhoneForms.dc.html": {
+      "h": 1240,
+      "page": "foundations",
+      "title": "Phone — forms and controls",
+      "w": 390,
+      "x": 1410,
+      "y": 5160
+    },
+    "PhoneLists.dc.html": {
+      "h": 1420,
+      "page": "foundations",
+      "title": "Phone — lists and rows",
+      "w": 390,
+      "x": 470,
+      "y": 5160
+    },
+    "PhoneNav.dc.html": {
+      "h": 1320,
+      "page": "foundations",
+      "title": "Phone — app bar, tab bar, add button",
+      "w": 390,
+      "x": 0,
+      "y": 5160
+    },
+    "PhoneOverlays.dc.html": {
+      "h": 1320,
+      "page": "foundations",
+      "title": "Phone — sheets and feedback",
+      "w": 390,
+      "x": 940,
+      "y": 5160
+    },
+    "TabBar.dc.html": {
+      "h": 88,
+      "page": "foundations",
+      "title": "Component — phone tab bar",
+      "w": 390,
+      "x": 3040,
+      "y": 240
+    },
+    "TaskAddDialog.dc.html": {
+      "h": 900,
+      "page": "tasks",
+      "title": "Desktop — Add task dialog",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "TaskCapturePhone.dc.html": {
+      "h": 844,
+      "page": "tasks",
+      "title": "Phone — Quick capture",
+      "w": 390,
+      "x": 470,
+      "y": 1570
+    },
+    "TaskDetailPhone.dc.html": {
+      "h": 844,
+      "page": "tasks",
+      "title": "Phone — Task detail",
+      "w": 390,
+      "x": 940,
+      "y": 1570
+    },
+    "TasksAllClear.dc.html": {
+      "h": 820,
+      "page": "tasks",
+      "title": "Desktop — Tasks, all clear",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "TasksAllClearPhone.dc.html": {
+      "h": 844,
+      "page": "tasks",
+      "title": "Phone — all clear",
+      "w": 390,
+      "x": 1410,
+      "y": 1570
+    },
+    "TasksPage.dc.html": {
+      "expand": "fill",
+      "h": 1150,
+      "page": "tasks",
+      "title": "Desktop — Tasks with detail panel",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "TasksPhone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "tasks",
+      "title": "Phone — Tasks",
+      "w": 390,
+      "x": 0,
+      "y": 1570
+    },
+    "AddressesList.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1050,
+      "title": "Desktop — Addresses",
+      "page": "addresses",
+      "expand": "fill"
+    },
+    "AddressDetail.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1250,
+      "title": "Desktop — one Address",
+      "page": "addresses",
+      "expand": "fill"
+    },
+    "AddressAddSheet.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Add address sheet",
+      "page": "addresses"
+    },
+    "AddressesPhone.dc.html": {
+      "x": 0,
+      "y": 1670,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Addresses",
+      "page": "addresses",
+      "is_interactive": true
+    },
+    "AddressDetailPhone.dc.html": {
+      "x": 470,
+      "y": 1670,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — one Address",
+      "page": "addresses",
+      "is_interactive": true
+    },
+    "UsageLocationPhone.dc.html": {
+      "x": 940,
+      "y": 1670,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Add usage location",
+      "page": "addresses"
+    },
+    "MobilesList.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Mobile numbers",
+      "page": "mobiles",
+      "expand": "fill"
+    },
+    "MobileDetail.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "Desktop — one Mobile number",
+      "page": "mobiles",
+      "expand": "fill"
+    },
+    "MobilesPhone.dc.html": {
+      "x": 0,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Mobile numbers",
+      "page": "mobiles",
+      "is_interactive": true
+    },
+    "MobileDetailPhone.dc.html": {
+      "x": 470,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — one Mobile number, copied",
+      "page": "mobiles",
+      "is_interactive": true
+    },
+    "SubscriptionsPage.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1150,
+      "title": "Desktop — Subscriptions",
+      "page": "subscriptions",
+      "expand": "fill"
+    },
+    "SubscriptionForm.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "Desktop — Edit subscription",
+      "page": "subscriptions"
+    },
+    "SubscriptionsPhone.dc.html": {
+      "x": 0,
+      "y": 1570,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Subscriptions",
+      "page": "subscriptions",
+      "is_interactive": true
+    },
+    "SubscriptionDetailPhone.dc.html": {
+      "x": 470,
+      "y": 1570,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — one Subscription",
+      "page": "subscriptions",
+      "is_interactive": true
+    },
+    "SubscriptionFormPhone.dc.html": {
+      "x": 940,
+      "y": 1570,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — New subscription",
+      "page": "subscriptions"
+    },
+    "PlaceDialog.dc.html": {
+      "x": 3040,
+      "y": 2040,
+      "w": 1440,
+      "h": 900,
+      "title": "Component — Add place dialog (Addresses, Mobile numbers)",
+      "page": "foundations"
+    },
+    "EmptyPage.dc.html": {
+      "x": 3040,
+      "y": 3060,
+      "w": 1440,
+      "h": 900,
+      "title": "Component — empty feature page",
+      "page": "foundations"
+    },
+    "EmptyPhone.dc.html": {
+      "x": 4560,
+      "y": 2040,
+      "w": 390,
+      "h": 844,
+      "title": "Component — empty phone screen",
+      "page": "foundations"
+    },
+    "AddressPlaceDialog.dc.html": {
+      "x": 5020,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Add place to an address",
+      "page": "addresses"
+    },
+    "AddressesEmpty.dc.html": {
+      "x": 6540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — no addresses yet",
+      "page": "addresses"
+    },
+    "AddressesEmptyPhone.dc.html": {
+      "x": 1410,
+      "y": 1670,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — no addresses yet",
+      "page": "addresses"
+    },
+    "MobilePlaceDialog.dc.html": {
+      "x": 3500,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Add place to a number",
+      "page": "mobiles"
+    },
+    "MobilesEmpty.dc.html": {
+      "x": 5020,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — no mobile numbers yet",
+      "page": "mobiles"
+    },
+    "MobilePlacePhone.dc.html": {
+      "x": 940,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Add place to a number",
+      "page": "mobiles"
+    },
+    "MobilesEmptyPhone.dc.html": {
+      "x": 1410,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — no mobile numbers yet",
+      "page": "mobiles"
+    },
+    "SubscriptionsEmpty.dc.html": {
+      "x": 3500,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — no subscriptions yet",
+      "page": "subscriptions"
+    },
+    "SubscriptionsEmptyPhone.dc.html": {
+      "x": 1410,
+      "y": 1570,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — no subscriptions yet",
+      "page": "subscriptions"
+    },
+    "YouTubeVideos.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "Desktop — YouTube videos",
+      "page": "youtube",
+      "expand": "fill"
+    },
+    "YouTubeShorts.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Shorts with daily budget",
+      "page": "youtube",
+      "expand": "fill"
+    },
+    "YouTubeChannels.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Channels",
+      "page": "youtube",
+      "expand": "fill"
+    },
+    "YouTubeConnect.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Connect, withdrawn, unavailable",
+      "page": "youtube"
+    },
+    "YouTubePhone.dc.html": {
+      "x": 0,
+      "y": 2900,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Videos",
+      "page": "youtube"
+    },
+    "ShortsPhone.dc.html": {
+      "x": 470,
+      "y": 2900,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Shorts",
+      "page": "youtube"
+    },
+    "YouTubeConnectPhone.dc.html": {
+      "x": 940,
+      "y": 2900,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Access withdrawn",
+      "page": "youtube"
+    },
+    "VaultPage.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 2400,
+      "title": "Desktop — Vault, unlocked",
+      "page": "vault",
+      "expand": "fill"
+    },
+    "VaultUnlock.dc.html": {
+      "x": 3040,
+      "y": 1300,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Unlock gate on other pages",
+      "page": "vault"
+    },
+    "VaultSetup.dc.html": {
+      "x": 4560,
+      "y": 1300,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — First-time setup and recovery key",
+      "page": "vault"
+    },
+    "VaultPhone.dc.html": {
+      "x": 0,
+      "y": 3000,
+      "w": 390,
+      "h": 1240,
+      "title": "Phone — Vault, unlocked",
+      "page": "vault"
+    },
+    "UnlockPhone.dc.html": {
+      "x": 940,
+      "y": 3000,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Unlock gate on other screens",
+      "page": "vault"
+    },
+    "RecoveryKeyPhone.dc.html": {
+      "x": 3290,
+      "y": 3000,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Save your recovery key (setup)",
+      "page": "vault"
+    },
+    "AccountPage.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1520,
+      "title": "Desktop — Account",
+      "page": "account",
+      "expand": "fill"
+    },
+    "DeleteAccountDialog.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Delete account, step 2: confirm",
+      "page": "account"
+    },
+    "AccountPhone.dc.html": {
+      "x": 0,
+      "y": 1900,
+      "w": 390,
+      "h": 1120,
+      "title": "Phone — Account",
+      "page": "account"
+    },
+    "AdminUsers.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Users",
+      "page": "admin",
+      "expand": "fill"
+    },
+    "AdminUserDetail.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "Desktop — User detail",
+      "page": "admin",
+      "expand": "fill"
+    },
+    "AdminAuditLog.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Audit log",
+      "page": "admin",
+      "expand": "fill"
+    },
+    "AdminActionDialog.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Withdraw YouTube Access",
+      "page": "admin"
+    },
+    "AdminUsersPhone.dc.html": {
+      "x": 0,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Users",
+      "page": "admin"
+    },
+    "AdminUserPhone.dc.html": {
+      "x": 470,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — User detail",
+      "page": "admin"
+    },
+    "AdminAuditPhone.dc.html": {
+      "x": 940,
+      "y": 1520,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Audit log",
+      "page": "admin"
+    },
+    "UserDashboard.dc.html": {
+      "expand": "fill",
+      "h": 1500,
+      "page": "dashboard",
+      "title": "Desktop — Home (user)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "VaultLocked.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 2400,
+      "title": "Desktop — Vault, locked (first open)",
+      "page": "vault"
+    },
+    "ChangePassphraseDialog.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Change passphrase dialog",
+      "page": "vault"
+    },
+    "RotateKeyDialog.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "Desktop — Rotate recovery key dialog, step 2",
+      "page": "vault"
+    },
+    "ImportReplaceDialog.dc.html": {
+      "x": 6080,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Import: replace this device's vault",
+      "page": "vault"
+    },
+    "RemoveVaultDialog.dc.html": {
+      "x": 7600,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Remove local vault dialog",
+      "page": "vault"
+    },
+    "VaultLockedPhone.dc.html": {
+      "x": 470,
+      "y": 3000,
+      "w": 390,
+      "h": 1240,
+      "title": "Phone — Vault, locked",
+      "page": "vault"
+    },
+    "ChangePassphrasePhone.dc.html": {
+      "x": 1410,
+      "y": 3000,
+      "w": 390,
+      "h": 1000,
+      "title": "Phone — Change passphrase",
+      "page": "vault"
+    },
+    "RotateKeyPhone.dc.html": {
+      "x": 1880,
+      "y": 3000,
+      "w": 390,
+      "h": 1240,
+      "title": "Phone — Rotate recovery key, step 2",
+      "page": "vault"
+    },
+    "BackupsPhone.dc.html": {
+      "x": 2350,
+      "y": 3000,
+      "w": 390,
+      "h": 1400,
+      "title": "Phone — Backups, export and import",
+      "page": "vault"
+    },
+    "ReaderPhone.dc.html": {
+      "x": 2820,
+      "y": 3000,
+      "w": 390,
+      "h": 1240,
+      "title": "Phone — Offline reader",
+      "page": "vault"
+    },
+    "DeleteAccountStep1.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Delete account, step 1: Escape Copy",
+      "page": "account"
+    },
+    "DeleteStep1Phone.dc.html": {
+      "x": 470,
+      "y": 1900,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Delete account, step 1",
+      "page": "account"
+    },
+    "DeleteStep2Phone.dc.html": {
+      "x": 940,
+      "y": 1900,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Delete account, step 2",
+      "page": "account"
+    },
+    "FeedbackDialog.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1180,
+      "title": "Desktop — Send feedback dialog",
+      "page": "feedback"
+    },
+    "YourReports.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1400,
+      "title": "Desktop — Your reports",
+      "page": "feedback",
+      "expand": "fill"
+    },
+    "YourReportsEmpty.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Your reports, empty",
+      "page": "feedback"
+    },
+    "FixNoticeUnsubscribe.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Fix Notice unsubscribe (email link)",
+      "page": "feedback"
+    },
+    "FeedbackPhone.dc.html": {
+      "x": 0,
+      "y": 1800,
+      "w": 390,
+      "h": 1360,
+      "title": "Phone — Send feedback",
+      "page": "feedback"
+    },
+    "MorePhone.dc.html": {
+      "x": 470,
+      "y": 1800,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — More tab, feedback entry points",
+      "page": "feedback"
+    },
+    "YourReportsPhone.dc.html": {
+      "x": 940,
+      "y": 1800,
+      "w": 390,
+      "h": 1100,
+      "title": "Phone — Your reports",
+      "page": "feedback"
+    },
+    "UnsubscribePhone.dc.html": {
+      "x": 1410,
+      "y": 1800,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Unsubscribe link no longer valid",
+      "page": "feedback"
+    },
+    "AdminFeedbackInbox.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Desktop — Feedback inbox",
+      "page": "adminfeedback",
+      "expand": "fill"
+    },
+    "AdminFeedbackReport.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1300,
+      "title": "Desktop — Report, open for triage",
+      "page": "adminfeedback",
+      "expand": "fill"
+    },
+    "AdminFeedbackFixed.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1300,
+      "title": "Desktop — Report, Fixed (Reopen only)",
+      "page": "adminfeedback"
+    },
+    "AdminFeedbackPhone.dc.html": {
+      "x": 0,
+      "y": 1700,
+      "w": 390,
+      "h": 844,
+      "title": "Phone — Feedback inbox",
+      "page": "adminfeedback"
+    },
+    "AdminReportPhone.dc.html": {
+      "x": 470,
+      "y": 1700,
+      "w": 390,
+      "h": 1500,
+      "title": "Phone — Report and triage",
+      "page": "adminfeedback"
+    },
+    "YouTubeFirstLook.dc.html": {
+      "x": 0,
+      "y": 1250,
+      "w": 1440,
+      "h": 1300,
+      "title": "Desktop — First look: access granted, not connected",
+      "page": "youtube",
+      "expand": "fill"
+    },
+    "YouTubeCallback.dc.html": {
+      "x": 1520,
+      "y": 1250,
+      "w": 1440,
+      "h": 900,
+      "title": "Desktop — Returning from Google: connecting, failed",
+      "page": "youtube"
+    },
+    "YouTubeFirstLookPhone.dc.html": {
+      "x": 1410,
+      "y": 2900,
+      "w": 390,
+      "h": 1640,
+      "title": "Phone — First look",
+      "page": "youtube"
+    },
+    "LegalPrivacy.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 3300,
+      "title": "Desktop — Privacy Policy",
+      "page": "legal",
+      "expand": "fill"
+    },
+    "LegalTerms.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 2100,
+      "title": "Desktop — Terms of Service",
+      "page": "legal",
+      "expand": "fill"
+    },
+    "LegalYouTubeData.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1400,
+      "title": "Desktop — How we store your YouTube data",
+      "page": "legal",
+      "expand": "fill"
+    },
+    "LegalPrivacyPhone.dc.html": {
+      "x": 0,
+      "y": 3700,
+      "w": 390,
+      "h": 6600,
+      "title": "Phone — Privacy Policy",
+      "page": "legal"
+    },
+    "LegalTermsPhone.dc.html": {
+      "x": 470,
+      "y": 3700,
+      "w": 390,
+      "h": 3900,
+      "title": "Phone — Terms of Service",
+      "page": "legal"
+    },
+    "LegalYouTubeDataPhone.dc.html": {
+      "x": 940,
+      "y": 3700,
+      "w": 390,
+      "h": 2300,
+      "title": "Phone — How we store your YouTube data",
+      "page": "legal"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-18T16:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "page": "foundations",
+    "view": "canvas"
+  },
+  "notes": {
+    "addrDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Addresses — desktop",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "addresses"
+    },
+    "addrPhone": {
+      "x": 0,
+      "y": 1370,
+      "text": "Addresses — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "addresses"
+    },
+    "addrNotes": {
+      "x": 4560,
+      "y": 0,
+      "w": 380,
+      "maxH": 520,
+      "fill": "yellow",
+      "page": "addresses",
+      "text": "Decisions in this page:\n• Copy is the main action: tap a field to copy it, or Copy all. The clipboard clears after 60 s.\n• Usage Locations become a checklist with progress (\"3 of 5 updated\"); the 7-column table only remains on wide desktop as columns inside each row.\n• Status Current / Old can be changed from the detail page (today it has no control).\n• Delete moves to the detail page's danger zone; the list keeps a row menu.\n• Same pattern is reused by Mobile numbers."
+    },
+    "mobDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Mobile numbers — desktop",
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "mobiles"
+    },
+    "mobPhone": {
+      "x": 0,
+      "y": 1220,
+      "text": "Mobile numbers — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "mobiles"
+    },
+    "mobNotes": {
+      "x": 3040,
+      "y": 1020,
+      "w": 380,
+      "maxH": 480,
+      "fill": "yellow",
+      "page": "mobiles",
+      "text": "Decisions in this page:\n• Parity with Addresses: search, counters, empty state with an action, visible delete (no hover-only button).\n• Copy number and a Call action (tel: link) on the detail page.\n• Country code uses the same searchable picker as Addresses.\n• Usage Locations reuse the Address checklist exactly; only the noun changes."
+    },
+    "subDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Subscriptions — desktop",
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "subscriptions"
+    },
+    "subPhone": {
+      "x": 0,
+      "y": 1270,
+      "text": "Subscriptions — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "subscriptions"
+    },
+    "subNotes": {
+      "x": 3040,
+      "y": 1020,
+      "w": 380,
+      "maxH": 520,
+      "fill": "yellow",
+      "page": "subscriptions",
+      "text": "Decisions in this page:\n• One headline number: a monthly equivalent across cycles (per currency, plus the converted total when the user asks for it).\n• \"Renews in N days\" replaces a bare date; within 7 days it turns amber.\n• Status is a pill and a filter (Active default); Cancelled and Expired drop out of totals as today.\n• Payment method, renewal type and tier finally show on the detail.\n• Inline field errors on the form; end date available when adding."
+    },
+    "ytDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "YouTube — desktop",
+      "kind": "title1",
+      "maxW": 5960,
+      "page": "youtube"
+    },
+    "ytPhone": {
+      "x": 0,
+      "y": 2600,
+      "text": "YouTube — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "youtube"
+    },
+    "ytNotes": {
+      "x": 6080,
+      "y": 0,
+      "w": 380,
+      "maxH": 560,
+      "fill": "yellow",
+      "page": "youtube",
+      "text": "Decisions in this page:\n• One page header with tabs Videos / Shorts / Channels, no card-in-card.\n• Sync freshness and the Sync button sit together in the header.\n• Three distinct notices: Connect (first time), Access withdrawn (permanent, explains why and what was deleted), Temporarily unavailable (try later). Today one notice covers all three.\n• Empty directory copy points to Channels, not to a list that isn't there.\n• Weekly digest stays on the Account page; Channels links to it.\nBackend: telling \"withdrawn\" from \"down\" needs the availability check to return a reason.\n• First look (access granted, not connected) uses today's copy word for word: the six storage points, the Before you connect points, the agreement and Connect YouTube. Tweak \"state\" shows ticked, the not-ticked error and the revoked note.\n• Flagged, not changed: connecting imports no channels, so the first connected view says \"No channels yet\"; a failed status or auth-url call shows nothing."
+    },
+    "vaultDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Vault — desktop",
+      "kind": "title1",
+      "maxW": 9040,
+      "page": "vault"
+    },
+    "vaultPhone": {
+      "x": 0,
+      "y": 2700,
+      "text": "Vault — phone",
+      "kind": "title1",
+      "maxW": 3680,
+      "page": "vault"
+    },
+    "vaultNotes": {
+      "x": 9120,
+      "y": 0,
+      "w": 380,
+      "maxH": 760,
+      "fill": "yellow",
+      "page": "vault",
+      "text": "Decisions in this page:\n• Every section from today's Vault page is here, with its copy kept word for word: Unlock, Change passphrase, Rotate recovery key, Encrypted Escape Copy (Google Drive), Export, Import, the offline reader, Remove local vault.\n• First open while locked: the Unlock panel replaces the status hero. Passphrase and recovery-key cards are disabled with today's reason; backups, export, import and the reader still work.\n• Change passphrase and Rotate recovery key move into dialogs (phone: pushed screens) that carry their full explanations. The cards keep their one-line description.\n• Change passphrase has a tweak for the recovery-key unlock path (\"Set new passphrase\").\n• Import and Restore from Google Drive share one replace dialog; its text and tick box follow what the file changes.\n• Remove dialog: the button says \"Remove from this device\" instead of today's \"Delete\".\n• Sample recovery keys are placeholders, never real keys."
+    },
+    "accDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Account — desktop",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "account"
+    },
+    "accPhone": {
+      "x": 0,
+      "y": 1600,
+      "text": "Account — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "account"
+    },
+    "accNotes": {
+      "x": 4560,
+      "y": 0,
+      "w": 380,
+      "maxH": 600,
+      "fill": "yellow",
+      "page": "account",
+      "text": "Decisions in this page:\n• Wording follows today's Account page; new copy only where today has none (profile header, Preferences line, backup summary).\n• A profile header (today the page has no identity or title).\n• Order: backups summary, Preferences, Weekly YouTube digest (only when YouTube is connected), Install MyOrganiser (hidden once installed), Delete account.\n• The backup summary links to the Vault page instead of duplicating it.\n• Delete keeps today's two steps. Step 1 offers an Escape Copy; its button reads \"Continue without a copy\" until one is downloaded, then \"Continue\" (tweak on the step 1 board). Step 2 asks for the password and DELETE."
+    },
+    "admDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Admin portal — desktop",
+      "kind": "title1",
+      "maxW": 5960,
+      "page": "admin"
+    },
+    "admPhone": {
+      "x": 0,
+      "y": 1220,
+      "text": "Admin portal — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "admin"
+    },
+    "admNotes": {
+      "x": 6080,
+      "y": 0,
+      "w": 380,
+      "maxH": 560,
+      "fill": "orange",
+      "page": "admin",
+      "text": "Decisions and backend needs:\n• Users: filter chips (role, status), sort, paging — needs list-users paging and filters.\n• User detail: sectioned cards; actions grouped by risk; you cannot disable or demote yourself (button disabled with a reason).\n• Recent activity on the user page — needs audit log filtered by user.\n• Audit log: names instead of raw ids, action pills, filters, paging past 50 — needs names joined and paging.\n• Every destructive action keeps a confirm dialog that says exactly what happens."
+    },
+    "adminBackend": {
+      "fill": "orange",
+      "maxH": 420,
+      "page": "dashboard",
+      "text": "Backend needed for the admin overview:\n• A stats endpoint: user totals by role, disabled, unverified, YouTube Access places used.\n• Audit log: actor and target names (today raw ids), plus paging past the newest 50.\n• Users list: paging, sort, and role / status filters (today search only).\nEach needs an API change and yarn openapi:sync before the UI can ship.",
+      "w": 380,
+      "x": 3040,
+      "y": 0
+    },
+    "dashDesktop": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "dashboard",
+      "text": "Dashboard — desktop",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "dashPhone": {
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "dashboard",
+      "text": "Dashboard — phone",
+      "w": 240,
+      "x": 0,
+      "y": 1600
+    },
+    "desktop": {
+      "kind": "title1",
+      "maxW": 2960,
+      "page": "foundations",
+      "text": "Foundations — desktop",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "grocDesktop": {
+      "kind": "title1",
+      "maxW": 5960,
+      "page": "groceries",
+      "text": "Groceries — desktop",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "grocNotes": {
+      "maxH": 520,
+      "page": "groceries",
+      "text": "Decisions in this page:\n• Words follow CONTEXT.md: Grocery List (never \"trip\"), Catalog Item, Uncheck All, Remove Checked, Delete Grocery List.\n• Lines group by category in shop-walk order (GROCERY_CATEGORY_ORDER).\n• An empty list says so — no more \"All checked\".\n• The Catalog is its own tab, so it is reachable with zero lists.\n• Totals unchanged: a line counts its Catalog Item price once; Amount is a label. Multiplying by amount would be a domain change.",
+      "w": 380,
+      "x": 6080,
+      "y": 0
+    },
+    "grocPhone": {
+      "kind": "title1",
+      "maxW": 1800,
+      "page": "groceries",
+      "text": "Groceries — phone",
+      "w": 240,
+      "x": 0,
+      "y": 1360
+    },
+    "phone": {
+      "kind": "title1",
+      "maxW": 1800,
+      "page": "foundations",
+      "text": "Foundations — phone (installed app)",
+      "w": 240,
+      "x": 0,
+      "y": 4860
+    },
+    "taskDesktop": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "tasks",
+      "text": "Tasks — desktop",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "taskNotes": {
+      "maxH": 520,
+      "page": "tasks",
+      "text": "Decisions in this page:\n• Tick to complete: the checkbox moves a Task to done (closedAt set), Undo in the toast.\n• Groups: Overdue, Today, Upcoming, No date — then Done collapsed.\n• Description and estimated minutes finally get UI.\n• Status shows as a pill only when it is not the default (In progress, Blocked).\n• Filters: context segmented + status chips; archived behind a chip.\n• Same sort inside a group as today: priority, then due, then created.",
+      "w": 380,
+      "x": 4560,
+      "y": 0
+    },
+    "taskPhone": {
+      "kind": "title1",
+      "maxW": 1800,
+      "page": "tasks",
+      "text": "Tasks — phone",
+      "w": 240,
+      "x": 0,
+      "y": 1270
+    },
+    "fbDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Feedback — desktop",
+      "kind": "title1",
+      "maxW": 6000,
+      "page": "feedback"
+    },
+    "fbPhone": {
+      "x": 0,
+      "y": 1500,
+      "text": "Feedback — phone",
+      "kind": "title1",
+      "maxW": 1800,
+      "page": "feedback"
+    },
+    "fbNotes": {
+      "x": 6080,
+      "y": 0,
+      "w": 380,
+      "maxH": 760,
+      "fill": "yellow",
+      "page": "feedback",
+      "text": "Decisions in this page:\n• Wording is today's, word for word, from the dialog, Your reports, the follow-up form and the unsubscribe page.\n• Entry points: \"Send feedback\" in the sidebar footer and the account menu (desktop), and the More tab (phone). Your reports sits on the Account page with its Updated badge.\n• The dialog keeps the plaintext warning and shows the Report Context before sending. Tweak \"kind\" switches Bug report and Suggestion.\n• Status pills: Received and Under review neutral and blue, Planned violet, Fixed and Shipped teal, Won't do red, Can't reproduce amber outline.\n• The unsubscribe page has a tweak for its four states: working, done, invalid, error.\n• New illustration: feedback (two speech bubbles). Added to Foundations."
+    },
+    "afDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Admin feedback — desktop",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "adminfeedback"
+    },
+    "afPhone": {
+      "x": 0,
+      "y": 1400,
+      "text": "Admin feedback — phone",
+      "kind": "title1",
+      "maxW": 860,
+      "page": "adminfeedback"
+    },
+    "afNotes": {
+      "x": 4560,
+      "y": 0,
+      "w": 380,
+      "maxH": 760,
+      "fill": "orange",
+      "page": "adminfeedback",
+      "text": "Decisions and backend needs:\n• Feedback joins the admin sidebar and the admin phone tab bar, with the slate inbox illustration.\n• Sidebar badge counts Received reports — needs a count endpoint (none today).\n• Inbox keeps today's filters (Status, Kind, Platform, Tracking issue). Platform becomes a dropdown (Any platform, Web, iOS, Android) instead of free text — the column is a plain string today, so the backend should validate these three values and columns; adds paging (Newer / Older) — needs offset or cursor paging (today: first 100, no paging).\n• Report detail splits the reading column from a Triage panel, so every action sits beside what it acts on. All wording is today's.\n• Triage keeps inline messages, no toasts or confirm dialogs, as today.\n• Fixed and Shipped show only the final note, the Tracking Issue and Reopen.\n• Admin Home is still a redirect today; the v2 Overview replaces it."
+    },
+    "lgDesktop": {
+      "x": 0,
+      "y": -300,
+      "text": "Legal pages — desktop",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "legal"
+    },
+    "lgPhone": {
+      "x": 0,
+      "y": 3400,
+      "text": "Legal pages — phone",
+      "kind": "title1",
+      "maxW": 1330,
+      "page": "legal"
+    },
+    "lgNotes": {
+      "x": 4560,
+      "y": 0,
+      "w": 380,
+      "maxH": 900,
+      "fill": "yellow",
+      "page": "legal",
+      "text": "Decisions in this page:\n• Every word of Privacy, Terms and How we store your YouTube data is today's, unchanged. Only the layout is new.\n• One public layout for all three: a slim header with Privacy Policy and Terms of Service, a navy title band with an illustration, an On this page list, numbered section cards, and the landing footer line.\n• On the phone the On this page list sits above the text.\n• The same section components still feed the Sign up dialog (h3 there).\n• Operator & Contact shows placeholder values; the real ones come from OPERATOR_NAME and OPERATOR_CONTACT_EMAIL.\n• Flagged, not changed: Terms has no Last updated line; How we store your YouTube data links only to /dashboard/youtube, so a signed-out reader has no way back. There is no separate YouTube terms page — Terms links to YouTube's own."
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Illustrations.dc.html",
+    "Illustration.dc.html",
+    "TabBar.dc.html",
+    "AppSidebar.dc.html",
+    "AdminSidebar.dc.html",
+    "AppHeader.dc.html",
+    "CategoryIllustration.dc.html",
+    "GroceryCategories.dc.html",
+    "Buttons.dc.html",
+    "Inputs.dc.html",
+    "Feedback.dc.html",
+    "Data.dc.html",
+    "Navigation.dc.html",
+    "PhoneNav.dc.html",
+    "PhoneLists.dc.html",
+    "PhoneOverlays.dc.html",
+    "PhoneForms.dc.html",
+    "UserDashboard.dc.html",
+    "AdminDashboard.dc.html",
+    "HomePhone.dc.html",
+    "HomePhoneLocked.dc.html",
+    "AdminPhone.dc.html",
+    "GroceriesLists.dc.html",
+    "GroceriesList.dc.html",
+    "GroceriesCatalog.dc.html",
+    "GroceriesAddItem.dc.html",
+    "GroceriesPhone.dc.html",
+    "GroceryListPhone.dc.html",
+    "GroceriesAddPhone.dc.html",
+    "GroceryListEmptyPhone.dc.html",
+    "TasksPage.dc.html",
+    "TasksAllClear.dc.html",
+    "TaskAddDialog.dc.html",
+    "TasksPhone.dc.html",
+    "TaskCapturePhone.dc.html",
+    "TaskDetailPhone.dc.html",
+    "TasksAllClearPhone.dc.html",
+    "AddressesList.dc.html",
+    "AddressDetail.dc.html",
+    "AddressAddSheet.dc.html",
+    "AddressesPhone.dc.html",
+    "AddressDetailPhone.dc.html",
+    "UsageLocationPhone.dc.html",
+    "MobilesList.dc.html",
+    "MobileDetail.dc.html",
+    "MobilesPhone.dc.html",
+    "MobileDetailPhone.dc.html",
+    "SubscriptionsPage.dc.html",
+    "SubscriptionForm.dc.html",
+    "SubscriptionsPhone.dc.html",
+    "SubscriptionDetailPhone.dc.html",
+    "SubscriptionFormPhone.dc.html",
+    "PlaceDialog.dc.html",
+    "EmptyPage.dc.html",
+    "EmptyPhone.dc.html",
+    "AddressPlaceDialog.dc.html",
+    "AddressesEmpty.dc.html",
+    "AddressesEmptyPhone.dc.html",
+    "MobilePlaceDialog.dc.html",
+    "MobilesEmpty.dc.html",
+    "MobilePlacePhone.dc.html",
+    "MobilesEmptyPhone.dc.html",
+    "SubscriptionsEmpty.dc.html",
+    "SubscriptionsEmptyPhone.dc.html",
+    "YouTubeVideos.dc.html",
+    "YouTubeShorts.dc.html",
+    "YouTubeChannels.dc.html",
+    "YouTubeConnect.dc.html",
+    "YouTubePhone.dc.html",
+    "ShortsPhone.dc.html",
+    "YouTubeConnectPhone.dc.html",
+    "VaultPage.dc.html",
+    "VaultUnlock.dc.html",
+    "VaultSetup.dc.html",
+    "VaultPhone.dc.html",
+    "UnlockPhone.dc.html",
+    "RecoveryKeyPhone.dc.html",
+    "AccountPage.dc.html",
+    "DeleteAccountDialog.dc.html",
+    "AccountPhone.dc.html",
+    "AdminUsers.dc.html",
+    "AdminUserDetail.dc.html",
+    "AdminAuditLog.dc.html",
+    "AdminActionDialog.dc.html",
+    "AdminUsersPhone.dc.html",
+    "AdminUserPhone.dc.html",
+    "AdminAuditPhone.dc.html",
+    "VaultLocked.dc.html",
+    "ChangePassphraseDialog.dc.html",
+    "RotateKeyDialog.dc.html",
+    "ImportReplaceDialog.dc.html",
+    "RemoveVaultDialog.dc.html",
+    "VaultLockedPhone.dc.html",
+    "ChangePassphrasePhone.dc.html",
+    "RotateKeyPhone.dc.html",
+    "BackupsPhone.dc.html",
+    "ReaderPhone.dc.html",
+    "DeleteAccountStep1.dc.html",
+    "DeleteStep1Phone.dc.html",
+    "DeleteStep2Phone.dc.html",
+    "FeedbackDialog.dc.html",
+    "YourReports.dc.html",
+    "YourReportsEmpty.dc.html",
+    "FixNoticeUnsubscribe.dc.html",
+    "FeedbackPhone.dc.html",
+    "MorePhone.dc.html",
+    "YourReportsPhone.dc.html",
+    "UnsubscribePhone.dc.html",
+    "AdminFeedbackInbox.dc.html",
+    "AdminFeedbackReport.dc.html",
+    "AdminFeedbackFixed.dc.html",
+    "AdminFeedbackPhone.dc.html",
+    "AdminReportPhone.dc.html",
+    "YouTubeFirstLook.dc.html",
+    "YouTubeCallback.dc.html",
+    "YouTubeFirstLookPhone.dc.html",
+    "LegalPrivacy.dc.html",
+    "LegalTerms.dc.html",
+    "LegalYouTubeData.dc.html",
+    "LegalPrivacyPhone.dc.html",
+    "LegalTermsPhone.dc.html",
+    "LegalYouTubeDataPhone.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "foundations",
+      "name": "0 · Foundations"
+    },
+    {
+      "id": "dashboard",
+      "name": "1 · Dashboard"
+    },
+    {
+      "id": "groceries",
+      "name": "2 · Groceries"
+    },
+    {
+      "id": "tasks",
+      "name": "3 · Tasks"
+    },
+    {
+      "id": "addresses",
+      "name": "4 · Addresses"
+    },
+    {
+      "id": "mobiles",
+      "name": "5 · Mobile numbers"
+    },
+    {
+      "id": "subscriptions",
+      "name": "6 · Subscriptions"
+    },
+    {
+      "id": "youtube",
+      "name": "7 · YouTube"
+    },
+    {
+      "id": "vault",
+      "name": "8 · Vault"
+    },
+    {
+      "id": "account",
+      "name": "9 · Account"
+    },
+    {
+      "id": "admin",
+      "name": "10 · Admin portal"
+    },
+    {
+      "id": "feedback",
+      "name": "11 · Feedback"
+    },
+    {
+      "id": "adminfeedback",
+      "name": "12 · Admin feedback"
+    },
+    {
+      "id": "legal",
+      "name": "13 · Legal pages"
+    }
+  ],
+  "title": "MyOrganiser Web v2.0"
+}

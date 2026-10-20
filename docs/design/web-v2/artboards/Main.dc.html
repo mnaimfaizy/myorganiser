@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>v2.0 tokens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1080px; box-sizing: border-box; padding: 48px; background: #FFFFFF; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 32px">
+
+  <header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #5B21B6">MYORGANISER WEB · V2.0 · FOUNDATIONS</span>
+      <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">Tokens</h1>
+      <p style="margin: 0; font-size: 17px; line-height: 24px; color: #475569; max-width: 760px">Every value comes from tokens.json. Swatches marked NEW are roles v2.0 adds; the hex already exists or sits beside an existing one.</p>
+    </div>
+    <span style="font-size: 13px; line-height: 18px; color: #64748B">Light mode · dark mode follows the existing dark roles</span>
+  </header>
+
+  <section aria-label="Colour roles" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">{{g.title}}</h2>
+        <sc-for list="{{g.items}}" as="c" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span aria-hidden="true" style="{{c.chip}}"></span>
+            <span style="display: flex; flex-direction: column; min-width: 0; flex-grow: 1">
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 15px; line-height: 20px; font-weight: 600">{{c.name}}
+                <sc-if value="{{c.isNew}}" hint-placeholder-val="{{false}}"><span style="padding: 1px 6px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; font-size: 11px; line-height: 14px; font-weight: 600">NEW</span></sc-if>
+              </span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 16px; color: #475569">{{c.hex}}</span>
+              <span style="font-size: 13px; line-height: 18px; color: #64748B">{{c.use}}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+  </section>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 40px; padding-top: 24px; border-top: 1px solid #E2E8F0">
+    <section aria-label="Type scale" style="display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">TYPE SCALE · 7 STEPS, USED WHOLE</h2>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">display</span><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">Good afternoon, Sam</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">title-lg</span><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Groceries</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">title</span><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -0.015em">Due today</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">body</span><span style="font-size: 17px; line-height: 24px">Pay council tax before Friday.</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">body-sm</span><span style="font-size: 15px; line-height: 20px">Buttons, rows, supporting copy</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">label-caps</span><span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em">DUE TODAY · 3</span></div>
+      <div style="display: flex; align-items: baseline; gap: 16px"><span style="width: 96px; flex-shrink: 0; font-size: 13px; color: #64748B">caption</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Updated 2 hours ago</span></div>
+      <p style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: #64748B">Plus Jakarta Sans sets display to title. Inter sets body and below. Numbers in tables and totals use tabular figures.</p>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 24px">
+      <section aria-label="Spacing" style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SPACING · 4 PX STEPS</h2>
+        <sc-for list="{{spaces}}" as="s" hint-placeholder-count="6">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span style="width: 64px; font-size: 13px; color: #64748B">{{s.name}}</span>
+            <span aria-hidden="true" style="{{s.bar}}"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #475569">{{s.px}}</span>
+          </div>
+        </sc-for>
+      </section>
+      <section aria-label="Radius and elevation" style="display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">RADIUS AND ELEVATION</h2>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap">
+          <sc-for list="{{radii}}" as="r" hint-placeholder-count="6">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+              <span aria-hidden="true" style="{{r.box}}"></span>
+              <span style="font-size: 12px; line-height: 16px; color: #475569">{{r.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 16px">
+          <div style="flex: 1; height: 64px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0px 1px 3px rgba(15, 23, 42, 0.05); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #475569">card · hairline + 1 px shadow</div>
+          <div style="flex: 1; height: 64px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #475569">popover · menus, sheets</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (hex, dark) => 'width:56px;height:56px;border-radius:14px;flex-shrink:0;background:' + hex + ';border:1px solid ' + (dark ? hex : '#E2E8F0');
+    const sw = (name, hex, use, isNew, dark) => ({ name, hex, use, isNew: !!isNew, chip: chip(hex, dark) });
+    const groups = [
+      { title: 'SURFACES', items: [
+        sw('Background', '#F8FAFC', 'Page ground'),
+        sw('Card', '#FFFFFF', 'Cards, sheets, inputs'),
+        sw('Container', '#ECEEF0', 'Secondary button, track'),
+        sw('Border', '#E2E8F0', 'Hairlines, card edge'),
+        sw('Navy', '#0F172A', 'Sidebar, hero, primary', false, true),
+        sw('Navy raised', '#1D283A', 'Sidebar card, dividers', false, true)
+      ] },
+      { title: 'TEXT', items: [
+        sw('Foreground', '#0F172A', 'Headings, body', false, true),
+        sw('Secondary', '#334155', 'Row text, labels', true, true),
+        sw('Muted', '#64748B', 'Captions, meta (4.8:1)', false, true),
+        sw('On navy', '#FFFFFF', 'Text on sidebar and hero'),
+        sw('On navy muted', '#94A3B8', 'Meta on navy (6.9:1)', false, true)
+      ] },
+      { title: 'BRAND AND TRUST', items: [
+        sw('Brand', '#7C3AED', 'Main create action, active nav', false, true),
+        sw('Brand soft', '#EDE9FE', 'Active tab pill, brand tint', true),
+        sw('Brand text', '#5B21B6', 'Links, brand text on light', true, true),
+        sw('Trust teal', '#0F766E', 'Encrypted, synced, unlocked', false, true),
+        sw('Teal soft', '#CCFBF1', 'Synced chip ground', true),
+        sw('Cyan', '#06B6D4', 'Progress on navy, snackbar action', false, true)
+      ] },
+      { title: 'STATUS', items: [
+        sw('Success', '#15803D', 'Done, complete (5.0:1)', false, true),
+        sw('Warning', '#B45309', 'Due soon, not yet sent', false, true),
+        sw('Warning soft', '#FEF3C7', 'Due pill ground · text #92400E', true),
+        sw('Destructive', '#DC2626', 'Delete fill only', false, true),
+        sw('Destructive soft', '#FEE2E2', 'Overdue pill · text #B91C1C', true)
+      ] }
+    ];
+    const spaces = [['xs', 4], ['sm', 8], ['md', 16], ['lg', 24], ['xl', 32], ['2xl', 48]].map(([name, px]) => ({ name, px: px + 'px', bar: 'height:12px;border-radius:3px;background:#C4B5FD;width:' + (px * 4) + 'px' }));
+    const radii = [['4 · tag', 4], ['8 · control', 8], ['12 · row group', 12], ['16 · card', 16], ['24 · hero', 24], ['full · pill', 999]].map(([label, r]) => ({ label, box: 'width:64px;height:48px;background:#F1F5F9;border:1px solid #CBD5E1;border-radius:' + r + 'px' }));
+    return { groups, spaces, radii };
+  }
+}
+</script>
+</body>
+</html>

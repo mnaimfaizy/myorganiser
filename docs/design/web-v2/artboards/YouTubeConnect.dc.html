@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YouTube access states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 40px 48px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 24px">
+  <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Three different YouTube notices</h1>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start">
+
+    <section style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #5B21B6">FIRST TIME</span>
+      <dc-import name="Illustration" kind="youtube" size="88" hint-size="88px,88px"></dc-import>
+      <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Connect Your YouTube Account</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Link your YouTube account to view and manage videos from your Enabled Channels. We only request read-only access.</p>
+      <p style="margin: 0; font-size: 13px; line-height: 18px; color: #64748B">The full first look, with the six storage points and the Before you connect acknowledgement, is on its own board.</p>
+      <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Connect YouTube</button>
+    </section>
+
+    <section role="alert" style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 24px; background: #FFFFFF; border: 1px solid #FCD34D">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #92400E">ACCESS WITHDRAWN · PERMANENT</span>
+      <dc-import name="Illustration" kind="youtube" size="88" hint-size="88px,88px"></dc-import>
+      <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">YouTube is no longer available to you</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">An admin withdrew your YouTube Access on 14 Oct. Your YouTube connection was ended and its cached data deleted. The rest of MyOrganiser is unaffected.</p>
+      <p style="margin: 0; font-size: 13px; line-height: 18px; color: #64748B">If you think this is a mistake, contact the person who runs your MyOrganiser.</p>
+      <a href="#" style="display: flex; align-items: center; justify-content: center; height: 48px; border-radius: 12px; border: 1px solid #CBD5E1; color: #0F172A; font: 600 16px 'Inter', sans-serif; text-decoration: none">Back to Home</a>
+    </section>
+
+    <section role="status" style="display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: 24px; background: #FFFFFF; border: 1px solid #E2E8F0">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #475569">TEMPORARY</span>
+      <dc-import name="Illustration" kind="youtube" size="88" hint-size="88px,88px"></dc-import>
+      <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">YouTube can't be reached right now</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">We couldn't check your YouTube connection. Your cached uploads are safe. Try again in a few minutes.</p>
+      <button type="button" style="height: 48px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Try again</button>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

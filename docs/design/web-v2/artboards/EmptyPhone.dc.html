@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Empty phone screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="display: flex; align-items: center; height: 44px; padding: 0 8px 0 4px">
+    <a href="#" style="display: flex; align-items: center; gap: 2px; height: 44px; padding: 0 8px 0 4px; text-decoration: none; color: #5B21B6; font-size: 17px"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M14 3.5 L6.5 11 L14 18.5 L15.6 16.9 L9.7 11 L15.6 5.1 Z" fill="#5B21B6"></path></svg>More</a>
+  </div>
+  <h1 style="margin: 0; padding: 0 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 32px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">{{title}}</h1>
+  <main style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 0 32px 80px; text-align: center">
+    <dc-import name="Illustration" kind="{{illo}}" size="112" hint-size="112px,112px"></dc-import>
+    <h2 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">{{heading}}</h2>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">{{line}}</p>
+    <button type="button" style="margin-top: 8px; width: 100%; height: 48px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">{{cta}}</button>
+    <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #115E59"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: #0F766E"></span>Encrypted on this phone</span>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"illo":{"editor":"enum","options":["addresses","mobile","subscriptions"],"default":"addresses"},"title":{"editor":"text","default":"Addresses"},"heading":{"editor":"text","default":"No addresses yet"},"line":{"editor":"text","default":"Save the places you live or have lived."},"cta":{"editor":"text","default":"Add address"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      illo: this.props.illo ?? 'addresses',
+      title: this.props.title ?? 'Addresses',
+      heading: this.props.heading ?? 'No addresses yet',
+      line: this.props.line ?? 'Save the places you live or have lived.',
+      cta: this.props.cta ?? 'Add address'
+    };
+  }
+}
+</script>
+</body>
+</html>

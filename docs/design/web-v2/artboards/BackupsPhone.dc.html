@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone backups</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}
+select{appearance:none}
+.c{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:16px;background:#FFFFFF;border:1px solid #E2E8F0}
+.h{margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;line-height:24px;font-weight:700}
+.d{margin:0;font-size:15px;line-height:20px;color:#334155}
+.p{margin:0;font-size:14px;line-height:20px;color:#475569}
+.b{height:48px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font:600 16px 'Inter',sans-serif}
+.bd{height:48px;border-radius:12px;border:0;background:#0F172A;color:#FFFFFF;font:600 16px 'Inter',sans-serif}
+</style>
+</helmet>
+<div style="width: 390px; height: 1400px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 12px 16px 34px">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; height: 44px; font-size: 17px; text-decoration: none"><svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.6 0 L8 1.4 L3.4 6 L8 10.6 L6.6 12 L0.6 6 Z" fill="#5B21B6"></path></svg>Vault</a>
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.02em">Backups</h1>
+
+    <section class="c">
+      <h2 class="h">Encrypted Escape Copy</h2>
+      <p class="d">Keep an encrypted copy of your vault in your own Google Drive, so it outlives MyOrganiser. Plaintext never leaves this device.</p>
+      <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #115E59"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #0F766E"></span>Linked to Google Drive<span style="flex-grow: 1"></span><button type="button" style="height: 40px; padding: 0 8px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #475569">Unlink</button></span>
+      <span style="font-size: 15px; color: #334155">Newest copy: <strong>2 days old</strong></span>
+      <label for="bp-r" style="font-size: 14px; font-weight: 600">Remind me when my newest copy is older than</label>
+      <select id="bp-r" style="height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 400 16px 'Inter', sans-serif; color: #0F172A"><option>1 week</option></select>
+      <button type="button" class="bd">Back up now</button>
+      <button type="button" class="b">Restore from Google Drive</button>
+    </section>
+
+    <section class="c">
+      <h2 class="h">Export encrypted vault</h2>
+      <p class="d">Download a ciphertext-only JSON bundle. The file never contains plaintext addresses or phone numbers.</p>
+      <p class="p">The exported file is decrypted only on this device using your passphrase or recovery key. The server stores audit metadata only — never the bundle itself.</p>
+      <button type="button" class="bd">Export vault JSON</button>
+    </section>
+
+    <section class="c">
+      <h2 class="h">Import encrypted vault</h2>
+      <p class="d">Validate and load a previously exported ciphertext bundle. After import, unlock with the backup's passphrase or Recovery Key.</p>
+      <label for="bp-f" style="font-size: 14px; font-weight: 600">Vault export file (.json)</label>
+      <button id="bp-f" type="button" style="height: 52px; border-radius: 12px; border: 1px dashed #A78BFA; background: #FAF5FF; font: 500 15px 'Inter', sans-serif; color: #5B21B6">Choose file…</button>
+      <button type="button" class="b" disabled="{{true}}" style="opacity: 0.45">Import vault JSON</button>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

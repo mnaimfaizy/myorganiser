@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>v2.0 actions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 48px; background: #FFFFFF; font-family: 'Inter', system-ui, sans-serif; color: #0F172A; display: flex; flex-direction: column; gap: 28px">
+  <header style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Actions</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 20px; color: #475569">Seven variants, six states. Height 44 on desktop, 48 on a phone. Radius 12. One Brand button per screen: the main create action.</p>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 140px repeat(6, minmax(0, 1fr)); gap: 14px 16px; align-items: center">
+    <span></span>
+    <sc-for list="{{states}}" as="s" hint-placeholder-count="6">
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">{{s}}</span>
+    </sc-for>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+      <span style="display: flex; flex-direction: column">
+        <span style="font-size: 15px; line-height: 20px; font-weight: 600">{{r.name}}</span>
+        <span style="font-size: 12px; line-height: 16px; color: #64748B">{{r.use}}</span>
+      </span>
+      <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="6">
+        <span>
+          <button type="button" style="{{c.style}}" disabled="{{c.disabled}}" aria-busy="{{c.busy}}">
+            <sc-if value="{{c.loading}}" hint-placeholder-val="{{false}}">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="2" r="1.6" fill="currentColor"></circle><circle cx="12.2" cy="3.8" r="1.6" fill="currentColor" opacity="0.85"></circle><circle cx="14" cy="8" r="1.6" fill="currentColor" opacity="0.7"></circle><circle cx="12.2" cy="12.2" r="1.6" fill="currentColor" opacity="0.55"></circle><circle cx="8" cy="14" r="1.6" fill="currentColor" opacity="0.4"></circle><circle cx="3.8" cy="12.2" r="1.6" fill="currentColor" opacity="0.3"></circle><circle cx="2" cy="8" r="1.6" fill="currentColor" opacity="0.2"></circle><circle cx="3.8" cy="3.8" r="1.6" fill="currentColor" opacity="0.15"></circle></svg>
+            </sc-if>
+            {{c.label}}
+          </button>
+        </span>
+      </sc-for>
+    </sc-for>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; padding-top: 24px; border-top: 1px solid #E2E8F0">
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">SIZES</h2>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <button type="button" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 14px 'Inter', sans-serif">Small 36</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Default 44</button>
+      </div>
+      <button type="button" style="height: 48px; width: 100%; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 16px 'Inter', sans-serif">Phone full width 48</button>
+    </section>
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">WITH ICON</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="8" y="2" width="2" height="14" rx="1" fill="#FFFFFF"></rect><rect x="2" y="8" width="14" height="2" rx="1" fill="#FFFFFF"></rect></svg>New list</button>
+        <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: 600 15px 'Inter', sans-serif">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="5" y="5" width="10" height="11" rx="2" fill="#334155"></rect><rect x="2" y="2" width="10" height="11" rx="2" fill="#94A3B8"></rect></svg>Copy all</button>
+      </div>
+    </section>
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">ICON BUTTONS · 44 TARGET</h2>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <button type="button" aria-label="Edit" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M12.6 2.2 L15.8 5.4 L6.4 14.8 L2.4 15.6 L3.2 11.6 Z" fill="#334155"></path></svg>
+        </button>
+        <button type="button" aria-label="More actions" style="width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="3.5" r="1.8" fill="#334155"></circle><circle cx="9" cy="9" r="1.8" fill="#334155"></circle><circle cx="9" cy="14.5" r="1.8" fill="#334155"></circle></svg>
+        </button>
+        <button type="button" aria-label="Delete" style="width: 44px; height: 44px; border-radius: 12px; border: 0; background: #FEE2E2; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="4" width="12" height="2" rx="1" fill="#B91C1C"></rect><rect x="7" y="2" width="4" height="2" rx="1" fill="#B91C1C"></rect><path d="M4.5 7 H13.5 L12.8 15 Q12.7 16 11.7 16 H6.3 Q5.3 16 5.2 15 Z" fill="#B91C1C"></path></svg>
+        </button>
+        <button type="button" aria-label="Quick add" style="width: 56px; height: 56px; border-radius: 18px; border: 0; background: #7C3AED; box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35); display: flex; align-items: center; justify-content: center">
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="9.75" y="2" width="2.5" height="18" rx="1.25" fill="#FFFFFF"></rect><rect x="2" y="9.75" width="18" height="2.5" rx="1.25" fill="#FFFFFF"></rect></svg>
+        </button>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #64748B">Every icon-only button carries an aria-label and a tooltip on desktop.</span>
+    </section>
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">BUTTON ORDER</h2>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px; border-radius: 16px; background: #F8FAFC; border: 1px solid #E2E8F0">
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: 600 15px 'Inter', sans-serif">Cancel</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #DC2626; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Delete list</button>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #64748B">Confirm on the right, Cancel first. A destructive confirm names its object: "Delete list", never "OK".</span>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const base = 'display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:12px;font:600 15px Inter,sans-serif;box-sizing:border-box;white-space:nowrap;cursor:pointer;';
+    const v = {
+      Brand: { use: 'Main create action', bg: ['#7C3AED', '#6D28D9', '#7C3AED', '#5B21B6'], fg: '#FFFFFF', border: 'transparent', label: 'New list' },
+      Primary: { use: 'Submit, confirm', bg: ['#0F172A', '#1D283A', '#0F172A', '#334155'], fg: '#FFFFFF', border: 'transparent', label: 'Save' },
+      Secondary: { use: 'Second action', bg: ['#ECEEF0', '#E2E8F0', '#ECEEF0', '#CBD5E1'], fg: '#0F172A', border: 'transparent', label: 'Uncheck All' },
+      Outline: { use: 'Cancel, neutral', bg: ['#FFFFFF', '#F8FAFC', '#FFFFFF', '#F1F5F9'], fg: '#0F172A', border: '#CBD5E1', label: 'Cancel' },
+      Ghost: { use: 'Low emphasis', bg: ['transparent', '#F1F5F9', 'transparent', '#E2E8F0'], fg: '#0F172A', border: 'transparent', label: 'Skip' },
+      Destructive: { use: 'Irreversible', bg: ['#DC2626', '#B91C1C', '#DC2626', '#991B1B'], fg: '#FFFFFF', border: 'transparent', label: 'Delete' },
+      Link: { use: 'Inline navigation', bg: ['transparent', 'transparent', 'transparent', 'transparent'], fg: '#5B21B6', border: 'transparent', label: 'View all' }
+    };
+    const states = ['DEFAULT', 'HOVER', 'FOCUS', 'PRESSED', 'DISABLED', 'LOADING'];
+    const rows = Object.keys(v).map((name) => {
+      const x = v[name];
+      const isLink = name === 'Link';
+      const cells = [0, 1, 2, 3, 4, 5].map((i) => {
+        const bgIdx = i === 1 ? 1 : i === 3 ? 3 : 0;
+        let style = base + 'background:' + x.bg[bgIdx] + ';color:' + x.fg + ';border:1px solid ' + x.border + ';';
+        if (isLink) style += 'padding:0 4px;height:32px;' + (i === 1 || i === 3 ? 'text-decoration:underline;' : 'text-decoration:none;');
+        if (i === 2) style += 'box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #0F172A;';
+        if (i === 4) style += 'opacity:0.45;cursor:not-allowed;';
+        return {
+          style,
+          label: i === 5 ? (name === 'Destructive' ? 'Deleting…' : 'Saving…') : x.label,
+          loading: i === 5,
+          busy: i === 5 ? 'true' : 'false',
+          disabled: i === 4
+        };
+      });
+      return { name, use: x.use, cells };
+    });
+    return { states, rows };
+  }
+}
+</script>
+</body>
+</html>

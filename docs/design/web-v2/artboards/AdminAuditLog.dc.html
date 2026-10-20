@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin audit log</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+select{appearance:none}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="audit" min-height="1000" hint-size="272px,1000px"></dc-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Audit log" crumb="Admin portal" state="admin" hint-size="100%,76px"></dc-import>
+
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="audit" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Audit log</h1>
+          <span style="font-size: 15px; color: #64748B">Every admin action, newest first. Entries can't be edited or removed.</span>
+        </span>
+      </div>
+
+      <div role="toolbar" aria-label="Filter the audit log" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0">
+        <span style="display: flex; flex-direction: column; gap: 4px"><label for="al-a" style="font-size: 13px; font-weight: 600; color: #475569">Action</label><select id="al-a" style="height: 40px; min-width: 180px; padding: 0 12px; border-radius: 10px; border: 2px solid #7C3AED; background: #FFFFFF; font: 500 14px 'Inter', sans-serif; color: #0F172A"><option>Disable, Enable</option></select></span>
+        <span style="display: flex; flex-direction: column; gap: 4px"><label for="al-w" style="font-size: 13px; font-weight: 600; color: #475569">Done by</label><select id="al-w" style="height: 40px; min-width: 160px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 500 14px 'Inter', sans-serif; color: #0F172A"><option>Any admin</option></select></span>
+        <span style="display: flex; flex-direction: column; gap: 4px"><label for="al-t" style="font-size: 13px; font-weight: 600; color: #475569">User</label><select id="al-t" style="height: 40px; min-width: 160px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 500 14px 'Inter', sans-serif; color: #0F172A"><option>Any user</option></select></span>
+        <span style="display: flex; flex-direction: column; gap: 4px"><label for="al-d" style="font-size: 13px; font-weight: 600; color: #475569">When</label><select id="al-d" style="height: 40px; min-width: 150px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 500 14px 'Inter', sans-serif; color: #0F172A"><option>Last 30 days</option></select></span>
+        <button type="button" style="height: 40px; padding: 0 12px; border: 0; background: transparent; font: 600 14px 'Inter', sans-serif; color: #5B21B6">Clear filters</button>
+      </div>
+
+      <section aria-label="Audit entries" style="border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+        <div role="row" style="display: grid; grid-template-columns: 150px 140px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; padding: 12px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">
+          <span>WHEN</span><span>ACTION</span><span>DONE BY</span><span>USER</span><span>DETAIL</span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+          <div role="row" style="display: grid; grid-template-columns: 150px 140px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #F1F5F9">
+            <span style="font-size: 14px; color: #475569">{{r.when}}</span>
+            <span style="{{r.pillStyle}}">{{r.action}}</span>
+            <a href="#" style="font-size: 15px; font-weight: 600; text-decoration: none; color: #0F172A">{{r.actor}}</a>
+            <a href="#" style="font-size: 15px; text-decoration: none">{{r.target}}</a>
+            <span style="font-size: 14px; color: #64748B">{{r.detail}}</span>
+          </div>
+        </sc-for>
+        <nav aria-label="Pages" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px">
+          <span style="flex-grow: 1; font-size: 14px; color: #475569">Showing 1–8 of 36 matching entries</span>
+          <button type="button" disabled="{{true}}" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #94A3B8">Newer</button>
+          <button type="button" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; font: 600 14px 'Inter', sans-serif; color: #0F172A">Older</button>
+        </nav>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pill = (bg, fg) => 'justify-self:start;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + fg;
+    const kinds = {
+      Disable: pill('#FEE2E2', '#B91C1C'),
+      Enable: pill('#CCFBF1', '#115E59')
+    };
+    const raw = [
+      ['Today 09:58', 'Enable', 'Sam Miller', 'Mia Wong', 'Re-enabled after support ticket'],
+      ['Yesterday 17:20', 'Disable', 'Jo Park', 'Leo Martin', 'Reason: repeated failed sign-ins'],
+      ['14 Oct 11:03', 'Disable', 'Sam Miller', 'Omar Haddad', 'Reason: requested by user'],
+      ['12 Oct 08:41', 'Enable', 'Jo Park', 'Ben Lee', '—'],
+      ['9 Oct 15:12', 'Disable', 'Jo Park', 'Ben Lee', 'Reason: suspicious activity'],
+      ['2 Oct 10:30', 'Enable', 'Sam Miller', 'Ana Costa', '—'],
+      ['28 Sep 13:45', 'Disable', 'Sam Miller', 'Ana Costa', 'Reason: duplicate account'],
+      ['20 Sep 09:02', 'Disable', 'Jo Park', 'Priya Shah', 'Reason: bounced email']
+    ];
+    const rows = raw.map((r) => ({ when: r[0], action: r[1], actor: r[2], target: r[3], detail: r[4], pillStyle: kinds[r[1]] }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

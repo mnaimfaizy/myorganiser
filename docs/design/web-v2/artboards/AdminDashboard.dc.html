@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1350px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AdminSidebar" active="admin" min-height="1350" hint-size="272px,1350px"></dc-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="Overview" crumb="Admin portal" state="admin" hint-size="100%,76px"></dc-import>
+
+    <main style="box-sizing: border-box; width: 100%; max-width: 1200px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <dc-import name="Illustration" kind="admin" size="64" hint-size="64px,64px"></dc-import>
+        <span style="display: flex; flex-direction: column; flex-grow: 1">
+          <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em">Platform overview</h1>
+          <span style="font-size: 15px; line-height: 20px; color: #64748B">Accounts and access only. Vault contents are never visible to admins.</span>
+        </span>
+        <a href="#" style="display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: 600 15px 'Inter', sans-serif; text-decoration: none">Open users</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #0F172A; color: #FFFFFF; font: 600 15px 'Inter', sans-serif; text-decoration: none">View audit log</a>
+      </div>
+
+      <section aria-label="Key numbers" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px">
+        <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
+          <a href="#" style="display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; text-decoration: none; color: #0F172A">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">{{s.label}}</span>
+            <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">{{s.value}}</span>
+            <span style="{{s.noteStyle}}">{{s.note}}</span>
+          </a>
+        </sc-for>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+          <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">YOUTUBE ACCESS PLACES</span>
+          <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">18<span style="font-size: 20px; color: #64748B"> / 25</span></span>
+          <div role="progressbar" aria-valuenow="18" aria-valuemin="0" aria-valuemax="25" aria-label="YouTube Access places used" style="height: 8px; border-radius: 999px; background: #ECEEF0; overflow: hidden"><div style="width: 72%; height: 8px; border-radius: 999px; background: #B45309"></div></div>
+          <span style="font-size: 13px; line-height: 18px; color: #92400E">7 left · a first grant uses one</span>
+        </div>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start">
+        <section aria-labelledby="attn" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #E2E8F0">
+            <h2 id="attn" style="margin: 0; flex-grow: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Needs attention</h2>
+            <span style="padding: 2px 10px; border-radius: 999px; background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 600">3</span>
+          </div>
+          <sc-for list="{{attention}}" as="a" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 0 20px; border-bottom: 1px solid #F1F5F9">
+              <span aria-hidden="true" style="{{a.dot}}"></span>
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><span style="font-size: 15px; line-height: 20px; font-weight: 600">{{a.title}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{a.detail}}</span></span>
+              <a href="#" style="flex-shrink: 0; display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #CBD5E1; color: #0F172A; font: 600 14px 'Inter', sans-serif; text-decoration: none">{{a.action}}</a>
+            </div>
+          </sc-for>
+        </section>
+
+        <section aria-labelledby="recent" style="display: flex; flex-direction: column; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #E2E8F0">
+            <h2 id="recent" style="margin: 0; flex-grow: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700">Recent admin activity</h2>
+            <a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Audit log</a>
+          </div>
+          <sc-for list="{{events}}" as="e" hint-placeholder-count="5">
+            <div style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 20px; border-bottom: 1px solid #F1F5F9">
+              <span style="{{e.pillStyle}}">{{e.action}}</span>
+              <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><span style="font-size: 15px; line-height: 20px"><a href="#" style="color: #0F172A; font-weight: 600; text-decoration: none">{{e.target}}</a></span><span style="font-size: 13px; line-height: 18px; color: #64748B">by {{e.actor}}</span></span>
+              <span style="flex-shrink: 0; font-size: 13px; color: #64748B; font-variant-numeric: tabular-nums">{{e.when}}</span>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1350}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const note = (c) => 'font-size:13px;line-height:18px;color:' + c;
+    const stats = [
+      { label: 'USERS', value: '148', note: '+6 this week', noteStyle: note('#115E59') },
+      { label: 'PLATFORM ADMINS', value: '3', note: 'You and 2 others', noteStyle: note('#64748B') },
+      { label: 'UNVERIFIED', value: '12', note: '5 for more than 7 days', noteStyle: note('#92400E') },
+      { label: 'DISABLED', value: '4', note: 'Cannot sign in', noteStyle: note('#B91C1C') }
+    ];
+    const dot = (c) => 'width:10px;height:10px;border-radius:999px;flex-shrink:0;background:' + c;
+    const attention = [
+      { dot: dot('#B45309'), title: '5 accounts unverified for over a week', detail: 'They cannot sign in until they verify.', action: 'Review' },
+      { dot: dot('#B45309'), title: 'YouTube Access places running low', detail: '7 of 25 left. Withdraw unused access to free one.', action: 'See holders' },
+      { dot: dot('#DC2626'), title: 'Leo Martin disabled 30 days ago', detail: 'Re-enable or leave as is.', action: 'Open user' }
+    ];
+    const pill = (bg, fg) => 'flex-shrink:0;min-width:96px;text-align:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:' + bg + ';color:' + fg;
+    const events = [
+      { action: 'Grant YouTube', pillStyle: pill('#EDE9FE', '#5B21B6'), target: 'Ana Costa', actor: 'Sam Miller', when: '10:42' },
+      { action: 'Resend email', pillStyle: pill('#F1F5F9', '#334155'), target: 'Priya Shah', actor: 'Sam Miller', when: '09:15' },
+      { action: 'Disable', pillStyle: pill('#FEE2E2', '#B91C1C'), target: 'Leo Martin', actor: 'Jo Park', when: 'Yesterday' },
+      { action: 'Promote', pillStyle: pill('#CCFBF1', '#115E59'), target: 'Jo Park', actor: 'Sam Miller', when: '14 Oct' },
+      { action: 'Force logout', pillStyle: pill('#FEF3C7', '#92400E'), target: 'Ben Lee', actor: 'Jo Park', when: '12 Oct' }
+    ];
+    return { stats, attention, events };
+  }
+}
+</script>
+</body>
+</html>

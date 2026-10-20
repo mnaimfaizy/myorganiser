@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Send feedback</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.fb-l{font-size:15px;font-weight:600}
+.fb-in{box-sizing:border-box;width:100%;padding:12px 14px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;font:400 16px 'Inter',sans-serif;color:#0F172A;resize:none}
+.fb-ctx{display:flex;gap:6px;font-size:13px;line-height:18px;color:#475569}
+.fb-ctx b{font-weight:600;color:#334155;min-width:128px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1180px; position: relative; overflow: hidden; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.4)"></div>
+  <form role="dialog" aria-labelledby="fb-t" aria-describedby="fb-d" style="position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 640px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 24px; background: #FFFFFF; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2)">
+    <div style="display: flex; align-items: center; gap: 14px; padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0">
+      <dc-import name="Illustration" kind="feedback" size="56" hint-size="56px,56px"></dc-import>
+      <span style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+        <h2 id="fb-t" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700">Send feedback</h2>
+        <span id="fb-d" style="font-size: 15px; line-height: 20px; color: #475569">Help us improve MyOrganiser by sharing your thoughts.</span>
+      </span>
+      <button type="button" aria-label="Close" style="align-self: flex-start; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(45 8 8)"></rect><rect x="7" y="-1" width="2.2" height="18" rx="1" fill="#475569" transform="rotate(-45 8 8)"></rect></svg></button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; padding: 20px 24px">
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend class="fb-l" style="padding: 0 0 8px">What kind of feedback is this?</legend>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <label style="{{bugCard}}"><input type="radio" name="fb-k" checked="{{isBug}}" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #7C3AED; flex-shrink: 0"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">Bug report</span><span style="font-size: 13px; line-height: 18px; color: #64748B">Something isn't working as it should.</span></span></label>
+          <label style="{{sugCard}}"><input type="radio" name="fb-k" checked="{{isSuggestion}}" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #7C3AED; flex-shrink: 0"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">Suggestion</span><span style="font-size: 13px; line-height: 18px; color: #64748B">An improvement or a new feature.</span></span></label>
+        </div>
+      </fieldset>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="display: flex; justify-content: space-between"><label for="fb-ti" class="fb-l">Title</label><span style="font-size: 13px; color: #64748B">31 / 120</span></span>
+        <input id="fb-ti" class="fb-in" type="text" placeholder="Brief summary of your feedback" value="{{titleValue}}" style="height: 48px">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="fb-de" class="fb-l">{{descLabel}}</label>
+        <textarea id="fb-de" class="fb-in" rows="4" placeholder="Please provide details...">{{descValue}}</textarea>
+      </div>
+
+      <sc-if value="{{isBug}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <label for="fb-ex" class="fb-l">What did you expect to happen? <span style="font-weight: 400; color: #64748B">(optional)</span></label>
+          <textarea id="fb-ex" class="fb-in" rows="3" placeholder="Describe what should have happened instead..."></textarea>
+        </div>
+      </sc-if>
+
+      <div role="note" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #FEF2F2; border: 1px solid #FCA5A5; font-size: 14px; line-height: 20px; color: #991B1B">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px"><path d="M9 1 L17.5 16 H0.5 Z" fill="#DC2626"></path><rect x="8" y="6" width="2" height="5" fill="#FFFFFF"></rect><rect x="8" y="12.5" width="2" height="2" fill="#FFFFFF"></rect></svg>
+        <span>This report is not encrypted. Do not include passwords, passphrases, or anything from your vault.</span>
+      </div>
+
+      <section aria-labelledby="fb-cx" style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0">
+        <h3 id="fb-cx" style="margin: 0 0 4px; font-size: 14px; font-weight: 700">Sent with your report</h3>
+        <span class="fb-ctx"><b>App:</b>MyOrganiser web 2.1.0</span>
+        <span class="fb-ctx"><b>Browser:</b>Chrome 126</span>
+        <span class="fb-ctx"><b>Operating system:</b>Windows</span>
+        <span class="fb-ctx"><b>Page:</b>/dashboard/groceries</span>
+        <span class="fb-ctx"><b>Time:</b>20/10/2026, 10:42:18 am</span>
+        <span style="margin-top: 4px; font-size: 13px; color: #64748B">No screenshots, logs, or vault contents are attached.</span>
+      </section>
+
+      <label style="display: flex; align-items: center; gap: 12px; font-size: 15px"><input type="checkbox" checked="{{true}}" style="width: 22px; height: 22px; margin: 0; accent-color: #0F172A">Email me when this is fixed</label>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid #E2E8F0">
+      <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: transparent; font: 600 15px 'Inter', sans-serif; color: #0F172A">Cancel</button>
+      <button type="submit" style="height: 44px; padding: 0 20px; border-radius: 12px; border: 0; background: #7C3AED; color: #FFFFFF; font: 600 15px 'Inter', sans-serif">Send report</button>
+    </div>
+  </form>
+
+  <aside aria-label="After sending" style="position: absolute; right: 32px; bottom: 32px; width: 320px; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12)">
+    <span style="font-size: 15px; font-weight: 600">Report received</span>
+    <span style="font-size: 14px; color: #475569">Thanks — we'll look at it.</span>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","options":["bug","suggestion"],"default":"bug","section":"Feedback kind"},"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const sug = this.props.kind === 'suggestion';
+    const card = (on) => 'display:flex;gap:10px;align-items:flex-start;padding:14px;border-radius:14px;cursor:pointer;' + (on ? 'border:2px solid #7C3AED;background:#F5F3FF' : 'border:1px solid #CBD5E1;background:#FFFFFF');
+    return {
+      isBug: !sug,
+      isSuggestion: sug,
+      bugCard: card(!sug),
+      sugCard: card(sug),
+      descLabel: sug ? 'What would you like to see?' : 'What happened?',
+      titleValue: sug ? 'Share a Grocery List with family' : 'Uncheck All skips the last item',
+      descValue: sug
+        ? 'It would help if two people could tick items off the same list while shopping.'
+        : 'On a list with 12 items, Uncheck All leaves the bottom item ticked. Happens every time on Chrome.'
+    };
+  }
+}
+</script>
+</body>
+</html>

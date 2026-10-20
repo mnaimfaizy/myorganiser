@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone admin overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5B21B6}a:hover{color:#4C1D95}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <main style="flex-grow: 1; overflow: hidden; box-sizing: border-box; padding: 12px 16px 0; display: flex; flex-direction: column; gap: 16px">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 44px">
+        <span style="padding: 2px 10px; border-radius: 999px; background: #7C3AED; color: #FFFFFF; font-size: 11px; line-height: 18px; font-weight: 600; letter-spacing: 0.02em">ADMIN PORTAL</span>
+        <button type="button" aria-label="Account menu for Sam Miller" style="width: 44px; height: 44px; border-radius: 14px; border: 0; background: #7C3AED; color: #FFFFFF; font: 700 14px 'Plus Jakarta Sans', sans-serif">SM</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <dc-import name="Illustration" kind="admin" size="44" hint-size="44px,44px"></dc-import>
+        <h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; line-height: 40px; font-weight: 800; letter-spacing: -0.02em">Overview</h1>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+        <a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E2E8F0; text-decoration: none; color: #0F172A">
+          <span style="font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">{{s.label}}</span>
+          <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; line-height: 34px; font-weight: 800; font-variant-numeric: tabular-nums">{{s.value}}</span>
+          <span style="{{s.noteStyle}}">{{s.note}}</span>
+        </a>
+      </sc-for>
+    </div>
+
+    <section aria-labelledby="pattn" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="pattn" style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: #64748B">NEEDS ATTENTION · 3</h2>
+      <div style="display: flex; flex-direction: column; border-radius: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; overflow: hidden">
+        <sc-for list="{{attention}}" as="a" hint-placeholder-count="3">
+          <a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 14px 0 16px; border-bottom: 1px solid #F1F5F9; text-decoration: none; color: #0F172A">
+            <span aria-hidden="true" style="{{a.dot}}"></span>
+            <span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0"><span style="font-size: 15px; line-height: 20px; font-weight: 600">{{a.title}}</span><span style="font-size: 13px; line-height: 18px; color: #64748B">{{a.detail}}</span></span>
+            <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M1.4 0 L7.4 6 L1.4 12 L0 10.6 L4.6 6 L0 1.4 Z" fill="#94A3B8"></path></svg>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+
+  <nav aria-label="Admin sections" style="width: 390px; height: 88px; box-sizing: border-box; padding: 8px 8px 18px; display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #E2E8F0">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <a href="#" aria-current="{{t.current}}" style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 72px; min-height: 60px; text-decoration: none">
+        <span style="{{t.pillStyle}}">
+          <sc-if value="{{t.isApp}}" hint-placeholder-val="{{false}}">
+            <svg width="28" height="28" viewBox="0 0 36 36" aria-hidden="true"><path d="M18 2 L32 7 V17 C32 26 25 32 18 34 C11 32 4 26 4 17 V7 Z" fill="#7C3AED"></path><path d="M4 17 C4 26 11 32 18 34 C25 32 32 26 32 17 Z" fill="#0F766E"></path><path d="M11.5 17.5 L16 22 L25 12.5 L27.2 14.6 L16 26 L9.3 19.6 Z" fill="#FFFFFF"></path></svg>
+          </sc-if>
+          <sc-if value="{{t.isSection}}" hint-placeholder-val="{{true}}">
+            <dc-import name="Illustration" kind="{{t.kind}}" size="28" hint-size="28px,28px"></dc-import>
+          </sc-if>
+        </span>
+        <span style="{{t.labelStyle}}">{{t.label}}</span>
+      </a>
+    </sc-for>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const note = (c) => 'font-size:12px;line-height:16px;color:' + c;
+    const stats = [
+      { label: 'USERS', value: '148', note: '+6 this week', noteStyle: note('#115E59') },
+      { label: 'UNVERIFIED', value: '12', note: '5 over a week', noteStyle: note('#92400E') },
+      { label: 'DISABLED', value: '4', note: 'Cannot sign in', noteStyle: note('#B91C1C') },
+      { label: 'YOUTUBE PLACES', value: '18/25', note: '7 left', noteStyle: note('#92400E') }
+    ];
+    const dot = (c) => 'width:10px;height:10px;border-radius:999px;flex-shrink:0;background:' + c;
+    const attention = [
+      { dot: dot('#B45309'), title: '5 unverified over a week', detail: 'They cannot sign in yet' },
+      { dot: dot('#B45309'), title: 'YouTube places running low', detail: '7 of 25 left' },
+      { dot: dot('#DC2626'), title: 'Leo Martin disabled 30 d', detail: 'Re-enable or leave' }
+    ];
+    const tabs = [
+      { kind: 'admin', label: 'Overview', active: true },
+      { kind: 'users', label: 'Users' },
+      { kind: 'audit', label: 'Audit log' },
+      { kind: 'inbox', label: 'Feedback' },
+      { kind: 'app', label: 'My app' }
+    ].map((t) => ({
+      kind: t.kind,
+      label: t.label,
+      isApp: t.kind === 'app',
+      isSection: t.kind !== 'app',
+      current: t.active ? 'page' : 'false',
+      pillStyle: 'display:flex;align-items:center;justify-content:center;width:56px;height:36px;border-radius:999px;background:' + (t.active ? '#EDE9FE' : 'transparent'),
+      labelStyle: 'font-size:12px;line-height:16px;font-weight:' + (t.active ? 600 : 500) + ';color:' + (t.active ? '#5B21B6' : '#475569')
+    }));
+    return { stats, attention, tabs };
+  }
+}
+</script>
+</body>
+</html>

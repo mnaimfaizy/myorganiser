@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YouTube first look</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8FAFC}
+a{color:#5B21B6;font-weight:600}
+.yf-li{display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:22px;color:#334155}
+.yf-dot{flex-shrink:0;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-top:-1px}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1300px; background: #F8FAFC; font-family: 'Inter', system-ui, sans-serif; color: #0F172A">
+  <div style="flex: 0 0 272px; display: flex">
+    <dc-import name="AppSidebar" active="youtube" min-height="1300" hint-size="272px,1300px"></dc-import>
+  </div>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <dc-import name="AppHeader" title="YouTube" crumb="Dashboard" state="synced" hint-size="100%,76px"></dc-import>
+    <main style="box-sizing: border-box; width: 100%; max-width: 1080px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+
+      <section aria-labelledby="yf-h" style="position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 28px; padding: 32px; border-radius: 24px; background: #0F172A; color: #FFFFFF">
+        <div aria-hidden="true" style="position: absolute; width: 300px; height: 300px; border-radius: 999px; background: #7C2D12; opacity: 0.45; right: -80px; top: -120px"></div>
+        <div style="position: relative">
+          <dc-import name="Illustration" kind="youtube" size="128" hint-size="128px,128px"></dc-import>
+        </div>
+        <div style="position: relative; display: flex; flex-direction: column; gap: 10px; flex: 1 1 380px">
+          <h1 id="yf-h" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 30px; line-height: 36px; font-weight: 800; letter-spacing: -0.02em">Connect Your YouTube Account</h1>
+          <p style="margin: 0; max-width: 560px; font-size: 17px; line-height: 25px; color: #CBD5E1">Link your YouTube account to view and manage videos from your Enabled Channels. We only request read-only access.</p>
+          <sc-if value="{{revoked}}" hint-placeholder-val="{{false}}">
+            <p role="status" style="margin: 4px 0 0; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: #78350F; color: #FDE68A; font-size: 14px; font-weight: 600">Your previous connection was revoked. Please reconnect.</p>
+          </sc-if>
+        </div>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <section aria-label="How we store your YouTube data" style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; background: #FFFFFF; border: 1px solid #E2E8F0">
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{bullets}}" as="b" hint-placeholder-count="6">
+              <li class="yf-li"><span class="yf-dot" aria-hidden="true" style="background: #FFEDD5"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M2.5 8.2 L6.2 11.8 L13.5 4.4 L12.1 3 L6.2 9 L3.9 6.8 Z" fill="#C2410C"></path></svg></span><span>{{b}}</span></li>
+            </sc-for>
+          </ul>
+          <a href="#" style="align-self: flex-start; font-size: 14px; text-decoration: underline; text-underline-offset: 3px">How we store your YouTube data</a>
+        </section>
+
+        <form aria-labelledby="yf-before" style="flex: 1.3 1 420px; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 20px; background: #FFFFFF; border: 2px solid #7C3AED">
+          <h2 id="yf-before" style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; line-height: 24px; font-weight: 700">Before you connect</h2>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{points}}" as="p" hint-placeholder-count="5">
+              <li class="yf-li"><span class="yf-dot" aria-hidden="true" style="{{p.dot}}">{{p.n}}</span><span>{{p.text}}</span></li>
+            </sc-for>
+          </ul>
+          <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; font-size: 15px; line-height: 22px"><input type="checkbox" checked="{{agreed}}" aria-describedby="yf-err" style="width: 22px; height: 22px; margin: 0; accent-color: #7C3AED; flex-shrink: 0"><span>I agree to the <a href="#">Privacy Policy</a> and to <a href="#">YouTube's Terms of Service ↗</a>.</span></label>
+          <sc-if value="{{showError}}" hint-placeholder-val="{{false}}">
+            <span id="yf-err" style="font-size: 13px; color: #B91C1C">Tick the box to agree before connecting</span>
+          </sc-if>
+          <button type="submit" disabled="{{notAgreed}}" style="{{buttonStyle}}">Connect YouTube</button>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["first look","ticked","not ticked error","revoked"],"default":"first look","section":"State"},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.state ?? 'first look';
+    const agreed = st === 'ticked' || st === 'revoked';
+    const bullets = [
+      'Metadata only — never video files',
+      'Watched is yes/no, not analytics',
+      'Latest 100 uploads cached per channel',
+      '30 days after you disable a channel',
+      'Disconnect deletes Followed Channels, Cached Uploads, Watched marks, notification and digest settings, and tokens',
+      'Shorts budget is tracked locally'
+    ];
+    const raw = [
+      'MyOrganiser reads your YouTube subscriptions and the channel and upload details for the channels you enable. It only reads from YouTube, and it never stores video files.',
+      'That data is stored outside your Vault and is not end-to-end encrypted. Your YouTube access tokens are encrypted at rest.',
+      "Google will show an “unverified app” warning when you connect. MyOrganiser is run personally and has not been through Google's app verification.",
+      "If you disconnect YouTube, or the operator withdraws your YouTube access, everything is deleted straight away: your followed channels, cached uploads, Watched marks, digest settings and tokens. Nothing is kept for a later reconnect.",
+      'YouTube in MyOrganiser is run personally by its operator, who can switch it off.'
+    ];
+    const points = raw.map((text, i) => ({ text, n: String(i + 1), dot: 'background:#EDE9FE;color:#5B21B6;font:700 12px Inter,sans-serif' }));
+    return {
+      bullets, points, agreed,
+      notAgreed: !agreed,
+      revoked: st === 'revoked',
+      showError: st === 'not ticked error',
+      buttonStyle: 'height:48px;border-radius:12px;border:0;background:#7C3AED;color:#FFFFFF;font:600 16px Inter,sans-serif;' + (agreed ? '' : 'opacity:0.45')
+    };
+  }
+}
+</script>
+</body>
+</html>
