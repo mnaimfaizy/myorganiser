@@ -1,21 +1,15 @@
 'use client';
 
-import { ChevronRight, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  cn,
+  Illustration,
+  type IllustrationKind,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@myorganiser/web-ui';
 
 const DASHBOARD_HOME_URL = '/dashboard';
@@ -44,105 +38,143 @@ export function isNavItemActive(pathname: string, url: string): boolean {
   return current.startsWith(`${target}/`);
 }
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string;
-    url: string;
-    icon?: LucideIcon;
-    isActive?: boolean;
-    items?: {
-      title: string;
-      url: string;
-    }[];
-  }[];
-}) {
+export interface NavItem {
+  title: string;
+  url: string;
+  kind: IllustrationKind;
+  /** Badge count. Rendered only when defined; no item supplies one yet. */
+  count?: number;
+}
+
+export interface NavGroup {
+  /** Group heading as rendered, e.g. "PEOPLE AND PLACES". */
+  label: string;
+  items: NavItem[];
+}
+
+export interface NavMainProps {
+  groups: NavGroup[];
+  /** Desktop icon rail: illustrations only, tooltips carry the titles. */
+  collapsed: boolean;
+  /** False while the Vault is locked; counts are hidden then. */
+  countsVisible: boolean;
+}
+
+interface NavRowProps {
+  item: NavItem;
+  active: boolean;
+  countVisible: boolean;
+}
+
+function NavRow({ item, active, countVisible }: NavRowProps) {
+  const showCount = countVisible && item.count !== undefined;
+
+  return (
+    <Link
+      href={item.url}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex min-h-11.5 items-center gap-3 rounded-menu border py-1 pl-1 pr-2.5 text-body-sm transition-colors',
+        active
+          ? 'border-sidebar-primary bg-sidebar-primary/25 font-semibold text-navy-foreground'
+          : 'border-transparent font-medium text-sidebar-foreground hover:bg-sidebar-accent',
+      )}
+    >
+      <Illustration kind={item.kind} size={36} />
+      <span className="min-w-0 flex-1 truncate">{item.title}</span>
+      {showCount && (
+        <span
+          className={cn(
+            'min-w-6 rounded-full px-2 py-0.5 text-center text-label-caps',
+            active
+              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+              : 'bg-sidebar-accent text-sidebar-foreground',
+          )}
+        >
+          {item.count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+interface NavRailTileProps {
+  item: NavItem;
+  active: boolean;
+}
+
+function NavRailTile({ item, active }: NavRailTileProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          href={item.url}
+          aria-label={item.title}
+          aria-current={active ? 'page' : undefined}
+          className={cn(
+            'flex size-13 items-center justify-center rounded-menu border transition-colors',
+            active
+              ? 'border-sidebar-primary bg-sidebar-primary/25'
+              : 'border-transparent hover:bg-sidebar-accent',
+          )}
+        >
+          <Illustration kind={item.kind} size={36} />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right">{item.title}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function NavMain({ groups, collapsed, countsVisible }: NavMainProps) {
   // usePathname() yields null outside the App Router context (e.g. unit tests
   // that render this tree without a router); treat that as "no active route".
   const pathname: string = usePathname() ?? '';
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => {
-          const hasChildren = (item.items?.length ?? 0) > 0;
+    <nav
+      aria-label="Sections"
+      className={cn(
+        'flex flex-1 flex-col',
+        collapsed ? 'items-center gap-3' : 'gap-3',
+      )}
+    >
+      {groups.map((group) => (
+        <div
+          key={group.label}
+          className={cn('flex flex-col', collapsed ? 'items-center' : '')}
+        >
+          {!collapsed && (
+            <span className="px-2.5 pb-1 pt-3 text-label-caps text-navy-muted-foreground">
+              {group.label}
+            </span>
+          )}
+          <ul
+            className={cn(
+              'flex flex-col',
+              collapsed ? 'items-center gap-2' : 'gap-0.75',
+            )}
+          >
+            {group.items.map((item) => {
+              const active = isNavItemActive(pathname, item.url);
 
-          if (!hasChildren) {
-            const isActive = isNavItemActive(pathname, item.url);
-
-            return (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={item.title}
-                  isActive={isActive}
-                >
-                  <Link
-                    href={item.url}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          }
-
-          const isParentActive = isNavItemActive(pathname, item.url);
-          const hasActiveChild = (item.items ?? []).some((subItem) =>
-            isNavItemActive(pathname, subItem.url),
-          );
-          const isGroupActive = isParentActive || hasActiveChild;
-
-          return (
-            <Collapsible
-              key={item.title}
-              asChild
-              defaultOpen={item.isActive || hasActiveChild}
-              className="group/collapsible"
-            >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={isGroupActive}
-                  >
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {item.items?.map((subItem) => {
-                      const isSubActive = isNavItemActive(
-                        pathname,
-                        subItem.url,
-                      );
-
-                      return (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild isActive={isSubActive}>
-                            <Link
-                              href={subItem.url}
-                              aria-current={isSubActive ? 'page' : undefined}
-                            >
-                              <span>{subItem.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      );
-                    })}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
+              return (
+                <li key={item.url}>
+                  {collapsed ? (
+                    <NavRailTile item={item} active={active} />
+                  ) : (
+                    <NavRow
+                      item={item}
+                      active={active}
+                      countVisible={countsVisible}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
   );
 }

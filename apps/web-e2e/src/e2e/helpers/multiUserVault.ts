@@ -445,12 +445,10 @@ export function setupBackend(
 }
 
 export async function signOut(page: Page) {
-  // NavUser is the only sidebar menu-button in the header — NavMain's live in
-  // SidebarContent — so this scopes to the account trigger without depending on
-  // the signed-in User's name. Radix portals the content, so open, then query.
-  const trigger = page.locator(
-    '[data-sidebar="header"] [data-sidebar="menu-button"]',
-  );
+  // The account menu is the only menu trigger in the page header, so this
+  // scopes to it without depending on the signed-in User's name. Radix portals
+  // the content, so open, then query.
+  const trigger = page.locator('header button[aria-haspopup="menu"]');
   await expect(trigger).toBeVisible({ timeout: 30000 });
   await trigger.click();
 

@@ -3,23 +3,33 @@ jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
 }));
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { usePathname } from 'next/navigation';
-import { SidebarProvider } from '@myorganiser/web-ui';
-import { isNavItemActive, NavMain } from './nav-main';
+import { TooltipProvider } from '@myorganiser/web-ui';
+import { isNavItemActive, NavMain, type NavGroup } from './nav-main';
 
-const leafItems = [
-  { title: 'Home', url: '/dashboard' },
-  { title: 'Groceries', url: '/dashboard/groceries' },
-  { title: 'Tasks', url: '/dashboard/tasks' },
+const groups: NavGroup[] = [
+  {
+    label: 'OVERVIEW',
+    items: [{ title: 'Home', url: '/dashboard', kind: 'home' }],
+  },
+  {
+    label: 'ORGANISE',
+    items: [
+      { title: 'Tasks', url: '/dashboard/tasks', kind: 'tasks' },
+      { title: 'Groceries', url: '/dashboard/groceries', kind: 'groceries' },
+    ],
+  },
 ];
 
-const collapsibleItems = [
+const groupsWithCount: NavGroup[] = [
   {
-    title: 'Account',
-    url: '/dashboard/account',
-    items: [{ title: 'Billing', url: '/dashboard/account/billing' }],
+    label: 'ORGANISE',
+    items: [
+      { title: 'Tasks', url: '/dashboard/tasks', kind: 'tasks', count: 3 },
+      { title: 'Groceries', url: '/dashboard/groceries', kind: 'groceries' },
+    ],
   },
 ];
 
@@ -27,26 +37,11 @@ function setPathname(pathname: string | null): void {
   (usePathname as jest.Mock).mockReturnValue(pathname);
 }
 
-// The real SidebarProvider reads window.matchMedia through useIsMobile,
-// which jsdom does not provide.
-function stubMatchMedia(): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    }),
-  });
-}
-
-function renderNavMain(items: Parameters<typeof NavMain>[0]['items']) {
+function renderNavMain(props: Parameters<typeof NavMain>[0]) {
   return render(
-    <SidebarProvider>
-      <NavMain items={items} />
-    </SidebarProvider>,
+    <TooltipProvider>
+      <NavMain {...props} />
+    </TooltipProvider>,
   );
 }
 
@@ -58,7 +53,6 @@ describe('isNavItemActive', () => {
     ['/dashboard', '/dashboard', true],
     ['/dashboard/groceries', '/dashboard', false],
     ['/dashboard/groceries/', '/dashboard/groceries', true],
-    ['', '/dashboard/groceries', false],
   ])('isNavItemActive(%p, %p) returns %p', (pathname, url, expected) => {
     expect(isNavItemActive(pathname, url)).toBe(expected);
   });
@@ -67,100 +61,153 @@ describe('isNavItemActive', () => {
 describe('NavMain', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    stubMatchMedia();
     setPathname('/dashboard');
   });
 
-  afterEach(() => {
-    Reflect.deleteProperty(window, 'matchMedia');
+  describe('expanded', () => {
+    it('renders group labels in the given order with each link title and href', () => {
+      renderNavMain({ groups, collapsed: false, countsVisible: true });
+
+      const nav = screen.getByRole('navigation', { name: 'Sections' });
+      const rendered = Array.from(nav.children).map((group) => ({
+        label: group.querySelector('span')?.textContent,
+        links: Array.from(group.querySelectorAll('a')).map((a) => ({
+          title: a.textContent,
+          href: a.getAttribute('href'),
+        })),
+      }));
+
+      expect(rendered).toEqual([
+        {
+          label: 'OVERVIEW',
+          links: [{ title: 'Home', href: '/dashboard' }],
+        },
+        {
+          label: 'ORGANISE',
+          links: [
+            { title: 'Tasks', href: '/dashboard/tasks' },
+            { title: 'Groceries', href: '/dashboard/groceries' },
+          ],
+        },
+      ]);
+    });
+
+    it('marks only the sub-path link as current when the pathname is under Groceries', () => {
+      setPathname('/dashboard/groceries/abc');
+      renderNavMain({ groups, collapsed: false, countsVisible: true });
+
+      expect(screen.getByRole('link', { name: 'Groceries' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('link', { name: 'Tasks' })).not.toHaveAttribute(
+        'aria-current',
+      );
+      expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
+        'aria-current',
+      );
+    });
+
+    it('marks Home current only at the exact dashboard path', () => {
+      setPathname('/dashboard');
+      const { rerender } = renderNavMain({
+        groups,
+        collapsed: false,
+        countsVisible: true,
+      });
+
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+
+      setPathname('/dashboard/tasks');
+      rerender(
+        <TooltipProvider>
+          <NavMain groups={groups} collapsed={false} countsVisible />
+        </TooltipProvider>,
+      );
+
+      expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
+        'aria-current',
+      );
+      expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+
+    it('marks no link current when usePathname returns null', () => {
+      setPathname(null);
+      renderNavMain({ groups, collapsed: false, countsVisible: true });
+
+      for (const name of ['Home', 'Tasks', 'Groceries']) {
+        expect(screen.getByRole('link', { name })).not.toHaveAttribute(
+          'aria-current',
+        );
+      }
+    });
+
+    it('shows an item count when counts are visible', () => {
+      renderNavMain({
+        groups: groupsWithCount,
+        collapsed: false,
+        countsVisible: true,
+      });
+
+      const tasks = screen.getByRole('link', { name: /Tasks/ });
+      expect(within(tasks).getByText('3')).toBeInTheDocument();
+    });
+
+    it('hides an item count while counts are not visible', () => {
+      renderNavMain({
+        groups: groupsWithCount,
+        collapsed: false,
+        countsVisible: false,
+      });
+
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Tasks' })).toHaveTextContent(
+        /^Tasks$/,
+      );
+    });
+
+    it('renders no badge for an item without a count', () => {
+      renderNavMain({ groups, collapsed: false, countsVisible: true });
+
+      expect(screen.getByRole('link', { name: 'Groceries' })).toHaveTextContent(
+        /^Groceries$/,
+      );
+    });
   });
 
-  it('marks only the exact leaf link as active with aria-current="page"', () => {
-    setPathname('/dashboard/groceries');
-    renderNavMain(leafItems);
+  describe('collapsed icon rail', () => {
+    it('renders no group labels and names each tile link by its title', () => {
+      renderNavMain({ groups, collapsed: true, countsVisible: true });
 
-    const groceries = screen.getByRole('link', { name: 'Groceries' });
-    expect(groceries).toHaveAttribute('href', '/dashboard/groceries');
-    expect(groceries).toHaveAttribute('data-active', 'true');
-    expect(groceries).toHaveAttribute('aria-current', 'page');
+      expect(screen.queryByText('OVERVIEW')).not.toBeInTheDocument();
+      expect(screen.queryByText('ORGANISE')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+        'href',
+        '/dashboard/tasks',
+      );
+      expect(screen.getByRole('link', { name: 'Groceries' })).toHaveAttribute(
+        'href',
+        '/dashboard/groceries',
+      );
+    });
 
-    for (const name of ['Home', 'Tasks']) {
-      const link = screen.getByRole('link', { name });
-      expect(link).toHaveAttribute('data-active', 'false');
-      expect(link).not.toHaveAttribute('aria-current');
-    }
-  });
+    it('marks the active tile with aria-current="page"', () => {
+      setPathname('/dashboard/groceries');
+      renderNavMain({ groups, collapsed: true, countsVisible: true });
 
-  it('keeps the Home link inactive for a nested path under another item', () => {
-    setPathname('/dashboard/groceries/list-1');
-    renderNavMain(leafItems);
-
-    expect(screen.getByRole('link', { name: 'Groceries' })).toHaveAttribute(
-      'data-active',
-      'true',
-    );
-    const home = screen.getByRole('link', { name: 'Home' });
-    expect(home).toHaveAttribute('data-active', 'false');
-    expect(home).not.toHaveAttribute('aria-current');
-  });
-
-  it('activates Home only when the pathname is exactly /dashboard', () => {
-    setPathname('/dashboard');
-    renderNavMain(leafItems);
-
-    const home = screen.getByRole('link', { name: 'Home' });
-    expect(home).toHaveAttribute('data-active', 'true');
-    expect(home).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Groceries' })).toHaveAttribute(
-      'data-active',
-      'false',
-    );
-  });
-
-  it('renders without throwing and marks no link active when usePathname returns null', () => {
-    setPathname(null);
-    renderNavMain(leafItems);
-
-    for (const name of ['Home', 'Groceries', 'Tasks']) {
-      const link = screen.getByRole('link', { name });
-      expect(link).toHaveAttribute('data-active', 'false');
-      expect(link).not.toHaveAttribute('aria-current');
-    }
-  });
-
-  it('opens a collapsible group by default and marks its active sub-link and trigger', () => {
-    setPathname('/dashboard/account/billing');
-    renderNavMain(collapsibleItems);
-
-    const trigger = screen.getByRole('button', { name: 'Account' });
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(trigger).toHaveAttribute('data-active', 'true');
-
-    const billing = screen.getByRole('link', { name: 'Billing' });
-    expect(billing).toHaveAttribute('href', '/dashboard/account/billing');
-    expect(billing).toHaveAttribute('data-active', 'true');
-    expect(billing).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('marks the group trigger active when the group url itself is the pathname', () => {
-    setPathname('/dashboard/account');
-    renderNavMain(collapsibleItems);
-
-    const trigger = screen.getByRole('button', { name: 'Account' });
-    expect(trigger).toHaveAttribute('data-active', 'true');
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('opens a collapsible group when item.isActive is set, even with a non-matching pathname', () => {
-    setPathname('/dashboard/tasks');
-    renderNavMain([{ ...collapsibleItems[0], isActive: true }]);
-
-    const trigger = screen.getByRole('button', { name: 'Account' });
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(trigger).toHaveAttribute('data-active', 'false');
-    expect(screen.getByRole('link', { name: 'Billing' })).toHaveAttribute(
-      'data-active',
-      'false',
-    );
+      expect(screen.getByRole('link', { name: 'Groceries' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
+        'aria-current',
+      );
+    });
   });
 });
