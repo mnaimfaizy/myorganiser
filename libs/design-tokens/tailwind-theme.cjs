@@ -42,6 +42,12 @@ module.exports = {
       foreground: 'hsl(var(--subtle-foreground))',
     },
     inactive: 'hsl(var(--inactive))',
+    focus: 'hsl(var(--focus))',
+    'control-edge': 'hsl(var(--control-edge))',
+    'error-text': 'hsl(var(--error-text))',
+    'error-edge': 'hsl(var(--error-edge))',
+    'raised-surface': 'hsl(var(--raised-surface))',
+    scrim: 'hsl(var(--scrim))',
     primary: {
       DEFAULT: 'hsl(var(--primary))',
       foreground: 'hsl(var(--primary-foreground))',
