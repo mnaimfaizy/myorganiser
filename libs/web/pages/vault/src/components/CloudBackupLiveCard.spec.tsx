@@ -2,13 +2,15 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 
+type ConnectionState = { status: 'not-linked' | 'linked' };
+
 /**
  * Controllable mock of useCloudBackup to drive backupCounter between renders.
  * Tests update this and call rerender to exercise the effect.
  */
 let mockCloudBackupState = {
   backupCounter: 0,
-  connection: { status: 'not-linked' as const },
+  connection: { status: 'not-linked' } as ConnectionState,
   ageLimit: 'off' as const,
   isBusy: false,
   lastError: null,
@@ -75,6 +77,7 @@ jest.mock('./ImportVaultReplaceDialog', () => ({
 }));
 
 import { CloudBackupLiveCard } from './CloudBackupLiveCard';
+import { useLatestCloudBackup } from '../hooks';
 
 describe('CloudBackupLiveCard', () => {
   beforeEach(() => {
@@ -82,7 +85,7 @@ describe('CloudBackupLiveCard', () => {
     // Reset mock state to defaults for each test
     mockCloudBackupState = {
       backupCounter: 0,
-      connection: { status: 'not-linked' as const },
+      connection: { status: 'not-linked' } as ConnectionState,
       ageLimit: 'off' as const,
       isBusy: false,
       lastError: null,
@@ -273,6 +276,78 @@ describe('CloudBackupLiveCard', () => {
       );
 
       expect(screen.getByTestId('import-dialog')).toBeInTheDocument();
+    });
+  });
+
+  describe('onSummaryChange callback behavior', () => {
+    const CREATED_AT = '2026-01-15T10:00:00.000Z';
+
+    test('C1: reports linked and the newest copy date once the latest record has loaded', () => {
+      const onSummaryChange = jest.fn();
+      mockCloudBackupState.connection = { status: 'linked' };
+      (useLatestCloudBackup as jest.Mock).mockReturnValue({
+        status: 'loaded',
+        record: {
+          createdAt: CREATED_AT,
+          status: 'success',
+          source: 'google-drive',
+          event: 'export',
+        },
+      });
+
+      render(
+        <CloudBackupLiveCard
+          provider={{ connect: jest.fn() } as any}
+          handle={{ loadVault: jest.fn() } as any}
+          onSummaryChange={onSummaryChange}
+        />,
+      );
+
+      expect(onSummaryChange).toHaveBeenLastCalledWith({
+        linked: true,
+        newestCopyCreatedAt: CREATED_AT,
+      });
+    });
+
+    test('C2: reports a null newest copy when the latest lookup is empty', () => {
+      const onSummaryChange = jest.fn();
+      (useLatestCloudBackup as jest.Mock).mockReturnValue({
+        status: 'empty',
+        record: null,
+      });
+
+      render(
+        <CloudBackupLiveCard
+          provider={{ connect: jest.fn() } as any}
+          handle={{ loadVault: jest.fn() } as any}
+          onSummaryChange={onSummaryChange}
+        />,
+      );
+
+      expect(onSummaryChange).toHaveBeenLastCalledWith({
+        linked: false,
+        newestCopyCreatedAt: null,
+      });
+    });
+
+    test('C3: reports an undefined newest copy while the latest record is loading', () => {
+      const onSummaryChange = jest.fn();
+      (useLatestCloudBackup as jest.Mock).mockReturnValue({
+        status: 'loading',
+        record: null,
+      });
+
+      render(
+        <CloudBackupLiveCard
+          provider={{ connect: jest.fn() } as any}
+          handle={{ loadVault: jest.fn() } as any}
+          onSummaryChange={onSummaryChange}
+        />,
+      );
+
+      const summary = onSummaryChange.mock.lastCall?.[0];
+      expect(summary.linked).toBe(false);
+      expect(summary.newestCopyCreatedAt).toBeUndefined();
     });
   });
 });

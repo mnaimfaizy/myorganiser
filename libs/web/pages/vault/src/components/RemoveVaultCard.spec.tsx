@@ -49,17 +49,19 @@ jest.mock('@myorganiser/web-ui', () => {
     CardTitle: ({ children }: any) => <h2>{children}</h2>,
     CardDescription: ({ children }: any) => <p>{children}</p>,
     CardContent: ({ children }: any) => <div>{children}</div>,
-    ConfirmDeleteDialog: ({
+    ConfirmDialog: ({
       open,
       onOpenChange,
       title,
       description,
+      confirmLabel,
+      tone,
       onConfirm,
       children,
     }: any) => {
       if (!open) return null;
       return (
-        <div data-testid="confirm-delete-dialog" role="dialog">
+        <div data-testid="confirm-remove-dialog" role="alertdialog">
           <h2>{title}</h2>
           <p data-testid="delete-description">{description}</p>
           {children && <div data-testid="dialog-children">{children}</div>}
@@ -69,8 +71,12 @@ jest.mock('@myorganiser/web-ui', () => {
           >
             Cancel
           </button>
-          <button data-testid="delete-confirm-btn" onClick={() => onConfirm()}>
-            Delete
+          <button
+            data-testid="delete-confirm-btn"
+            data-tone={tone}
+            onClick={() => onConfirm()}
+          >
+            {confirmLabel}
           </button>
         </div>
       );
@@ -226,7 +232,7 @@ describe('RemoveVaultCard', () => {
 
     // Dialog should not open
     expect(
-      screen.queryByTestId('confirm-delete-dialog'),
+      screen.queryByTestId('confirm-remove-dialog'),
     ).not.toBeInTheDocument();
   });
 
@@ -237,8 +243,13 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
+
+    // The confirm control is the destructive action, labelled for what it does
+    const confirmButton = screen.getByTestId('delete-confirm-btn');
+    expect(confirmButton).toHaveTextContent('Remove from this device');
+    expect(confirmButton).toHaveAttribute('data-tone', 'destructive');
   });
 
   test('5a: unsent types pending — description shows "Checking what this device has not sent…"', async () => {
@@ -346,7 +357,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const confirmButton = screen.getByTestId('delete-confirm-btn');
@@ -371,7 +382,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const dialogChildren = screen.getByTestId('dialog-children');
@@ -404,7 +415,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const dialogChildren = screen.getByTestId('dialog-children');
@@ -473,7 +484,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(removeButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const exportButton = screen.getByTestId('remove-vault-export-first-button');
@@ -487,7 +498,7 @@ describe('RemoveVaultCard', () => {
     );
 
     // Dialog should still be open
-    expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
   });
 
   test('11: clicking confirm calls handle.removeVault() and shows success toast', async () => {
@@ -508,7 +519,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(removeButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const confirmButton = screen.getByTestId('delete-confirm-btn');
@@ -552,7 +563,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(removeButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const confirmButton = screen.getByTestId('delete-confirm-btn');
@@ -571,7 +582,7 @@ describe('RemoveVaultCard', () => {
     );
 
     // Dialog should still be open (no reload)
-    expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
   });
 
   test('13: clicking cancel button closes the dialog without calling removeVault()', async () => {
@@ -587,7 +598,7 @@ describe('RemoveVaultCard', () => {
     fireEvent.click(removeButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('confirm-remove-dialog')).toBeInTheDocument();
     });
 
     const cancelButton = screen.getByTestId('delete-cancel-btn');
@@ -595,7 +606,7 @@ describe('RemoveVaultCard', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByTestId('confirm-delete-dialog'),
+        screen.queryByTestId('confirm-remove-dialog'),
       ).not.toBeInTheDocument();
     });
 

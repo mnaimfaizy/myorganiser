@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@myorganiser/web-ui';
+import { Button, Card, Illustration } from '@myorganiser/web-ui';
 
 import {
   ESCAPE_COPY_READER_CHECKSUM_FILENAME,
@@ -40,90 +33,103 @@ export function EscapeCopyReaderCard({
 }: EscapeCopyReaderCardProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Open your Escape Copy without us</CardTitle>
-        <CardDescription>
-          A self-contained reader that works offline and needs no account
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        <div className="flex items-center gap-4">
+          <Illustration kind="vault" size={48} />
+          <div className="flex flex-col gap-0.5">
+            <h3 className="font-display text-title">
+              Open your Escape Copy without us
+            </h3>
+            <p className="text-body text-foreground-supporting">
+              A self-contained reader that works offline and needs no account
+            </p>
+          </div>
+        </div>
+
         {justMadeACopy && (
           <div
-            className="rounded-lg border border-warning bg-warning/10 p-4"
+            className="rounded-control border border-warning-edge bg-warning-faint p-4"
             data-testid="escape-copy-reader-just-made"
           >
-            <p className="text-sm font-medium text-warning">
+            <p className="text-body-sm font-medium text-warning-text">
               An Escape Copy was just made. Get the reader and keep it with your
               copy — a copy you cannot open is not a backup.
             </p>
           </div>
         )}
 
-        <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-          <p>
-            The Escape Copy reader is one self-contained HTML file. It requires
-            no account, no server, and no Google account. It works completely
-            offline, displays your data on screen only, and never writes
-            decrypted files to disk.
-          </p>
+        <div className="flex flex-wrap gap-6">
+          <div className="flex min-w-72 flex-1 flex-col gap-3">
+            <p className="text-body text-foreground-supporting">
+              The Escape Copy reader is one self-contained HTML file. It
+              requires no account, no server, and no Google account. It works
+              completely offline, displays your data on screen only, and never
+              writes decrypted files to disk.
+            </p>
 
-          <p>
-            Download{' '}
-            <code className="bg-muted rounded px-1 py-0.5 text-xs">
-              {ESCAPE_COPY_READER_FILENAME}
-            </code>{' '}
-            from the GitHub Releases page and keep it in the same folder as your
-            Escape Copy. When you need to read your copy, open the reader,
-            select your Escape Copy file, and enter either your passphrase or
-            your recovery key — both open it. Your data appears on screen.
-          </p>
-
-          <p className="font-medium text-foreground">
-            Verify the file before opening it with your passphrase. A file that
-            accepts a vault passphrase is exactly what an attacker would want to
-            substitute.
-          </p>
-
-          <p>
-            After downloading, verify the reader's integrity against the
-            published{' '}
-            <code className="bg-muted px-1 py-0.5 rounded text-xs">
-              {ESCAPE_COPY_READER_CHECKSUM_FILENAME}
-            </code>{' '}
-            file using:
-          </p>
-
-          <ul className="list-disc list-inside space-y-1 text-xs">
-            <li>
-              <code className="bg-muted px-1 py-0.5 rounded">sha256sum</code>{' '}
-              (Linux/macOS/WSL)
-            </li>
-            <li>
-              <code className="bg-muted px-1 py-0.5 rounded">
-                shasum -a 256
+            <p className="text-body text-foreground-supporting">
+              Download{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-caption">
+                {ESCAPE_COPY_READER_FILENAME}
               </code>{' '}
-              (macOS legacy)
-            </li>
-            <li>
-              <code className="bg-muted px-1 py-0.5 rounded">Get-FileHash</code>{' '}
-              (Windows PowerShell)
-            </li>
-          </ul>
-        </div>
+              from the GitHub Releases page and keep it in the same folder as
+              your Escape Copy. When you need to read your copy, open the
+              reader, select your Escape Copy file, and enter either your
+              passphrase or your recovery key — both open it. Your data appears
+              on screen.
+            </p>
 
-        <div className="flex gap-2">
-          <Button asChild>
-            <a
-              href={ESCAPE_COPY_READER_RELEASES_URL}
-              target="_blank"
-              rel="noreferrer noopener"
-              data-testid="escape-copy-reader-download-link"
-            >
-              Get the reader from GitHub Releases
-            </a>
-          </Button>
+            <Button asChild className="w-full md:w-auto md:self-start">
+              <a
+                href={ESCAPE_COPY_READER_RELEASES_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid="escape-copy-reader-download-link"
+              >
+                Get the reader from GitHub Releases
+              </a>
+            </Button>
+          </div>
+
+          <aside className="flex min-w-72 flex-1 flex-col gap-2.5 rounded-panel bg-brand-soft p-4">
+            <p className="text-body-sm font-bold text-brand-text-strong">
+              Verify the file before opening it with your passphrase. A file
+              that accepts a vault passphrase is exactly what an attacker would
+              want to substitute.
+            </p>
+
+            <p className="text-body-sm text-foreground-supporting">
+              After downloading, verify the reader&apos;s integrity against the
+              published{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-caption">
+                {ESCAPE_COPY_READER_CHECKSUM_FILENAME}
+              </code>{' '}
+              file using:
+            </p>
+
+            <ul className="list-disc space-y-1.5 pl-4 text-body-sm text-foreground-supporting">
+              <li>
+                <code className="rounded bg-muted px-1 py-0.5 text-caption">
+                  sha256sum
+                </code>{' '}
+                (Linux/macOS/WSL)
+              </li>
+              <li>
+                <code className="rounded bg-muted px-1 py-0.5 text-caption">
+                  shasum -a 256
+                </code>{' '}
+                (macOS legacy)
+              </li>
+              <li>
+                <code className="rounded bg-muted px-1 py-0.5 text-caption">
+                  Get-FileHash
+                </code>{' '}
+                (Windows PowerShell)
+              </li>
+            </ul>
+          </aside>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

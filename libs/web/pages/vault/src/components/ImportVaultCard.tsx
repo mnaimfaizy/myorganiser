@@ -1,18 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  useToast,
-} from '@myorganiser/web-ui';
+import { Button, Card, Label, useToast } from '@myorganiser/web-ui';
 
 import {
   createDefaultAuditReporter,
@@ -46,6 +36,7 @@ export function ImportVaultCard() {
 
   const [importing, setImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [lastServerNote, setLastServerNote] = useState<string | null>(null);
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
   const disclosure = useVaultImportDisclosure(
@@ -163,47 +154,87 @@ export function ImportVaultCard() {
     [],
   );
 
+  // The real file input is visually hidden and keeps the label association
+  // and the test id. The visible chip buttons open its native picker.
+  const handleChooseFile = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Import encrypted vault</CardTitle>
-          <CardDescription>
+      <Card className="h-full">
+        <div className="flex h-full flex-col gap-3 p-4 md:p-6">
+          <h3 className="font-display text-title">Import encrypted vault</h3>
+          <p className="text-body text-foreground-supporting">
             Validate and load a previously exported ciphertext bundle. After
             import, unlock with the backup&apos;s passphrase or Recovery Key.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+          </p>
           <VaultUnavailableNotice
             reason={unavailableReason}
             testId="import-vault-unavailable"
           />
-          <div className="space-y-2">
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="vault-import-file">Vault export file (.json)</Label>
-            <Input
+            <input
+              ref={fileInputRef}
               id="vault-import-file"
               data-testid="import-vault-file"
               type="file"
               accept="application/json"
+              className="sr-only"
+              tabIndex={-1}
               disabled={!allowed}
               onChange={handleFileChange}
             />
+            <div className="flex min-h-12 flex-wrap items-center gap-2.5 rounded-control border border-dashed border-brand bg-brand-soft px-3.5 py-2">
+              {selectedFile ? (
+                <>
+                  <span className="min-w-0 flex-1 truncate text-body-sm text-foreground">
+                    {`${selectedFile.name} · ${formatBytes(selectedFile.size)}`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleChooseFile}
+                    disabled={!allowed}
+                  >
+                    Change file
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleChooseFile}
+                  disabled={!allowed}
+                >
+                  Choose file…
+                </Button>
+              )}
+            </div>
           </div>
-
-          <div className="flex gap-2">
-            <Button
-              data-testid="import-vault-button"
-              onClick={handleImport}
-              disabled={importing || !selectedFile || !allowed}
-            >
-              {importing ? 'Importing…' : 'Import vault JSON'}
-            </Button>
-          </div>
+          <p className="text-body text-foreground-supporting">
+            If this device already holds a vault, we show exactly what the file
+            changes before anything is replaced.
+          </p>
 
           {lastServerNote && (
-            <p className="text-sm text-muted-foreground">{lastServerNote}</p>
+            <p className="text-body-sm text-foreground-supporting">
+              {lastServerNote}
+            </p>
           )}
-        </CardContent>
+
+          <Button
+            data-testid="import-vault-button"
+            onClick={handleImport}
+            disabled={importing || !selectedFile || !allowed}
+            className="mt-auto w-full md:w-auto"
+          >
+            {importing ? 'Importing…' : 'Import vault JSON'}
+          </Button>
+        </div>
       </Card>
 
       <ImportVaultReplaceDialog

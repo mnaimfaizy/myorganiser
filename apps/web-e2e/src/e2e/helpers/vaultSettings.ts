@@ -38,9 +38,13 @@ export async function unlockVaultOnSettingsPage(
 /**
  * Change the vault passphrase on the Vault Settings page via `ChangePassphraseCard`.
  *
- * Fills the three passphrase inputs ('Current passphrase', 'New passphrase',
- * 'Confirm new passphrase'), waits for the submit button to be enabled, clicks
- * it, and then waits for the 'Passphrase changed' success toast to appear.
+ * The card's form lives in a Radix dialog ('Change passphrase'), so this helper
+ * first opens it with `change-passphrase-open`. That opener is disabled while
+ * the vault is locked, so the helper waits for it to be enabled (PBKDF2 budget)
+ * before clicking. It then fills the three passphrase inputs ('Current
+ * passphrase', 'New passphrase', 'Confirm new passphrase') inside the dialog,
+ * waits for the submit to be enabled, clicks it, waits for the 'Passphrase
+ * changed' success toast, and waits for the dialog to close.
  * Use `exact: true` on label selectors to avoid matching similar labels
  * (e.g., 'New passphrase' vs 'Confirm new passphrase').
  */
@@ -48,15 +52,22 @@ export async function changePassphrase(
   page: Page,
   { current, next }: { current: string; next: string },
 ): Promise<void> {
+  const open = page.getByTestId('change-passphrase-open');
+  await expect(open).toBeEnabled({ timeout: PBKDF2_BUDGET_MS });
+  await open.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Change passphrase' });
+  await expect(dialog).toBeVisible();
+
   // Without `exact`, 'New passphrase' would also match 'Confirm new passphrase'.
-  const currentPassphrase = page.getByLabel('Current passphrase', {
+  const currentPassphrase = dialog.getByLabel('Current passphrase', {
     exact: true,
   });
-  const newPassphrase = page.getByLabel('New passphrase', { exact: true });
-  const confirmPassphrase = page.getByLabel('Confirm new passphrase', {
+  const newPassphrase = dialog.getByLabel('New passphrase', { exact: true });
+  const confirmPassphrase = dialog.getByLabel('Confirm new passphrase', {
     exact: true,
   });
-  const changeSubmit = page.getByTestId('change-passphrase-submit');
+  const changeSubmit = dialog.getByTestId('change-passphrase-submit');
 
   await expect(currentPassphrase).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
   await expect(newPassphrase).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
@@ -67,15 +78,17 @@ export async function changePassphrase(
   await newPassphrase.fill(next);
   await confirmPassphrase.fill(next);
 
-  // `ChangePassphraseCard` disables this control while the Vault is locked
+  // The submit is disabled while the form is changing or the vault is locked
   // (`PassphraseChange` is `needsMasterKey: true`). Asserting enabled before
   // the click names that state directly instead of letting `click()` auto-wait
   // and report a generic actionability timeout.
   await expect(changeSubmit).toBeEnabled({ timeout: PBKDF2_BUDGET_MS });
   await changeSubmit.click();
 
-  // Wait for the success toast to confirm the passphrase change landed.
+  // Wait for the success toast to confirm the passphrase change landed, then
+  // for the dialog to close (the form unmounts on done).
   await expect(
     page.getByText('Passphrase changed', { exact: true }),
   ).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
+  await expect(dialog).toHaveCount(0, { timeout: PBKDF2_BUDGET_MS });
 }

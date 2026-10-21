@@ -253,12 +253,16 @@ test.describe('Multi-user vault isolation (E2E)', () => {
     await expect(removeButton).toBeVisible({ timeout: 10000 });
     await removeButton.click();
 
-    // Confirmation dialog should appear
-    const dialog = page.getByRole('dialog');
+    // Confirmation dialog should appear. RemoveVaultDialog is a ConfirmDialog,
+    // which is role="alertdialog", so `dialog` queries do not match it.
+    const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    // Click Delete button in the dialog
-    const deleteButton = dialog.getByRole('button', { name: 'Delete' });
+    // Click the confirm button in the dialog ("Remove from this device")
+    const deleteButton = dialog.getByRole('button', {
+      name: 'Remove from this device',
+      exact: true,
+    });
     await expect(deleteButton).toBeVisible();
 
     // RemoveVaultCard triggers window.location.reload() after removal. A

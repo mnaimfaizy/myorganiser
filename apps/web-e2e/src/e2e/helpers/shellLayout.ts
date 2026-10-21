@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { routeApi } from './apiStub';
+import { stubJsonGet } from './apiStub';
 import { login, setupBackend, type IdentityEntry } from './multiUserVault';
 
 /**
@@ -19,47 +19,6 @@ export interface ShellAccount {
   /** Throwaway login fixture; the backend is stubbed in-process. */
   loginFixture: string;
   identities: IdentityEntry[];
-}
-
-function corsHeaders(origin: string) {
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-  } as const;
-}
-
-/**
- * Answer GET with a fixed JSON body and OPTIONS with a CORS preflight. Any
- * other method is handed to the network. The body shapes are the generated
- * client's response types: ListFeedbackReportsResponse,
- * YouTubeAvailabilityResponse and the `connected` field the Account page and
- * Home read from GET /youtube/status.
- */
-export async function stubJsonGet(page: Page, url: RegExp, body: unknown) {
-  await routeApi(page, url, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-    const request = route.request();
-
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    if (request.method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        headers,
-        contentType: 'application/json',
-        body: JSON.stringify(body),
-      });
-      return;
-    }
-
-    await route.continue();
-  });
 }
 
 /**

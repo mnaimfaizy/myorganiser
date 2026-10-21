@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardTitle,
-  Input,
-  Label,
-  useToast,
-} from '@myorganiser/web-ui';
+import { Button, Input, Label, useToast } from '@myorganiser/web-ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -30,6 +22,7 @@ import {
 } from './RecoveryKeyClaimOffer';
 import { RecoveryKeyAcknowledgment } from './RecoveryKeyAcknowledgment';
 import { UnacknowledgedRecoveryKeyBanner } from './UnacknowledgedRecoveryKeyBanner';
+import { VaultGateFrame } from './VaultGateFrame';
 import { useOptionalVaultSession } from './session';
 import { useLocalVaultRevision } from './useLocalVaultRevision';
 import { ABSENT_EVIDENCE_WITHOUT_OWNER } from './useVaultAbsentEvidence';
@@ -405,19 +398,12 @@ export function VaultGate(props: VaultGateProps) {
   // unlocked branches so an already-unlocked session cannot sidestep the Acknowledgment.
   if (unacknowledgedRecoveryKey !== null) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <Card className="p-4">
-          <CardTitle className="text-lg">
-            {title}: Save your recovery key
-          </CardTitle>
-          <CardContent className="mt-4 space-y-4">
-            <RecoveryKeyAcknowledgment
-              recoveryKey={unacknowledgedRecoveryKey}
-              onAcknowledge={handleAcknowledgeRecoveryKey}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <VaultGateFrame title={`${title}: Save your recovery key`}>
+        <RecoveryKeyAcknowledgment
+          recoveryKey={unacknowledgedRecoveryKey}
+          onAcknowledge={handleAcknowledgeRecoveryKey}
+        />
+      </VaultGateFrame>
     );
   }
 
@@ -439,20 +425,13 @@ export function VaultGate(props: VaultGateProps) {
 
   if (currentVaultStatus === 'owned' && effectivePendingReplace) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <Card className="p-4">
-          <CardTitle className="text-lg">
-            {title}: Replace this device's vault?
-          </CardTitle>
-          <CardContent className="mt-4 space-y-4">
-            <VaultReplaceOffer
-              onExport={exportVaultAboutToBeReplaced}
-              onConfirm={confirmReplace}
-              onDecline={declineReplace}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <VaultGateFrame title={`${title}: Replace this device's vault?`}>
+        <VaultReplaceOffer
+          onExport={exportVaultAboutToBeReplaced}
+          onConfirm={confirmReplace}
+          onDecline={declineReplace}
+        />
+      </VaultGateFrame>
     );
   }
 
@@ -464,24 +443,23 @@ export function VaultGate(props: VaultGateProps) {
   if (currentVaultStatus === 'unclaimed') {
     if (claimEvidence.status === 'checking') {
       return (
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <Card className="p-4">
-            <CardTitle className="text-lg">{title}</CardTitle>
-            <CardContent className="mt-4 space-y-4">
-              {/* Says nothing about what this device holds — see the copy
-                  note in `vaultClaimEvidenceGateView.ts`. */}
-              <p className="text-sm text-muted-foreground">
-                Setting up your vault on this device…
-              </p>
-              {/* The check that is still out is the server one, and a recovery
-                  key needs no server — so the offer is available here for the
-                  same reason it is on every other screen, and withholding it
-                  until the check settles would time the offer's appearance to
-                  whether this device holds a Vault. */}
-              <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-            </CardContent>
-          </Card>
-        </div>
+        <VaultGateFrame
+          title={title}
+          footer={
+            /* The check that is still out is the server one, and a recovery
+               key needs no server — so the offer is available here for the
+               same reason it is on every other screen, and withholding it
+               until the check settles would time the offer's appearance to
+               whether this device holds a Vault. */
+            <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+          }
+        >
+          {/* Says nothing about what this device holds — see the copy
+              note in `vaultClaimEvidenceGateView.ts`. */}
+          <p className="text-sm text-muted-foreground">
+            Setting up your vault on this device…
+          </p>
+        </VaultGateFrame>
       );
     }
 
@@ -489,21 +467,18 @@ export function VaultGate(props: VaultGateProps) {
 
     if (view.kind === 'cannot-check') {
       return (
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <Card className="p-4">
-            <CardTitle className="text-lg">{view.title}</CardTitle>
-            <CardContent className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {view.description}
-              </p>
-              {/* A recovery key claim needs nothing from the server, so it stays
-                  available on the one screen a User reaches because the server
-                  could not be reached. Leaving it off here would make the
-                  action's own availability a presence tell. */}
-              <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-            </CardContent>
-          </Card>
-        </div>
+        <VaultGateFrame
+          title={view.title}
+          footer={
+            /* A recovery key claim needs nothing from the server, so it stays
+               available on the one screen a User reaches because the server
+               could not be reached. Leaving it off here would make the
+               action's own availability a presence tell. */
+            <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+          }
+        >
+          <p className="text-sm text-muted-foreground">{view.description}</p>
+        </VaultGateFrame>
       );
     }
 
@@ -518,20 +493,19 @@ export function VaultGate(props: VaultGateProps) {
   if (currentVaultStatus === 'absent') {
     if (absentEvidence.status === 'checking') {
       return (
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <Card className="p-4">
-            <CardTitle className="text-lg">{title}</CardTitle>
-            <CardContent className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Checking whether your vault is already on the server…
-              </p>
-              {/* The check that is still out is the server one, and a
-                  recovery key needs no server — available here for the same
-                  reason it is on every other withheld screen. */}
-              <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-            </CardContent>
-          </Card>
-        </div>
+        <VaultGateFrame
+          title={title}
+          footer={
+            /* The check that is still out is the server one, and a
+               recovery key needs no server — available here for the same
+               reason it is on every other withheld screen. */
+            <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            Checking whether your vault is already on the server…
+          </p>
+        </VaultGateFrame>
       );
     }
 
@@ -543,17 +517,14 @@ export function VaultGate(props: VaultGateProps) {
       absentView.kind === 'awaiting-download'
     ) {
       return (
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <Card className="p-4">
-            <CardTitle className="text-lg">{absentView.title}</CardTitle>
-            <CardContent className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {absentView.description}
-              </p>
-              <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-            </CardContent>
-          </Card>
-        </div>
+        <VaultGateFrame
+          title={absentView.title}
+          footer={<RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />}
+        >
+          <p className="text-sm text-muted-foreground">
+            {absentView.description}
+          </p>
+        </VaultGateFrame>
       );
     }
 
@@ -569,50 +540,50 @@ export function VaultGate(props: VaultGateProps) {
     }).success;
 
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <Card className="p-4">
-          <CardTitle className="text-lg">
-            {title}: Set encryption passphrase
-          </CardTitle>
-          <CardContent className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="setup-passphrase">Encryption passphrase</Label>
-              <Input
-                id="setup-passphrase"
-                type="password"
-                value={setupPassphrase}
-                onChange={(e) => setSetupPassphrase(e.target.value)}
-                placeholder="Choose a strong passphrase"
-              />
-            </div>
+      <VaultGateFrame
+        title={`${title}: Set encryption passphrase`}
+        footer={
+          /* This screen is what a User sees both when this device holds
+             nothing and when it holds an Unclaimed Local Vault nothing has
+             proved theirs, so the offer sits here precisely because the two
+             are the same screen. */
+          <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="setup-passphrase">Encryption passphrase</Label>
+          <Input
+            id="setup-passphrase"
+            type="password"
+            value={setupPassphrase}
+            onChange={(e) => setSetupPassphrase(e.target.value)}
+            placeholder="Choose a strong passphrase"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="setup-confirm">Confirm passphrase</Label>
-              <Input
-                id="setup-confirm"
-                type="password"
-                value={setupConfirm}
-                onChange={(e) => setSetupConfirm(e.target.value)}
-                placeholder="Re-enter passphrase"
-              />
-              <p className="text-sm text-muted-foreground">
-                Minimum {MIN_PASSPHRASE_LENGTH} characters. This passphrase
-                never leaves your device.
-              </p>
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="setup-confirm">Confirm passphrase</Label>
+          <Input
+            id="setup-confirm"
+            type="password"
+            value={setupConfirm}
+            onChange={(e) => setSetupConfirm(e.target.value)}
+            placeholder="Re-enter passphrase"
+          />
+          <p className="text-sm text-muted-foreground">
+            Minimum {MIN_PASSPHRASE_LENGTH} characters. This passphrase never
+            leaves your device.
+          </p>
+        </div>
 
-            <Button disabled={!canCreate} onClick={handleCreateVault}>
-              Create encrypted vault
-            </Button>
-
-            {/* This screen is what a User sees both when this device holds
-                nothing and when it holds an Unclaimed Local Vault nothing has
-                proved theirs, so the offer sits here precisely because the two
-                are the same screen. */}
-            <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-          </CardContent>
-        </Card>
-      </div>
+        <Button
+          className="w-full"
+          disabled={!canCreate}
+          onClick={handleCreateVault}
+        >
+          Create encrypted vault
+        </Button>
+      </VaultGateFrame>
     );
   }
 
@@ -620,96 +591,95 @@ export function VaultGate(props: VaultGateProps) {
     const canRecover = recoveryInput.trim().length > 0;
 
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <Card className="p-4">
-          <CardTitle className="text-lg">{title}: Recover</CardTitle>
-          <CardContent className="mt-4 space-y-4">
-            {showRemountRecoveryKeyBanner && (
-              <UnacknowledgedRecoveryKeyBanner surface="locked" />
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setUseRecovery(false)}
-              >
-                Use passphrase
-              </Button>
-              <Button type="button" variant="default">
-                Forgot passphrase
-              </Button>
-            </div>
+      <VaultGateFrame
+        title={`${title}: Recover`}
+        footer={
+          /* A User who is already `owned` here may also hold a recovery key
+             for a second, unclaimed Vault on this device, and this is where
+             they say so. */
+          <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+        }
+      >
+        {showRemountRecoveryKeyBanner && (
+          <UnacknowledgedRecoveryKeyBanner surface="locked" />
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setUseRecovery(false)}
+          >
+            Use passphrase
+          </Button>
+          <Button type="button" variant="default">
+            Forgot passphrase
+          </Button>
+        </div>
 
-            {/* A User who is already `owned` here may also hold a recovery key
-                for a second, unclaimed Vault on this device, and this is where
-                they say so. */}
-            <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+        <div className="space-y-2">
+          <Label htmlFor="recovery-key">Recovery key</Label>
+          <Input
+            id="recovery-key"
+            value={recoveryInput}
+            onChange={(e) => setRecoveryInput(e.target.value)}
+            placeholder="Paste your recovery key"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="recovery-key">Recovery key</Label>
-              <Input
-                id="recovery-key"
-                value={recoveryInput}
-                onChange={(e) => setRecoveryInput(e.target.value)}
-                placeholder="Paste your recovery key"
-              />
-            </div>
-
-            <Button
-              disabled={!canRecover}
-              onClick={handleUnlockWithRecoveryKey}
-            >
-              Unlock with recovery key
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <Button
+          className="w-full"
+          disabled={!canRecover}
+          onClick={handleUnlockWithRecoveryKey}
+        >
+          Unlock with recovery key
+        </Button>
+      </VaultGateFrame>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <Card className="p-4">
-        <CardTitle className="text-lg">{title}: Unlock</CardTitle>
-        <CardContent className="mt-4 space-y-4">
-          {showRemountRecoveryKeyBanner && (
-            <UnacknowledgedRecoveryKeyBanner surface="locked" />
-          )}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={useRecovery ? 'secondary' : 'default'}
-              onClick={() => setUseRecovery(false)}
-            >
-              Use passphrase
-            </Button>
-            <Button
-              type="button"
-              variant={useRecovery ? 'default' : 'secondary'}
-              onClick={() => setUseRecovery(true)}
-            >
-              Forgot passphrase
-            </Button>
-          </div>
+    <VaultGateFrame
+      title={`${title}: Unlock`}
+      footer={
+        /* A User who is already `owned` here may also hold a recovery key
+           for a second, unclaimed Vault on this device, and this is where
+           they say so. */
+        <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+      }
+    >
+      {showRemountRecoveryKeyBanner && (
+        <UnacknowledgedRecoveryKeyBanner surface="locked" />
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant={useRecovery ? 'secondary' : 'default'}
+          onClick={() => setUseRecovery(false)}
+        >
+          Use passphrase
+        </Button>
+        <Button
+          type="button"
+          variant={useRecovery ? 'default' : 'secondary'}
+          onClick={() => setUseRecovery(true)}
+        >
+          Forgot passphrase
+        </Button>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="unlock-passphrase">Encryption passphrase</Label>
-            <Input
-              id="unlock-passphrase"
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-            />
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="unlock-passphrase">Encryption passphrase</Label>
+        <Input
+          id="unlock-passphrase"
+          type="password"
+          value={passphrase}
+          onChange={(e) => setPassphrase(e.target.value)}
+        />
+      </div>
 
-          <Button onClick={handleUnlockWithPassphrase}>Unlock</Button>
-
-          {/* A User who is already `owned` here may also hold a recovery key
-              for a second, unclaimed Vault on this device, and this is where
-              they say so. */}
-          <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
-        </CardContent>
-      </Card>
-    </div>
+      <Button className="w-full" onClick={handleUnlockWithPassphrase}>
+        Unlock
+      </Button>
+    </VaultGateFrame>
   );
 }

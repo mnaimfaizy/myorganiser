@@ -57,8 +57,15 @@ export function RecoveryKeyAcknowledgment(
       <Label htmlFor="acknowledgment-recovery-key">
         Recovery key (save this)
       </Label>
-      <Input id="acknowledgment-recovery-key" readOnly value={recoveryKey} />
-      <div className="flex gap-2">
+      <div className="rounded-control border border-dashed border-brand bg-brand-soft p-3">
+        <Input
+          id="acknowledgment-recovery-key"
+          readOnly
+          value={recoveryKey}
+          className="border-0 bg-transparent px-0 font-mono shadow-none"
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={handleDownload}>
           Download recovery key
         </Button>

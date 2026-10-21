@@ -50,7 +50,8 @@ jest.mock('@myorganiser/web-vault', () => ({
 
 /**
  * Mock web-ui components and useToast.
- * Spread actual to get cn and other utilities, then override components.
+ * Spread actual to get cn, the real Dialog primitives and other utilities,
+ * then override components.
  */
 jest.mock('@myorganiser/web-ui', () => {
   const actual = jest.requireActual('@myorganiser/web-ui');
@@ -237,6 +238,16 @@ function createMockHandle(overrides?: Partial<VaultHandle>): VaultHandle {
   return { ...base, ...overrides };
 }
 
+/** The card shows only the summary and an opener; the form lives in the dialog. */
+function openRotationDialog() {
+  fireEvent.click(screen.getByTestId('recovery-key-rotation-open'));
+}
+
+function renderCardOpen() {
+  render(<RecoveryKeyRotationCard />);
+  openRotationDialog();
+}
+
 describe('RecoveryKeyRotationCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -271,47 +282,56 @@ describe('RecoveryKeyRotationCard', () => {
   });
 
   describe('Visibility — disabled-state ladder', () => {
-    test('1: no session/handle → card renders, mint button disabled, shows "Your vault is not available on this device right now."', () => {
+    test('1: no session/handle → card renders, opener disabled, shows "Your vault is not available on this device right now.", no form in the DOM', () => {
       (useVaultDisabledState as jest.Mock).mockReturnValue('signed-out');
 
       render(<RecoveryKeyRotationCard />);
 
       expect(screen.getByTestId('card')).toBeInTheDocument();
-      expect(screen.getByTestId('recovery-key-rotation-mint')).toBeDisabled();
+      expect(screen.getByTestId('recovery-key-rotation-open')).toBeDisabled();
       expect(
         screen.getByText(
           'Your vault is not available on this device right now.',
         ),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('recovery-key-rotation-mint'),
+      ).not.toBeInTheDocument();
     });
 
-    test('2: handle present, loadVault() returns null → mint button disabled, shows "Set up a local vault…"', () => {
+    test('2: handle present, loadVault() returns null → opener disabled, shows "Set up a local vault…", no form in the DOM', () => {
       (useVaultDisabledState as jest.Mock).mockReturnValue('no-local-vault');
 
       render(<RecoveryKeyRotationCard />);
 
       expect(screen.getByTestId('card')).toBeInTheDocument();
-      expect(screen.getByTestId('recovery-key-rotation-mint')).toBeDisabled();
+      expect(screen.getByTestId('recovery-key-rotation-open')).toBeDisabled();
       expect(
         screen.getByText(
           'Set up a local vault on this device to rotate its recovery key.',
         ),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('recovery-key-rotation-mint'),
+      ).not.toBeInTheDocument();
     });
 
-    test('3: handle present, masterKeyBytes === null (locked), vault exists → mint button disabled, shows "Unlock your vault…"', () => {
+    test('3: handle present, masterKeyBytes === null (locked), vault exists → opener disabled, shows "Unlock your vault…", no form in the DOM', () => {
       (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
 
       render(<RecoveryKeyRotationCard />);
 
       expect(screen.getByTestId('card')).toBeInTheDocument();
-      expect(screen.getByTestId('recovery-key-rotation-mint')).toBeDisabled();
+      expect(screen.getByTestId('recovery-key-rotation-open')).toBeDisabled();
       expect(
         screen.getByText('Unlock your vault to rotate its recovery key.'),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('recovery-key-rotation-mint'),
+      ).not.toBeInTheDocument();
     });
 
-    test('4: handle and masterKeyBytes present, passphrase field empty → mint button disabled independently (empty passphrase gates it), no unavailability message', () => {
+    test('4: handle and masterKeyBytes present → opener enabled, no unavailability message; inside the dialog the mint button is disabled until a passphrase is entered', () => {
       (useOptionalVaultSession as jest.Mock).mockReturnValue({
         handle: createMockHandle({ loadVault: jest.fn().mockReturnValue({}) }),
         masterKeyBytes: new Uint8Array(32),
@@ -320,8 +340,7 @@ describe('RecoveryKeyRotationCard', () => {
       render(<RecoveryKeyRotationCard />);
 
       expect(screen.getByTestId('card')).toBeInTheDocument();
-      const mintButton = screen.getByTestId('recovery-key-rotation-mint');
-      expect(mintButton).toBeDisabled();
+      expect(screen.getByTestId('recovery-key-rotation-open')).toBeEnabled();
       // Assert no ladder message is shown (already unlocked)
       expect(
         screen.queryByText('Your vault is not available'),
@@ -333,17 +352,22 @@ describe('RecoveryKeyRotationCard', () => {
       expect(
         screen.queryByTestId('recovery-key-rotation-unavailable'),
       ).not.toBeInTheDocument();
+
+      openRotationDialog();
+
+      const mintButton = screen.getByTestId('recovery-key-rotation-mint');
+      expect(mintButton).toBeDisabled();
     });
   });
 
   describe('Static copy — rendering in enabled state', () => {
-    test('5: renders reassurance paragraph and paragraph mentioning Export encrypted vault', () => {
+    test('5: dialog renders reassurance paragraph and paragraph mentioning Export encrypted vault on the Vault page', () => {
       (useOptionalVaultSession as jest.Mock).mockReturnValue({
         handle: createMockHandle({ loadVault: jest.fn().mockReturnValue({}) }),
         masterKeyBytes: new Uint8Array(32),
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Paragraph 1: minting does not write anything
       expect(
@@ -355,18 +379,13 @@ describe('RecoveryKeyRotationCard', () => {
       // Paragraph 2: Export saved before rotating still opens with old key
       expect(
         screen.getByText(
-          /A Vault Export you saved before rotating still opens with your old recovery key — see "Export encrypted vault" below\./,
+          /A Vault Export you saved before rotating still opens with your old recovery key — see "Export encrypted vault" on the Vault page\./,
         ),
       ).toBeInTheDocument();
     });
 
     test("5a: the passphrase field label is distinct from the passphrase card's", () => {
-      (useOptionalVaultSession as jest.Mock).mockReturnValue({
-        handle: createMockHandle({ loadVault: jest.fn().mockReturnValue({}) }),
-        masterKeyBytes: new Uint8Array(32),
-      });
-
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // ChangePassphraseCard renders "Current passphrase" and sits on the same
       // Vault page. Two identically-labelled password fields give a screen
@@ -393,7 +412,7 @@ describe('RecoveryKeyRotationCard', () => {
         rotateRecoveryKey: mockRotateRecoveryKey,
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill the passphrase field (should be a password field)
       const allInputs = screen.getAllByDisplayValue('');
@@ -428,7 +447,7 @@ describe('RecoveryKeyRotationCard', () => {
 
   describe('Paste-back gate', () => {
     test('7: after minting, submit disabled with empty confirm field', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and submit passphrase to mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -454,7 +473,7 @@ describe('RecoveryKeyRotationCard', () => {
     });
 
     test('8: after minting, submit disabled with wrong/partial value in confirm field', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and submit passphrase to mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -486,7 +505,7 @@ describe('RecoveryKeyRotationCard', () => {
     });
 
     test('9: after minting, submit enabled only when confirm matches minted key exactly', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and submit passphrase to mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -522,7 +541,7 @@ describe('RecoveryKeyRotationCard', () => {
 
   describe('Confirm-key validation', () => {
     test('9a: after minting, typing fewer characters than minted key should NOT show mismatch error', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -558,7 +577,7 @@ describe('RecoveryKeyRotationCard', () => {
     });
 
     test('9b: after minting, typing at least as many characters as minted key that do NOT match SHOULD show mismatch error', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -598,7 +617,7 @@ describe('RecoveryKeyRotationCard', () => {
     });
 
     test('9c: after minting with mismatch error shown, correcting to exact match clears the error', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -656,14 +675,14 @@ describe('RecoveryKeyRotationCard', () => {
   });
 
   describe('Abandonment', () => {
-    test('10: after minting, click cancel, key display and confirm field no longer shown, rotateRecoveryKey never called', async () => {
+    test('10: after minting, click cancel, dialog closes, key display and confirm field no longer shown, rotateRecoveryKey never called', async () => {
       const mockRotateRecoveryKey = jest.fn();
       (useRecoveryKeyRotation as jest.Mock).mockReturnValue({
         rotating: false,
         rotateRecoveryKey: mockRotateRecoveryKey,
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and submit passphrase to mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -687,7 +706,10 @@ describe('RecoveryKeyRotationCard', () => {
       const cancelButton = screen.getByTestId('recovery-key-rotation-cancel');
       fireEvent.click(cancelButton);
 
-      // Assert key display and confirm field are no longer shown
+      // Assert the dialog closed, so key display and confirm field are no longer shown
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
       expect(
         screen.queryByTestId('recovery-key-rotation-key'),
       ).not.toBeInTheDocument();
@@ -697,6 +719,43 @@ describe('RecoveryKeyRotationCard', () => {
 
       // Assert rotateRecoveryKey was never called
       expect(mockRotateRecoveryKey).not.toHaveBeenCalled();
+    });
+
+    test('10a: after Cancel with a minted key, reopening shows a fresh form: empty passphrase, no minted key, mint disabled', async () => {
+      renderCardOpen();
+
+      const allInputs = screen.getAllByDisplayValue('');
+      const passphraseInput = allInputs.find(
+        (input): input is HTMLInputElement =>
+          input instanceof HTMLInputElement && input.type === 'password',
+      );
+      fireEvent.change(passphraseInput!, { target: { value: 'testpass1234' } });
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-mint'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('recovery-key-rotation-key'),
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-cancel'));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      openRotationDialog();
+
+      expect(
+        screen.queryByTestId('recovery-key-rotation-key'),
+      ).not.toBeInTheDocument();
+      const reopenedPassphrase = screen
+        .getAllByDisplayValue('')
+        .find(
+          (input): input is HTMLInputElement =>
+            input instanceof HTMLInputElement && input.type === 'password',
+        );
+      expect(reopenedPassphrase!.value).toBe('');
+      expect(screen.getByTestId('recovery-key-rotation-mint')).toBeDisabled();
     });
   });
 
@@ -708,7 +767,7 @@ describe('RecoveryKeyRotationCard', () => {
         rotateRecoveryKey: mockRotateRecoveryKey,
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -754,6 +813,43 @@ describe('RecoveryKeyRotationCard', () => {
         ).not.toBeInTheDocument();
       });
     });
+
+    test('11a: successful rotation closes the dialog and leaves the opener enabled', async () => {
+      const mockRotateRecoveryKey = jest.fn().mockResolvedValue('ok');
+      (useRecoveryKeyRotation as jest.Mock).mockReturnValue({
+        rotating: false,
+        rotateRecoveryKey: mockRotateRecoveryKey,
+      });
+
+      renderCardOpen();
+
+      const allInputs = screen.getAllByDisplayValue('');
+      const passphraseInput = allInputs.find(
+        (input): input is HTMLInputElement =>
+          input instanceof HTMLInputElement && input.type === 'password',
+      );
+      fireEvent.change(passphraseInput!, { target: { value: 'testpass1234' } });
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-mint'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('recovery-key-rotation-confirm'),
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByTestId('recovery-key-rotation-confirm'), {
+        target: { value: 'MOCKED-RECOVERY-KEY-VALUE' },
+      });
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-submit'));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+      expect(
+        screen.queryByTestId('recovery-key-rotation-submit'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('recovery-key-rotation-open')).toBeEnabled();
+    });
   });
 
   describe('Commit — wrong passphrase', () => {
@@ -766,7 +862,7 @@ describe('RecoveryKeyRotationCard', () => {
         rotateRecoveryKey: mockRotateRecoveryKey,
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -821,6 +917,57 @@ describe('RecoveryKeyRotationCard', () => {
     });
   });
 
+  describe('Commit — hook error', () => {
+    test('12a: rotateRecoveryKey returns "error" → hook already toasted, dialog stays open with key and confirm still shown, onDone not run', async () => {
+      const mockRotateRecoveryKey = jest.fn().mockResolvedValue('error');
+      (useRecoveryKeyRotation as jest.Mock).mockReturnValue({
+        rotating: false,
+        rotateRecoveryKey: mockRotateRecoveryKey,
+      });
+
+      renderCardOpen();
+
+      const allInputs = screen.getAllByDisplayValue('');
+      const passphraseInput = allInputs.find(
+        (input): input is HTMLInputElement =>
+          input instanceof HTMLInputElement && input.type === 'password',
+      );
+
+      fireEvent.change(passphraseInput!, { target: { value: 'testpass1234' } });
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-mint'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('recovery-key-rotation-confirm'),
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByTestId('recovery-key-rotation-confirm'), {
+        target: { value: 'MOCKED-RECOVERY-KEY-VALUE' },
+      });
+      fireEvent.click(screen.getByTestId('recovery-key-rotation-submit'));
+
+      await waitFor(() => {
+        expect(mockRotateRecoveryKey).toHaveBeenCalledWith({
+          currentPassphrase: 'testpass1234',
+          recoveryKey: 'MOCKED-RECOVERY-KEY-VALUE',
+        });
+      });
+
+      // onDone did not run: the dialog is still open, with the minted key and confirm field
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('recovery-key-rotation-key'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('recovery-key-rotation-confirm'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('That is not your current passphrase.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('Loading state', () => {
     test('13: rotating true → submit button shows "Rotating…" and is disabled', async () => {
       (useRecoveryKeyRotation as jest.Mock).mockReturnValue({
@@ -828,7 +975,7 @@ describe('RecoveryKeyRotationCard', () => {
         rotateRecoveryKey: jest.fn(),
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Mint first so the submit button appears
       const allInputs = screen.getAllByDisplayValue('');
@@ -859,7 +1006,7 @@ describe('RecoveryKeyRotationCard', () => {
       const mockToast = jest.fn();
       (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -912,7 +1059,7 @@ describe('RecoveryKeyRotationCard', () => {
         },
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -955,7 +1102,7 @@ describe('RecoveryKeyRotationCard', () => {
 
   describe('Download button', () => {
     test('15: after minting, click download → downloadTextFile called with minted key content', async () => {
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Fill and mint
       const allInputs = screen.getAllByDisplayValue('');
@@ -1003,7 +1150,7 @@ describe('RecoveryKeyRotationCard', () => {
         recheck: jest.fn(),
       });
 
-      render(<RecoveryKeyRotationCard />);
+      renderCardOpen();
 
       // Step 1: Fill passphrase and mint
       const allInputs = screen.getAllByDisplayValue('');

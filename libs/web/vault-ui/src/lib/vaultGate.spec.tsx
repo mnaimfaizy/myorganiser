@@ -52,7 +52,13 @@ jest.mock('@myorganiser/web-vault', () => ({
     mockCreateDefaultAuditReporter(...args),
 }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 // Import real VaultSecretMismatchError so instanceof checks work
 import { readFileSync } from 'node:fs';
@@ -217,6 +223,13 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'We could not reach the server',
+        }),
+      ).toBeInTheDocument();
       expect(
         screen.getByText(/We could not reach the server/),
       ).toBeInTheDocument();
@@ -248,6 +261,10 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Please sign in again' }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Please sign in again/)).toBeInTheDocument();
       expect(
         screen.queryByLabelText(/Encryption passphrase/),
@@ -734,6 +751,142 @@ describe('VaultGate', () => {
       expect(source).not.toContain('RecoverySetNewPassphraseForm');
       expect(source).not.toContain('Set a new passphrase');
       expect(source).not.toContain('changePassphraseWithCurrent');
+    });
+  });
+
+  describe('gate screen headings (VaultGateFrame contract)', () => {
+    const claimOfferName = /I have a recovery key for a vault on this device/;
+
+    test('unlock screen has one level 1 heading named "<title>: Unlock" and renders the claim offer', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+
+      render(<VaultGate title="Tasks">{() => <div>children</div>}</VaultGate>);
+
+      await act(async () => {});
+
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Tasks: Unlock' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: claimOfferName }),
+      ).toBeInTheDocument();
+    });
+
+    test('create screen has one level 1 heading named "<title>: Set encryption passphrase" and renders the claim offer', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'absent'),
+      });
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+
+      render(<VaultGate title="Tasks">{() => <div>children</div>}</VaultGate>);
+
+      await act(async () => {});
+
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'Tasks: Set encryption passphrase',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: claimOfferName }),
+      ).toBeInTheDocument();
+    });
+
+    test('evidence-check screen uses the bare title as its only level 1 heading and renders the claim offer', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'unclaimed'),
+      });
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+      mockUseVaultClaimEvidence.mockReturnValue({ status: 'checking' });
+
+      render(<VaultGate title="Tasks">{() => <div>children</div>}</VaultGate>);
+
+      await act(async () => {});
+
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Tasks' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: claimOfferName }),
+      ).toBeInTheDocument();
+    });
+
+    test('recover screen is titled "<title>: Recover" after the User picks Forgot passphrase', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+
+      render(<VaultGate title="Tasks">{() => <div>children</div>}</VaultGate>);
+
+      await act(async () => {});
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Forgot passphrase' }),
+      );
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Tasks: Recover' }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('button', { name: claimOfferName }),
+      ).toBeInTheDocument();
+    });
+
+    test('replace offer is titled "<title>: Replace this device\'s vault?" as its only level 1 heading', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+      mockUseVaultClaimEvidence.mockReturnValue({
+        status: 'settled',
+        result: { kind: 'replace-offer' },
+      });
+
+      render(<VaultGate title="Tasks">{() => <div>children</div>}</VaultGate>);
+
+      await act(async () => {});
+
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: "Tasks: Replace this device's vault?",
+        }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -1530,6 +1683,10 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Test' }),
+      ).toBeInTheDocument();
       expect(
         screen.getByText(
           /Checking whether your vault is already on the server/,
@@ -1565,6 +1722,13 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'Getting your vault back',
+        }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Getting your vault back/)).toBeInTheDocument();
       expect(
         screen.getByText(/The server already holds a vault for your account/),
@@ -1599,6 +1763,13 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'We could not reach the server',
+        }),
+      ).toBeInTheDocument();
       expect(
         screen.getByText(/We could not reach the server/),
       ).toBeInTheDocument();
@@ -1637,6 +1808,10 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Please sign in again' }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Please sign in again/)).toBeInTheDocument();
       expect(
         screen.getByText(

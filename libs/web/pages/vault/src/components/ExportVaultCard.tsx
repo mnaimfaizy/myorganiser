@@ -2,14 +2,7 @@
 
 import { useCallback } from 'react';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@myorganiser/web-ui';
+import { Button, Card } from '@myorganiser/web-ui';
 
 import { useExportVault, useVaultOperationAvailability } from '../hooks';
 import { VAULT_OPERATIONS } from '../policy';
@@ -37,16 +30,14 @@ export function ExportVaultCard({ onEscapeCopyMade }: ExportVaultCardProps) {
   }, [exportVaultNow, onEscapeCopyMade]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Export encrypted vault</CardTitle>
-        <CardDescription>
+    <Card className="h-full">
+      <div className="flex h-full flex-col gap-3 p-4 md:p-6">
+        <h3 className="font-display text-title">Export encrypted vault</h3>
+        <p className="text-body text-foreground-supporting">
           Download a ciphertext-only JSON bundle. The file never contains
           plaintext addresses or phone numbers.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">
+        </p>
+        <p className="text-body text-foreground-supporting">
           The exported file is decrypted only on this device using your
           passphrase or recovery key. The server stores audit metadata only —
           never the bundle itself.
@@ -55,16 +46,15 @@ export function ExportVaultCard({ onEscapeCopyMade }: ExportVaultCardProps) {
           reason={unavailableReason}
           testId="export-vault-unavailable"
         />
-        <div className="flex gap-2">
-          <Button
-            data-testid="export-vault-button"
-            onClick={handleExport}
-            disabled={exporting || !allowed}
-          >
-            {exporting ? 'Exporting…' : 'Export vault JSON'}
-          </Button>
-        </div>
-      </CardContent>
+        <Button
+          data-testid="export-vault-button"
+          onClick={handleExport}
+          disabled={exporting || !allowed}
+          className="mt-auto w-full md:w-auto"
+        >
+          {exporting ? 'Exporting…' : 'Export vault JSON'}
+        </Button>
+      </div>
     </Card>
   );
 }

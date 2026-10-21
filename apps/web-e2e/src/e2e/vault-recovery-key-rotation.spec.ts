@@ -70,9 +70,8 @@ test.describe('Recovery Key Rotation (E2E)', () => {
       await expect(savedButton).toBeVisible({ timeout: 60000 });
 
       // Capture the original recovery key BEFORE clicking "I saved it".
-      // This readonly input has no id/data-testid in vaultGate.tsx, and it is
-      // the only readonly input on screen at this step in the setup flow.
-      const readonlyInput = page.locator('input[readonly]');
+      // The acknowledgment step renders it in the readonly #acknowledgment-recovery-key input.
+      const readonlyInput = page.locator('#acknowledgment-recovery-key');
       originalRecoveryKey = await readonlyInput.inputValue();
       expectNonEmptyKey(originalRecoveryKey);
 
@@ -90,22 +89,30 @@ test.describe('Recovery Key Rotation (E2E)', () => {
     // Click the "Vault" sidebar link to preserve the in-memory vault session
     await page.getByRole('link', { name: 'Vault', exact: true }).click();
 
-    // Wait for the passphrase field to be editable (card is unlocked)
-    const passphraseInput = page.getByLabel(
+    // The rotation form lives in a "Rotate recovery key" dialog, opened by
+    // `recovery-key-rotation-open`. That opener is disabled while the vault is
+    // locked, so wait for it to be enabled (unlock landed) before clicking.
+    const openButton = page.getByTestId('recovery-key-rotation-open');
+    await expect(openButton).toBeEnabled({ timeout: 60000 });
+    await openButton.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Rotate recovery key' });
+    await expect(dialog).toBeVisible();
+
+    // Fill current passphrase
+    const passphraseInput = dialog.getByLabel(
       'Passphrase to authorize this rotation',
     );
     await expect(passphraseInput).toBeEditable({ timeout: 60000 });
-
-    // Fill current passphrase
     await passphraseInput.fill(VAULT_PASSPHRASE);
 
     // Click "Generate recovery key"
-    const mintButton = page.getByTestId('recovery-key-rotation-mint');
+    const mintButton = dialog.getByTestId('recovery-key-rotation-mint');
     await expect(mintButton).toBeEnabled();
     await mintButton.click();
 
     // Wait for and capture the minted key
-    const mintedKeyInput = page.getByTestId('recovery-key-rotation-key');
+    const mintedKeyInput = dialog.getByTestId('recovery-key-rotation-key');
     await expect(mintedKeyInput).toBeVisible({ timeout: 60000 });
     newRecoveryKey = await mintedKeyInput.inputValue();
 
@@ -113,18 +120,18 @@ test.describe('Recovery Key Rotation (E2E)', () => {
     expect(newRecoveryKey).not.toBe(originalRecoveryKey);
 
     // Paste back the new key to confirm
-    const confirmInput = page.getByTestId('recovery-key-rotation-confirm');
+    const confirmInput = dialog.getByTestId('recovery-key-rotation-confirm');
     await confirmInput.fill(newRecoveryKey);
 
     // Submit the rotation
-    const submitButton = page.getByTestId('recovery-key-rotation-submit');
+    const submitButton = dialog.getByTestId('recovery-key-rotation-submit');
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    // Wait for the card to reset (mintedKey becomes null, so the display disappears)
-    await expect(page.getByTestId('recovery-key-rotation-key')).toHaveCount(0, {
-      timeout: 60000,
-    });
+    // Wait for the dialog to close (the form unmounts on done), which also
+    // means the minted key display is gone.
+    await expect(dialog).toHaveCount(0, { timeout: 60000 });
+    await expect(page.getByTestId('recovery-key-rotation-key')).toHaveCount(0);
 
     // 5. Reload and lock the session
     await page.reload();
