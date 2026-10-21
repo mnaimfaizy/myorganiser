@@ -22,18 +22,9 @@ import {
 } from '@myorganiser/web-vault-ui';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { useLogOut } from '../hooks/use-log-out';
+import { initialsOf } from '../utils';
 
 const MENU_ITEM_CLASS = 'min-h-10 rounded-item px-2.5 text-body-sm';
-
-function initialsOf(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
 
 /**
  * The account menu in the dashboard header. Radix owns the open state. The
