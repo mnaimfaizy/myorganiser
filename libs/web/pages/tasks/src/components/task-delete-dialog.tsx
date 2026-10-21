@@ -54,8 +54,11 @@ export function TaskDeleteDialog({
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton={!isDeleting}>
         <div className="mb-4 flex items-center justify-center">
-          <div className="rounded-full bg-red-100 p-3">
-            <AlertTriangle className="h-6 w-6 text-red-600" />
+          <div className="rounded-full bg-destructive-soft p-3">
+            <AlertTriangle
+              aria-hidden="true"
+              className="h-6 w-6 text-destructive-text"
+            />
           </div>
         </div>
         <DialogHeader>
