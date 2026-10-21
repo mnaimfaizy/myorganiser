@@ -17,6 +17,7 @@ jest.mock('@myorganiser/auth', () => ({
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
   useSidebar: jest.fn(),
+  useToast: jest.fn(),
   // The top-level Sidebar branches on the real context (Sheet on phone width).
   // Stub it so the mocked isMobile value is the only width signal under test.
   Sidebar: (props: React.ComponentProps<'div'>) => (
@@ -28,10 +29,11 @@ jest.mock('@myorganiser/web-ui', () => ({
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { getCurrentUser, logout } from '@myorganiser/auth';
-import { SidebarProvider, useSidebar } from '@myorganiser/web-ui';
+import { SidebarProvider, useSidebar, useToast } from '@myorganiser/web-ui';
 import { AdminSidebar } from './AdminSidebar';
 
 const adminUser = { name: 'Test Admin', email: 'admin@example.com' };
+const mockToast = jest.fn();
 
 function stubSidebar(isMobile: boolean) {
   const sidebar = {
@@ -91,6 +93,7 @@ describe('AdminSidebar', () => {
     stubMatchMedia();
     (getCurrentUser as jest.Mock).mockReturnValue(adminUser);
     (logout as jest.Mock).mockResolvedValue(undefined);
+    (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
     document.addEventListener('click', preventAnchorNavigation);
   });
 
@@ -124,6 +127,24 @@ describe('AdminSidebar', () => {
     await waitFor(() => {
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
     });
+  });
+
+  it('should stay on the page and show a destructive toast when the sign-out is rejected', async () => {
+    stubSidebar(false);
+    (logout as jest.Mock).mockRejectedValue(new Error('network down'));
+
+    renderAdminSidebar();
+    openUserMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Log out failed',
+        description: 'You are still signed in. Try again.',
+        variant: 'destructive',
+      });
+    });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('should not touch drawer state on desktop when an admin nav link is chosen', () => {

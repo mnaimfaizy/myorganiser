@@ -10,3 +10,4 @@ export type {
   SessionEndedListener,
   SessionEndedReason,
 } from './lib/session-ended-signal';
+export * from './lib/is-platform-admin';

@@ -14,7 +14,7 @@ import {
 import {
   describeVaultSyncStatus,
   SyncStatusWidget,
-  useOptionalVaultSession,
+  useVaultLockState,
   useVaultSyncStatus,
 } from '@myorganiser/web-vault-ui';
 import { AccountMenu } from './AccountMenu';
@@ -31,7 +31,7 @@ export function DashboardHeader() {
   // treats an empty path as the Dashboard root.
   const pathname: string = usePathname() ?? '';
   const { state, isMobile, toggleSidebar } = useSidebar();
-  const session = useOptionalVaultSession();
+  const lockState = useVaultLockState();
   const { status } = useVaultSyncStatus();
 
   const crumbs = getBreadcrumbItems(pathname);
@@ -47,7 +47,7 @@ export function DashboardHeader() {
       ? 'Collapse sidebar'
       : 'Expand sidebar';
 
-  const locked = session !== null && session.masterKeyBytes === null;
+  const locked = lockState === 'locked';
   const reading = describeVaultSyncStatus(status);
   const synced = !locked && status !== null && reading.label === null;
 

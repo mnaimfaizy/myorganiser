@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
   useSidebar,
 } from '@myorganiser/web-ui';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
+import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { NavMain, type NavGroup } from './nav-main';
@@ -69,8 +69,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // desktop collapse state is.
   const collapsed = state === 'collapsed' && !isMobile;
   const youtubeNavVisible = useYouTubeNavVisible();
-  const session = useOptionalVaultSession();
-  const vaultLocked = session !== null && session.masterKeyBytes === null;
+  const vaultLocked = useVaultLockState() === 'locked';
 
   // A group whose only item is hidden is dropped whole, header included.
   const groups = React.useMemo(

@@ -12,7 +12,7 @@ jest.mock('../hooks/use-feedback-dialog', () => ({
 }));
 
 jest.mock('@myorganiser/web-vault-ui', () => ({
-  useOptionalVaultSession: jest.fn(),
+  useVaultLockState: jest.fn(),
 }));
 
 jest.mock('./SidebarVaultCard', () => ({
@@ -43,7 +43,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
 import { TooltipProvider, useSidebar } from '@myorganiser/web-ui';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
+import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { AppSidebar } from './app-sidebar';
@@ -71,10 +71,8 @@ function stubSidebar({
   return sidebar;
 }
 
-function stubVaultSession(masterKeyBytes: Uint8Array | null | 'no-session') {
-  (useOptionalVaultSession as jest.Mock).mockReturnValue(
-    masterKeyBytes === 'no-session' ? null : { masterKeyBytes },
-  );
+function stubVaultLockState(state: 'locked' | 'unlocked' | 'no-session') {
+  (useVaultLockState as jest.Mock).mockReturnValue(state);
 }
 
 function lastNavMainProps(): { countsVisible: boolean } {
@@ -95,7 +93,7 @@ describe('AppSidebar', () => {
     jest.clearAllMocks();
     (usePathname as jest.Mock).mockReturnValue('/dashboard');
     (useYouTubeNavVisible as jest.Mock).mockReturnValue(true);
-    stubVaultSession('no-session');
+    stubVaultLockState('no-session');
     stubSidebar();
   });
 
@@ -221,7 +219,7 @@ describe('AppSidebar', () => {
   describe('collapsed layout', () => {
     it('hides the vault card, group labels and keeps Send feedback reachable by name on the desktop rail', () => {
       stubSidebar({ isMobile: false, state: 'collapsed' });
-      stubVaultSession(new Uint8Array(32));
+      stubVaultLockState('unlocked');
 
       renderSidebar();
 
@@ -236,7 +234,7 @@ describe('AppSidebar', () => {
 
     it('keeps the expanded layout at phone width even when the desktop state is collapsed', () => {
       stubSidebar({ isMobile: true, state: 'collapsed' });
-      stubVaultSession(new Uint8Array(32));
+      stubVaultLockState('unlocked');
 
       renderSidebar();
 
@@ -247,7 +245,7 @@ describe('AppSidebar', () => {
 
   describe('vault counts', () => {
     it('hides counts while the Vault is locked', () => {
-      stubVaultSession(null);
+      stubVaultLockState('locked');
 
       renderSidebar();
 
@@ -255,7 +253,7 @@ describe('AppSidebar', () => {
     });
 
     it('shows counts while the Vault is unlocked', () => {
-      stubVaultSession(new Uint8Array(32));
+      stubVaultLockState('unlocked');
 
       renderSidebar();
 
@@ -263,7 +261,7 @@ describe('AppSidebar', () => {
     });
 
     it('shows counts when there is no Vault Session', () => {
-      stubVaultSession('no-session');
+      stubVaultLockState('no-session');
 
       renderSidebar();
 

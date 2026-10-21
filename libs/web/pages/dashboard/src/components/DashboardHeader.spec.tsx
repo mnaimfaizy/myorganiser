@@ -10,7 +10,7 @@ jest.mock('@myorganiser/web-ui', () => ({
 
 jest.mock('@myorganiser/web-vault-ui', () => ({
   ...jest.requireActual('@myorganiser/web-vault-ui'),
-  useOptionalVaultSession: jest.fn(),
+  useVaultLockState: jest.fn(),
   useVaultSyncStatus: jest.fn(),
   // The real widget reads its own module-local status hook, which the barrel
   // mock cannot reach. The header only decides its className, so the widget
@@ -32,7 +32,7 @@ import { VaultBlobType } from '@myorganiser/app-api-client';
 import { TooltipProvider, useSidebar } from '@myorganiser/web-ui';
 import {
   describeVaultSyncStatus,
-  useOptionalVaultSession,
+  useVaultLockState,
   useVaultSyncStatus,
 } from '@myorganiser/web-vault-ui';
 import { DashboardHeader } from './DashboardHeader';
@@ -80,14 +80,8 @@ function stubSidebar({
   return sidebar;
 }
 
-function stubVaultSession(state: 'unlocked' | 'locked' | 'no-session') {
-  (useOptionalVaultSession as jest.Mock).mockReturnValue(
-    state === 'no-session'
-      ? null
-      : {
-          masterKeyBytes: state === 'unlocked' ? new Uint8Array(32) : null,
-        },
-  );
+function stubVaultLockState(state: 'unlocked' | 'locked' | 'no-session') {
+  (useVaultLockState as jest.Mock).mockReturnValue(state);
 }
 
 function stubSyncStatus(status: SyncStatus | null) {
@@ -110,7 +104,7 @@ describe('DashboardHeader', () => {
     jest.clearAllMocks();
     (usePathname as jest.Mock).mockReturnValue('/dashboard');
     stubSidebar();
-    stubVaultSession('unlocked');
+    stubVaultLockState('unlocked');
     stubSyncStatus(SYNCED);
   });
 
@@ -190,11 +184,19 @@ describe('DashboardHeader', () => {
 
   describe('vault state chip', () => {
     it('shows Vault locked and hides the live widget visually when the session is locked', () => {
-      stubVaultSession('locked');
+      stubVaultLockState('locked');
       renderHeader();
 
       expect(screen.getByText('Vault locked')).toBeInTheDocument();
       expect(screen.getByTestId('sync-status-widget')).toHaveClass('sr-only');
+    });
+
+    it('shows Synced and no locked chip when no Vault Session is mounted', () => {
+      stubVaultLockState('no-session');
+      renderHeader();
+
+      expect(screen.getByText('Synced')).toBeInTheDocument();
+      expect(screen.queryByText('Vault locked')).not.toBeInTheDocument();
     });
 
     it('shows Synced and hides the live widget visually when the sync status is synced', () => {
