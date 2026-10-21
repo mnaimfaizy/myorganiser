@@ -25,7 +25,7 @@ export class GroceriesPage {
     // said nothing about either (issue #524).
     await expect(
       unlockButton
-        .or(this.page.getByRole('heading', { name: 'Active trips' }))
+        .or(this.page.getByRole('heading', { level: 1, name: 'Groceries' }))
         .first(),
     ).toBeVisible({ timeout: 30000 });
 
@@ -45,35 +45,26 @@ export class GroceriesPage {
    */
   async waitForGroceriesReady(): Promise<void> {
     await expect(
-      this.page.getByRole('heading', { name: 'Active trips' }),
+      this.page.getByRole('heading', { level: 1, name: 'Groceries' }),
     ).toBeVisible({ timeout: 30000 });
 
     // The heading renders before the decrypted trips do. The board's primary
     // action is the first thing that depends on that list having resolved —
-    // "New trip" when there are trips, the empty-state CTA when there are
-    // none — so it is the honest end of "the board is ready".
+    // "New list" in the header, present whether or not any lists exist, so it
+    // is the honest end of "the board is ready".
     await expect(
-      this.page
-        .getByRole('button', { name: 'New trip' })
-        .or(this.page.getByRole('button', { name: 'Create Your First List' }))
-        .first(),
+      this.page.getByRole('button', { name: 'New list', exact: true }).first(),
     ).toBeVisible({ timeout: 30000 });
   }
 
   /**
-   * Click "New trip" or the empty-state "Create Your First List" button.
+   * Click the "New list" header button.
    */
-  async clickNewTrip(): Promise<void> {
-    const newTrip = this.page.getByRole('button', { name: 'New trip' });
-    const createFirst = this.page.getByRole('button', {
-      name: 'Create Your First List',
-    });
-
-    if (await newTrip.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await newTrip.click();
-    } else {
-      await createFirst.click();
-    }
+  async clickNewList(): Promise<void> {
+    await this.page
+      .getByRole('button', { name: 'New list', exact: true })
+      .first()
+      .click();
   }
 
   /**
@@ -104,7 +95,7 @@ export class GroceriesPage {
    * Create a new grocery trip via the UI.
    */
   async createList(name: string): Promise<void> {
-    await this.clickNewTrip();
+    await this.clickNewList();
 
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -180,7 +171,7 @@ export class GroceriesPage {
    */
   async renameList(oldName: string, newName: string): Promise<void> {
     await this.openTripActionsMenu(oldName);
-    await this.page.getByRole('menuitem', { name: 'Rename trip' }).click();
+    await this.page.getByRole('menuitem', { name: 'Rename list' }).click();
 
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -198,7 +189,9 @@ export class GroceriesPage {
    */
   async deleteList(listName: string): Promise<void> {
     await this.openTripActionsMenu(listName);
-    await this.page.getByRole('menuitem', { name: 'Delete trip' }).click();
+    await this.page
+      .getByRole('menuitem', { name: 'Delete Grocery List…' })
+      .click();
 
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -213,9 +206,7 @@ export class GroceriesPage {
    */
   private async openTripActionsMenu(tripName: string): Promise<void> {
     const card = this.tripCard(tripName).first();
-    await card
-      .getByRole('button', { name: `Trip actions for ${tripName}` })
-      .click();
+    await card.getByRole('button', { name: `Actions for ${tripName}` }).click();
   }
 
   /**
@@ -223,29 +214,36 @@ export class GroceriesPage {
    */
   private async openRowActionsMenu(itemName: string): Promise<void> {
     await this.page
-      .getByRole('button', { name: `More actions for ${itemName}` })
+      .getByRole('button', { name: `More for ${itemName}` })
       .click();
   }
 
   /**
-   * Add an item to the current trip via the Add Item dialog.
+   * Add an item to the current list via the Add item dialog.
    */
   async addItem(name: string): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add Item' }).click();
+    await this.page
+      .getByRole('button', { name: 'Add item', exact: true })
+      .click();
 
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 30000 });
 
-    const nameInput = this.page.getByRole('combobox', { name: /Item Name/ });
+    const nameInput = this.page.getByRole('combobox', {
+      name: 'Item',
+      exact: true,
+    });
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.fill(name);
 
-    const addBtn = dialog.getByRole('button', { name: 'Add to List' });
+    const addBtn = dialog.getByRole('button', { name: 'Add to list' });
     await expect(addBtn).toBeEnabled({ timeout: 10000 });
     await addBtn.click();
 
     await expect(dialog).toHaveCount(0, { timeout: 30000 });
-    await expect(this.page.getByText(name, { exact: true })).toBeVisible({
+    await expect(
+      this.page.getByRole('checkbox', { name: `Bought ${name}`, exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
   }
@@ -298,7 +296,7 @@ export class GroceriesPage {
     updates: { amount?: string },
   ): Promise<void> {
     await this.page
-      .getByRole('button', { name: `Edit List Line for ${itemName}` })
+      .getByRole('button', { name: `Edit amount for ${itemName}` })
       .click();
 
     const dialog = this.page.getByRole('dialog');
@@ -341,11 +339,12 @@ export class GroceriesPage {
   }
 
   /**
-   * Toggle the checked state of an item.
+   * Toggle the checked state of an item (the line moves into the collapsed Checked section).
    */
   async toggleItemChecked(itemName: string): Promise<void> {
     const checkbox = this.page.getByRole('checkbox', {
-      name: new RegExp(`Toggle ${itemName}`),
+      name: `Bought ${itemName}`,
+      exact: true,
     });
     await expect(checkbox).toBeVisible({ timeout: 30000 });
     await checkbox.click();
@@ -356,7 +355,8 @@ export class GroceriesPage {
    */
   async isItemChecked(itemName: string): Promise<boolean> {
     const checkbox = this.page.getByRole('checkbox', {
-      name: new RegExp(`Toggle ${itemName}`),
+      name: `Bought ${itemName}`,
+      exact: true,
     });
     return await checkbox.isChecked();
   }
@@ -371,10 +371,12 @@ export class GroceriesPage {
       .getByRole('menuitem', { name: 'Confirm remove line' })
       .click();
 
-    await expect(this.page.getByText(itemName, { exact: true })).toHaveCount(
-      0,
-      { timeout: 30000 },
-    );
+    await expect(
+      this.page.getByRole('checkbox', {
+        name: `Bought ${itemName}`,
+        exact: true,
+      }),
+    ).toHaveCount(0, { timeout: 30000 });
   }
 
   /**
@@ -383,7 +385,8 @@ export class GroceriesPage {
   async assertItemVisible(itemName: string): Promise<void> {
     await expect(
       this.page.getByRole('checkbox', {
-        name: new RegExp(`Toggle ${itemName}`),
+        name: `Bought ${itemName}`,
+        exact: true,
       }),
     ).toBeVisible({ timeout: 30000 });
   }
@@ -392,17 +395,24 @@ export class GroceriesPage {
    * Verify that an item is NOT visible on the current trip board.
    */
   async assertItemNotVisible(itemName: string): Promise<void> {
-    await expect(this.page.getByText(itemName, { exact: true })).toHaveCount(
-      0,
-      { timeout: 10000 },
-    );
+    await expect(
+      this.page.getByRole('checkbox', {
+        name: `Bought ${itemName}`,
+        exact: true,
+      }),
+    ).toHaveCount(0, { timeout: 10000 });
   }
 
   /**
    * Verify that a specific price value is displayed.
    */
   async assertPriceVisible(price: string): Promise<void> {
-    await expect(this.page.getByText(`$${price}`)).toBeVisible({
+    await expect(
+      this.page
+        .locator('[data-testid^="list-line-"]')
+        .getByText(`$${price}`)
+        .first(),
+    ).toBeVisible({
       timeout: 30000,
     });
   }
@@ -420,7 +430,7 @@ export class GroceriesPage {
    */
   async assertPageUsable(): Promise<void> {
     await expect(
-      this.page.getByRole('button', { name: 'New trip' }),
+      this.page.getByRole('button', { name: 'New list', exact: true }).first(),
     ).toBeVisible();
   }
 

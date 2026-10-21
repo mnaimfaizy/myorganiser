@@ -10,10 +10,10 @@ import {
   DialogTitle,
   Form,
 } from '@myorganiser/web-ui';
-import { Info, Lock } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useForm } from 'react-hook-form';
+import { searchCatalog } from '../../shared/utils';
 import { addItemSchema, type AddItemFormValues } from '../schemas';
 import { AddItemDetailsFields } from './AddItemDetailsFields';
 import { AddItemMetadataFields } from './AddItemMetadataFields';
@@ -36,7 +36,13 @@ interface AddItemDialogProps {
   isLoading?: boolean;
   catalog?: CatalogItem[];
   mode?: 'list' | 'catalog';
+  /** The Grocery List the item is added to; named in the title and footer. */
+  listName?: string;
+  /** Prefills the Item name when the dialog opens (from the phone add sheet). */
+  initialName?: string;
 }
+
+const SUGGESTION_LIMIT = 8;
 
 export function AddItemDialog({
   isOpen,
@@ -45,8 +51,11 @@ export function AddItemDialog({
   isLoading = false,
   catalog = [],
   mode = 'list',
+  listName,
+  initialName,
 }: AddItemDialogProps) {
   const [activeSuggestion, setActiveSuggestion] = useState(0);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [selectedCatalogItemId, setSelectedCatalogItemId] = useState<
     string | undefined
   >();
@@ -65,15 +74,26 @@ export function AddItemDialog({
   });
 
   const nameValue = form.watch('name');
-  const selectedCategory = form.watch('category');
   const imageUrl = form.watch('imageUrl');
   const matchingCatalogItems = useMemo(() => {
-    const query = nameValue.trim().toLowerCase();
-    if (!query) return [];
-    return catalog
-      .filter((item) => item.name.toLowerCase().includes(query))
-      .slice(0, 8);
+    if (!nameValue.trim()) return [];
+    return searchCatalog(catalog, nameValue).slice(0, SUGGESTION_LIMIT);
   }, [catalog, nameValue]);
+
+  const showListbox =
+    isSuggestionsOpen &&
+    nameValue.trim() !== '' &&
+    matchingCatalogItems.length > 0;
+  const hasMoreErrors = Boolean(
+    form.formState.errors.imageUrl || form.formState.errors.links,
+  );
+
+  useEffect(() => {
+    if (isOpen && initialName) {
+      form.setValue('name', initialName, { shouldValidate: true });
+      setIsSuggestionsOpen(false);
+    }
+  }, [form, initialName, isOpen]);
 
   const handleSelectCatalogItem = useCallback(
     (item: CatalogItem) => {
@@ -87,14 +107,22 @@ export function AddItemDialog({
           shouldValidate: true,
         },
       );
+      setIsSuggestionsOpen(false);
       setActiveSuggestion(0);
     },
     [form],
   );
 
+  const handleKeepTypedName = useCallback(() => {
+    setSelectedCatalogItemId(undefined);
+    setIsSuggestionsOpen(false);
+    setActiveSuggestion(0);
+  }, []);
+
   const handleNameChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       setSelectedCatalogItemId(undefined);
+      setIsSuggestionsOpen(true);
       setActiveSuggestion(0);
       form.setValue('name', event.target.value, { shouldValidate: true });
     },
@@ -103,31 +131,40 @@ export function AddItemDialog({
 
   const handleNameKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (matchingCatalogItems.length === 0) return;
+      if (!showListbox) return;
+      // The last option is "Add as a new Catalog Item", one past the matches.
+      const optionCount = matchingCatalogItems.length + 1;
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActiveSuggestion((index) =>
-          Math.min(index + 1, matchingCatalogItems.length - 1),
-        );
+        setActiveSuggestion((index) => Math.min(index + 1, optionCount - 1));
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveSuggestion((index) => Math.max(index - 1, 0));
-      } else if (
-        event.key === 'Enter' &&
-        matchingCatalogItems[activeSuggestion]
-      ) {
+      } else if (event.key === 'Enter') {
         event.preventDefault();
-        handleSelectCatalogItem(matchingCatalogItems[activeSuggestion]);
+        const item = matchingCatalogItems[activeSuggestion];
+        if (item) {
+          handleSelectCatalogItem(item);
+        } else {
+          handleKeepTypedName();
+        }
       } else if (event.key === 'Escape') {
         setActiveSuggestion(0);
       }
     },
-    [activeSuggestion, handleSelectCatalogItem, matchingCatalogItems],
+    [
+      activeSuggestion,
+      handleKeepTypedName,
+      handleSelectCatalogItem,
+      matchingCatalogItems,
+      showListbox,
+    ],
   );
 
   const resetForm = useCallback(() => {
     form.reset();
     setSelectedCatalogItemId(undefined);
+    setIsSuggestionsOpen(false);
     setActiveSuggestion(0);
   }, [form]);
 
@@ -166,69 +203,74 @@ export function AddItemDialog({
     handleOpenChange(false);
   }, [handleOpenChange]);
 
+  const isCatalogMode = mode === 'catalog';
+  const title = isCatalogMode
+    ? 'New Catalog Item'
+    : listName
+      ? `Add item to ${listName}`
+      : 'Add item';
+  const showCatalogHint = !isCatalogMode && selectedCatalogItemId !== undefined;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-xl gap-0 overflow-hidden p-0">
+      <DialogContent className="max-w-150 gap-0 overflow-hidden rounded-panel p-0">
         <Form {...form}>
-          <form onSubmit={handleSubmit}>
-            <div className="border-b border-border px-6 py-5">
-              <div className="mb-1 flex items-start gap-3">
-                <DialogTitle className="text-xl font-semibold text-primary">
-                  {mode === 'catalog' ? 'New staple' : 'Add New Item'}
-                </DialogTitle>
-                <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                  <Lock className="h-3 w-3" />
-                  Encrypted Data
-                </span>
-              </div>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Stored securely in your private vault.
+          <form onSubmit={handleSubmit} className="flex flex-col">
+            <div className="flex flex-col gap-1 border-b border-border px-6 pt-6 pb-4">
+              <DialogTitle className="font-display text-title text-foreground">
+                {title}
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-1.5 text-caption text-trust-text">
+                <span
+                  aria-hidden="true"
+                  className="size-2 shrink-0 rounded-full bg-trust"
+                />
+                Encrypted on this device before it syncs
               </DialogDescription>
             </div>
 
-            <div className="max-h-[60vh] space-y-5 overflow-y-auto px-6 py-5">
+            <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-6 py-5">
               <AddItemMetadataFields
                 control={form.control}
                 matchingCatalogItems={matchingCatalogItems}
                 activeSuggestion={activeSuggestion}
-                selectedCategory={selectedCategory}
+                showListbox={showListbox}
+                typedName={nameValue}
                 onNameChange={handleNameChange}
                 onNameKeyDown={handleNameKeyDown}
                 onSelectCatalogItem={handleSelectCatalogItem}
+                onKeepTypedName={handleKeepTypedName}
                 isLoading={isLoading}
               />
               <AddItemDetailsFields
                 control={form.control}
                 imageUrl={imageUrl}
                 isLoading={isLoading}
-                showAmount={mode !== 'catalog'}
+                showAmount={!isCatalogMode}
+                hasMoreErrors={hasMoreErrors}
               />
             </div>
 
-            <div className="flex items-center justify-between border-t border-border bg-muted px-6 py-4">
-              <div className="flex items-center gap-1.5 text-muted-foreground opacity-60">
-                <Info className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-medium">
-                  Auto-syncs across shared devices
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancel}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoading || !form.formState.isValid}
-                  className="gap-2"
-                >
-                  Add to {mode === 'catalog' ? 'catalog' : 'List'}
-                </Button>
-              </div>
+            <div className="flex items-center gap-2.5 border-t border-border px-6 pt-4 pb-6">
+              <p className="min-w-0 flex-1 text-caption text-muted-foreground">
+                {showCatalogHint
+                  ? `Already in your Catalog — this adds it to ${listName ?? 'this list'}.`
+                  : null}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !form.formState.isValid}
+              >
+                {isCatalogMode ? 'Add to catalog' : 'Add to list'}
+              </Button>
             </div>
           </form>
         </Form>

@@ -365,7 +365,7 @@ async function setupVaultWithGroceryData(page: Page) {
   const unlockButton = page.getByRole('button', { name: 'Use passphrase' });
   await expect(
     unlockButton
-      .or(page.getByRole('heading', { name: 'Active trips' }))
+      .or(page.getByRole('heading', { level: 1, name: 'Groceries' }))
       .first(),
   ).toBeVisible({ timeout: 30000 });
 
@@ -377,22 +377,17 @@ async function setupVaultWithGroceryData(page: Page) {
     await unlockWithPassphrase(page, passphrase);
   }
 
-  await expect(page.getByRole('heading', { name: 'Active trips' })).toBeVisible(
-    { timeout: 30000 },
-  );
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Groceries' }),
+  ).toBeVisible({ timeout: 30000 });
 
   // The heading renders before the decrypted trips do; the board's primary
   // action is what depends on that list having resolved.
-  const newTrip = page.getByRole('button', { name: 'New trip' });
-  const createFirst = page.getByRole('button', {
-    name: 'Create Your First List',
-  });
-  await expect(newTrip.or(createFirst).first()).toBeVisible({ timeout: 30000 });
-  if (await newTrip.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await newTrip.click();
-  } else {
-    await createFirst.click();
-  }
+  const newList = page
+    .getByRole('button', { name: 'New list', exact: true })
+    .first();
+  await expect(newList).toBeVisible({ timeout: 30000 });
+  await newList.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByPlaceholder('e.g., Weekly Shopping').fill('Backup Test List');
   await page.getByRole('button', { name: 'Create List' }).click();
