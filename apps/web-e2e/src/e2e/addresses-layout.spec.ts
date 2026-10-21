@@ -111,250 +111,257 @@ async function closeAddSheet(dialog: Locator) {
   await expect(dialog).toHaveCount(0);
 }
 
-test.describe('Addresses layout at 1440px (E2E)', () => {
-  test.use({ viewport: DESKTOP_VIEWPORT });
+test.describe('Addresses layout (E2E)', () => {
+  test.describe('Addresses layout at 1440px (E2E)', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-  test('empty page has one h1, the empty state, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await signIn(page);
-    await gotoStable(page, '/dashboard/addresses');
-    await createAndUnlockAddressesVault(page);
-
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'No addresses yet',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-    await expectSingleH1(page, 'Addresses');
-    await expect(
-      page.getByRole('button', { name: 'Add address', exact: true }).first(),
-    ).toBeVisible();
-
-    await expectNoHorizontalOverflow(page, 'Addresses empty at 1440px');
-  });
-
-  test('the add sheet has labelled fields and no overflow, and a saved address is listed as one card', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await signIn(page);
-    await gotoStable(page, '/dashboard/addresses');
-    await createAndUnlockAddressesVault(page);
-
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'No addresses yet',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-
-    const dialog = await openAddSheet(page);
-    for (const name of [
-      'Label',
-      'Number',
-      'Street',
-      'Suburb or city',
-      'State',
-      'Postcode',
-    ]) {
-      await expect(dialog.getByLabel(name, { exact: true })).toBeVisible();
-    }
-    await expect(
-      dialog.getByRole('combobox', { name: 'Country', exact: true }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Add address sheet at 1440px');
-
-    await saveAddress(dialog, DESKTOP_LABEL);
-    await closeAddSheet(dialog);
-
-    await expect(
-      page.getByRole('link', { name: DESKTOP_LABEL, exact: true }),
-    ).toBeVisible({ timeout: 30000 });
-    await expect(
-      page.getByRole('link', { name: DESKTOP_LABEL, exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      page.getByRole('button', { name: 'Copy address', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', {
-        name: `Actions for ${DESKTOP_LABEL}`,
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expectSingleH1(page, 'Addresses');
-    await expectNoHorizontalOverflow(page, 'Addresses with one card at 1440px');
-  });
-
-  test('the detail has one h1, a labelled Places checklist, and an Add place dialog that ticks a new place', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await signIn(page);
-    await gotoStable(page, '/dashboard/addresses');
-    await createAndUnlockAddressesVault(page);
-
-    const dialog = await openAddSheet(page);
-    await saveAddress(dialog, DESKTOP_LABEL);
-    await dialog
-      .getByRole('button', { name: 'Set up usage locations', exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/dashboard\/addresses\/[^/]+$/);
-
-    await expectSingleH1(page, DESKTOP_LABEL);
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'Places to update',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-    await expect(
-      page.getByText('No places yet', { exact: true }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Address detail at 1440px');
-
-    await page
-      .getByRole('button', { name: 'Add place', exact: true })
-      .first()
-      .click();
-    const placeDialog = page.getByRole('dialog', {
-      name: 'Add place',
-      exact: true,
-    });
-    await expect(placeDialog).toBeVisible({ timeout: 30000 });
-    await placeDialog
-      .getByLabel('Organisation', { exact: true })
-      .fill(PLACE_NAME);
-    const submit = placeDialog.getByRole('button', {
-      name: 'Add place',
-      exact: true,
-    });
-    await expect(submit).toBeEnabled({ timeout: 30000 });
-    await submit.click();
-    await expect(placeDialog).toHaveCount(0);
-
-    await expect(
-      page.getByRole('checkbox', {
-        name: `Updated at ${PLACE_NAME}`,
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-    await expect(
-      page.getByRole('progressbar', { name: 'Places updated', exact: true }),
-    ).toBeVisible();
-    await expectSingleH1(page, DESKTOP_LABEL);
-    await expectNoHorizontalOverflow(
+    test('empty page has one h1, the empty state, and no horizontal overflow', async ({
       page,
-      'Address detail with a place at 1440px',
-    );
-  });
-});
+    }) => {
+      test.setTimeout(120000);
 
-test.describe('Addresses layout at 390px (E2E)', () => {
-  test.use({ viewport: PHONE_VIEWPORT });
+      await signIn(page);
+      await gotoStable(page, '/dashboard/addresses');
+      await createAndUnlockAddressesVault(page);
 
-  test('empty list has one h1, the empty state, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
+      await expect(
+        page.getByRole('heading', {
+          level: 2,
+          name: 'No addresses yet',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expectSingleH1(page, 'Addresses');
+      await expect(
+        page.getByRole('button', { name: 'Add address', exact: true }).first(),
+      ).toBeVisible();
 
-    await signIn(page);
-    await openAddressesFromMore(page);
-    await createAndUnlockAddressesVault(page);
-
-    await expect(
-      page.getByRole('heading', {
-        name: 'No addresses yet',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-    await expectSingleH1(page, 'Addresses');
-    await expect(
-      page.getByRole('button', { name: 'Add address', exact: true }),
-    ).toBeVisible();
-
-    await expectNoHorizontalOverflow(page, 'Addresses empty at 390px');
-  });
-
-  test('a saved address is listed under a sr-only h1 with the Add address FAB', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await signIn(page);
-    await openAddressesFromMore(page);
-    await createAndUnlockAddressesVault(page);
-
-    await expect(
-      page.getByRole('heading', {
-        name: 'No addresses yet',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-
-    const dialog = await openAddSheet(page);
-    await saveAddress(dialog, PHONE_LABEL);
-    await closeAddSheet(dialog);
-
-    await expect(
-      // The row link's name is the whole row (label, pill, address, progress),
-      // so anchor the label rather than match it exactly.
-      page.getByRole('link', { name: new RegExp(`^${PHONE_LABEL}\\b`) }),
-    ).toBeVisible({
-      timeout: 30000,
+      await expectNoHorizontalOverflow(page, 'Addresses empty at 1440px');
     });
-    await expectSingleH1(page, 'Addresses');
-    await expect(
-      page.getByRole('button', { name: 'Add address', exact: true }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Addresses list at 390px');
+
+    test('the add sheet has labelled fields and no overflow, and a saved address is listed as one card', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await gotoStable(page, '/dashboard/addresses');
+      await createAndUnlockAddressesVault(page);
+
+      await expect(
+        page.getByRole('heading', {
+          level: 2,
+          name: 'No addresses yet',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+
+      const dialog = await openAddSheet(page);
+      for (const name of [
+        'Label',
+        'Number',
+        'Street',
+        'Suburb or city',
+        'State',
+        'Postcode',
+      ]) {
+        await expect(dialog.getByLabel(name, { exact: true })).toBeVisible();
+      }
+      await expect(
+        dialog.getByRole('combobox', { name: 'Country', exact: true }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Add address sheet at 1440px');
+
+      await saveAddress(dialog, DESKTOP_LABEL);
+      await closeAddSheet(dialog);
+
+      await expect(
+        page.getByRole('link', { name: DESKTOP_LABEL, exact: true }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole('link', { name: DESKTOP_LABEL, exact: true }),
+      ).toHaveCount(1);
+      await expect(
+        page.getByRole('button', { name: 'Copy address', exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', {
+          name: `Actions for ${DESKTOP_LABEL}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expectSingleH1(page, 'Addresses');
+      await expectNoHorizontalOverflow(
+        page,
+        'Addresses with one card at 1440px',
+      );
+    });
+
+    test('the detail has one h1, a labelled Places checklist, and an Add place dialog that ticks a new place', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await gotoStable(page, '/dashboard/addresses');
+      await createAndUnlockAddressesVault(page);
+
+      const dialog = await openAddSheet(page);
+      await saveAddress(dialog, DESKTOP_LABEL);
+      await dialog
+        .getByRole('button', { name: 'Set up usage locations', exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/dashboard\/addresses\/[^/]+$/);
+
+      await expectSingleH1(page, DESKTOP_LABEL);
+      await expect(
+        page.getByRole('heading', {
+          level: 2,
+          name: 'Places to update',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByText('No places yet', { exact: true }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Address detail at 1440px');
+
+      await page
+        .getByRole('button', { name: 'Add place', exact: true })
+        .first()
+        .click();
+      const placeDialog = page.getByRole('dialog', {
+        name: 'Add place',
+        exact: true,
+      });
+      await expect(placeDialog).toBeVisible({ timeout: 30000 });
+      await placeDialog
+        .getByLabel('Organisation', { exact: true })
+        .fill(PLACE_NAME);
+      const submit = placeDialog.getByRole('button', {
+        name: 'Add place',
+        exact: true,
+      });
+      await expect(submit).toBeEnabled({ timeout: 30000 });
+      await submit.click();
+      await expect(placeDialog).toHaveCount(0);
+
+      await expect(
+        page.getByRole('checkbox', {
+          name: `Updated at ${PLACE_NAME}`,
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole('progressbar', { name: 'Places updated', exact: true }),
+      ).toBeVisible();
+      await expectSingleH1(page, DESKTOP_LABEL);
+      await expectNoHorizontalOverflow(
+        page,
+        'Address detail with a place at 1440px',
+      );
+    });
   });
 
-  test('the pushed detail has one h1, and the Add place sheet opens as a dialog', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
+  test.describe('Addresses layout at 390px (E2E)', () => {
+    test.use({ viewport: PHONE_VIEWPORT });
 
-    await signIn(page);
-    await openAddressesFromMore(page);
-    await createAndUnlockAddressesVault(page);
+    test('empty list has one h1, the empty state, and no horizontal overflow', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
 
-    const dialog = await openAddSheet(page);
-    await saveAddress(dialog, PHONE_LABEL);
-    await dialog
-      .getByRole('button', { name: 'Set up usage locations', exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/dashboard\/addresses\/[^/]+$/);
+      await signIn(page);
+      await openAddressesFromMore(page);
+      await createAndUnlockAddressesVault(page);
 
-    await expectSingleH1(page, PHONE_LABEL);
-    // The phone heading is drawn in capitals, but its text is the same.
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'PLACES TO UPDATE',
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 30000 });
-    await expectNoHorizontalOverflow(page, 'Address detail at 390px');
+      await expect(
+        page.getByRole('heading', {
+          name: 'No addresses yet',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expectSingleH1(page, 'Addresses');
+      await expect(
+        page.getByRole('button', { name: 'Add address', exact: true }),
+      ).toBeVisible();
 
-    await page.getByRole('button', { name: 'Add place', exact: true }).click();
-    const sheet = page.getByRole('dialog', {
-      name: 'Add place',
-      exact: true,
+      await expectNoHorizontalOverflow(page, 'Addresses empty at 390px');
     });
-    await expect(sheet).toBeVisible({ timeout: 30000 });
-    await expect(
-      sheet.getByLabel('Organisation', { exact: true }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Add place sheet at 390px');
+
+    test('a saved address is listed under a sr-only h1 with the Add address FAB', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await openAddressesFromMore(page);
+      await createAndUnlockAddressesVault(page);
+
+      await expect(
+        page.getByRole('heading', {
+          name: 'No addresses yet',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+
+      const dialog = await openAddSheet(page);
+      await saveAddress(dialog, PHONE_LABEL);
+      await closeAddSheet(dialog);
+
+      await expect(
+        // The row link's name is the whole row (label, pill, address, progress),
+        // so anchor the label rather than match it exactly.
+        page.getByRole('link', { name: new RegExp(`^${PHONE_LABEL}\\b`) }),
+      ).toBeVisible({
+        timeout: 30000,
+      });
+      await expectSingleH1(page, 'Addresses');
+      await expect(
+        page.getByRole('button', { name: 'Add address', exact: true }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Addresses list at 390px');
+    });
+
+    test('the pushed detail has one h1, and the Add place sheet opens as a dialog', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await openAddressesFromMore(page);
+      await createAndUnlockAddressesVault(page);
+
+      const dialog = await openAddSheet(page);
+      await saveAddress(dialog, PHONE_LABEL);
+      await dialog
+        .getByRole('button', { name: 'Set up usage locations', exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/dashboard\/addresses\/[^/]+$/);
+
+      await expectSingleH1(page, PHONE_LABEL);
+      // The phone heading is drawn in capitals, but its text is the same.
+      await expect(
+        page.getByRole('heading', {
+          level: 2,
+          name: 'PLACES TO UPDATE',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expectNoHorizontalOverflow(page, 'Address detail at 390px');
+
+      await page
+        .getByRole('button', { name: 'Add place', exact: true })
+        .click();
+      const sheet = page.getByRole('dialog', {
+        name: 'Add place',
+        exact: true,
+      });
+      await expect(sheet).toBeVisible({ timeout: 30000 });
+      await expect(
+        sheet.getByLabel('Organisation', { exact: true }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Add place sheet at 390px');
+    });
   });
 });
