@@ -81,7 +81,7 @@ export function RecentAdminActivity() {
         </p>
       ) : null}
       {!loading && !error && entries.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-panel border border-border bg-raised-surface">
+        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised-surface">
           {entries.map((entry) => (
             <li
               key={entry.id}

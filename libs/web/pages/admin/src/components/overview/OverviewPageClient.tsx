@@ -1,7 +1,5 @@
 'use client';
 
-import * as React from 'react';
-
 import { Illustration } from '@myorganiser/web-ui';
 
 import { useAdminOverview } from '../../hooks/use-admin-overview';
@@ -21,10 +19,6 @@ import { RecentAdminActivity } from './RecentAdminActivity';
 export function OverviewPageClient() {
   const { overview, loading, error, reload } = useAdminOverview();
 
-  const handleRetry = React.useCallback(() => {
-    reload();
-  }, [reload]);
-
   return (
     <div className="flex flex-col gap-6 p-4 md:gap-7 md:p-8">
       <OverviewHero />
@@ -35,7 +29,7 @@ export function OverviewPageClient() {
       <OverviewStatus
         loading={loading && overview === null}
         error={error}
-        onRetry={handleRetry}
+        onRetry={reload}
       />
       {overview !== null && !error ? (
         <>

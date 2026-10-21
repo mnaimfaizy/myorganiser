@@ -91,7 +91,7 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
         ) : (
           <Button
             variant="outline"
-            className="h-12 gap-2.5 rounded-menu border-border bg-background py-0 pl-1.5 pr-2.5 text-foreground"
+            className="h-12 gap-2.5 rounded-lg border-border bg-background py-0 pl-1.5 pr-2.5 text-foreground"
           >
             <Avatar aria-hidden="true" className="size-9 rounded-control-sm">
               <AvatarFallback className="rounded-control-sm bg-brand font-display text-control-sm font-bold text-brand-foreground">
@@ -116,7 +116,7 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-65 rounded-xl p-1.5 shadow-popover"
+        className="w-65 rounded-menu p-1.5 shadow-popover"
       >
         <DropdownMenuLabel className="mb-1.5 flex flex-col gap-0.5 border-b border-border px-2.5 pb-3 pt-2.5 font-normal">
           <span className="text-body-sm font-semibold text-foreground">

@@ -1,6 +1,7 @@
 import type { AdminOverviewResponse } from '@myorganiser/app-api-client';
 
 import {
+  arePlacesLow,
   phonePlacesLeftNote,
   phoneUnverifiedNote,
   usersJoinedNote,
@@ -41,7 +42,14 @@ export function OverviewPhoneStats({ overview }: OverviewPhoneStatsProps) {
         label="YOUTUBE PLACES"
         value={`${overview.youtubeAccessPlacesUsed}/${overview.youtubeAccessCeiling}`}
         note={phonePlacesLeftNote(overview.youtubeAccessPlacesLeft)}
-        noteTone="warning"
+        noteTone={
+          arePlacesLow({
+            youtubeAccessPlacesLeft: overview.youtubeAccessPlacesLeft,
+            youtubeAccessCeiling: overview.youtubeAccessCeiling,
+          })
+            ? 'warning'
+            : 'muted'
+        }
       />
     </div>
   );

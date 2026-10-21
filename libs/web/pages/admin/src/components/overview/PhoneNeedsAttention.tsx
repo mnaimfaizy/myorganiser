@@ -4,7 +4,6 @@ import Link from 'next/link';
 import * as React from 'react';
 
 import type { AdminOverviewResponse } from '@myorganiser/app-api-client';
-import { cn } from '@myorganiser/web-ui';
 import { ChevronRight } from 'lucide-react';
 
 import {
@@ -14,6 +13,7 @@ import {
   deriveAttentionRows,
   phoneAttentionCopy,
 } from '../../lib/overview';
+import { AttentionDot } from './AttentionDot';
 
 export interface PhoneNeedsAttentionProps {
   overview: AdminOverviewResponse;
@@ -37,7 +37,7 @@ export function PhoneNeedsAttention({ overview }: PhoneNeedsAttentionProps) {
       <h2 id={headingId} className="text-label-caps text-muted-foreground">
         {`NEEDS ATTENTION · ${rows.length}`}
       </h2>
-      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-panel border border-border bg-raised-surface">
+      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised-surface">
         {rows.map((row) => (
           <PhoneAttentionItem key={row.id} row={row} />
         ))}
@@ -59,13 +59,7 @@ function PhoneAttentionItem({ row }: PhoneAttentionItemProps) {
         href={ATTENTION_HREF}
         className="flex min-h-11 items-center gap-3 px-4 py-3"
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            'size-2.5 shrink-0 rounded-full',
-            attentionTone(row) === 'danger' ? 'bg-destructive' : 'bg-warning',
-          )}
-        />
+        <AttentionDot tone={attentionTone(row)} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-body-sm font-semibold text-foreground">
             {copy.title}

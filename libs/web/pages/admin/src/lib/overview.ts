@@ -52,6 +52,8 @@ export type AttentionRow =
   | { id: 'places'; left: number; ceiling: number }
   | { id: 'disabled'; count: number };
 
+export type AttentionRowId = AttentionRow['id'];
+
 export type AttentionTone = 'warning' | 'danger';
 
 /**
@@ -80,66 +82,88 @@ export function deriveAttentionRows(
   return rows;
 }
 
-export function attentionTone(row: AttentionRow): AttentionTone {
-  return row.id === 'disabled' ? 'danger' : 'warning';
-}
-
 export interface AttentionCopy {
   title: string;
   detail: string;
   action: string;
 }
 
+export interface PhoneAttentionCopy {
+  title: string;
+  detail: string;
+}
+
+/** Each row's copy and tone, keyed by row id. */
+interface AttentionDefinition<Id extends AttentionRowId> {
+  tone: AttentionTone;
+  desktop: (row: Extract<AttentionRow, { id: Id }>) => AttentionCopy;
+  phone: (row: Extract<AttentionRow, { id: Id }>) => PhoneAttentionCopy;
+}
+
 function accountsWord(count: number): string {
   return count === 1 ? 'account' : 'accounts';
 }
 
+const ATTENTION_DEFINITIONS = {
+  unverified: {
+    tone: 'warning',
+    desktop: (row) => ({
+      title: `${row.count} ${accountsWord(row.count)} unverified for over a week`,
+      detail: 'They cannot sign in until they verify.',
+      action: 'Review',
+    }),
+    phone: (row) => ({
+      title: `${row.count} unverified over a week`,
+      detail: 'They cannot sign in yet',
+    }),
+  },
+  places: {
+    tone: 'warning',
+    desktop: (row) => ({
+      title: 'YouTube Access places running low',
+      detail: `${row.left} of ${row.ceiling} left.`,
+      action: 'See holders',
+    }),
+    phone: (row) => ({
+      title: 'YouTube places running low',
+      detail: `${row.left} of ${row.ceiling} left`,
+    }),
+  },
+  disabled: {
+    tone: 'danger',
+    desktop: (row) => ({
+      title: `${row.count} ${accountsWord(row.count)} disabled`,
+      detail: 'Cannot sign in',
+      action: 'Open users',
+    }),
+    phone: (row) => ({
+      title: `${row.count} ${accountsWord(row.count)} disabled`,
+      detail: 'Cannot sign in',
+    }),
+  },
+} as const satisfies { [Id in AttentionRowId]: AttentionDefinition<Id> };
+
+/**
+ * The definitions table is keyed by row id, so a lookup by `row.id` yields a
+ * union of per-row functions. Each function only ever receives the row whose
+ * id selected it, so widening the parameter back to AttentionRow is sound.
+ */
+function definitionFor(row: AttentionRow): AttentionDefinition<AttentionRowId> {
+  return ATTENTION_DEFINITIONS[row.id] as AttentionDefinition<AttentionRowId>;
+}
+
 /** Desktop Needs attention copy, with the action link's text. */
 export function desktopAttentionCopy(row: AttentionRow): AttentionCopy {
-  switch (row.id) {
-    case 'unverified':
-      return {
-        title: `${row.count} ${accountsWord(row.count)} unverified for over a week`,
-        detail: 'They cannot sign in until they verify.',
-        action: 'Review',
-      };
-    case 'places':
-      return {
-        title: 'YouTube Access places running low',
-        detail: `${row.left} of ${row.ceiling} left.`,
-        action: 'See holders',
-      };
-    case 'disabled':
-      return {
-        title: `${row.count} ${accountsWord(row.count)} disabled`,
-        detail: 'Cannot sign in',
-        action: 'Open users',
-      };
-  }
+  return definitionFor(row).desktop(row);
 }
 
 /** Phone Needs attention copy. The phone row has no separate action text. */
-export function phoneAttentionCopy(row: AttentionRow): {
-  title: string;
-  detail: string;
-} {
-  switch (row.id) {
-    case 'unverified':
-      return {
-        title: `${row.count} unverified over a week`,
-        detail: 'They cannot sign in yet',
-      };
-    case 'places':
-      return {
-        title: 'YouTube places running low',
-        detail: `${row.left} of ${row.ceiling} left`,
-      };
-    case 'disabled':
-      return {
-        title: `${row.count} ${accountsWord(row.count)} disabled`,
-        detail: 'Cannot sign in',
-      };
-  }
+export function phoneAttentionCopy(row: AttentionRow): PhoneAttentionCopy {
+  return definitionFor(row).phone(row);
+}
+
+export function attentionTone(row: AttentionRow): AttentionTone {
+  return definitionFor(row).tone;
 }
 
 /** Every attention row links to the user directory. */

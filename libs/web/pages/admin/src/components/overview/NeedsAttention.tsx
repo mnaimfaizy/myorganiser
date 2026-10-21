@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import * as React from 'react';
 
-import { Button, cn } from '@myorganiser/web-ui';
+import { Button } from '@myorganiser/web-ui';
 
 import type { AdminOverviewResponse } from '@myorganiser/app-api-client';
 
@@ -14,6 +14,7 @@ import {
   deriveAttentionRows,
   desktopAttentionCopy,
 } from '../../lib/overview';
+import { AttentionDot } from './AttentionDot';
 
 export interface NeedsAttentionProps {
   overview: AdminOverviewResponse;
@@ -42,7 +43,7 @@ export function NeedsAttention({ overview }: NeedsAttentionProps) {
           {rows.length}
         </span>
       </div>
-      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-panel border border-border bg-raised-surface">
+      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised-surface">
         {rows.map((row) => (
           <AttentionItem key={row.id} row={row} />
         ))}
@@ -60,13 +61,7 @@ function AttentionItem({ row }: AttentionItemProps) {
 
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <span
-        aria-hidden="true"
-        className={cn(
-          'size-2.5 shrink-0 rounded-full',
-          attentionTone(row) === 'danger' ? 'bg-destructive' : 'bg-warning',
-        )}
-      />
+      <AttentionDot tone={attentionTone(row)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="text-body-sm font-semibold text-foreground">
           {copy.title}
