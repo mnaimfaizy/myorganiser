@@ -290,7 +290,8 @@ async function expectDeleteConfirmDialogVisible(
   page: import('@playwright/test').Page,
   organisationName: string,
 ) {
-  const dialog = page.getByRole('dialog');
+  // ConfirmDeleteDialog wraps ConfirmDialog, which is an alertdialog.
+  const dialog = page.getByRole('alertdialog');
   await expect(
     dialog.getByText(new RegExp(`Delete "${organisationName}"\\?`)),
   ).toBeVisible({ timeout: 10000 });
