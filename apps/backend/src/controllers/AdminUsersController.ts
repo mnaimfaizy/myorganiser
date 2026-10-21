@@ -21,14 +21,22 @@ import {
   YouTubeAccessCeilingReachedError,
 } from '../errors/AdminLifecycleErrors';
 import { PlatformAdminControllerBase } from './PlatformAdminControllerBase';
+import { ValidateErrorJSON } from '../interfaces';
 import { toAdminUserIdentity } from '../helpers/filterUser';
 import youtubeAccessService from '../services/YouTubeAccessService';
 import userService from '../services/UserService';
 import {
   AdminUserIdentity,
+  AdminUserListResponse,
+  AdminUserSort,
+  AdminUserStatusFilter,
+  UserRole,
   VersionFloorRefusal,
   WithdrawYouTubeAccessResponse,
 } from '../types';
+
+const DEFAULT_ADMIN_USER_PAGE_SIZE = 25;
+const DEFAULT_ADMIN_USER_SORT: AdminUserSort = 'newest';
 
 @Tags('Platform Admin')
 @Route('/admin/users')
@@ -36,16 +44,49 @@ import {
 @Response<VersionFloorRefusal>(426, 'Below the Version Floor')
 export class AdminUsersController extends PlatformAdminControllerBase {
   /**
-   * List/search Users (identity fields only). Platform Admin only.
+   * List/search Users (identity fields only), one page at a time. Platform
+   * Admin only.
+   * @param q Matches email, name, first name or last name (case-insensitive).
+   * @param status `disabled`: Disabled Users. `unverified`: Unverified Users who
+   * are not disabled. `active`: neither disabled nor unverified.
+   * @param role `platform_admin` or `user`.
+   * @param sort `newest` (joined, newest first; the default) or `name`.
+   * @param page 1-based page number. Defaults to 1.
+   * @param pageSize Users per page, 1 to 100. Defaults to 25.
+   * @isInt page
+   * @minimum page 1
+   * @isInt pageSize
+   * @minimum pageSize 1
+   * @maximum pageSize 100
    */
   @Get()
+  @Response<ValidateErrorJSON>(422, 'Validation Failed')
   async listUsers(
     @Request() req: ExRequest,
     @Query() q?: string,
-  ): Promise<AdminUserIdentity[]> {
+    @Query() status?: AdminUserStatusFilter,
+    @Query() role?: UserRole,
+    @Query() sort?: AdminUserSort,
+    @Query() page?: number,
+    @Query() pageSize?: number,
+  ): Promise<AdminUserListResponse> {
     this.assertPlatformAdmin(req);
-    const users = await userService.listIdentityUsers(q);
-    return users.map((user) => toAdminUserIdentity(user));
+    const effectivePage = page ?? 1;
+    const effectivePageSize = pageSize ?? DEFAULT_ADMIN_USER_PAGE_SIZE;
+    const { users, total } = await userService.listIdentityUsers({
+      q,
+      status,
+      role,
+      sort: sort ?? DEFAULT_ADMIN_USER_SORT,
+      page: effectivePage,
+      pageSize: effectivePageSize,
+    });
+    return {
+      users: users.map((user) => toAdminUserIdentity(user)),
+      total,
+      page: effectivePage,
+      pageSize: effectivePageSize,
+    };
   }
 
   /**

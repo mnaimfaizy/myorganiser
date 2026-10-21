@@ -241,7 +241,54 @@ export interface AdminUserIdentity {
      * Whether a Platform Admin currently grants this User YouTube Access (ADR 0129).
      */
     'youtubeAccess': boolean;
+    /**
+     * When the User joined (`User.created_at`).
+     */
+    'createdAt': string;
 }
+
+
+/**
+ * One page of the Platform Admin users list.
+ */
+export interface AdminUserListResponse {
+    'users': Array<AdminUserIdentity>;
+    /**
+     * Count matching q + status + role, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
+/**
+ * Sort order for the Platform Admin users list.
+ */
+
+export const AdminUserSort = {
+    Newest: 'newest',
+    Name: 'name',
+} as const;
+
+export type AdminUserSort = typeof AdminUserSort[keyof typeof AdminUserSort];
+
+
+/**
+ * User state filter for the Platform Admin users list. `disabled` is a Disabled User; `unverified` is an Unverified User who is not disabled; `active` is neither a Disabled User nor an Unverified User.
+ */
+
+export const AdminUserStatusFilter = {
+    Active: 'active',
+    Unverified: 'unverified',
+    Disabled: 'disabled',
+} as const;
+
+export type AdminUserStatusFilter = typeof AdminUserStatusFilter[keyof typeof AdminUserStatusFilter];
 
 
 export interface AuthUrlResponse {
@@ -1167,6 +1214,10 @@ export interface WithdrawYouTubeAccessResponse {
      * Whether a Platform Admin currently grants this User YouTube Access (ADR 0129).
      */
     'youtubeAccess': boolean;
+    /**
+     * When the User joined (`User.created_at`).
+     */
+    'createdAt': string;
     'youtubeDisconnect': YouTubeDisconnectOutcome;
 }
 
@@ -2873,12 +2924,17 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
-         * @param {string} [q] 
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
+         * @param {string} [q] Matches email, name, first name or last name (case-insensitive).
+         * @param {AdminUserStatusFilter} [status] &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+         * @param {UserRole} [role] &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+         * @param {AdminUserSort} [sort] &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Users per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listUsers: async (q?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listUsers: async (q?: string, status?: AdminUserStatusFilter, role?: UserRole, sort?: AdminUserSort, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/users`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2897,6 +2953,26 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
 
             if (q !== undefined) {
                 localVarQueryParameter['q'] = q;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (role !== undefined) {
+                localVarQueryParameter['role'] = role;
+            }
+
+            if (sort !== undefined) {
+                localVarQueryParameter['sort'] = sort;
+            }
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -3312,13 +3388,18 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
-         * @param {string} [q] 
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
+         * @param {string} [q] Matches email, name, first name or last name (case-insensitive).
+         * @param {AdminUserStatusFilter} [status] &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+         * @param {UserRole} [role] &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+         * @param {AdminUserSort} [sort] &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Users per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listUsers(q?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AdminUserIdentity>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listUsers(q, options);
+        async listUsers(q?: string, status?: AdminUserStatusFilter, role?: UserRole, sort?: AdminUserSort, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminUserListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listUsers(q, status, role, sort, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listUsers']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -3522,13 +3603,13 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(axios, basePath));
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
          * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<Array<AdminUserIdentity>> {
-            return localVarFp.listUsers(requestParameters.q, options).then((request) => request(axios, basePath));
+        listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminUserListResponse> {
+            return localVarFp.listUsers(requestParameters.q, requestParameters.status, requestParameters.role, requestParameters.sort, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
          * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
@@ -3680,7 +3761,35 @@ export interface PlatformAdminApiListFeedbackReportsRequest {
  * Request parameters for listUsers operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListUsersRequest {
+    /**
+     * Matches email, name, first name or last name (case-insensitive).
+     */
     readonly q?: string
+
+    /**
+     * &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+     */
+    readonly status?: AdminUserStatusFilter
+
+    /**
+     * &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+     */
+    readonly role?: UserRole
+
+    /**
+     * &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+     */
+    readonly sort?: AdminUserSort
+
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Users per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
@@ -3862,13 +3971,13 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
-     * List/search Users (identity fields only). Platform Admin only.
+     * List/search Users (identity fields only), one page at a time. Platform Admin only.
      * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listUsers(requestParameters.q, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listUsers(requestParameters.q, requestParameters.status, requestParameters.role, requestParameters.sort, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

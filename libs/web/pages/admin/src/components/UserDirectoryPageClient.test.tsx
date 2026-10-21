@@ -48,6 +48,7 @@ const sampleUsers: AdminUserIdentity[] = [
     disabled: false,
     emailVerified: true,
     youtubeAccess: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'u-2',
@@ -60,6 +61,7 @@ const sampleUsers: AdminUserIdentity[] = [
     disabled: true,
     emailVerified: false,
     youtubeAccess: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
 ];
 
@@ -93,7 +95,14 @@ describe('UserDirectoryPageClient', () => {
       push: mockPush,
       replace: jest.fn(),
     });
-    mockListUsers.mockResolvedValue({ data: sampleUsers });
+    mockListUsers.mockResolvedValue({
+      data: {
+        users: sampleUsers,
+        total: sampleUsers.length,
+        page: 1,
+        pageSize: 25,
+      },
+    });
   });
 
   it('loads users on mount and renders identity columns', async () => {
@@ -102,7 +111,10 @@ describe('UserDirectoryPageClient', () => {
     expect(screen.getByText('Loading…')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockListUsers).toHaveBeenCalledWith({ q: undefined });
+      expect(mockListUsers).toHaveBeenCalledWith({
+        q: undefined,
+        pageSize: 100,
+      });
     });
 
     await waitFor(() => {
@@ -119,7 +131,9 @@ describe('UserDirectoryPageClient', () => {
   });
 
   it('shows empty state when the API returns no users', async () => {
-    mockListUsers.mockResolvedValue({ data: [] });
+    mockListUsers.mockResolvedValue({
+      data: { users: [], total: 0, page: 1, pageSize: 25 },
+    });
 
     render(<UserDirectoryPageClient />);
 
@@ -127,7 +141,7 @@ describe('UserDirectoryPageClient', () => {
       expect(screen.getByText('No users found.')).toBeInTheDocument();
     });
 
-    expect(mockListUsers).toHaveBeenCalledWith({ q: undefined });
+    expect(mockListUsers).toHaveBeenCalledWith({ q: undefined, pageSize: 100 });
   });
 
   it('shows an error message when listUsers rejects', async () => {
@@ -159,7 +173,7 @@ describe('UserDirectoryPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
-      expect(mockListUsers).toHaveBeenCalledWith({ q: 'grace' });
+      expect(mockListUsers).toHaveBeenCalledWith({ q: 'grace', pageSize: 100 });
     });
   });
 
@@ -176,7 +190,7 @@ describe('UserDirectoryPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
-      expect(mockListUsers).toHaveBeenCalledWith({ q: 'grace' });
+      expect(mockListUsers).toHaveBeenCalledWith({ q: 'grace', pageSize: 100 });
     });
 
     mockListUsers.mockClear();
@@ -187,7 +201,10 @@ describe('UserDirectoryPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
-      expect(mockListUsers).toHaveBeenCalledWith({ q: undefined });
+      expect(mockListUsers).toHaveBeenCalledWith({
+        q: undefined,
+        pageSize: 100,
+      });
     });
   });
 
@@ -221,7 +238,9 @@ describe('UserDirectoryPageClient', () => {
       masterKey: 'mk-secret',
     } as AdminUserIdentity;
 
-    mockListUsers.mockResolvedValue({ data: [bloatedUser] });
+    mockListUsers.mockResolvedValue({
+      data: { users: [bloatedUser], total: 1, page: 1, pageSize: 25 },
+    });
 
     const { container } = render(<UserDirectoryPageClient />);
 

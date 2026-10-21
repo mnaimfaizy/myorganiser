@@ -736,8 +736,30 @@ const models: TsoaRoute.Models = {
             "disabled": {"dataType":"boolean","required":true},
             "emailVerified": {"dataType":"boolean","required":true},
             "youtubeAccess": {"dataType":"boolean","required":true},
+            "createdAt": {"dataType":"datetime","required":true},
         },
         "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserListResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "users": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminUserIdentity"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserStatusFilter": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["active"]},{"dataType":"enum","enums":["unverified"]},{"dataType":"enum","enums":["disabled"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserSort": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["newest"]},{"dataType":"enum","enums":["name"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "YouTubeDisconnectOutcome": {
@@ -2428,6 +2450,11 @@ export function RegisterRoutes(app: Router) {
         const argsAdminUsersController_listUsers: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
                 q: {"in":"query","name":"q","dataType":"string"},
+                status: {"in":"query","name":"status","ref":"AdminUserStatusFilter"},
+                role: {"in":"query","name":"role","ref":"UserRole"},
+                sort: {"in":"query","name":"sort","ref":"AdminUserSort"},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/users',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),

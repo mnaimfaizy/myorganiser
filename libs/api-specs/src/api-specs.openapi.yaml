@@ -1291,6 +1291,10 @@ components:
           type: boolean
           description: Whether a Platform Admin currently grants this User YouTube Access
             (ADR 0129).
+        createdAt:
+          type: string
+          format: date-time
+          description: When the User joined (`User.created_at`).
       required:
         - id
         - name
@@ -1301,8 +1305,55 @@ components:
         - disabled
         - emailVerified
         - youtubeAccess
+        - createdAt
       type: object
       additionalProperties: false
+    AdminUserListResponse:
+      description: One page of the Platform Admin users list.
+      properties:
+        users:
+          items:
+            $ref: "#/components/schemas/AdminUserIdentity"
+          type: array
+        total:
+          type: number
+          format: double
+          description: Count matching q + status + role, ignoring paging.
+        page:
+          type: number
+          format: double
+          description: Echoed effective 1-based page.
+        pageSize:
+          type: number
+          format: double
+          description: Echoed effective page size.
+      required:
+        - users
+        - total
+        - page
+        - pageSize
+      type: object
+      additionalProperties: false
+    AdminUserStatusFilter:
+      type: string
+      enum:
+        - active
+        - unverified
+        - disabled
+      description: >-
+        User state filter for the Platform Admin users list. `disabled` is a
+        Disabled
+
+        User; `unverified` is an Unverified User who is not disabled; `active`
+        is
+
+        neither a Disabled User nor an Unverified User.
+    AdminUserSort:
+      type: string
+      enum:
+        - newest
+        - name
+      description: Sort order for the Platform Admin users list.
     YouTubeDisconnectOutcome:
       type: string
       enum:
@@ -3304,27 +3355,71 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/AdminUserIdentity"
-                type: array
+                $ref: "#/components/schemas/AdminUserListResponse"
+        "422":
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateErrorJSON"
         "426":
           description: Below the Version Floor
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionFloorRefusal"
-      description: List/search Users (identity fields only). Platform Admin only.
+      description: |-
+        List/search Users (identity fields only), one page at a time. Platform
+        Admin only.
       tags:
         - Platform Admin
       security:
         - jwt:
             - platform_admin
       parameters:
-        - in: query
+        - description: Matches email, name, first name or last name (case-insensitive).
+          in: query
           name: q
           required: false
           schema:
             type: string
+        - description: |-
+            `disabled`: Disabled Users. `unverified`: Unverified Users who
+            are not disabled. `active`: neither disabled nor unverified.
+          in: query
+          name: status
+          required: false
+          schema:
+            $ref: "#/components/schemas/AdminUserStatusFilter"
+        - description: "`platform_admin` or `user`."
+          in: query
+          name: role
+          required: false
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - description: "`newest` (joined, newest first; the default) or `name`."
+          in: query
+          name: sort
+          required: false
+          schema:
+            $ref: "#/components/schemas/AdminUserSort"
+        - description: 1-based page number. Defaults to 1.
+          in: query
+          name: page
+          required: false
+          schema:
+            format: int32
+            type: integer
+            minimum: 1
+        - description: Users per page, 1 to 100. Defaults to 25.
+          in: query
+          name: pageSize
+          required: false
+          schema:
+            format: int32
+            type: integer
+            minimum: 1
+            maximum: 100
   /admin/users/{userId}:
     get:
       operationId: GetUserById

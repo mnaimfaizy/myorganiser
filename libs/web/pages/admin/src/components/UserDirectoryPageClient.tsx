@@ -39,8 +39,8 @@ export function UserDirectoryPageClient() {
 
     try {
       const api = createPlatformAdminApi();
-      const response = await api.listUsers({ q: query });
-      setUsers(response.data);
+      const response = await api.listUsers({ q: query, pageSize: 100 });
+      setUsers(response.data.users);
     } catch {
       setError('Unable to load users. Please try again.');
       setUsers([]);

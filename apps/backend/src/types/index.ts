@@ -49,6 +49,29 @@ export interface AdminUserIdentity {
   emailVerified: boolean;
   /** Whether a Platform Admin currently grants this User YouTube Access (ADR 0129). */
   youtubeAccess: boolean;
+  /** When the User joined (`User.created_at`). */
+  createdAt: Date;
+}
+
+/**
+ * User state filter for the Platform Admin users list. `disabled` is a Disabled
+ * User; `unverified` is an Unverified User who is not disabled; `active` is
+ * neither a Disabled User nor an Unverified User.
+ */
+export type AdminUserStatusFilter = 'active' | 'unverified' | 'disabled';
+
+/** Sort order for the Platform Admin users list. */
+export type AdminUserSort = 'newest' | 'name';
+
+/** One page of the Platform Admin users list. */
+export interface AdminUserListResponse {
+  users: AdminUserIdentity[];
+  /** Count matching q + status + role, ignoring paging. */
+  total: number;
+  /** Echoed effective 1-based page. */
+  page: number;
+  /** Echoed effective page size. */
+  pageSize: number;
 }
 
 /** Outcome of the YouTube Disconnect that a withdrawal triggers (ADR 0129). */
