@@ -112,7 +112,7 @@ export function MoreScreen() {
         <Link href="/dashboard/account" className={ROW_CLASS}>
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand font-display text-label-caps text-brand-foreground"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-label-caps text-brand-foreground"
           >
             {initials || <User aria-hidden="true" className="size-4" />}
           </span>

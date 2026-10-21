@@ -23,7 +23,14 @@ export function PhoneTabBar() {
   const screen = getPhoneScreen(pathname);
 
   if (screen.type === 'pushed') {
-    return null;
+    // No bar on a pushed screen, but the end of a scrolled page must still
+    // clear the home indicator, so the safe-area inset is reserved here.
+    return (
+      <div
+        aria-hidden="true"
+        className="h-[env(safe-area-inset-bottom)] md:hidden"
+      />
+    );
   }
 
   const current = getCurrentPhoneTab(pathname);
@@ -54,12 +61,11 @@ export function PhoneTabBar() {
             >
               <Illustration kind={tab.kind} size={28} />
             </span>
-            {/* Placeholder sizing: 12px/16px is the artboard label, not a token. */}
             <span
               className={
                 isCurrent
-                  ? 'text-[12px] leading-4 font-semibold text-brand-text'
-                  : 'text-[12px] leading-4 font-medium text-foreground-secondary'
+                  ? 'text-label-caps text-brand-text'
+                  : 'text-label-caps text-foreground-secondary'
               }
             >
               {tab.label}

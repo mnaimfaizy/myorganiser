@@ -16,6 +16,23 @@ import {
 
 import { getPhoneScreen } from '../../utils/phone-screen';
 
+interface LockVaultButtonProps {
+  onClick: () => void;
+}
+
+/** The lock control in the app bar; the same button in both bar states. */
+function LockVaultButton({ onClick }: LockVaultButtonProps) {
+  return (
+    <IconButton
+      variant="ghost"
+      label="Lock vault"
+      icon={<Lock aria-hidden="true" />}
+      className="text-brand"
+      onClick={onClick}
+    />
+  );
+}
+
 /**
  * The top bar of the installed phone shell, in three states: a tab root with
  * a large title, the same root once its title has scrolled away (a compact
@@ -94,13 +111,7 @@ export function PhoneAppBar() {
               <SyncStatusWidget className={syncClassName} />
             </div>
             {canLockVault && !scrolledPast && (
-              <IconButton
-                variant="ghost"
-                label="Lock vault"
-                icon={<Lock aria-hidden="true" />}
-                className="text-brand"
-                onClick={lockVault}
-              />
+              <LockVaultButton onClick={lockVault} />
             )}
           </div>
           <div ref={titleRowRef} className="flex items-center gap-3">
@@ -123,13 +134,7 @@ export function PhoneAppBar() {
             {screen.title}
           </p>
           {canLockVault ? (
-            <IconButton
-              variant="ghost"
-              label="Lock vault"
-              icon={<Lock aria-hidden="true" />}
-              className="text-brand"
-              onClick={lockVault}
-            />
+            <LockVaultButton onClick={lockVault} />
           ) : (
             <span aria-hidden="true" />
           )}
