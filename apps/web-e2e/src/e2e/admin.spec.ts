@@ -16,7 +16,7 @@ import { stubAdminAuditLogs, stubAdminOverview } from './helpers/adminOverview';
  * - `/auth/refresh` returns the seeded persona or 401 for guests (OPTIONS + GET/POST).
  * - `GET /admin/overview` returns fixed counts (OPTIONS + GET).
  * - `GET /admin/audit-logs` returns fixed entries (OPTIONS + GET).
- * - `GET /admin/users` returns mock AdminUserIdentity rows (OPTIONS + GET).
+ * - `GET /admin/users` returns one page of mock AdminUserIdentity rows (OPTIONS + GET).
  *
  * No live third-party services or admin mutation endpoints.
  */
@@ -96,7 +96,13 @@ async function stubAdminUsersList(page: Page, users: AdminUserIdentityRow[]) {
     }
 
     const url = new URL(request.url());
-    const payload = filterDirectoryUsers(users, url.searchParams.get('q'));
+    const matches = filterDirectoryUsers(users, url.searchParams.get('q'));
+    const payload = {
+      users: matches,
+      total: matches.length,
+      page: 1,
+      pageSize: 25,
+    };
 
     await route.fulfill({
       status: 200,

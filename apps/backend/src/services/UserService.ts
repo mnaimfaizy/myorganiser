@@ -22,6 +22,7 @@ import {
   PrismaClient,
   createPrismaClient,
 } from '../prisma';
+import type { AdminUserSort, AdminUserStatusFilter, UserRole } from '../types';
 import sendEmail from './EmailService';
 import youtubeSyncService from './YouTubeSyncService';
 
@@ -43,11 +44,45 @@ const ADMIN_IDENTITY_SELECT = {
   disabled: true,
   email_verification_timestamp: true,
   youtube_access: true,
+  created_at: true,
 } as const;
 
 export type AdminIdentityUser = Prisma.UserGetPayload<{
   select: typeof ADMIN_IDENTITY_SELECT;
 }>;
+
+/** Where-clause fan-out for the status filter. Disabled wins over the verification buckets. */
+const ADMIN_USER_STATUS_WHERE = {
+  disabled: { disabled: true },
+  unverified: { disabled: false, email_verification_timestamp: null },
+  active: { disabled: false, email_verification_timestamp: { not: null } },
+} as const satisfies Record<AdminUserStatusFilter, Prisma.UserWhereInput>;
+
+/** Order-by fan-out for the sort option. Ties break on id so paging is stable. */
+const ADMIN_USER_SORT_ORDER = {
+  newest: [{ created_at: 'desc' }, { id: 'asc' }],
+  name: [{ name: 'asc' }, { email: 'asc' }, { id: 'asc' }],
+} as const satisfies Record<
+  AdminUserSort,
+  readonly Prisma.UserOrderByWithRelationInput[]
+>;
+
+/** Options for one page of the Platform Admin users list. */
+export interface AdminUserListOptions {
+  q?: string;
+  status?: AdminUserStatusFilter;
+  role?: UserRole;
+  sort: AdminUserSort;
+  /** 1-based page. */
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminUserListResult {
+  users: AdminIdentityUser[];
+  /** Count matching q + status + role, ignoring paging. */
+  total: number;
+}
 
 export type AdminAuditLogRow = {
   id: string;
@@ -88,12 +123,15 @@ class UserService {
   }
 
   /**
-   * List/search Users for Platform Admin directory (identity fields only).
-   * Optional `q` matches email, name, first_name, or last_name (case-insensitive).
+   * One page of Users for the Platform Admin directory (identity fields only).
+   * `q` matches email, name, first_name, or last_name (case-insensitive).
+   * `total` counts every match of q + status + role, ignoring paging.
    */
-  async listIdentityUsers(q?: string): Promise<AdminIdentityUser[]> {
-    const query = (q ?? '').trim();
-    const where: Prisma.UserWhereInput = query
+  async listIdentityUsers(
+    options: AdminUserListOptions,
+  ): Promise<AdminUserListResult> {
+    const query = (options.q ?? '').trim();
+    const queryWhere: Prisma.UserWhereInput = query
       ? {
           OR: [
             { email: { contains: query, mode: 'insensitive' } },
@@ -103,12 +141,29 @@ class UserService {
           ],
         }
       : {};
+    const statusWhere: Prisma.UserWhereInput =
+      options.status === undefined
+        ? {}
+        : { ...ADMIN_USER_STATUS_WHERE[options.status] };
+    const roleWhere: Prisma.UserWhereInput =
+      options.role === undefined ? {} : { role: options.role };
+    const where: Prisma.UserWhereInput = {
+      ...queryWhere,
+      ...statusWhere,
+      ...roleWhere,
+    };
 
-    return this.prisma.user.findMany({
-      where,
-      select: ADMIN_IDENTITY_SELECT,
-      orderBy: [{ email: 'asc' }],
-    });
+    const [users, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        select: ADMIN_IDENTITY_SELECT,
+        orderBy: [...ADMIN_USER_SORT_ORDER[options.sort]],
+        skip: (options.page - 1) * options.pageSize,
+        take: options.pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { users, total };
   }
 
   async getIdentityById(id: string): Promise<AdminIdentityUser | null> {

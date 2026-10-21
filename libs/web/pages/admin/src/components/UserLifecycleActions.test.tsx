@@ -44,6 +44,7 @@ const activeUser: AdminUserIdentity = {
   disabled: false,
   emailVerified: false,
   youtubeAccess: false,
+  createdAt: '2026-01-01T00:00:00.000Z',
 };
 
 const disabledUser: AdminUserIdentity = {
@@ -63,6 +64,7 @@ const platformAdmin: AdminUserIdentity = {
   disabled: false,
   emailVerified: true,
   youtubeAccess: false,
+  createdAt: '2026-01-01T00:00:00.000Z',
 };
 
 const youtubeUser: AdminUserIdentity = {

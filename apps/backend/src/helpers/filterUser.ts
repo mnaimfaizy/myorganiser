@@ -41,6 +41,7 @@ export function toAdminUserIdentity(
     last_name?: string;
     email_verification_timestamp?: Date | null;
     youtube_access?: boolean;
+    created_at: Date;
   };
   const firstName = (record.first_name ?? '').trim();
   const lastName = (record.last_name ?? '').trim();
@@ -60,5 +61,6 @@ export function toAdminUserIdentity(
     disabled: resolveDisabled(record),
     emailVerified,
     youtubeAccess: record.youtube_access === true,
+    createdAt: record.created_at,
   };
 }
