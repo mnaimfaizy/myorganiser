@@ -10,7 +10,7 @@ import {
   type SubscriptionStatus,
   type SubscriptionTier,
 } from '@myorganiser/vault-core';
-import { format, isValid, parseISO } from 'date-fns';
+import type { StatusPillTone } from '@myorganiser/web-ui';
 
 function titleCase(input: string) {
   return input.replace(/\b\w/g, (c) => c.toUpperCase());
@@ -52,9 +52,9 @@ const billingCycleLabels = {
 } as const satisfies Record<SubscriptionBillingCycle, string>;
 
 const paymentMethodLabels = {
-  [SubscriptionPaymentMethodEnum.CreditCard]: 'Credit Card',
+  [SubscriptionPaymentMethodEnum.CreditCard]: 'Credit card',
   [SubscriptionPaymentMethodEnum.PayPal]: 'PayPal',
-  [SubscriptionPaymentMethodEnum.BankTransfer]: 'Bank Transfer',
+  [SubscriptionPaymentMethodEnum.BankTransfer]: 'Bank transfer',
 } as const satisfies Record<SubscriptionPaymentMethod, string>;
 
 const renewalTypeLabels = {
@@ -101,13 +101,34 @@ export function getSubscriptionTierLabel(value: string) {
   return (tierLabels as Record<string, string>)[value] ?? fallbackLabel(value);
 }
 
-export function formatIsoDateForDisplay(iso?: string) {
-  if (!iso) return '—';
-  // Use the date-only portion (YYYY-MM-DD) so that parseISO treats it as local
-  // midnight rather than UTC midnight, preventing off-by-one-day for users in
-  // timezones behind UTC (e.g. UTC-5 would show the previous day otherwise).
-  const dateOnly = iso.slice(0, 10);
-  const parsed = parseISO(dateOnly);
-  if (!isValid(parsed)) return '—';
-  return format(parsed, 'PPP');
+// The status pill colour. Active reads as trust (teal), Pending as a warning,
+// Expired as danger; Inactive and Cancelled are neutral.
+const statusTones = {
+  [SubscriptionStatusEnum.Active]: 'trust',
+  [SubscriptionStatusEnum.Pending]: 'warning',
+  [SubscriptionStatusEnum.Inactive]: 'neutral',
+  [SubscriptionStatusEnum.Cancelled]: 'neutral',
+  [SubscriptionStatusEnum.Expired]: 'danger',
+} as const satisfies Record<SubscriptionStatus, StatusPillTone>;
+
+export function getSubscriptionStatusTone(value: string): StatusPillTone {
+  return (statusTones as Record<string, StatusPillTone>)[value] ?? 'neutral';
+}
+
+// What one billing covers, after the amount: "A$15.49 a month".
+const billingCyclePhrases = {
+  [SubscriptionBillingCycleEnum.Weekly]: 'a week',
+  [SubscriptionBillingCycleEnum.Fortnightly]: 'a fortnight',
+  [SubscriptionBillingCycleEnum.Monthly]: 'a month',
+  [SubscriptionBillingCycleEnum.Quarterly]: 'a quarter',
+  [SubscriptionBillingCycleEnum.Yearly]: 'a year',
+  [SubscriptionBillingCycleEnum.TwoYears]: 'every 2 years',
+  [SubscriptionBillingCycleEnum.ThreeYears]: 'every 3 years',
+} as const satisfies Record<SubscriptionBillingCycle, string>;
+
+export function getSubscriptionBillingCyclePhrase(value: string) {
+  return (
+    (billingCyclePhrases as Record<string, string>)[value] ??
+    getSubscriptionBillingCycleLabel(value).toLowerCase()
+  );
 }

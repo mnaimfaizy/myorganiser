@@ -1,1 +1,1 @@
-export { default as SubscriptionsPage } from './page';
+export { default as SubscriptionsPage, SubscriptionDetailPage } from './page';
