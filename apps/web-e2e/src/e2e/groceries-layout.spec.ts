@@ -174,253 +174,272 @@ async function addItemOnPhone(
   ).toBeVisible({ timeout: 30000 });
 }
 
-test.describe('Groceries layout at 1440px (E2E)', () => {
-  test.use({ viewport: DESKTOP_VIEWPORT });
+test.describe('Groceries layout (E2E)', () => {
+  test.describe('Groceries layout at 1440px (E2E)', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-  test('lists index has one h1, the Lists and Catalog tabs, a list card with progress, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, false);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
-    await goBackToIndex(page);
-
-    const tablist = page.getByRole('tablist', {
-      name: 'Groceries',
-      exact: true,
-    });
-    await expect(
-      tablist.getByRole('tab', { name: 'Lists · 1', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true');
-    await expect(
-      tablist.getByRole('tab', { name: /^Catalog · \d+$/ }),
-    ).toHaveAttribute('aria-selected', 'false');
-
-    const card = page.getByRole('article').filter({
-      has: page.getByRole('link', { name: LIST_NAME, exact: true }),
-    });
-    await expect(card).toHaveCount(1);
-    await expect(
-      card.getByRole('progressbar', {
-        name: `${LIST_NAME} progress`,
-        exact: true,
-      }),
-    ).toBeVisible();
-
-    await expectNoHorizontalOverflow(page, 'Groceries lists at 1440px');
-  });
-
-  test('the Catalog tab has the filter and category chips with their pressed state, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, false);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
-    await goBackToIndex(page);
-
-    const catalogTab = page.getByRole('tab', { name: /^Catalog · / });
-    await catalogTab.click();
-    await expect(catalogTab).toHaveAttribute('aria-selected', 'true');
-
-    // type="search" makes the filter a searchbox, not a textbox.
-    await expect(
-      page.getByRole('searchbox', { name: 'Filter your Catalog', exact: true }),
-    ).toBeVisible();
-
-    const allChip = page.getByRole('button', { name: /^All · / });
-    const produceChip = page.getByRole('button', { name: /^Produce · / });
-    await expect(allChip).toHaveAttribute('aria-pressed', 'true');
-    await expect(produceChip).toHaveAttribute('aria-pressed', 'false');
-
-    await produceChip.click();
-    await expect(produceChip).toHaveAttribute('aria-pressed', 'true');
-    await expect(allChip).toHaveAttribute('aria-pressed', 'false');
-
-    await expectSingleH1(page, 'Groceries');
-    await expectNoHorizontalOverflow(page, 'Groceries catalog at 1440px');
-  });
-
-  test('list detail has one h1, the Catalog strip, a category section, a Bought checkbox, and the list summary, with no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, false);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
-
-    await expectSingleH1(page, LIST_NAME);
-    await expect(
-      page.getByRole('region', { name: 'Add from your Catalog', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('region', { name: ITEM_CATEGORY, exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('checkbox', { name: `Bought ${ITEM_NAME}`, exact: true }),
-    ).toBeVisible();
-
-    const summary = page.getByRole('complementary', {
-      name: 'List summary',
-      exact: true,
-    });
-    await expect(summary).toBeVisible();
-    await expect(
-      summary.getByRole('progressbar', { name: 'Items checked', exact: true }),
-    ).toBeVisible();
-
-    await expectNoHorizontalOverflow(page, 'List detail at 1440px');
-  });
-
-  test('the add dialog is named for the list, its Item combobox offers Catalog matches, and Category is a group', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, false);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    // A Catalog Item must exist before the combobox has anything to offer.
-    await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
-
-    await page
-      .getByRole('button', { name: 'Add item', exact: true })
-      .first()
-      .click();
-    const dialog = page.getByRole('dialog', {
-      name: `Add item to ${LIST_NAME}`,
-      exact: true,
-    });
-    await expect(dialog).toBeVisible({ timeout: 30000 });
-
-    await dialog
-      .getByRole('combobox', { name: 'Item', exact: true })
-      .fill('Ban');
-    await expect(
-      dialog.getByRole('listbox', { name: 'From your Catalog', exact: true }),
-    ).toBeVisible();
-    await expect(dialog.getByRole('option', { name: /Bananas/ })).toBeVisible();
-    await expect(
-      dialog.getByRole('group', { name: 'Category', exact: true }),
-    ).toBeVisible();
-
-    await expectNoHorizontalOverflow(page, 'Add item dialog at 1440px');
-  });
-});
-
-test.describe('Groceries layout at 390px (E2E)', () => {
-  test.use({ viewport: PHONE_VIEWPORT });
-
-  test('phone lists have one h1, the tabs, a card with progress, the New list button and tab bar, and no horizontal overflow on either tab', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, true);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    await addItemOnPhone(
+    test('lists index has one h1, the Lists and Catalog tabs, a list card with progress, and no horizontal overflow', async ({
       page,
-      LIST_NAME,
-      'Add items',
-      ITEM_NAME,
-      ITEM_CATEGORY,
-    );
-    await goBackToIndex(page);
+    }) => {
+      test.setTimeout(120000);
 
-    const tablist = page.getByRole('tablist', {
-      name: 'Groceries',
-      exact: true,
+      await enterGroceries(page, false);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
+      await goBackToIndex(page);
+
+      const tablist = page.getByRole('tablist', {
+        name: 'Groceries',
+        exact: true,
+      });
+      await expect(
+        tablist.getByRole('tab', { name: 'Lists · 1', exact: true }),
+      ).toHaveAttribute('aria-selected', 'true');
+      await expect(
+        tablist.getByRole('tab', { name: /^Catalog · \d+$/ }),
+      ).toHaveAttribute('aria-selected', 'false');
+
+      const card = page.getByRole('article').filter({
+        has: page.getByRole('link', { name: LIST_NAME, exact: true }),
+      });
+      await expect(card).toHaveCount(1);
+      await expect(
+        card.getByRole('progressbar', {
+          name: `${LIST_NAME} progress`,
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      await expectNoHorizontalOverflow(page, 'Groceries lists at 1440px');
     });
-    await expect(
-      tablist.getByRole('tab', { name: 'Lists', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true');
 
-    const card = page.getByRole('link', { name: LIST_NAME });
-    await expect(
-      card.getByRole('progressbar', {
-        name: `${LIST_NAME} progress`,
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'New list', exact: true }),
-    ).toBeVisible();
-    await expect(tabBar(page)).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Groceries lists at 390px');
-
-    const catalogTab = tablist.getByRole('tab', { name: /^Catalog · / });
-    await catalogTab.click();
-    await expect(catalogTab).toHaveAttribute('aria-selected', 'true');
-    await expectNoHorizontalOverflow(page, 'Groceries catalog at 390px');
-  });
-
-  test('an empty phone list has one h1, the empty heading, a List actions menu, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, true);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'Nothing on this list yet',
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Empty list at 390px');
-
-    await page
-      .getByRole('button', { name: 'List actions', exact: true })
-      .click();
-    await expect(
-      page.getByRole('menuitem', { name: 'Rename list', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('menuitem', { name: 'Delete Grocery List…', exact: true }),
-    ).toBeVisible();
-  });
-
-  test('a stocked phone list has one h1 and an add sheet with a Catalog searchbox, and no horizontal overflow', async ({
-    page,
-  }) => {
-    test.setTimeout(120000);
-
-    await enterGroceries(page, true);
-    await createList(page, LIST_NAME);
-    await openList(page, LIST_NAME);
-    await addItemOnPhone(
+    test('the Catalog tab has the filter and category chips with their pressed state, and no horizontal overflow', async ({
       page,
-      LIST_NAME,
-      'Add items',
-      ITEM_NAME,
-      ITEM_CATEGORY,
-    );
+    }) => {
+      test.setTimeout(120000);
 
-    await expectSingleH1(page, LIST_NAME);
-    await page.getByRole('button', { name: 'Add item', exact: true }).click();
+      await enterGroceries(page, false);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
+      await goBackToIndex(page);
 
-    const sheet = page.getByRole('dialog', {
-      name: `Add to ${LIST_NAME}`,
-      exact: true,
+      const catalogTab = page.getByRole('tab', { name: /^Catalog · / });
+      await catalogTab.click();
+      await expect(catalogTab).toHaveAttribute('aria-selected', 'true');
+
+      // type="search" makes the filter a searchbox, not a textbox.
+      await expect(
+        page.getByRole('searchbox', {
+          name: 'Filter your Catalog',
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      const allChip = page.getByRole('button', { name: /^All · / });
+      const produceChip = page.getByRole('button', { name: /^Produce · / });
+      await expect(allChip).toHaveAttribute('aria-pressed', 'true');
+      await expect(produceChip).toHaveAttribute('aria-pressed', 'false');
+
+      await produceChip.click();
+      await expect(produceChip).toHaveAttribute('aria-pressed', 'true');
+      await expect(allChip).toHaveAttribute('aria-pressed', 'false');
+
+      await expectSingleH1(page, 'Groceries');
+      await expectNoHorizontalOverflow(page, 'Groceries catalog at 1440px');
     });
-    await expect(sheet).toBeVisible({ timeout: 30000 });
-    await expect(
-      sheet.getByRole('searchbox', {
-        name: 'Search your Catalog',
+
+    test('list detail has one h1, the Catalog strip, a category section, a Bought checkbox, and the list summary, with no horizontal overflow', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await enterGroceries(page, false);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
+
+      await expectSingleH1(page, LIST_NAME);
+      await expect(
+        page.getByRole('region', {
+          name: 'Add from your Catalog',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('region', { name: ITEM_CATEGORY, exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('checkbox', {
+          name: `Bought ${ITEM_NAME}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      const summary = page.getByRole('complementary', {
+        name: 'List summary',
         exact: true,
-      }),
-    ).toBeVisible();
-    await expectNoHorizontalOverflow(page, 'Add sheet at 390px');
+      });
+      await expect(summary).toBeVisible();
+      await expect(
+        summary.getByRole('progressbar', {
+          name: 'Items checked',
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      await expectNoHorizontalOverflow(page, 'List detail at 1440px');
+    });
+
+    test('the add dialog is named for the list, its Item combobox offers Catalog matches, and Category is a group', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await enterGroceries(page, false);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      // A Catalog Item must exist before the combobox has anything to offer.
+      await addItemOnDesktop(page, LIST_NAME, ITEM_NAME, ITEM_CATEGORY);
+
+      await page
+        .getByRole('button', { name: 'Add item', exact: true })
+        .first()
+        .click();
+      const dialog = page.getByRole('dialog', {
+        name: `Add item to ${LIST_NAME}`,
+        exact: true,
+      });
+      await expect(dialog).toBeVisible({ timeout: 30000 });
+
+      await dialog
+        .getByRole('combobox', { name: 'Item', exact: true })
+        .fill('Ban');
+      await expect(
+        dialog.getByRole('listbox', { name: 'From your Catalog', exact: true }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByRole('option', { name: /Bananas/ }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByRole('group', { name: 'Category', exact: true }),
+      ).toBeVisible();
+
+      await expectNoHorizontalOverflow(page, 'Add item dialog at 1440px');
+    });
+  });
+
+  test.describe('Groceries layout at 390px (E2E)', () => {
+    test.use({ viewport: PHONE_VIEWPORT });
+
+    test('phone lists have one h1, the tabs, a card with progress, the New list button and tab bar, and no horizontal overflow on either tab', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await enterGroceries(page, true);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      await addItemOnPhone(
+        page,
+        LIST_NAME,
+        'Add items',
+        ITEM_NAME,
+        ITEM_CATEGORY,
+      );
+      await goBackToIndex(page);
+
+      const tablist = page.getByRole('tablist', {
+        name: 'Groceries',
+        exact: true,
+      });
+      await expect(
+        tablist.getByRole('tab', { name: 'Lists', exact: true }),
+      ).toHaveAttribute('aria-selected', 'true');
+
+      const card = page.getByRole('link', { name: LIST_NAME });
+      await expect(
+        card.getByRole('progressbar', {
+          name: `${LIST_NAME} progress`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'New list', exact: true }),
+      ).toBeVisible();
+      await expect(tabBar(page)).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Groceries lists at 390px');
+
+      const catalogTab = tablist.getByRole('tab', { name: /^Catalog · / });
+      await catalogTab.click();
+      await expect(catalogTab).toHaveAttribute('aria-selected', 'true');
+      await expectNoHorizontalOverflow(page, 'Groceries catalog at 390px');
+    });
+
+    test('an empty phone list has one h1, the empty heading, a List actions menu, and no horizontal overflow', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await enterGroceries(page, true);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+
+      await expect(
+        page.getByRole('heading', {
+          level: 2,
+          name: 'Nothing on this list yet',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Empty list at 390px');
+
+      await page
+        .getByRole('button', { name: 'List actions', exact: true })
+        .click();
+      await expect(
+        page.getByRole('menuitem', { name: 'Rename list', exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('menuitem', {
+          name: 'Delete Grocery List…',
+          exact: true,
+        }),
+      ).toBeVisible();
+    });
+
+    test('a stocked phone list has one h1 and an add sheet with a Catalog searchbox, and no horizontal overflow', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await enterGroceries(page, true);
+      await createList(page, LIST_NAME);
+      await openList(page, LIST_NAME);
+      await addItemOnPhone(
+        page,
+        LIST_NAME,
+        'Add items',
+        ITEM_NAME,
+        ITEM_CATEGORY,
+      );
+
+      await expectSingleH1(page, LIST_NAME);
+      await page.getByRole('button', { name: 'Add item', exact: true }).click();
+
+      const sheet = page.getByRole('dialog', {
+        name: `Add to ${LIST_NAME}`,
+        exact: true,
+      });
+      await expect(sheet).toBeVisible({ timeout: 30000 });
+      await expect(
+        sheet.getByRole('searchbox', {
+          name: 'Search your Catalog',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 'Add sheet at 390px');
+    });
   });
 });
