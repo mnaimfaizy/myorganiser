@@ -92,32 +92,54 @@ describe('PhoneAppBar', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the title row with its illustration and the lock button on the Home root when unlocked', () => {
+  it('draws no title row, illustration, or lock button on the Home root when unlocked', () => {
     renderAppBar('/dashboard');
 
-    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getByTestId('sync-status-widget')).toBeInTheDocument();
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('illustration')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Lock vault' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('draws no title row or lock button on the Home root when the vault is locked', () => {
+    stubVaultLockState('locked');
+    renderAppBar('/dashboard');
+
+    expect(screen.getByTestId('sync-status-widget')).toBeInTheDocument();
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Lock vault' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the title row with its illustration and the lock button on the Tasks root when unlocked', () => {
+    renderAppBar('/dashboard/tasks');
+
+    expect(screen.getByText('Tasks')).toBeInTheDocument();
     expect(screen.getByTestId('illustration')).toHaveAttribute(
       'data-kind',
-      'home',
+      'tasks',
     );
     expect(
       screen.getByRole('button', { name: 'Lock vault' }),
     ).toBeInTheDocument();
   });
 
-  it('locks the vault once when Lock vault is pressed on the unlocked Home root', () => {
-    renderAppBar('/dashboard');
+  it('locks the vault once when Lock vault is pressed on the unlocked Tasks root', () => {
+    renderAppBar('/dashboard/tasks');
 
     fireEvent.click(screen.getByRole('button', { name: 'Lock vault' }));
 
     expect(lock).toHaveBeenCalledTimes(1);
   });
 
-  it('shows no Lock vault button on the Home root when the vault is locked', () => {
+  it('shows no Lock vault button on the Tasks root when the vault is locked', () => {
     stubVaultLockState('locked');
-    renderAppBar('/dashboard');
+    renderAppBar('/dashboard/tasks');
 
-    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getByText('Tasks')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Lock vault' }),
     ).not.toBeInTheDocument();

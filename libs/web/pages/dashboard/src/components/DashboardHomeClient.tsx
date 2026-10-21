@@ -1,40 +1,66 @@
 'use client';
 
 import { getCurrentUser } from '@myorganiser/auth';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
-import { useMemo } from 'react';
+import { useIsMobileState } from '@myorganiser/web-ui';
+import {
+  describeVaultSyncStatus,
+  useOptionalVaultSession,
+  useVaultSyncStatus,
+} from '@myorganiser/web-vault-ui';
+import { useCallback, useMemo } from 'react';
 
-import { AddressesCountCard } from './widgets/AddressesCountCard';
-import { InstallAppCard } from './widgets/InstallAppCard';
-import { MobileNumbersCountCard } from './widgets/MobileNumbersCountCard';
-import { QuickActionsCard } from './widgets/QuickActionsCard';
-import { RecentYouTubeCard } from './widgets/RecentYouTubeCard';
-import { SubscriptionsOverviewCard } from './widgets/SubscriptionsOverviewCard';
-import { TasksSummaryCard } from './widgets/TasksSummaryCard';
-import { WelcomeCard } from './widgets/WelcomeCard';
+import { HomeDesktop } from '../home/components/HomeDesktop';
+import { HomePhone } from '../home/components/HomePhone';
+import { buildHomeView } from '../home/home-view';
+import { useHomeSummary } from '../home/hooks/use-home-summary';
+import { useLatestBackupSummary } from '../home/hooks/use-latest-backup-summary';
+import { useYouTubeHome } from '../home/hooks/use-youtube-home';
 
+/**
+ * The Home page. Reads the vault and YouTube, then renders the phone or the
+ * desktop layout. Renders nothing until the breakpoint is known, so a phone
+ * never paints the desktop page first (the Tasks pattern).
+ */
 export function DashboardHomeClient() {
   const user = useMemo(() => getCurrentUser(), []);
   const session = useOptionalVaultSession();
   const handle = session?.handle ?? null;
+  const unlocked = handle?.isUnlocked === true;
 
-  return (
-    <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
-      {/* Install prompt: full width, renders nothing once installed or dismissed */}
-      <InstallAppCard />
+  const { now, summary } = useHomeSummary(handle);
+  const backup = useLatestBackupSummary(unlocked);
+  const youtube = useYouTubeHome();
+  const { status } = useVaultSyncStatus();
+  const isPhone = useIsMobileState();
 
-      {/* Row 1: Welcome + Quick Actions */}
-      <WelcomeCard user={user} />
-      <QuickActionsCard />
+  const lockVault = useCallback(() => {
+    session?.lock();
+  }, [session]);
 
-      {/* Row 2: Vault stat cards */}
-      <TasksSummaryCard handle={handle} />
-      <SubscriptionsOverviewCard handle={handle} />
-      <AddressesCountCard handle={handle} />
-      <MobileNumbersCountCard handle={handle} />
+  if (isPhone === undefined) {
+    return null;
+  }
 
-      {/* Row 3: YouTube (full width) */}
-      <RecentYouTubeCard />
-    </div>
+  // Healthy sync shows the Synced chip; any other state shows the shell's
+  // sync widget instead.
+  const synced =
+    unlocked &&
+    status !== null &&
+    describeVaultSyncStatus(status).label === null;
+
+  const view = buildHomeView({
+    now,
+    firstName: user?.firstName ?? null,
+    unlocked,
+    summary,
+    backup,
+    youtube,
+    synced,
+  });
+
+  return isPhone ? (
+    <HomePhone view={view} onLock={lockVault} />
+  ) : (
+    <HomeDesktop view={view} />
   );
 }
