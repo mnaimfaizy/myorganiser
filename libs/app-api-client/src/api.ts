@@ -180,6 +180,43 @@ export interface AdminFeedbackReporterDto {
     'email': string;
 }
 /**
+ * Platform counts for the admin Overview page. Platform Admin only.
+ */
+export interface AdminOverviewResponse {
+    /**
+     * Total number of Users.
+     */
+    'users': number;
+    /**
+     * Users whose role is platform_admin.
+     */
+    'platformAdmins': number;
+    /**
+     * Users who have not verified their email.
+     */
+    'unverified': number;
+    /**
+     * Users who are disabled.
+     */
+    'disabled': number;
+    /**
+     * Users ever granted YouTube Access (lifetime, ADR 0129).
+     */
+    'youtubeAccessPlacesUsed': number;
+    /**
+     * YouTube Access places still available under the ceiling, never negative.
+     */
+    'youtubeAccessPlacesLeft': number;
+    /**
+     * The configured lifetime YouTube Access ceiling.
+     */
+    'youtubeAccessCeiling': number;
+    /**
+     * Feedback Reports in the received status.
+     */
+    'feedbackReportsReceived': number;
+}
+/**
  * Identity-only User projection for Platform Admin directory APIs.
  */
 export interface AdminUserIdentity {
@@ -2513,6 +2550,39 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminOverview: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/admin/overview`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
          * @param {string} reportId 
          * @param {*} [options] Override http request option.
@@ -3135,6 +3205,17 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getAdminOverview(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminOverviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getAdminOverview(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.getAdminOverview']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
          * @param {string} reportId 
          * @param {*} [options] Override http request option.
@@ -3361,6 +3442,14 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
          */
         forceLogoutUser(requestParameters: PlatformAdminApiForceLogoutUserRequest, options?: RawAxiosRequestConfig): AxiosPromise<AdminUserIdentity> {
             return localVarFp.forceLogoutUser(requestParameters.userId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminOverview(options?: RawAxiosRequestConfig): AxiosPromise<AdminOverviewResponse> {
+            return localVarFp.getAdminOverview(options).then((request) => request(axios, basePath));
         },
         /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
@@ -3684,6 +3773,15 @@ export class PlatformAdminApi extends BaseAPI {
      */
     public forceLogoutUser(requestParameters: PlatformAdminApiForceLogoutUserRequest, options?: RawAxiosRequestConfig) {
         return PlatformAdminApiFp(this.configuration).forceLogoutUser(requestParameters.userId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * Platform counts for the admin Overview page. Platform Admin only.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getAdminOverview(options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).getAdminOverview(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

@@ -1320,6 +1320,53 @@ components:
             - youtubeDisconnect
           type: object
       description: Identity after a YouTube Access withdrawal, with the disconnect outcome.
+    AdminOverviewResponse:
+      description: Platform counts for the admin Overview page. Platform Admin only.
+      properties:
+        users:
+          type: number
+          format: double
+          description: Total number of Users.
+        platformAdmins:
+          type: number
+          format: double
+          description: Users whose role is platform_admin.
+        unverified:
+          type: number
+          format: double
+          description: Users who have not verified their email.
+        disabled:
+          type: number
+          format: double
+          description: Users who are disabled.
+        youtubeAccessPlacesUsed:
+          type: number
+          format: double
+          description: Users ever granted YouTube Access (lifetime, ADR 0129).
+        youtubeAccessPlacesLeft:
+          type: number
+          format: double
+          description: YouTube Access places still available under the ceiling, never
+            negative.
+        youtubeAccessCeiling:
+          type: number
+          format: double
+          description: The configured lifetime YouTube Access ceiling.
+        feedbackReportsReceived:
+          type: number
+          format: double
+          description: Feedback Reports in the received status.
+      required:
+        - users
+        - platformAdmins
+        - unverified
+        - disabled
+        - youtubeAccessPlacesUsed
+        - youtubeAccessPlacesLeft
+        - youtubeAccessCeiling
+        - feedbackReportsReceived
+      type: object
+      additionalProperties: false
     AdminFeedbackReporterDto:
       description: Admin Feedback Reporter identity.
       properties:
@@ -3665,6 +3712,29 @@ paths:
           required: true
           schema:
             type: string
+  /admin/overview:
+    get:
+      operationId: GetAdminOverview
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverviewResponse"
+        "426":
+          description: Below the Version Floor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionFloorRefusal"
+      description: Platform counts for the admin Overview page. Platform Admin only.
+      tags:
+        - Platform Admin
+      security:
+        - jwt:
+            - platform_admin
+      parameters: []
   /admin/feedback/reports:
     get:
       operationId: ListFeedbackReports
