@@ -432,22 +432,102 @@ describe('TasksBoard', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete…' }));
-        const dialog = screen.getByRole('dialog', {
+        const dialog = screen.getByRole('alertdialog', {
           name: 'Delete "Plan trip"?',
         });
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Delete task' }),
+        );
 
         await waitFor(() => {
           expect(page.deleteTask).toHaveBeenCalledWith('c');
         });
         await waitFor(() => {
-          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+          expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
         });
         expect(
           !!screen.queryByRole('complementary', { name: 'Task detail' }),
         ).toBe(panelOpen);
       },
     );
+
+    it('moves focus to Cancel when the delete confirm opens', () => {
+      render(
+        <TasksBoard
+          page={makeTasksPageController(FIXTURE)}
+          variant="desktop"
+          initialSelectedTaskId="c"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete…' }));
+
+      const dialog = screen.getByRole('alertdialog', {
+        name: 'Delete "Plan trip"?',
+      });
+      expect(
+        within(dialog).getByRole('button', { name: 'Cancel' }),
+      ).toHaveFocus();
+    });
+
+    it('does not dismiss the delete confirm on an outside click', async () => {
+      const page = makeTasksPageController(FIXTURE);
+      render(
+        <TasksBoard page={page} variant="desktop" initialSelectedTaskId="c" />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete…' }));
+      // Radix attaches its outside-pointerdown listener on a setTimeout(0).
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      fireEvent.pointerDown(document.body);
+
+      expect(
+        screen.getByRole('alertdialog', { name: 'Delete "Plan trip"?' }),
+      ).toBeInTheDocument();
+      expect(page.deleteTask).not.toHaveBeenCalled();
+    });
+
+    it('shows the pending label on the confirm button while deleteTask is in flight', async () => {
+      const page = makeTasksPageController(FIXTURE);
+      let resolveDelete: (deleted: boolean) => void = () => {};
+      (page.deleteTask as jest.Mock).mockImplementation(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveDelete = resolve;
+          }),
+      );
+      render(
+        <TasksBoard page={page} variant="desktop" initialSelectedTaskId="c" />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete…' }));
+      const dialog = screen.getByRole('alertdialog', {
+        name: 'Delete "Plan trip"?',
+      });
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete task' }),
+      );
+
+      await waitFor(() => {
+        expect(
+          within(dialog).getByRole('button', { name: /Delete task/ }),
+        ).toHaveTextContent(/^Delete task…$/);
+      });
+      expect(
+        within(dialog).getByRole('button', { name: /Delete task/ }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        resolveDelete(true);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+    });
 
     it('renders no detail panel when initialSelectedTaskId names no task', () => {
       render(

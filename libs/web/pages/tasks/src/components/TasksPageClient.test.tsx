@@ -16,11 +16,11 @@ jest.mock('../hooks/use-tasks-page', () => ({
 
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
-  useIsMobile: jest.fn(),
+  useIsMobileState: jest.fn(),
 }));
 
 import type { Task } from '@myorganiser/vault-core';
-import { useIsMobile } from '@myorganiser/web-ui';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { useTasksPage } from '../hooks/use-tasks-page';
@@ -51,8 +51,8 @@ describe('TasksPageClient', () => {
     (useTasksPage as jest.Mock).mockReturnValue(
       makeTasksPageController([morningCall]),
     );
-    (useIsMobile as jest.Mock).mockReset();
-    (useIsMobile as jest.Mock).mockReturnValue(false);
+    (useIsMobileState as jest.Mock).mockReset();
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
     mockGate.handle = FAKE_HANDLE;
   });
 
@@ -68,7 +68,7 @@ describe('TasksPageClient', () => {
   });
 
   it('renders the phone board, with rows linking to the detail route, when on a phone', () => {
-    (useIsMobile as jest.Mock).mockReturnValue(true);
+    (useIsMobileState as jest.Mock).mockReturnValue(true);
 
     render(<TasksPageClient />);
 
@@ -79,6 +79,20 @@ describe('TasksPageClient', () => {
       'href',
       '/dashboard/tasks/task-1',
     );
+  });
+
+  it('renders no board while the breakpoint is still undecided', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(undefined);
+
+    const { container } = render(<TasksPageClient />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(
+      screen.queryByRole('textbox', { name: 'Quick add a task' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /Morning call/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('opens the detail panel for initialSelectedTaskId on desktop', () => {

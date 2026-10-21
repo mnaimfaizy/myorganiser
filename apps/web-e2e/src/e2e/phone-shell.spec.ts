@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
+import type { IdentityEntry } from './helpers';
+import {
+  expectNoHorizontalOverflow,
+  PHONE_VIEWPORT,
+  signInToShell,
+  tabBar,
+} from './helpers/shellLayout';
 
 /**
  * Installed phone shell at 390x844 (issue #1249).
@@ -42,85 +48,18 @@ const IDENTITIES: IdentityEntry[] = [
   },
 ];
 
-const PHONE_VIEWPORT = { width: 390, height: 844 };
-
-function corsHeaders(origin: string) {
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-  } as const;
-}
-
 /**
- * Answer GET with a fixed JSON body and OPTIONS with a CORS preflight. Any
- * other method is handed to the network. The body shapes are the generated
- * client's response types: ListFeedbackReportsResponse,
- * YouTubeAvailabilityResponse and the `connected` field the Account page and
- * Home read from GET /youtube/status.
- */
-async function stubJsonGet(page: Page, url: RegExp, body: unknown) {
-  await routeApi(page, url, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-    const request = route.request();
-
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    if (request.method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        headers,
-        contentType: 'application/json',
-        body: JSON.stringify(body),
-      });
-      return;
-    }
-
-    await route.continue();
-  });
-}
-
-/**
- * Sign in and land on the dashboard at phone width. `login()` waits for the
- * tab bar (see waitForDashboardReady) and the mount-time vault work to settle.
- * Navigation after this point is by clicking links only: a `gotoStable` to
- * another dashboard route remounts VaultSessionProvider after login.
+ * Sign in and land on the dashboard at phone width. The shared sign-in stubs
+ * the mount-time reads. Navigation after this point is by clicking links only:
+ * a `gotoStable` to another dashboard route remounts VaultSessionProvider after
+ * login.
  */
 async function signInToPhoneDashboard(page: Page) {
-  setupBackend(page, IDENTITIES);
-  await stubJsonGet(page, /\/feedback\/reports\/?(\?.*)?$/, {
-    items: [],
-    hasChangedSinceLastSeen: false,
+  await signInToShell(page, {
+    email: EMAIL,
+    loginFixture: LOGIN_FIXTURE,
+    identities: IDENTITIES,
   });
-  await stubJsonGet(page, /\/youtube\/availability\/?(\?.*)?$/, {
-    available: false,
-  });
-  await stubJsonGet(page, /\/youtube\/status\/?(\?.*)?$/, {
-    connected: false,
-  });
-  await login(page, EMAIL, LOGIN_FIXTURE);
-  await expect(page).toHaveURL(/.*dashboard/);
-}
-
-function tabBar(page: Page) {
-  return page.getByRole('navigation', { name: 'App sections' });
-}
-
-async function expectNoHorizontalOverflow(page: Page, route: string) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => document.documentElement.scrollWidth - window.innerWidth,
-        ),
-      { message: route, timeout: 10000 },
-    )
-    .toBeLessThanOrEqual(0);
 }
 
 test.describe('Phone shell (E2E)', () => {

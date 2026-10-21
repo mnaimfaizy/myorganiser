@@ -10,13 +10,13 @@ import {
   BottomSheetContent,
   BottomSheetDescription,
   BottomSheetTitle,
+  ChoiceChip,
   Form,
   FormField,
   IconButton,
   Input,
 } from '@myorganiser/web-ui';
 import { formatDueLabel } from '../workflow/task-grouping';
-import { ChoiceChip } from './choice-chip';
 
 /** What a capture sends to `onCapture`: the trimmed title and the chosen flags. */
 export interface TaskCaptureInput {

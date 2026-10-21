@@ -1,7 +1,7 @@
 'use client';
 
 import type { Task } from '@myorganiser/vault-core';
-import { IconButton } from '@myorganiser/web-ui';
+import { ConfirmDialog, IconButton } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -19,7 +19,6 @@ import {
 import type { TaskCounts } from '../workflow/task-grouping';
 import { TaskAddDialog } from './task-add-dialog';
 import { TaskCaptureSheet } from './task-capture-sheet';
-import { TaskDeleteDialog } from './task-delete-dialog';
 import { TaskDetailPanel } from './task-detail-panel';
 import { TaskFilters } from './task-filters';
 import type { TaskContextFilter, TaskStatusFilter } from './task-filters';
@@ -208,8 +207,8 @@ export function TasksBoard({
     setDeletingTask(selectedTask ?? null);
   }, [selectedTask]);
 
-  const handleCloseDelete = useCallback(() => {
-    setDeletingTask(null);
+  const handleDeleteOpenChange = useCallback((open: boolean) => {
+    if (!open) setDeletingTask(null);
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -247,14 +246,17 @@ export function TasksBoard({
     />
   );
 
-  const deleteDialog = (
-    <TaskDeleteDialog
-      task={deletingTask}
-      isOpen={deletingTask !== null}
-      onClose={handleCloseDelete}
+  const deleteDialog = deletingTask ? (
+    <ConfirmDialog
+      open
+      onOpenChange={handleDeleteOpenChange}
+      title={`Delete "${deletingTask.title}"?`}
+      description="This action cannot be undone. The task will be permanently deleted."
+      confirmLabel="Delete task"
+      tone="destructive"
       onConfirm={handleConfirmDelete}
     />
-  );
+  ) : null;
 
   if (isPhone) {
     return (

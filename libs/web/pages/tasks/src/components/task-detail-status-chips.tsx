@@ -1,7 +1,7 @@
 'use client';
 
 import type { TaskStatus } from '@myorganiser/vault-core';
-import { ChoiceChip } from './choice-chip';
+import { ChoiceChip } from '@myorganiser/web-ui';
 import { TASK_STATUS_OPTIONS } from '../utils/task-detail-copy';
 
 export interface TaskDetailStatusChipsProps {

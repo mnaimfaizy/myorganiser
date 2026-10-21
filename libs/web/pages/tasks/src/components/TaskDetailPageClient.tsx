@@ -1,6 +1,6 @@
 'use client';
 
-import { useIsMobile } from '@myorganiser/web-ui';
+import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,6 @@ import type { TaskDetailPatch } from '../hooks/use-task-detail-draft';
 import { useTasksPage } from '../hooks/use-tasks-page';
 import type { TasksPageController } from '../hooks/use-tasks-page';
 import { localDateKey } from '../workflow/task-grouping';
-import { TaskDeleteDialog } from './task-delete-dialog';
 import { TaskDetailScreen } from './task-detail-screen';
 import { TasksBoard } from './tasks-board';
 
@@ -82,8 +81,8 @@ function TaskDetailPhone({ page, taskId }: TaskDetailPhoneProps) {
     setDeleting(true);
   }, []);
 
-  const handleCloseDelete = useCallback(() => {
-    setDeleting(false);
+  const handleDeleteOpenChange = useCallback((open: boolean) => {
+    setDeleting(open);
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -114,10 +113,13 @@ function TaskDetailPhone({ page, taskId }: TaskDetailPhoneProps) {
         onUnarchive={handleUnarchive}
         onDelete={handleRequestDelete}
       />
-      <TaskDeleteDialog
-        task={task}
-        isOpen={deleting}
-        onClose={handleCloseDelete}
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={handleDeleteOpenChange}
+        title={`Delete "${task.title}"?`}
+        description="This action cannot be undone. The task will be permanently deleted."
+        confirmLabel="Delete task"
+        tone="destructive"
         onConfirm={handleConfirmDelete}
       />
     </>
@@ -126,7 +128,13 @@ function TaskDetailPhone({ page, taskId }: TaskDetailPhoneProps) {
 
 function TaskDetailInner({ handle, taskId }: TaskDetailInnerProps) {
   const page = useTasksPage(handle);
-  const isPhone = useIsMobile();
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop board on the first frame.
+  const isPhone = useIsMobileState();
+
+  if (isPhone === undefined) {
+    return null;
+  }
 
   if (isPhone) {
     return <TaskDetailPhone page={page} taskId={taskId} />;

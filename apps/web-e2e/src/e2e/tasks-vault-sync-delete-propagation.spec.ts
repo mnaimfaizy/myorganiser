@@ -415,16 +415,17 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
       .getByRole('button', { name: 'Delete\u2026', exact: true })
       .click();
 
-    // Step 3 (deletion): Confirm dialog appears and we click Delete
+    // Step 3 (deletion): The shared confirm is an alertdialog; its action is
+    // named for the object, "Delete task", so the button is clicked by that name.
     await expect(
       page1
-        .getByRole('dialog')
+        .getByRole('alertdialog')
         .filter({ hasText: `Delete "${seedTaskTitle}"?` }),
     ).toBeVisible({ timeout: 30000 });
 
     const confirmDelete = page1
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Delete', exact: true });
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete task', exact: true });
     await expect(confirmDelete).toBeVisible();
     await confirmDelete.click();
 

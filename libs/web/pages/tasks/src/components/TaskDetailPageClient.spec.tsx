@@ -20,11 +20,11 @@ jest.mock('../hooks/use-tasks-page', () => ({
 
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
-  useIsMobile: jest.fn(),
+  useIsMobileState: jest.fn(),
 }));
 
 import type { Task } from '@myorganiser/vault-core';
-import { useIsMobile } from '@myorganiser/web-ui';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import {
   act,
   fireEvent,
@@ -80,8 +80,8 @@ describe('TaskDetailPageClient', () => {
     mockRouter.push.mockReset();
     mockRouter.replace.mockReset();
     (useTasksPage as jest.Mock).mockReset();
-    (useIsMobile as jest.Mock).mockReset();
-    (useIsMobile as jest.Mock).mockReturnValue(true);
+    (useIsMobileState as jest.Mock).mockReset();
+    (useIsMobileState as jest.Mock).mockReturnValue(true);
     mockGate.handle = FAKE_HANDLE;
   });
 
@@ -206,12 +206,12 @@ describe('TaskDetailPageClient', () => {
 
         render(<TaskDetailPageClient taskId="task-1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Delete…' }));
-        const dialog = screen.getByRole('dialog', {
+        const dialog = screen.getByRole('alertdialog', {
           name: 'Delete "Renew passport"?',
         });
         await act(async () => {
           fireEvent.click(
-            within(dialog).getByRole('button', { name: 'Delete' }),
+            within(dialog).getByRole('button', { name: 'Delete task' }),
           );
         });
 
@@ -219,7 +219,7 @@ describe('TaskDetailPageClient', () => {
           expect(page.deleteTask).toHaveBeenCalledWith('task-1');
         });
         await waitFor(() => {
-          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+          expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
         });
         expect(mockRouter.push.mock.calls).toEqual(
           navigates ? [[TASKS_HREF]] : [],
@@ -243,9 +243,20 @@ describe('TaskDetailPageClient', () => {
     });
   });
 
+  describe('before the breakpoint is decided', () => {
+    it('renders nothing, so neither the phone nor the desktop board paints first', () => {
+      (useIsMobileState as jest.Mock).mockReturnValue(undefined);
+      setController(makeTasksPageController([renewPassport]));
+
+      const { container } = render(<TaskDetailPageClient taskId="task-1" />);
+
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
   describe('desktop', () => {
     it('renders the board with the task detail panel open', () => {
-      (useIsMobile as jest.Mock).mockReturnValue(false);
+      (useIsMobileState as jest.Mock).mockReturnValue(false);
       setController(makeTasksPageController([renewPassport]));
 
       render(<TaskDetailPageClient taskId="task-1" />);

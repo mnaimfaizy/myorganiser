@@ -1,9 +1,8 @@
 'use client';
 
-import { cn, SegmentedControl } from '@myorganiser/web-ui';
+import { ChoiceChip, cn, SegmentedControl } from '@myorganiser/web-ui';
 import type { SegmentedControlOption } from '@myorganiser/web-ui';
 import { useCallback } from 'react';
-import { ChoiceChip } from './choice-chip';
 
 export type TaskContextFilter = 'all' | 'personal' | 'work';
 

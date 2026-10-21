@@ -1,6 +1,6 @@
 'use client';
 
-import { useIsMobile } from '@myorganiser/web-ui';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
 
@@ -18,7 +18,13 @@ interface TasksInnerProps extends TasksPageClientProps {
 
 function TasksInner({ handle, initialSelectedTaskId }: TasksInnerProps) {
   const page = useTasksPage(handle);
-  const isPhone = useIsMobile();
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop board on the first frame.
+  const isPhone = useIsMobileState();
+
+  if (isPhone === undefined) {
+    return null;
+  }
 
   return (
     <TasksBoard

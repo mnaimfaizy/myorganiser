@@ -7,13 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus } from 'lucide-react';
 import {
+  ChoiceChip,
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
 } from '@myorganiser/web-ui';
-import { ChoiceChip } from './choice-chip';
 
 const quickAddSchema = z.object({
   title: z.string().trim().min(1),

@@ -3,12 +3,15 @@ import {
   createOwnedVault,
   E2E_USER_ID,
   gotoStable,
-  login,
-  routeApi,
-  setupBackend,
   unlockWithPassphrase,
   type IdentityEntry,
 } from './helpers';
+import {
+  expectNoHorizontalOverflow,
+  PHONE_VIEWPORT,
+  signInToShell,
+  tabBar,
+} from './helpers/shellLayout';
 
 /**
  * Tasks page layout and roles (issue #1252).
@@ -40,88 +43,23 @@ const IDENTITIES: IdentityEntry[] = [
 const VAULT_PASSPHRASE = 'layout-vault-01';
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1000 };
-const PHONE_VIEWPORT = { width: 390, height: 844 };
-
-function corsHeaders(origin: string) {
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-  } as const;
-}
 
 /**
- * Answer GET with a fixed JSON body and OPTIONS with a CORS preflight. The
- * bodies are the shapes the dashboard reads on mount (the More feedback list,
- * YouTube availability and status), as phone-shell.spec stubs them.
- */
-async function stubJsonGet(page: Page, url: RegExp, body: unknown) {
-  await routeApi(page, url, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-    const request = route.request();
-
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    if (request.method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        headers,
-        contentType: 'application/json',
-        body: JSON.stringify(body),
-      });
-      return;
-    }
-
-    await route.continue();
-  });
-}
-
-/**
- * Sign in and land on the dashboard. The vault backend starts with no vault
- * on the server (GET /vault is 404 until the spec's own PUT), so the gate
- * offers creation.
+ * Sign in as the layout owner and land on the dashboard. The shared sign-in
+ * stubs the mount-time reads and leaves the vault on the server absent.
  */
 async function signIn(page: Page) {
-  setupBackend(page, IDENTITIES);
-  await stubJsonGet(page, /\/feedback\/reports\/?(\?.*)?$/, {
-    items: [],
-    hasChangedSinceLastSeen: false,
+  await signInToShell(page, {
+    email: EMAIL,
+    loginFixture: LOGIN_FIXTURE,
+    identities: IDENTITIES,
   });
-  await stubJsonGet(page, /\/youtube\/availability\/?(\?.*)?$/, {
-    available: false,
-  });
-  await stubJsonGet(page, /\/youtube\/status\/?(\?.*)?$/, {
-    connected: false,
-  });
-  await login(page, EMAIL, LOGIN_FIXTURE);
-  await expect(page).toHaveURL(/.*dashboard/);
 }
 
 /** Create the owner's vault and unlock it, leaving the Tasks board rendered. */
-async function createAndUnlockVault(page: Page) {
+async function createAndUnlockTasksVault(page: Page) {
   await createOwnedVault(page, { passphrase: VAULT_PASSPHRASE });
   await unlockWithPassphrase(page, VAULT_PASSPHRASE);
-}
-
-function tabBar(page: Page) {
-  return page.getByRole('navigation', { name: 'App sections' });
-}
-
-async function expectNoHorizontalOverflow(page: Page, route: string) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => document.documentElement.scrollWidth - window.innerWidth,
-        ),
-      { message: route, timeout: 10000 },
-    )
-    .toBeLessThanOrEqual(0);
 }
 
 async function expectSingleH1(page: Page, text: string) {
@@ -140,7 +78,7 @@ test.describe('Tasks layout at 1440px (E2E)', () => {
 
     await signIn(page);
     await gotoStable(page, '/dashboard/tasks');
-    await createAndUnlockVault(page);
+    await createAndUnlockTasksVault(page);
 
     await expect(
       page.getByRole('heading', { level: 2, name: 'All clear', exact: true }),
@@ -167,7 +105,7 @@ test.describe('Tasks layout at 1440px (E2E)', () => {
 
     await signIn(page);
     await gotoStable(page, '/dashboard/tasks');
-    await createAndUnlockVault(page);
+    await createAndUnlockTasksVault(page);
 
     await expect(
       page.getByRole('heading', { level: 2, name: 'All clear', exact: true }),
@@ -235,7 +173,7 @@ test.describe('Tasks layout at 390px (E2E)', () => {
     await bar.getByRole('link', { name: 'Tasks', exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard\/tasks\/?$/);
 
-    await createAndUnlockVault(page);
+    await createAndUnlockTasksVault(page);
 
     await expect(
       page.getByRole('heading', { level: 2, name: 'All clear', exact: true }),
@@ -259,7 +197,7 @@ test.describe('Tasks layout at 390px (E2E)', () => {
     await bar.getByRole('link', { name: 'Tasks', exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard\/tasks\/?$/);
 
-    await createAndUnlockVault(page);
+    await createAndUnlockTasksVault(page);
 
     await expect(
       page.getByRole('heading', { level: 2, name: 'All clear', exact: true }),

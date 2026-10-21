@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@myorganiser/web-ui';
+import { cn } from '../../utils';
 
 export interface ChoiceChipProps extends Omit<
   React.ButtonHTMLAttributes<HTMLButtonElement>,
