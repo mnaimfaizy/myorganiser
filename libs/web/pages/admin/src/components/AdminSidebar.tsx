@@ -1,117 +1,54 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 
-import { getCurrentUser, logout } from '@myorganiser/auth';
 import {
   AppLogo,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  Illustration,
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   useSidebar,
-  useToast,
 } from '@myorganiser/web-ui';
-import {
-  ChevronsUpDown,
-  Home,
-  LogOut,
-  MessageSquare,
-  ScrollText,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
-const adminNavItems: {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-}[] = [
-  {
-    title: 'Home',
-    url: '/admin',
-    icon: Home,
-  },
-  {
-    title: 'Users',
-    url: '/admin/users',
-    icon: Users,
-  },
-  {
-    title: 'Audit Log',
-    url: '/admin/audit-logs',
-    icon: ScrollText,
-  },
-  {
-    title: 'Feedback',
-    url: '/admin/feedback',
-    icon: MessageSquare,
-  },
-];
+import { useAdminOverview } from '../hooks/use-admin-overview';
+import { AdminNav, type AdminNavBadges } from './AdminNav';
 
 type AdminSidebarProps = React.ComponentProps<typeof Sidebar>;
 
+/**
+ * The admin sidebar: the navy shell with the ADMIN PORTAL chip, the section
+ * list with its badges, and a footer that returns to the personal dashboard.
+ * Reads the overview through the provider, so badges need no request of their
+ * own.
+ */
 export function AdminSidebar({ ...props }: AdminSidebarProps) {
-  const currentUser = getCurrentUser();
-  const router = useRouter();
-  const { toast } = useToast();
   const { state, isMobile, setOpenMobile } = useSidebar();
+  // Desktop only: the phone drawer is always laid out expanded.
+  const collapsed = state === 'collapsed' && !isMobile;
+  const { overview } = useAdminOverview();
 
-  const userName = currentUser?.name ?? '';
-  const userEmail = currentUser?.email ?? '';
-  const initials = userName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  // A rejected sign-out keeps the User here and says so; it must not redirect.
-  // Inlined rather than shared with the dashboard's useLogOut: the admin page
-  // lib cannot import the dashboard page lib (Nx page-to-page boundary).
-  const handleLogout = React.useCallback(async () => {
-    try {
-      await logout();
-    } catch {
-      toast({
-        title: 'Log out failed',
-        description: 'You are still signed in. Try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    router.push('/login');
-  }, [router, toast]);
-
-  // Radix closes the menu itself after a select unless the select is
-  // defaultPrevented, so the logout select must not call preventDefault.
-  // At phone width the sidebar is a drawer that must close too.
-  const handleLogoutSelect = React.useCallback(() => {
-    void handleLogout();
-    if (isMobile) setOpenMobile(false);
-  }, [handleLogout, isMobile, setOpenMobile]);
+  // Badges render only with a loaded, non-zero count (AdminNav enforces the
+  // zero case); a null overview yields no badges at all.
+  const badges = React.useMemo<AdminNavBadges>(
+    () => ({
+      users: overview?.unverified,
+      feedback: overview?.feedbackReportsReceived,
+    }),
+    [overview],
+  );
 
   // Phone width renders the sidebar as a drawer, which must close once a
   // destination is chosen. Closing on pathname change would miss a tap on the
-  // link to the page already open, so this closes on any anchor click instead:
-  // one capture handler covers every admin link in the content. The header has
-  // no links: the user menu closes the drawer itself. Desktop never touches
+  // link to the page already open, so this closes on any anchor click instead.
+  // The handler sits on the header, content and footer, so the footer's
+  // link back to the dashboard closes the drawer too. Desktop never touches
   // the drawer state.
   const handleNavigate = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
@@ -125,84 +62,63 @@ export function AdminSidebar({ ...props }: AdminSidebarProps) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <div className="flex flex-col gap-1 px-2 py-3">
-          <AppLogo
-            variant={state === 'collapsed' ? 'icon' : 'full'}
-            height={28}
-          />
-          {state !== 'collapsed' ? (
-            <p className="text-xs text-muted-foreground">Platform Admin</p>
-          ) : null}
-        </div>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src="" alt={userName} />
-                    <AvatarFallback className="rounded-lg">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{userName}</span>
-                    <span className="truncate text-xs">{userEmail}</span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                side={isMobile ? 'bottom' : 'right'}
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src="" alt={userName} />
-                      <AvatarFallback className="rounded-lg">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{userName}</span>
-                      <span className="truncate text-xs">{userEmail}</span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleLogoutSelect}>
-                  <LogOut />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="gap-0 p-4" onClickCapture={handleNavigate}>
+        <Link
+          href="/admin"
+          aria-label="MyOrganiser admin home"
+          className="flex items-center gap-3 rounded-control px-1.5 py-1"
+        >
+          <AppLogo variant="icon" height={34} aria-hidden />
+          {!collapsed && (
+            <span className="flex flex-col gap-0.5">
+              <span className="font-display text-title text-navy-foreground">
+                My<span className="font-extrabold">Organiser</span>
+              </span>
+              <span className="self-start rounded-full bg-brand px-2 py-px text-label-caps text-brand-foreground">
+                ADMIN PORTAL
+              </span>
+            </span>
+          )}
+        </Link>
       </SidebarHeader>
-      <SidebarContent onClickCapture={handleNavigate}>
-        <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
-          <SidebarMenu>
-            {adminNavItems.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild tooltip={item.title}>
-                  <Link href={item.url}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+      <SidebarContent
+        className="gap-4.5 px-4 pb-0 pt-2"
+        onClickCapture={handleNavigate}
+      >
+        <AdminNav collapsed={collapsed} badges={badges} />
       </SidebarContent>
+      <SidebarFooter
+        className="gap-4.5 p-4 pt-0"
+        onClickCapture={handleNavigate}
+      >
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/dashboard"
+                aria-label="Back to MyOrganiser"
+                className="flex size-13 items-center justify-center self-center rounded-menu hover:bg-sidebar-accent"
+              >
+                <Illustration kind="home" size={36} />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Back to MyOrganiser</TooltipContent>
+          </Tooltip>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-control bg-navy-raised p-3.5">
+            <p className="text-caption text-navy-muted-foreground">
+              Admin actions are recorded in the audit log. Vault data is never
+              visible here.
+            </p>
+            <Link
+              href="/dashboard"
+              className="flex h-10 w-full items-center justify-center rounded-control border border-sidebar-border text-body-sm font-semibold text-navy-foreground transition-colors hover:bg-sidebar-accent"
+            >
+              Back to MyOrganiser
+            </Link>
+          </div>
+        )}
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

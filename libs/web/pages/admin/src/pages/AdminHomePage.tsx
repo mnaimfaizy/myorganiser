@@ -1,14 +1,6 @@
-'use client';
+import { OverviewPageClient } from '../components/overview/OverviewPageClient';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-
+/** The /admin Overview page. The body is a client component; this stays thin. */
 export default function AdminHomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/admin/users');
-  }, [router]);
-
-  return null;
+  return <OverviewPageClient />;
 }
