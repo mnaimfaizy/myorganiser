@@ -2,6 +2,7 @@
 jest.mock('@myorganiser/web-vault-ui', () => ({
   ...jest.requireActual('@myorganiser/web-vault-ui'),
   useOptionalVaultSession: jest.fn(),
+  useVaultLockState: jest.fn(),
   useVaultSyncStatus: jest.fn(),
 }));
 
@@ -11,6 +12,7 @@ import { VaultBlobType } from '@myorganiser/app-api-client';
 import {
   describeVaultSyncStatus,
   useOptionalVaultSession,
+  useVaultLockState,
   useVaultSyncStatus,
 } from '@myorganiser/web-vault-ui';
 import { SidebarVaultCard } from './SidebarVaultCard';
@@ -31,6 +33,8 @@ const PENDING: SyncStatus = {
   retrying: false,
 };
 
+// One state drives both readers, so the lock-state hook and the session the
+// card locks through cannot disagree.
 function stubVaultSession(state: 'unlocked' | 'locked' | 'no-session') {
   const lock = jest.fn();
   (useOptionalVaultSession as jest.Mock).mockReturnValue(
@@ -41,6 +45,7 @@ function stubVaultSession(state: 'unlocked' | 'locked' | 'no-session') {
           lock,
         },
   );
+  (useVaultLockState as jest.Mock).mockReturnValue(state);
   return lock;
 }
 

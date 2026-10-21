@@ -24,7 +24,7 @@ const SEGMENT_LABEL_REGISTRY: Record<string, string> = {
   tasks: 'Tasks',
   groceries: 'Groceries',
   addresses: 'Addresses',
-  'mobile-numbers': 'Mobile Numbers',
+  'mobile-numbers': 'Mobile numbers',
   subscriptions: 'Subscriptions',
   youtube: 'YouTube',
   shorts: 'Shorts',

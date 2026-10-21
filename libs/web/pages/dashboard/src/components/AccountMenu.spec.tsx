@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 jest.mock('@myorganiser/auth', () => ({
+  // isPlatformAdmin is pure, so the real one is used rather than a copy.
+  ...jest.requireActual('@myorganiser/auth'),
   getCurrentUser: jest.fn(),
   logout: jest.fn(),
 }));
@@ -8,8 +10,14 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
+  useToast: jest.fn(),
+}));
+
 jest.mock('@myorganiser/web-vault-ui', () => ({
   useOptionalVaultSession: jest.fn(),
+  useVaultLockState: jest.fn(),
 }));
 
 jest.mock('../hooks/use-feedback-dialog', () => ({
@@ -19,8 +27,12 @@ jest.mock('../hooks/use-feedback-dialog', () => ({
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCurrentUser, logout } from '@myorganiser/auth';
+import { useToast } from '@myorganiser/web-ui';
 import { useRouter } from 'next/navigation';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
+import {
+  useOptionalVaultSession,
+  useVaultLockState,
+} from '@myorganiser/web-vault-ui';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { AccountMenu } from './AccountMenu';
 
@@ -34,6 +46,8 @@ function stubUser({
   (getCurrentUser as jest.Mock).mockReturnValue({ name, email, role });
 }
 
+// One state drives both readers, so the lock-state hook and the session the
+// menu locks through cannot disagree.
 function stubVaultSession(state: 'unlocked' | 'locked' | 'no-session') {
   const lock = jest.fn();
   (useOptionalVaultSession as jest.Mock).mockReturnValue(
@@ -44,6 +58,7 @@ function stubVaultSession(state: 'unlocked' | 'locked' | 'no-session') {
           lock,
         },
   );
+  (useVaultLockState as jest.Mock).mockReturnValue(state);
   return lock;
 }
 
@@ -60,10 +75,12 @@ async function menuItems() {
 
 describe('AccountMenu', () => {
   const push = jest.fn();
+  const toast = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue({ push });
+    (useToast as jest.Mock).mockReturnValue({ toast });
     (logout as jest.Mock).mockResolvedValue(undefined);
     stubUser();
     stubVaultSession('unlocked');
@@ -181,6 +198,23 @@ describe('AccountMenu', () => {
     expect((logout as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
       (push as jest.Mock).mock.invocationCallOrder[0],
     );
+  });
+
+  it('stays on the page and shows a destructive toast when Log out is rejected', async () => {
+    (logout as jest.Mock).mockRejectedValue(new Error('network down'));
+    render(<AccountMenu />);
+    openAccountMenu();
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith({
+        title: 'Log out failed',
+        description: 'You are still signed in. Try again.',
+        variant: 'destructive',
+      });
+    });
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('has no Notifications, Billing or Upgrade to Pro items', async () => {

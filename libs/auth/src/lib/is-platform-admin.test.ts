@@ -1,6 +1,6 @@
-import type { AuthUser } from '@myorganiser/auth';
+import type { AuthUser } from './auth-session-types';
 
-import { isPlatformAdmin } from './isPlatformAdmin';
+import { isPlatformAdmin } from './is-platform-admin';
 
 const baseUser: AuthUser = {
   id: 'user-1',

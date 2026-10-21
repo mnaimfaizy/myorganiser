@@ -1,9 +1,8 @@
 'use client';
 
-import { getCurrentUser, logout } from '@myorganiser/auth';
+import { getCurrentUser, isPlatformAdmin } from '@myorganiser/auth';
 import { ChevronDown, User } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
 import {
@@ -17,8 +16,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@myorganiser/web-ui';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
+import {
+  useOptionalVaultSession,
+  useVaultLockState,
+} from '@myorganiser/web-vault-ui';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
+import { useLogOut } from '../hooks/use-log-out';
 
 const MENU_ITEM_CLASS = 'min-h-10 rounded-item px-2.5 text-body-sm';
 
@@ -38,18 +41,14 @@ function initialsOf(name: string): string {
  * a selection.
  */
 export function AccountMenu() {
-  const router = useRouter();
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
-  // Inlined rather than imported: the admin page lib's isPlatformAdmin is not
-  // exported, and a dashboard import of it would cross a page boundary.
-  const isPlatformAdmin = currentUser?.role === 'platform_admin';
   const session = useOptionalVaultSession();
   // Initials come from the name; with no name the email's first letter stands in,
   // and with neither the avatar shows an icon rather than empty text.
   const initials = initialsOf(name) || email.charAt(0).toUpperCase();
-  const canLockVault = session !== null && session.masterKeyBytes !== null;
+  const canLockVault = useVaultLockState() === 'unlocked';
 
   const lockVault = useCallback(() => {
     session?.lock();
@@ -59,9 +58,7 @@ export function AccountMenu() {
     openFeedbackDialog();
   }, []);
 
-  const logOut = useCallback(() => {
-    void logout().then(() => router.push('/login'));
-  }, [router]);
+  const logOut = useLogOut();
 
   return (
     <DropdownMenu>
@@ -117,7 +114,7 @@ export function AccountMenu() {
         <DropdownMenuItem asChild className={MENU_ITEM_CLASS}>
           <Link href="/dashboard/account/reports">Your reports</Link>
         </DropdownMenuItem>
-        {isPlatformAdmin && (
+        {isPlatformAdmin(currentUser) && (
           <DropdownMenuItem asChild className={MENU_ITEM_CLASS}>
             <Link href="/admin">Admin portal</Link>
           </DropdownMenuItem>

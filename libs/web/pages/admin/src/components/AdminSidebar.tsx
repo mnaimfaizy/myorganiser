@@ -24,6 +24,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
+  useToast,
 } from '@myorganiser/web-ui';
 import {
   ChevronsUpDown,
@@ -69,6 +70,7 @@ type AdminSidebarProps = React.ComponentProps<typeof Sidebar>;
 export function AdminSidebar({ ...props }: AdminSidebarProps) {
   const currentUser = getCurrentUser();
   const router = useRouter();
+  const { toast } = useToast();
   const { state, isMobile, setOpenMobile } = useSidebar();
 
   const userName = currentUser?.name ?? '';
@@ -80,10 +82,22 @@ export function AdminSidebar({ ...props }: AdminSidebarProps) {
     .slice(0, 2)
     .toUpperCase();
 
+  // A rejected sign-out keeps the User here and says so; it must not redirect.
+  // Inlined rather than shared with the dashboard's useLogOut: the admin page
+  // lib cannot import the dashboard page lib (Nx page-to-page boundary).
   const handleLogout = React.useCallback(async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      toast({
+        title: 'Log out failed',
+        description: 'You are still signed in. Try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
     router.push('/login');
-  }, [router]);
+  }, [router, toast]);
 
   // Radix closes the menu itself after a select unless the select is
   // defaultPrevented, so the logout select must not call preventDefault.

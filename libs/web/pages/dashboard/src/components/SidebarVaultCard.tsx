@@ -7,6 +7,7 @@ import { Button } from '@myorganiser/web-ui';
 import {
   describeVaultSyncStatus,
   useOptionalVaultSession,
+  useVaultLockState,
   useVaultSyncStatus,
 } from '@myorganiser/web-vault-ui';
 
@@ -17,15 +18,16 @@ import {
  */
 export function SidebarVaultCard() {
   const session = useOptionalVaultSession();
+  const lockState = useVaultLockState();
   const { status } = useVaultSyncStatus();
 
   const lockVault = useCallback(() => {
     session?.lock();
   }, [session]);
 
-  if (!session) return null;
+  if (lockState === 'no-session') return null;
 
-  const unlocked = session.masterKeyBytes !== null;
+  const unlocked = lockState === 'unlocked';
   // Synced has no label, so it reads as "Synced" here. There is no last-synced
   // timestamp to show. A null status (first reading pending) shows no meta.
   const reading = describeVaultSyncStatus(status);

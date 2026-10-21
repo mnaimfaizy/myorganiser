@@ -3,6 +3,7 @@
 import {
   authSession,
   getCurrentUser,
+  isPlatformAdmin,
   onSessionEnded,
   type OutboundGuardOutcome,
   resolveOutboundGuard,
@@ -10,8 +11,6 @@ import {
 import { type GateDecision, RetryableGate } from '@myorganiser/web-ui';
 import { useRouter } from 'next/navigation';
 import { type ReactNode } from 'react';
-
-import { isPlatformAdmin } from '../lib/isPlatformAdmin';
 
 interface AdminGuardProps {
   children: ReactNode;
