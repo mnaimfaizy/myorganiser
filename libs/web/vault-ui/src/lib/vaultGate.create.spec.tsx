@@ -215,6 +215,14 @@ describe('VaultGate (create recovery key flow)', () => {
       { timeout: 10000 },
     );
 
+    // The save screen's title is the page's only level 1 heading (VaultGateFrame).
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: /Tasks: Save your recovery key/,
+      }),
+    ).toBeInTheDocument();
+
     // Verify the "I saved it" button appears
     expect(
       screen.getByRole('button', { name: /I saved it/ }),

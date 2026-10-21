@@ -17,6 +17,16 @@ import {
 } from '../hooks';
 import { ImportVaultReplaceDialog } from './ImportVaultReplaceDialog';
 
+/**
+ * What the page needs to know about Google Drive backup state: whether the
+ * connection is linked, and when the newest copy was made. `undefined` while
+ * the latest record is loading or failed to load, `null` when there is none.
+ */
+export interface CloudBackupSummary {
+  linked: boolean;
+  newestCopyCreatedAt: string | null | undefined;
+}
+
 interface CloudBackupLiveCardProps {
   provider: CloudBackupProvider;
   handle: VaultHandle;
@@ -25,12 +35,18 @@ interface CloudBackupLiveCardProps {
    * initial mount or before the first backup attempt.
    */
   onEscapeCopyMade?: () => void;
+  /**
+   * Optional callback reporting the connection state and newest copy. Called
+   * from an effect when either changes, including once on mount.
+   */
+  onSummaryChange?: (summary: CloudBackupSummary) => void;
 }
 
 export function CloudBackupLiveCard({
   provider,
   handle,
   onEscapeCopyMade,
+  onSummaryChange,
 }: CloudBackupLiveCardProps) {
   const getNewestCopyMs = useCallback(async () => {
     try {
@@ -74,6 +90,25 @@ export function CloudBackupLiveCard({
       : latestCloud.status === 'empty'
         ? null
         : undefined;
+
+  const linked = cloud.connection.status === 'linked';
+  const newestCopyCreatedAt =
+    latestRecord === undefined
+      ? undefined
+      : latestRecord === null
+        ? null
+        : latestRecord.createdAt;
+
+  // Kept in a ref so an unstable parent callback does not re-fire the effect
+  // below; only the connection state and the newest copy drive it.
+  const onSummaryChangeRef = useRef(onSummaryChange);
+  useEffect(() => {
+    onSummaryChangeRef.current = onSummaryChange;
+  }, [onSummaryChange]);
+
+  useEffect(() => {
+    onSummaryChangeRef.current?.({ linked, newestCopyCreatedAt });
+  }, [linked, newestCopyCreatedAt]);
 
   // Track current time outside render for purity: poll every 60s so the
   // relative age and overdue status stay current while the page is open

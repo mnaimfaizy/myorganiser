@@ -18,37 +18,32 @@ import {
 } from '@myorganiser/web-vault-ui';
 import type { MintedRecoveryKey } from '@myorganiser/web-vault';
 
-import type { RotationFormInput } from './RecoveryKeyRotationCard';
+import type { RotationFormInput } from './RecoveryKeyRotationForm';
 
 interface RecoveryKeyMintedSectionProps {
   mintedKey: MintedRecoveryKey;
   form: UseFormReturn<RotationFormInput>;
   /** True when the Vault operation policy refuses the rotation in the current state. */
   disabled: boolean;
-  rotating: boolean;
   onDownload: () => void;
   onCopy: () => Promise<void>;
-  onCancel: () => void;
-  onRotate: () => Promise<void>;
 }
 
+/**
+ * Shows the minted key, its save actions, and the confirm field. The Cancel and
+ * rotate buttons belong to the surrounding form's layout footer, not here.
+ */
 export function RecoveryKeyMintedSection({
   mintedKey,
   form,
   disabled,
-  rotating,
   onDownload,
   onCopy,
-  onCancel,
-  onRotate,
 }: RecoveryKeyMintedSectionProps) {
-  const confirmRecoveryKey = form.watch('confirmRecoveryKey');
-  const isConfirmMatched = confirmRecoveryKey === mintedKey;
-
   // useServerReachability lives here because this component mounts only when
   // a recovery key is minted. That mount/unmount lifetime is the probe's
   // lifetime — it probes on mount and refreshes on window focus. Hoisting to
-  // RecoveryKeyRotationCard would fire a network request for every User who
+  // the rotation form would fire a network request for every User who
   // visits vault settings, the vast majority of whom never rotate.
   const { reachability, recheck } = useServerReachability();
 
@@ -64,7 +59,7 @@ export function RecoveryKeyMintedSection({
           value={mintedKey}
           data-testid="recovery-key-rotation-key"
         />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             data-testid="recovery-key-rotation-download"
@@ -110,25 +105,6 @@ export function RecoveryKeyMintedSection({
         reachability={reachability}
         onRecheck={recheck}
       />
-
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          data-testid="recovery-key-rotation-cancel"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          data-testid="recovery-key-rotation-submit"
-          disabled={disabled || !isConfirmMatched || rotating}
-          onClick={onRotate}
-        >
-          {rotating ? 'Rotating…' : 'Rotate recovery key'}
-        </Button>
-      </div>
     </div>
   );
 }

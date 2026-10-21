@@ -1,4 +1,4 @@
-export { routeApi } from './apiStub';
+export { routeApi, stubJsonGet } from './apiStub';
 export {
   submitLoginForm,
   waitForDashboardReady,
@@ -15,6 +15,7 @@ export {
   LIVE_DELETION_EMAIL,
   LIVE_DELETION_PASSWORD,
 } from './liveAuth';
+export { expectNoHorizontalOverflow, expectSingleH1 } from './layout';
 export { gotoStable } from './navigation';
 export { setNetworkDown } from './networkOutage';
 export {

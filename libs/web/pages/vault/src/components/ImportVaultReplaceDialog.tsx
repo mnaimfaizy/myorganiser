@@ -185,6 +185,12 @@ export function ImportVaultReplaceDialog({
 
   const acknowledgement = acknowledgementLabel();
 
+  // The body band is only drawn when it has something in it, so an outcome
+  // with neither the copy-age box nor the acknowledgement does not leave an
+  // empty strip between the two hairlines.
+  const hasBodyContent =
+    Boolean(copyCreatedAt) || acknowledgement !== null || Boolean(confirmError);
+
   // Pending disables the confirm because the claim is not derived yet, not
   // because the import needs authorising. Showing a reassuring sentence and
   // then correcting it is the one failure worse than the fixed warning, since
@@ -198,61 +204,70 @@ export function ImportVaultReplaceDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="w-[calc(100%-2rem)] md:max-w-md"
+        className="w-[calc(100%-2rem)] gap-0 p-0 md:max-w-xl"
         data-testid="import-vault-replace-dialog"
       >
-        <DialogHeader>
+        <DialogHeader className="border-b border-border px-6 pb-4 pt-6 pr-12">
           <DialogTitle>{title ?? "Replace this device's vault?"}</DialogTitle>
           <DialogDescription data-testid="import-vault-replace-disclosure">
             {describeOutcome()}
           </DialogDescription>
         </DialogHeader>
 
-        {copyCreatedAt && (
-          <div
-            data-testid="import-vault-replace-copy-age"
-            className="text-sm text-muted-foreground"
-          >
-            <p>
-              This copy was made{' '}
-              {formatDistanceToNow(new Date(copyCreatedAt), {
-                addSuffix: true,
-              })}{' '}
-              (<time dateTime={copyCreatedAt}>{formatDate(copyCreatedAt)}</time>
-              ). Everything changed on this device since then will be replaced.
-            </p>
-            <p className="mt-2">
-              The next sync will ask you about anything that differs from the
-              copy on the server.
-            </p>
+        {hasBodyContent && (
+          <div className="flex flex-col gap-3.5 px-6 py-5">
+            {copyCreatedAt && (
+              <div
+                data-testid="import-vault-replace-copy-age"
+                className="flex flex-col gap-1.5 rounded-control border border-border-subtle bg-subtle p-3.5 text-body-sm text-foreground-supporting"
+              >
+                <p>
+                  This copy was made{' '}
+                  {formatDistanceToNow(new Date(copyCreatedAt), {
+                    addSuffix: true,
+                  })}{' '}
+                  (
+                  <time dateTime={copyCreatedAt}>
+                    {formatDate(copyCreatedAt)}
+                  </time>
+                  ). Everything changed on this device since then will be
+                  replaced.
+                </p>
+                <p>
+                  The next sync will ask you about anything that differs from
+                  the copy on the server.
+                </p>
+              </div>
+            )}
+
+            {acknowledgement !== null && (
+              <div className="flex items-start gap-3 rounded-control border border-destructive-edge bg-destructive-faint p-3.5">
+                <Checkbox
+                  id={acknowledgeId}
+                  data-testid="import-vault-replace-acknowledge"
+                  checked={isAcknowledged}
+                  onCheckedChange={handleAcknowledgeChange}
+                  disabled={isConfirming}
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor={acknowledgeId}
+                  className="cursor-pointer text-body font-normal leading-relaxed"
+                >
+                  {acknowledgement}
+                </Label>
+              </div>
+            )}
+
+            {confirmError && (
+              <p role="alert" className="text-body-sm text-destructive-text">
+                {confirmError}
+              </p>
+            )}
           </div>
         )}
 
-        {acknowledgement !== null && (
-          <div className="flex items-start gap-2">
-            <Checkbox
-              id={acknowledgeId}
-              data-testid="import-vault-replace-acknowledge"
-              checked={isAcknowledged}
-              onCheckedChange={handleAcknowledgeChange}
-              disabled={isConfirming}
-            />
-            <Label
-              htmlFor={acknowledgeId}
-              className="cursor-pointer text-sm font-normal leading-relaxed"
-            >
-              {acknowledgement}
-            </Label>
-          </div>
-        )}
-
-        {confirmError && (
-          <p role="alert" className="text-sm text-destructive">
-            {confirmError}
-          </p>
-        )}
-
-        <DialogFooter className="gap-2 pt-2 sm:gap-3">
+        <DialogFooter className="gap-2.5 border-t border-border px-6 pb-6 pt-4">
           <Button
             type="button"
             variant="outline"
@@ -264,6 +279,7 @@ export function ImportVaultReplaceDialog({
           </Button>
           <Button
             type="button"
+            variant="destructive"
             data-testid="import-vault-replace-confirm"
             onClick={handleConfirm}
             disabled={confirmDisabled}

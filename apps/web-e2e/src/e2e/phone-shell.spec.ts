@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
+import {
+  createOwnedVaultWithRecoveryKey,
+  E2E_VAULT_PHRASE,
+  expectNoHorizontalOverflow,
+  expectSingleH1,
+  login,
+  setupBackend,
+  stubJsonGet,
+  type IdentityEntry,
+} from './helpers';
 
 /**
  * Installed phone shell at 390x844 (issue #1249).
@@ -7,10 +16,10 @@ import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
  * Covers the three shell behaviours a phone user meets on every tab:
  * - the bottom tab bar is present on the tab roots, and on the pushed Account
  *   screen, with the right tab current;
- * - Home, Vault, More and the pushed Account screen do not scroll sideways.
- *   The other shell screens (Tasks, Groceries, Subscriptions, Addresses,
- *   Mobile numbers) are not overflow-checked yet: the vault unlock gate
- *   overflows there, and that is tracked by #1257 (Vault slice);
+ * - Home, Vault, More and the pushed Account screen do not scroll sideways,
+ *   and the gated screens (Tasks, Groceries, Subscriptions, Addresses, Mobile
+ *   numbers) do not overflow while the vault is locked, from the setup and
+ *   recovery-key screens through to the unlock gate;
  * - More reaches a pushed screen, and its back link returns to More.
  *
  * Not asserted here, because Playwright cannot emulate them or they are visual:
@@ -22,9 +31,11 @@ import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
  * - the "Updated" badge on Your reports;
  * - the Admin portal row (platform admin only);
  * - the YouTube row (feature-gated);
- * - standalone display mode.
+ * - standalone display mode;
+ * - the unlocked internals of the gated screens (Tasks is being redesigned).
  *
- * Hermetic: the backend is stubbed by setupBackend (no vault on the server).
+ * Hermetic: the backend is stubbed by setupBackend (no vault on the server
+ * until the gated-screens test creates one through the real setup form).
  * The reads that the shell makes on mount are stubbed here: the feedback
  * reports list (More), YouTube availability (the Home and More YouTube checks)
  * and YouTube status (read by the Account page). With availability off, Home
@@ -43,47 +54,6 @@ const IDENTITIES: IdentityEntry[] = [
 ];
 
 const PHONE_VIEWPORT = { width: 390, height: 844 };
-
-function corsHeaders(origin: string) {
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-  } as const;
-}
-
-/**
- * Answer GET with a fixed JSON body and OPTIONS with a CORS preflight. Any
- * other method is handed to the network. The body shapes are the generated
- * client's response types: ListFeedbackReportsResponse,
- * YouTubeAvailabilityResponse and the `connected` field the Account page and
- * Home read from GET /youtube/status.
- */
-async function stubJsonGet(page: Page, url: RegExp, body: unknown) {
-  await routeApi(page, url, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-    const request = route.request();
-
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    if (request.method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        headers,
-        contentType: 'application/json',
-        body: JSON.stringify(body),
-      });
-      return;
-    }
-
-    await route.continue();
-  });
-}
 
 /**
  * Sign in and land on the dashboard at phone width. `login()` waits for the
@@ -109,18 +79,6 @@ async function signInToPhoneDashboard(page: Page) {
 
 function tabBar(page: Page) {
   return page.getByRole('navigation', { name: 'App sections' });
-}
-
-async function expectNoHorizontalOverflow(page: Page, route: string) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => document.documentElement.scrollWidth - window.innerWidth,
-        ),
-      { message: route, timeout: 10000 },
-    )
-    .toBeLessThanOrEqual(0);
 }
 
 test.describe('Phone shell (E2E)', () => {
@@ -187,11 +145,15 @@ test.describe('Phone shell (E2E)', () => {
     await expect(
       bar.getByRole('link', { name: 'Vault', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
-    // The Vault page has no heading of its own on the phone; with no Local
-    // Vault its always-rendered Export card is the stable content to wait for.
+    // With no Local Vault the page's only heading is its sr-only h1. Wait for
+    // that, then for the always-rendered Export card, and count the h1s.
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Vault', exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByText('Export encrypted vault', { exact: true }),
     ).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
     await expectNoHorizontalOverflow(page, 'Vault');
 
     await bar.getByRole('link', { name: 'More', exact: true }).click();
@@ -214,6 +176,85 @@ test.describe('Phone shell (E2E)', () => {
       bar.getByRole('link', { name: 'More', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
     await expectNoHorizontalOverflow(page, 'Account');
+  });
+
+  test('gated screens do not overflow while the vault is locked', async ({
+    page,
+  }) => {
+    test.setTimeout(180000);
+
+    await signInToPhoneDashboard(page);
+    const bar = tabBar(page);
+
+    // Tasks has no Local Vault yet, so it shows the setup screen.
+    await bar.getByRole('link', { name: 'Tasks', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/tasks\/?$/);
+    await expect(page.locator('#setup-passphrase')).toBeVisible();
+    await expectSingleH1(page, 'Tasks: Set encryption passphrase');
+    await expectNoHorizontalOverflow(page, 'Tasks setup');
+
+    // Create the vault from the setup form. The recovery-key screen is
+    // inspected while it is showing its key, before the User confirms it.
+    await createOwnedVaultWithRecoveryKey(page, {
+      passphrase: E2E_VAULT_PHRASE,
+      owner: 'phone-shell-1',
+      onRecoveryKeyScreen: async () => {
+        await expectSingleH1(page, 'Tasks: Save your recovery key');
+        await expectNoHorizontalOverflow(page, 'Tasks save recovery key');
+      },
+    });
+
+    await expectSingleH1(page, 'Tasks: Unlock');
+    await expect(
+      page.getByRole('button', {
+        name: 'I have a recovery key for a vault on this device',
+      }),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page, 'Tasks unlock');
+
+    // Forgot passphrase switches the gate to recovery; its claim offer opens
+    // the claim form.
+    await page.getByRole('button', { name: 'Forgot passphrase' }).click();
+    await expectSingleH1(page, 'Tasks: Recover');
+    await expectNoHorizontalOverflow(page, 'Tasks recover');
+
+    await page
+      .getByRole('button', {
+        name: 'I have a recovery key for a vault on this device',
+      })
+      .click();
+    await expect(page.locator('#claim-recovery-key')).toBeVisible();
+    await expectNoHorizontalOverflow(page, 'Tasks claim offer');
+
+    await bar.getByRole('link', { name: 'Groceries', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/groceries\/?$/);
+    await expectSingleH1(page, 'Groceries: Unlock');
+    await expectNoHorizontalOverflow(page, 'Groceries unlock');
+
+    await bar.getByRole('link', { name: 'More', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/more\/?$/);
+    await page
+      .getByRole('link', { name: 'Subscriptions', exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/dashboard\/subscriptions\/?$/);
+    await expectSingleH1(page, 'Subscriptions: Unlock');
+    await expectNoHorizontalOverflow(page, 'Subscriptions unlock');
+    await page.getByRole('link', { name: 'Back to More' }).click();
+    await expect(page).toHaveURL(/\/dashboard\/more\/?$/);
+
+    await page.getByRole('link', { name: 'Addresses', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/addresses\/?$/);
+    await expectSingleH1(page, 'Addresses: Unlock');
+    await expectNoHorizontalOverflow(page, 'Addresses unlock');
+    await page.getByRole('link', { name: 'Back to More' }).click();
+    await expect(page).toHaveURL(/\/dashboard\/more\/?$/);
+
+    await page
+      .getByRole('link', { name: 'Mobile numbers', exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/dashboard\/mobile-numbers\/?$/);
+    await expectSingleH1(page, 'Mobile Numbers: Unlock');
+    await expectNoHorizontalOverflow(page, 'Mobile numbers unlock');
   });
 
   test('More opens its sections, pushes Subscriptions, and Back to More returns to the tab root', async ({

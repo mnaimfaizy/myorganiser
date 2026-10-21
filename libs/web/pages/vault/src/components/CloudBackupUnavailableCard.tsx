@@ -1,9 +1,4 @@
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@myorganiser/web-ui';
+import { Card } from '@myorganiser/web-ui';
 
 interface CloudBackupUnavailableCardProps {
   reason: string;
@@ -13,11 +8,11 @@ export function CloudBackupUnavailableCard({
   reason,
 }: CloudBackupUnavailableCardProps) {
   return (
-    <Card data-testid="cloud-backup-unavailable">
-      <CardHeader>
-        <CardTitle>Encrypted cloud backup</CardTitle>
-        <CardDescription>{reason}</CardDescription>
-      </CardHeader>
+    <Card className="h-full" data-testid="cloud-backup-unavailable">
+      <div className="flex h-full flex-col gap-3 p-4 md:p-6">
+        <h3 className="font-display text-title">Encrypted cloud backup</h3>
+        <p className="text-body text-foreground-supporting">{reason}</p>
+      </div>
     </Card>
   );
 }

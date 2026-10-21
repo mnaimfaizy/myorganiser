@@ -41,15 +41,25 @@ async function assertPassphraseResetPrompt(page: Page) {
 }
 
 async function assertRecoveryModeChangePassphraseCard(page: Page) {
-  // CardTitle renders a div, not a heading. The submit label is the
-  // recovery-mode signal.
-  await expect(
-    page.getByLabel('Current passphrase', { exact: true }),
-  ).toHaveCount(0);
+  // The card's opener is the entry point; its form lives in a dialog. The
+  // dialog title and submit label ('Set new passphrase') are the recovery-mode
+  // signal, and there is no 'Current passphrase' field in that mode.
+  await expect(page.getByTestId('change-passphrase-open')).toBeEnabled({
+    timeout: PBKDF2_BUDGET_MS,
+  });
+  await page.getByTestId('change-passphrase-open').click();
 
-  const submit = page.getByTestId('change-passphrase-submit');
-  await expect(submit).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
-  await expect(submit).toHaveText('Set new passphrase');
+  const dialog = page.getByRole('dialog', { name: 'Set new passphrase' });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByLabel('Current passphrase', { exact: true }),
+  ).toHaveCount(0);
+  await expect(dialog.getByTestId('change-passphrase-submit')).toHaveText(
+    'Set new passphrase',
+  );
+
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toHaveCount(0);
 }
 
 test.describe('Passphrase Reset Prompt (E2E)', () => {

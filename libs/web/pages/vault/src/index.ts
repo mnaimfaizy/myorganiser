@@ -1,4 +1,8 @@
 export { default as VaultPage } from './page';
+export { VaultPassphrasePage } from './passphrase-page';
+export { VaultRecoveryKeyPage } from './recovery-key-page';
+export { VaultBackupsPage } from './backups-page';
+export { VaultReaderPage } from './reader-page';
 export * from './components';
 export * from './hooks';
 export * from './utils';

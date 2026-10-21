@@ -345,13 +345,17 @@ test.describe('Vault Removal Offers Real Vault Back (E2E)', () => {
       // Click remove button
       await page.getByTestId('remove-vault-button').click();
 
-      // Confirm in ConfirmDeleteDialog
-      // The dialog contains "Cancel" button (outline) and "Delete" button (destructive)
-      const dialog = page.getByRole('dialog');
+      // Confirm in RemoveVaultDialog (ConfirmDialog, role="alertdialog").
+      // The dialog contains a "Cancel" button and a "Remove from this device"
+      // confirm button, which is named exactly that while idle.
+      const dialog = page.getByRole('alertdialog');
       await expect(dialog).toBeVisible({ timeout: 30000 });
 
-      // Find and click the Delete button inside the dialog
-      const deleteButton = dialog.getByRole('button', { name: /Delete/ });
+      // Find and click the confirm button inside the dialog
+      const deleteButton = dialog.getByRole('button', {
+        name: 'Remove from this device',
+        exact: true,
+      });
       await expect(deleteButton).toBeVisible({ timeout: 30000 });
       await deleteButton.click();
     });

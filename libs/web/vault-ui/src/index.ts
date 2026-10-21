@@ -34,6 +34,7 @@ export * from './lib/useVaultSyncStatus';
 export * from './lib/vaultAbsentEvidenceGateView';
 export * from './lib/vaultClaimEvidenceGateView';
 export * from './lib/vaultGate';
+export * from './lib/VaultGateFrame';
 export * from './lib/vaultImportErrorMessages';
 export * from './lib/vaultMetaPushMessages';
 export * from './lib/vaultMountSettle';

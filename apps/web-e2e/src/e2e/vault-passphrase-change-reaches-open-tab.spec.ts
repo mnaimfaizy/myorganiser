@@ -315,7 +315,8 @@ test.describe('Vault Passphrase Change Reaches Open Tab (E2E)', () => {
     await expect(page2.getByRole('dialog')).toHaveCount(0);
 
     // Step 11-12: page1 navigates to /dashboard/vault (not wrapped by VaultGate,
-    // uses VaultUnlockCard with different selectors than VaultGate's unlock flow)
+    // uses VaultUnlockCard, whose heading is "Unlock your vault" and whose
+    // controls are different from VaultGate's unlock flow)
     await gotoStable(page1, '/dashboard/vault');
 
     // Step 13: Unlock page1 via VaultUnlockCard (vault settings page route)
@@ -325,7 +326,8 @@ test.describe('Vault Passphrase Change Reaches Open Tab (E2E)', () => {
     // Step 14: Capture etag before passphrase change
     const priorMetaEtag = serverMetaEtag;
 
-    // Step 15: Fill and submit ChangePassphraseCard
+    // Step 15: Open the ChangePassphraseCard dialog, then fill and submit it
+    // (changePassphrase opens the dialog via change-passphrase-open)
     await changePassphrase(page1, {
       current: ORIGINAL_PASSPHRASE,
       next: NEW_PASSPHRASE,
