@@ -1,6 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
   FormControl,
   FormField,
   FormItem,
@@ -19,6 +17,7 @@ import type { Control } from 'react-hook-form';
 import { ORGANISATION_TYPE_OPTIONS } from '../labels';
 import type { PlaceFormValues } from '../placeForm';
 import type { PlaceNoun } from './PlaceDialog';
+import { PlaceDuplicateAlert } from './PlaceDuplicateAlert';
 
 export interface PlaceDialogOrganisationFieldsProps {
   control: Control<PlaceFormValues>;
@@ -88,14 +87,7 @@ export function PlaceDialogOrganisationFields({
       </div>
 
       {isDuplicate ? (
-        <Alert variant="notice" tone="warning">
-          <AlertDescription>
-            <span className="font-semibold text-warning-text">
-              {`“${orgName.trim()}” is already on this ${noun}.`}
-            </span>{' '}
-            Add it again only if it&apos;s a different account.
-          </AlertDescription>
-        </Alert>
+        <PlaceDuplicateAlert orgName={orgName} noun={noun} />
       ) : null}
     </>
   );
