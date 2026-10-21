@@ -53,9 +53,9 @@ const ROW_CLASS =
 
 /**
  * The More tab: the sections that do not fit the tab bar, plus the account
- * actions. The visible large title comes from PhoneAppBar on the phone and
- * from DashboardHeader on desktop, so this screen keeps only a visually
- * hidden h1.
+ * actions. On the phone its h1 is the large title (MorePhone artboard), with
+ * no illustration and no lock control; on desktop DashboardHeader carries the
+ * title, so the h1 is visually hidden there.
  */
 export function MoreScreen() {
   const currentUser = getCurrentUser();
@@ -95,7 +95,9 @@ export function MoreScreen() {
 
   return (
     <div className="flex flex-col gap-3 pt-3 pb-6 pl-[calc(1rem_+_env(safe-area-inset-left))] pr-[calc(1rem_+_env(safe-area-inset-right))] md:pt-6 md:pr-8 md:pl-8">
-      <h1 className="sr-only">More</h1>
+      <h1 className="font-display text-display text-foreground md:sr-only">
+        More
+      </h1>
 
       <h2 className="text-label-caps text-muted-foreground">ORGANISE</h2>
       <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -131,6 +133,10 @@ export function MoreScreen() {
             </span>
           )}
         </Link>
+        {/*
+         * Deliberate departure from MorePhone.dc.html: the admin portal row stays
+         * here, as the only phone route to /admin. Recorded in PRD #1241.
+         */}
         {isPlatformAdmin(currentUser) && (
           <Link href="/admin" className={ROW_CLASS}>
             <Illustration kind="admin" size={32} />

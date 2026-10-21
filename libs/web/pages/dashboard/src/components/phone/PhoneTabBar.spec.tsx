@@ -6,6 +6,10 @@ jest.mock('next/navigation', () => ({
 import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
+import {
+  fontWeightMediumVar,
+  fontWeightSemiboldVar,
+} from '@myorganiser/design-tokens';
 import { PhoneTabBar } from './PhoneTabBar';
 
 function setPathname(pathname: string | null): void {
@@ -80,12 +84,11 @@ describe('PhoneTabBar', () => {
       'aria-current',
       'page',
     );
-    expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute(
-      'aria-current',
-    );
-    expect(
-      within(nav).getByRole('link', { name: 'Vault' }),
-    ).not.toHaveAttribute('aria-current');
+    for (const name of ['Home', 'Groceries', 'Vault', 'More']) {
+      expect(within(nav).getByRole('link', { name })).not.toHaveAttribute(
+        'aria-current',
+      );
+    }
   });
 
   it('marks Vault as the only current tab on the vault route', () => {
@@ -96,9 +99,11 @@ describe('PhoneTabBar', () => {
       'aria-current',
       'page',
     );
-    expect(within(nav).getByRole('link', { name: 'More' })).not.toHaveAttribute(
-      'aria-current',
-    );
+    for (const name of ['Home', 'Tasks', 'Groceries', 'More']) {
+      expect(within(nav).getByRole('link', { name })).not.toHaveAttribute(
+        'aria-current',
+      );
+    }
   });
 
   it('marks More as the only current tab on the more route', () => {
@@ -109,25 +114,63 @@ describe('PhoneTabBar', () => {
       'aria-current',
       'page',
     );
-    expect(
-      within(nav).getByRole('link', { name: 'Vault' }),
-    ).not.toHaveAttribute('aria-current');
+    for (const name of ['Home', 'Tasks', 'Groceries', 'Vault']) {
+      expect(within(nav).getByRole('link', { name })).not.toHaveAttribute(
+        'aria-current',
+      );
+    }
   });
 
-  it('renders no tab bar on a pushed section reached from More', () => {
-    renderTabBar('/dashboard/subscriptions');
+  it('renders the tab bar on Account with More as the only current tab and no spacer', () => {
+    const { container } = renderTabBar('/dashboard/account');
+
+    const nav = screen.getByRole('navigation', { name: 'App sections' });
+    expect(within(nav).getByRole('link', { name: 'More' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    for (const name of ['Home', 'Tasks', 'Groceries', 'Vault']) {
+      expect(within(nav).getByRole('link', { name })).not.toHaveAttribute(
+        'aria-current',
+      );
+    }
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild).toBe(nav);
+  });
+
+  it('renders no tab bar on a pushed section reached from More, only the spacer', () => {
+    const { container } = renderTabBar('/dashboard/subscriptions');
 
     expect(
       screen.queryByRole('navigation', { name: 'App sections' }),
     ).not.toBeInTheDocument();
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders no tab bar on a pushed detail screen', () => {
-    renderTabBar('/dashboard/groceries/abc123');
+  it('renders no tab bar on a pushed detail screen, only the spacer', () => {
+    const { container } = renderTabBar('/dashboard/groceries/abc123');
 
     expect(
       screen.queryByRole('navigation', { name: 'App sections' }),
     ).not.toBeInTheDocument();
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('weights the active tab label semibold and the inactive labels medium', () => {
+    renderTabBar('/dashboard/tasks');
+
+    const nav = screen.getByRole('navigation', { name: 'App sections' });
+    expect(within(nav).getByText('Tasks').style.fontWeight).toBe(
+      fontWeightSemiboldVar,
+    );
+    expect(within(nav).getByText('Home').style.fontWeight).toBe(
+      fontWeightMediumVar,
+    );
+    expect(within(nav).getByText('More').style.fontWeight).toBe(
+      fontWeightMediumVar,
+    );
   });
 
   it('treats a null pathname as Home', () => {

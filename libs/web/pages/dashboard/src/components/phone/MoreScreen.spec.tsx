@@ -76,6 +76,15 @@ describe('MoreScreen', () => {
     await settleReports();
   });
 
+  it('keeps the More h1 visible on the phone, hidden only from md up', async () => {
+    render(<MoreScreen />);
+
+    const title = screen.getByRole('heading', { level: 1, name: 'More' });
+    expect(title.classList).not.toContain('sr-only');
+    expect(title).toHaveClass('md:sr-only');
+    await settleReports();
+  });
+
   it('links the Subscriptions, Addresses, Mobile numbers and YouTube sections when YouTube is visible', async () => {
     render(<MoreScreen />);
 

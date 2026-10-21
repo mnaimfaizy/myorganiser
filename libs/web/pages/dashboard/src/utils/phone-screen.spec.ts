@@ -60,18 +60,28 @@ describe('getPhoneScreen', () => {
     ['/dashboard/addresses', 'Addresses'],
     ['/dashboard/mobile-numbers', 'Mobile numbers'],
     ['/dashboard/youtube', 'YouTube'],
-    ['/dashboard/account', 'Account'],
   ])(
-    'pushes top-level section %j from More with back to More',
+    'pushes top-level section %j from More with back to More and no tab bar',
     (pathname, title) => {
       expect(getPhoneScreen(pathname)).toEqual({
         type: 'pushed',
         tab: 'more',
         title,
         back: { label: 'More', href: '/dashboard/more' },
+        tabBar: false,
       });
     },
   );
+
+  it('pushes Account from More with back to More and keeps the tab bar', () => {
+    expect(getPhoneScreen('/dashboard/account')).toEqual({
+      type: 'pushed',
+      tab: 'more',
+      title: 'Account',
+      back: { label: 'More', href: '/dashboard/more' },
+      tabBar: true,
+    });
+  });
 
   it('pushes a groceries item with no title of its own and back to Groceries', () => {
     expect(getPhoneScreen('/dashboard/groceries/abc123')).toEqual({
@@ -79,6 +89,7 @@ describe('getPhoneScreen', () => {
       tab: 'groceries',
       title: null,
       back: { label: 'Groceries', href: '/dashboard/groceries' },
+      tabBar: false,
     });
   });
 
@@ -88,6 +99,7 @@ describe('getPhoneScreen', () => {
       tab: 'more',
       title: null,
       back: { label: 'Addresses', href: '/dashboard/addresses' },
+      tabBar: false,
     });
   });
 
@@ -97,15 +109,17 @@ describe('getPhoneScreen', () => {
       tab: 'more',
       title: 'Shorts',
       back: { label: 'YouTube', href: '/dashboard/youtube' },
+      tabBar: false,
     });
   });
 
-  it('pushes an account reports screen back to Account', () => {
+  it('pushes an account reports screen back to Account with no tab bar', () => {
     expect(getPhoneScreen('/dashboard/account/reports')).toEqual({
       type: 'pushed',
       tab: 'more',
       title: 'Your reports',
       back: { label: 'Account', href: '/dashboard/account' },
+      tabBar: false,
     });
   });
 });

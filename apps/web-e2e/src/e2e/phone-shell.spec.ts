@@ -5,7 +5,8 @@ import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
  * Installed phone shell at 390x844 (issue #1249).
  *
  * Covers the three shell behaviours a phone user meets on every tab:
- * - the bottom tab bar is present on the tab roots with the right tab current;
+ * - the bottom tab bar is present on the tab roots, and on the pushed Account
+ *   screen, with the right tab current;
  * - Home, Vault, More and the pushed Account screen do not scroll sideways.
  *   The other shell screens (Tasks, Groceries, Subscriptions, Addresses,
  *   Mobile numbers) are not overflow-checked yet: the vault unlock gate
@@ -208,7 +209,10 @@ test.describe('Phone shell (E2E)', () => {
     await expect(
       page.getByRole('link', { name: 'Back to More' }),
     ).toBeVisible();
-    await expect(bar).toHaveCount(0);
+    await expect(bar).toBeVisible();
+    await expect(
+      bar.getByRole('link', { name: 'More', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
     await expectNoHorizontalOverflow(page, 'Account');
   });
 
@@ -228,7 +232,7 @@ test.describe('Phone shell (E2E)', () => {
     ).toHaveAttribute('aria-current', 'page');
 
     const title = page.getByRole('heading', { level: 1, name: 'More' });
-    await expect(title).toBeAttached();
+    await expect(title).toBeVisible();
     await expect(title).toHaveText('More');
 
     for (const label of [

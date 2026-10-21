@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import {
+  fontWeightMediumVar,
+  fontWeightSemiboldVar,
+} from '@myorganiser/design-tokens';
 import { Illustration } from '@myorganiser/web-ui';
 
 import {
@@ -13,18 +17,20 @@ import {
 } from '../../utils/phone-screen';
 
 /**
- * The bottom tab bar of the installed phone shell. It is hidden from md up and
- * on pushed screens, which carry a back link instead. Its data attribute lets
- * the layout raise the toast offset while the bar is mounted.
+ * The bottom tab bar of the installed phone shell. It is hidden from md up. It
+ * shows on a tab root and on the pushed screens that keep it (`tabBar`); other
+ * pushed screens carry a back link instead. Its data attribute lets the layout
+ * raise the toast offset while the bar is mounted.
  */
 export function PhoneTabBar() {
   // usePathname() can be null outside the App Router; an empty path is Home.
   const pathname: string = usePathname() ?? '';
   const screen = getPhoneScreen(pathname);
 
-  if (screen.type === 'pushed') {
-    // No bar on a pushed screen, but the end of a scrolled page must still
-    // clear the home indicator, so the safe-area inset is reserved here.
+  if (screen.type === 'pushed' && !screen.tabBar) {
+    // No bar on this pushed screen, but the end of a scrolled page must still
+    // clear the home indicator, so the safe-area inset is reserved here. When
+    // the bar is shown it carries that inset itself, so nothing is reserved.
     return (
       <div
         aria-hidden="true"
@@ -61,12 +67,22 @@ export function PhoneTabBar() {
             >
               <Illustration kind={tab.kind} size={28} />
             </span>
+            {/*
+             * The label step (12px/16px) comes from label-caps. Its weight is
+             * set here: the artboard has the active tab at 600 and the rest at
+             * 500, so a font-weight class would lose to label-caps' own weight.
+             */}
             <span
               className={
                 isCurrent
                   ? 'text-label-caps text-brand-text'
                   : 'text-label-caps text-foreground-secondary'
               }
+              style={{
+                fontWeight: isCurrent
+                  ? fontWeightSemiboldVar
+                  : fontWeightMediumVar,
+              }}
             >
               {tab.label}
             </span>

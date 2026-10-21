@@ -48,9 +48,17 @@ export const PHONE_TABS = {
 } as const satisfies Record<PhoneTabId, PhoneTab>;
 
 /**
+ * Pushed routes that keep the tab bar beneath them, as AccountPhone.dc.html
+ * does. Every other pushed route hides the bar. The route is still pushed: it
+ * keeps its back link, and its tab (More) stays marked current.
+ */
+const PUSHED_ROUTES_KEEPING_TAB_BAR: readonly string[] = ['/dashboard/account'];
+
+/**
  * What the phone shell shows for a route. A tab root has a large title and the
- * tab bar; a pushed screen has a back link and no tab bar. A pushed screen
- * whose last segment is an id has no title of its own: the page supplies it.
+ * tab bar; a pushed screen has a back link, and the tab bar only when
+ * `tabBar` is set. A pushed screen whose last segment is an id has no title of
+ * its own: the page supplies it.
  */
 export type PhoneScreen =
   | { type: 'root'; tab: PhoneTabId; title: string; kind: IllustrationKind }
@@ -59,6 +67,7 @@ export type PhoneScreen =
       tab: PhoneTabId;
       title: string | null;
       back: { label: string; href: string };
+      tabBar: boolean;
     };
 
 /**
@@ -99,5 +108,11 @@ export function getPhoneScreen(pathname: string): PhoneScreen {
       ? { label: PHONE_TABS.more.label, href: PHONE_TABS.more.href }
       : { label: parent.label, href: parent.href };
 
-  return { type: 'pushed', tab, title: getSegmentLabel(segment), back };
+  return {
+    type: 'pushed',
+    tab,
+    title: getSegmentLabel(segment),
+    back,
+    tabBar: PUSHED_ROUTES_KEEPING_TAB_BAR.includes(current.href),
+  };
 }
