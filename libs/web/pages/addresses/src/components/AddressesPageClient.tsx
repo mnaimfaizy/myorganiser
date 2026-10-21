@@ -1,183 +1,33 @@
 'use client';
 
-import { AddressRecord, AddressStatusEnum } from '@myorganiser/vault-core';
-import { ConfirmDeleteDialog, useToast } from '@myorganiser/web-ui';
-import {
-  normalizeAddresses,
-  saveVaultRecords,
-  type VaultHandle,
-} from '@myorganiser/web-vault';
-import { useLocalVaultRevision, VaultGate } from '@myorganiser/web-vault-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useIsMobileState } from '@myorganiser/web-ui';
+import type { VaultHandle } from '@myorganiser/web-vault';
+import { VaultGate } from '@myorganiser/web-vault-ui';
 
-import { type AddAddressFormValues } from '../schemas/address';
-import { addressFormValuesToRecordFields } from '../utils/addressForm';
-import { randomId } from '../utils/randomId';
-import { AddAddressCard } from './AddAddressCard';
-import { AddressListCard } from './AddressListCard';
+import { useAddressesPage } from '../hooks/use-addresses-page';
+import { AddressesBoard } from './addresses-board';
 
 interface AddressesInnerProps {
   handle: VaultHandle;
 }
 
-function describeAddressDeletion(address: AddressRecord | null): string {
-  if (!address) return '';
-  const count = address.usageLocations.length;
-  if (count === 0) {
-    return 'This action cannot be undone. The address will be permanently removed.';
-  } else if (count === 1) {
-    return 'This action cannot be undone. The address and its 1 usage location will be permanently removed.';
-  } else {
-    return `This action cannot be undone. The address and its ${count} usage locations will be permanently removed.`;
+function AddressesInner({ handle }: AddressesInnerProps) {
+  const page = useAddressesPage(handle);
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop list on the first frame.
+  const isPhone = useIsMobileState();
+
+  if (isPhone === undefined) {
+    return null;
   }
-}
 
-function AddressesInner(props: AddressesInnerProps) {
-  const { toast } = useToast();
-
-  const [items, setItems] = useState<AddressRecord[]>([]);
-  const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
-  const [deletingAddress, setDeletingAddress] = useState<AddressRecord | null>(
-    null,
-  );
-
-  // Convergence replaces the Local Vault without passing through this
-  // component, so the revision is the only thing that says the Ciphertext
-  // behind `items` moved. Every mutation below saves the whole list, so a
-  // stale `items` is not merely out of date on screen — it is what gets
-  // written back over the record that arrived (#587).
-  const revision = useLocalVaultRevision();
-
-  useEffect(() => {
-    // Cancellation matters now that this effect re-fires on every convergence:
-    // without it, an earlier read resolving late can put stale records back
-    // over the ones a later read just applied.
-    let isActive = true;
-
-    props.handle
-      .loadDecryptedData<unknown>({
-        type: 'addresses',
-        defaultValue: [],
-      })
-      .then(async (raw) => {
-        const normalized = normalizeAddresses(raw);
-        if (isActive) setItems(normalized.value);
-        if (normalized.changed) {
-          await saveVaultRecords(props.handle, 'addresses', normalized.value);
-        }
-      })
-      .catch(() => {
-        if (!isActive) return;
-        toast({
-          title: 'Failed to load addresses',
-          description: 'Could not decrypt saved data.',
-          variant: 'destructive',
-        });
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [props.handle, toast, revision]);
-
-  const persist = useCallback(
-    async (next: AddressRecord[], deletedId?: string) => {
-      setItems(next);
-      try {
-        await saveVaultRecords(
-          props.handle,
-          'addresses',
-          next,
-          deletedId === undefined ? undefined : { deletedId },
-        );
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        toast({
-          title: 'Failed to save',
-          description: message,
-          variant: 'destructive',
-        });
-        throw e;
-      }
-    },
-    [props.handle, toast],
-  );
-
-  const handleAddAddress = useCallback(
-    async (values: AddAddressFormValues): Promise<AddressRecord> => {
-      const nextItem: AddressRecord = {
-        id: randomId(),
-        ...addressFormValuesToRecordFields(values),
-        status: AddressStatusEnum.Current,
-        usageLocations: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      await persist([nextItem, ...items]);
-      toast({
-        title: 'Saved',
-        description: 'Address saved (encrypted).',
-      });
-
-      return nextItem;
-    },
-    [items, persist, toast],
-  );
-
-  const handleRequestDelete = useCallback((item: AddressRecord) => {
-    setDeletingAddress(item);
-  }, []);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deletingAddress) return;
-    try {
-      await persist(
-        items.filter((x) => x.id !== deletingAddress.id),
-        deletingAddress.id,
-      );
-      toast({ title: 'Deleted', description: 'Address removed.' });
-      setDeletingAddress(null);
-    } catch {
-      // persist() already toasted the failure; leave the dialog open for retry
-    }
-  }, [deletingAddress, items, persist, toast]);
-
-  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setDeletingAddress(null);
-    }
-  }, []);
-
-  return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <AddAddressCard
-        open={isAddAddressOpen}
-        items={items}
-        onOpenChange={setIsAddAddressOpen}
-        onAdd={handleAddAddress}
-      />
-
-      <AddressListCard
-        items={items}
-        onAddAddress={() => setIsAddAddressOpen(true)}
-        onRequestDelete={handleRequestDelete}
-      />
-
-      <ConfirmDeleteDialog
-        open={deletingAddress !== null}
-        onOpenChange={handleDeleteDialogOpenChange}
-        title={deletingAddress ? `Delete "${deletingAddress.label}"?` : ''}
-        description={describeAddressDeletion(deletingAddress)}
-        onConfirm={handleConfirmDelete}
-      />
-    </div>
-  );
+  return <AddressesBoard page={page} variant={isPhone ? 'phone' : 'desktop'} />;
 }
 
 export function AddressesPageClient() {
   return (
     <VaultGate title="Addresses">
-      {({ handle }) => <AddressesInner handle={handle!} />}
+      {({ handle }) => (handle ? <AddressesInner handle={handle} /> : null)}
     </VaultGate>
   );
 }

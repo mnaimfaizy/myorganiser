@@ -294,7 +294,13 @@ test.describe('Vault (E2E)', () => {
     // successor and pushes the same /dashboard/addresses/{id} route
     // (AddAddressCard.handleSetUpUsageLocations). Issue #506.
     await page1.getByRole('button', { name: 'Set up usage locations' }).click();
-    await expect(page1.getByText('Full Address')).toBeVisible({
+    await expect(
+      page1.getByRole('heading', {
+        level: 2,
+        name: 'Places to update',
+        exact: true,
+      }),
+    ).toBeVisible({
       timeout: 60000,
     });
     await expect(page1.getByText('Address not found.')).toHaveCount(0);
@@ -353,7 +359,8 @@ test.describe('Vault (E2E)', () => {
 
     await gotoStable(page2, '/dashboard/addresses');
     await unlockWithPassphrase(page2, passphrase);
-    await expect(page2.locator('text=221B Baker Street, London')).toBeVisible({
+    // The list card splits the address over two lines, so match its first line.
+    await expect(page2.getByText('221B Baker Street').first()).toBeVisible({
       timeout: 60000,
     });
 

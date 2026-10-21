@@ -37,36 +37,3 @@ export function getGoogleMapsUrl(item: AddressRecord): string {
     address,
   )}`;
 }
-
-/**
- * Format address for display in forms (multi-line)
- */
-export function formatAddressMultiline(item: AddressRecord): string[] {
-  if (isStructuredAddress(item)) {
-    const lines: string[] = [];
-
-    // Line 1: Property number + Street
-    const line1 = [item.propertyNumber, item.street].filter(Boolean).join(' ');
-    if (line1) lines.push(line1);
-
-    // Line 2: Suburb + State (with comma if both present)
-    const suburbState = [];
-    if (item.suburb) suburbState.push(item.suburb);
-    if (item.state) suburbState.push(item.state);
-    if (suburbState.length > 0) {
-      lines.push(suburbState.join(', '));
-    }
-
-    // Line 3: Zip Code + Country (with comma if both present)
-    const zipCountry = [];
-    if (item.zipCode) zipCountry.push(item.zipCode);
-    if (item.country) zipCountry.push(item.country);
-    if (zipCountry.length > 0) {
-      lines.push(zipCountry.join(', '));
-    }
-
-    return lines;
-  }
-
-  return item.address ? [item.address] : ['No address provided'];
-}

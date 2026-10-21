@@ -18,12 +18,18 @@ export interface AddAddressFormFieldsProps {
   control: Control<AddAddressFormValues>;
 }
 
+/**
+ * The address fields in the artboard's grid: Label and Country, then Number and
+ * Street, then Suburb or city, State and Postcode. Each row stacks to one column
+ * below the sm breakpoint, where the three-up and the number row would be cramped.
+ * The input ids are e2e selectors and do not change.
+ */
 export function AddAddressFormFields(props: AddAddressFormFieldsProps) {
   const { control } = props;
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <FormField
           control={control}
           name="label"
@@ -59,13 +65,13 @@ export function AddAddressFormFields(props: AddAddressFormFieldsProps) {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
         <FormField
           control={control}
           name="propertyNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="addr-property">Property number</FormLabel>
+              <FormLabel htmlFor="addr-property">Number</FormLabel>
               <FormControl>
                 <Input id="addr-property" placeholder="221B" {...field} />
               </FormControl>
@@ -89,7 +95,7 @@ export function AddAddressFormFields(props: AddAddressFormFieldsProps) {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <FormField
           control={control}
           name="suburb"
@@ -109,7 +115,7 @@ export function AddAddressFormFields(props: AddAddressFormFieldsProps) {
           name="state"
           render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="addr-state">State or province</FormLabel>
+              <FormLabel htmlFor="addr-state">State</FormLabel>
               <FormControl>
                 <Input
                   id="addr-state"
@@ -121,21 +127,21 @@ export function AddAddressFormFields(props: AddAddressFormFieldsProps) {
             </FormItem>
           )}
         />
-      </div>
 
-      <FormField
-        control={control}
-        name="zipCode"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel htmlFor="addr-zipcode">Zip or postal code</FormLabel>
-            <FormControl>
-              <Input id="addr-zipcode" placeholder="NW1 6XE" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+        <FormField
+          control={control}
+          name="zipCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor="addr-zipcode">Postcode</FormLabel>
+              <FormControl>
+                <Input id="addr-zipcode" placeholder="NW1 6XE" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
     </>
   );
 }
