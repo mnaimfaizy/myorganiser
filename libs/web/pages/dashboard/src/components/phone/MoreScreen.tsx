@@ -1,16 +1,17 @@
 'use client';
 
-import { getCurrentUser, logout } from '@myorganiser/auth';
+import { getCurrentUser, isPlatformAdmin } from '@myorganiser/auth';
 import { User } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { Illustration, type IllustrationKind } from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../../lib/apiClient';
 import { openFeedbackDialog } from '../../hooks/use-feedback-dialog';
+import { useLogOut } from '../../hooks/use-log-out';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
+import { initialsOf } from '../../utils';
 
 interface MoreLink {
   id: string;
@@ -50,17 +51,6 @@ const ORGANISE_LINKS: readonly MoreLink[] = [
 const ROW_CLASS =
   'flex min-h-14 w-full items-center gap-3 border-b border-border-subtle py-1.5 pr-3.5 pl-3 text-left text-body text-foreground no-underline last:border-b-0';
 
-// Placeholder: replaced by the shared initialsOf helper from feat/web-v2-0-ui-ux.
-function initialsOf(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 /**
  * The More tab: the sections that do not fit the tab bar, plus the account
  * actions. The visible large title comes from PhoneAppBar on the phone and
@@ -68,13 +58,10 @@ function initialsOf(name: string): string {
  * hidden h1.
  */
 export function MoreScreen() {
-  const router = useRouter();
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
   const initials = initialsOf(name) || email.charAt(0).toUpperCase();
-  // Placeholder: replaced by the shared platform-admin check from feat/web-v2-0-ui-ux.
-  const isPlatformAdmin = currentUser?.role === 'platform_admin';
   const youtubeVisible = useYouTubeNavVisible();
   const [hasUnreadReports, setHasUnreadReports] = useState(false);
 
@@ -100,10 +87,7 @@ export function MoreScreen() {
     openFeedbackDialog();
   }, []);
 
-  const logOut = useCallback(() => {
-    // Placeholder: replaced by the shared logout hook from feat/web-v2-0-ui-ux.
-    void logout().then(() => router.push('/login'));
-  }, [router]);
+  const logOut = useLogOut();
 
   const organiseLinks = ORGANISE_LINKS.filter(
     (link) => link.id !== 'youtube' || youtubeVisible,
@@ -147,7 +131,7 @@ export function MoreScreen() {
             </span>
           )}
         </Link>
-        {isPlatformAdmin && (
+        {isPlatformAdmin(currentUser) && (
           <Link href="/admin" className={ROW_CLASS}>
             <Illustration kind="admin" size={32} />
             <span className="flex-1">Admin portal</span>

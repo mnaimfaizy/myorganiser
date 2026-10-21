@@ -10,6 +10,7 @@ import {
   describeVaultSyncStatus,
   SyncStatusWidget,
   useOptionalVaultSession,
+  useVaultLockState,
   useVaultSyncStatus,
 } from '@myorganiser/web-vault-ui';
 
@@ -28,6 +29,7 @@ export function PhoneAppBar() {
   const isRoot = screen.type === 'root';
 
   const session = useOptionalVaultSession();
+  const lockState = useVaultLockState();
   const { status } = useVaultSyncStatus();
   const titleRowRef = useRef<HTMLDivElement>(null);
   const [scrolledPast, setScrolledPast] = useState(false);
@@ -48,10 +50,8 @@ export function PhoneAppBar() {
     return () => observer.disconnect();
   }, [isRoot]);
 
-  // Placeholder: replaced by the shared vault-lock helper from feat/web-v2-0-ui-ux.
-  const canLockVault = session !== null && session.masterKeyBytes !== null;
-  // Placeholder: replaced by the shared vault-lock helper from feat/web-v2-0-ui-ux.
-  const locked = session !== null && session.masterKeyBytes === null;
+  const canLockVault = lockState === 'unlocked';
+  const locked = lockState === 'locked';
   const reading = describeVaultSyncStatus(status);
   const synced = !locked && status !== null && reading.label === null;
   // The sync widget stays mounted in both states so its live region keeps

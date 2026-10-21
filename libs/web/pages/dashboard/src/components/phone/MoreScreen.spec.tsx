@@ -1,11 +1,7 @@
 /* eslint-disable import/first */
 jest.mock('@myorganiser/auth', () => ({
+  ...jest.requireActual('@myorganiser/auth'),
   getCurrentUser: jest.fn(),
-  logout: jest.fn(),
-}));
-
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
 }));
 
 jest.mock('../../lib/apiClient', () => ({
@@ -16,22 +12,20 @@ jest.mock('../../hooks/use-feedback-dialog', () => ({
   openFeedbackDialog: jest.fn(),
 }));
 
+jest.mock('../../hooks/use-log-out', () => ({
+  useLogOut: jest.fn(),
+}));
+
 jest.mock('../../hooks/useYouTubeNavVisible', () => ({
   useYouTubeNavVisible: jest.fn(),
 }));
 
 import '@testing-library/jest-dom';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
-import { getCurrentUser, logout } from '@myorganiser/auth';
-import { useRouter } from 'next/navigation';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { getCurrentUser } from '@myorganiser/auth';
 import { createFeedbackApi } from '../../lib/apiClient';
 import { openFeedbackDialog } from '../../hooks/use-feedback-dialog';
+import { useLogOut } from '../../hooks/use-log-out';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
 import { MoreScreen } from './MoreScreen';
 
@@ -50,6 +44,7 @@ function stubUser({
  * microtask, so flush it inside act() before asserting or unmounting.
  */
 const listReports = jest.fn();
+const logOut = jest.fn();
 
 async function settleReports() {
   expect(listReports).toHaveBeenCalledTimes(1);
@@ -57,12 +52,9 @@ async function settleReports() {
 }
 
 describe('MoreScreen', () => {
-  const push = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
-    (useRouter as jest.Mock).mockReturnValue({ push });
-    (logout as jest.Mock).mockResolvedValue(undefined);
+    (useLogOut as jest.Mock).mockReturnValue(logOut);
     (createFeedbackApi as jest.Mock).mockReturnValue({ listReports });
     listReports.mockResolvedValue({ data: { hasChangedSinceLastSeen: false } });
     (useYouTubeNavVisible as jest.Mock).mockReturnValue(true);
@@ -191,18 +183,12 @@ describe('MoreScreen', () => {
     await settleReports();
   });
 
-  it('logs out and then routes to login when Log out is pressed', async () => {
+  it('calls the shared log-out handler once when Log out is pressed', async () => {
     render(<MoreScreen />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
-    await waitFor(() => {
-      expect(push).toHaveBeenCalledWith('/login');
-    });
-    expect(logout).toHaveBeenCalledTimes(1);
-    expect((logout as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
-      (push as jest.Mock).mock.invocationCallOrder[0],
-    );
+    expect(logOut).toHaveBeenCalledTimes(1);
     await settleReports();
   });
 

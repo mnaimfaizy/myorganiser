@@ -25,9 +25,9 @@ import { login, routeApi, setupBackend, type IdentityEntry } from './helpers';
  *
  * Hermetic: the backend is stubbed by setupBackend (no vault on the server).
  * The reads that the shell makes on mount are stubbed here: the feedback
- * reports list (More), YouTube availability and status (the More and Home
- * YouTube checks, and the Account page's own status read). YouTube is reported
- * off, so no further YouTube reads follow.
+ * reports list (More), YouTube availability (the Home and More YouTube checks)
+ * and YouTube status (read by the Account page). With availability off, Home
+ * does not read status, and no further YouTube reads follow.
  */
 
 const EMAIL = 'phone-shell-01@example.com';
@@ -162,6 +162,9 @@ test.describe('Phone shell (E2E)', () => {
     test.setTimeout(120000);
 
     await signInToPhoneDashboard(page);
+    await expect(
+      page.getByText('Quick Actions', { exact: true }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page, 'Home');
 
     const bar = tabBar(page);
