@@ -149,10 +149,15 @@ import request from 'supertest';
 
 jest.setTimeout(30_000);
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const FIXED_NOW_MS = Date.parse('2026-10-21T12:00:00.000Z');
+
 interface OverviewSeed {
   users: number;
+  usersJoinedLast7Days: number;
   platformAdmins: number;
   unverified: number;
+  unverifiedOverAWeek: number;
   disabled: number;
   everGranted: number;
   ceiling: number;
@@ -160,13 +165,25 @@ interface OverviewSeed {
 }
 
 type CountArgs = { where?: Record<string, unknown> };
+type CreatedAtFilter = { gte?: Date; lt?: Date };
 
 /** Routes each user.count call by its where clause, as the service issues them. */
 function userCountFor(seed: OverviewSeed) {
   return async (args?: CountArgs): Promise<number> => {
     const where = args?.where;
     if (where === undefined) return seed.users;
+    const createdAt = where.created_at as CreatedAtFilter | undefined;
     if (where.role === 'platform_admin') return seed.platformAdmins;
+    if (createdAt?.gte instanceof Date && Object.keys(where).length === 1) {
+      return seed.usersJoinedLast7Days;
+    }
+    if (
+      createdAt?.lt instanceof Date &&
+      where.email_verification_timestamp === null &&
+      Object.keys(where).length === 2
+    ) {
+      return seed.unverifiedOverAWeek;
+    }
     if (where.email_verification_timestamp === null) return seed.unverified;
     if (where.disabled === true) return seed.disabled;
     throw new Error(`Unexpected user.count where: ${JSON.stringify(where)}`);
@@ -272,11 +289,13 @@ describe('AdminOverviewController (HTTP integration)', () => {
   });
 
   describe('admin counts', () => {
-    test('GET /admin/overview returns the exact eight-field body mapped from distinct counts', async () => {
+    test('GET /admin/overview returns the exact ten-field body mapped from distinct counts', async () => {
       seedOverview({
         users: 148,
+        usersJoinedLast7Days: 21,
         platformAdmins: 3,
         unverified: 12,
+        unverifiedOverAWeek: 7,
         disabled: 4,
         everGranted: 18,
         ceiling: 25,
@@ -290,8 +309,10 @@ describe('AdminOverviewController (HTTP integration)', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         users: 148,
+        usersJoinedLast7Days: 21,
         platformAdmins: 3,
         unverified: 12,
+        unverifiedOverAWeek: 7,
         disabled: 4,
         youtubeAccessPlacesUsed: 18,
         youtubeAccessPlacesLeft: 7,
@@ -300,47 +321,66 @@ describe('AdminOverviewController (HTTP integration)', () => {
       });
     });
 
-    test('each count is queried with its own filter', async () => {
+    test('each count is queried with its own filter, and both 7-day counts use the boundary now minus 7 days', async () => {
       const prisma = require('../prisma').__mockPrisma;
       const users = require('../services/UserService').default;
       seedOverview({
         users: 1,
+        usersJoinedLast7Days: 1,
         platformAdmins: 1,
         unverified: 1,
+        unverifiedOverAWeek: 1,
         disabled: 1,
         everGranted: 1,
         ceiling: 25,
         feedbackReportsReceived: 1,
       });
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(FIXED_NOW_MS);
+      const boundary = new Date(FIXED_NOW_MS - SEVEN_DAYS_MS);
 
-      const res = await request(app)
-        .get('/admin/overview')
-        .set('Authorization', 'Bearer admin');
+      try {
+        const res = await request(app)
+          .get('/admin/overview')
+          .set('Authorization', 'Bearer admin');
 
-      expect(res.status).toBe(200);
-      expect(prisma.user.count).toHaveBeenCalledTimes(4);
-      expect(prisma.user.count).toHaveBeenCalledWith();
-      expect(prisma.user.count).toHaveBeenCalledWith({
-        where: { role: 'platform_admin' },
-      });
-      expect(prisma.user.count).toHaveBeenCalledWith({
-        where: { email_verification_timestamp: null },
-      });
-      expect(prisma.user.count).toHaveBeenCalledWith({
-        where: { disabled: true },
-      });
-      expect(prisma.feedbackReport.count).toHaveBeenCalledTimes(1);
-      expect(prisma.feedbackReport.count).toHaveBeenCalledWith({
-        where: { status: 'received' },
-      });
-      expect(users.getYouTubeAccessUsage).toHaveBeenCalledTimes(1);
+        expect(res.status).toBe(200);
+        expect(prisma.user.count).toHaveBeenCalledTimes(6);
+        expect(prisma.user.count).toHaveBeenCalledWith();
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: { created_at: { gte: boundary } },
+        });
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: { role: 'platform_admin' },
+        });
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: { email_verification_timestamp: null },
+        });
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: {
+            email_verification_timestamp: null,
+            created_at: { lt: boundary },
+          },
+        });
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: { disabled: true },
+        });
+        expect(prisma.feedbackReport.count).toHaveBeenCalledTimes(1);
+        expect(prisma.feedbackReport.count).toHaveBeenCalledWith({
+          where: { status: 'received' },
+        });
+        expect(users.getYouTubeAccessUsage).toHaveBeenCalledTimes(1);
+      } finally {
+        nowSpy.mockRestore();
+      }
     });
 
     test('zero state reports zero counts and the full ceiling as places left', async () => {
       seedOverview({
         users: 0,
+        usersJoinedLast7Days: 0,
         platformAdmins: 0,
         unverified: 0,
+        unverifiedOverAWeek: 0,
         disabled: 0,
         everGranted: 0,
         ceiling: 25,
@@ -354,8 +394,10 @@ describe('AdminOverviewController (HTTP integration)', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         users: 0,
+        usersJoinedLast7Days: 0,
         platformAdmins: 0,
         unverified: 0,
+        unverifiedOverAWeek: 0,
         disabled: 0,
         youtubeAccessPlacesUsed: 0,
         youtubeAccessPlacesLeft: 25,
@@ -367,8 +409,10 @@ describe('AdminOverviewController (HTTP integration)', () => {
     test('fully used ceiling reports zero places left', async () => {
       seedOverview({
         users: 30,
+        usersJoinedLast7Days: 3,
         platformAdmins: 2,
         unverified: 5,
+        unverifiedOverAWeek: 2,
         disabled: 1,
         everGranted: 25,
         ceiling: 25,
@@ -390,8 +434,10 @@ describe('AdminOverviewController (HTTP integration)', () => {
     test('ever-granted above a lowered ceiling clamps places left to zero', async () => {
       seedOverview({
         users: 30,
+        usersJoinedLast7Days: 3,
         platformAdmins: 2,
         unverified: 5,
+        unverifiedOverAWeek: 2,
         disabled: 1,
         everGranted: 18,
         ceiling: 10,
@@ -414,8 +460,10 @@ describe('AdminOverviewController (HTTP integration)', () => {
       const prisma = require('../prisma').__mockPrisma;
       seedOverview({
         users: 10,
+        usersJoinedLast7Days: 2,
         platformAdmins: 1,
         unverified: 0,
+        unverifiedOverAWeek: 0,
         disabled: 0,
         everGranted: 2,
         ceiling: 25,

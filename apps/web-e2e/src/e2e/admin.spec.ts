@@ -1,25 +1,25 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { gotoStable, routeApi } from './helpers';
+import {
+  corsHeaders,
+  seedSession,
+  stubAuthRefresh,
+  type PersonaUser,
+} from './helpers/adminSession';
+import { stubAdminAuditLogs, stubAdminOverview } from './helpers/adminOverview';
 
 /**
- * Platform Admin console — access control + user directory smoke (issue #204).
+ * Platform Admin console — access control + Overview landing + user directory
+ * smoke (issue #204, Overview #1265).
  *
  * Hermetic stubs:
  * - `/auth/refresh` returns the seeded persona or 401 for guests (OPTIONS + GET/POST).
+ * - `GET /admin/overview` returns fixed counts (OPTIONS + GET).
+ * - `GET /admin/audit-logs` returns fixed entries (OPTIONS + GET).
  * - `GET /admin/users` returns mock AdminUserIdentity rows (OPTIONS + GET).
  *
  * No live third-party services or admin mutation endpoints.
  */
-
-interface PersonaUser {
-  id: string;
-  name: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: 'user' | 'platform_admin';
-  disabled: boolean;
-}
 
 interface AdminUserIdentityRow {
   id: string;
@@ -30,48 +30,6 @@ interface AdminUserIdentityRow {
   role: 'user' | 'platform_admin';
   disabled: boolean;
   emailVerified: boolean;
-}
-
-function corsHeaders(origin: string) {
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
-  } as const;
-}
-
-async function seedSession(page: Page, user: PersonaUser) {
-  await page.addInitScript((seedUser: PersonaUser) => {
-    window.localStorage.setItem('myorganiser_access_token', 'fake-jwt-token');
-    window.localStorage.setItem('myorganiser_token_storage', 'local');
-    window.localStorage.setItem('myorganiser_user', JSON.stringify(seedUser));
-  }, user);
-}
-
-async function stubAuthRefresh(page: Page, user: PersonaUser) {
-  const refreshUrl = /\/auth\/refresh\/?(\?.*)?$/;
-
-  await routeApi(page, refreshUrl, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-
-    if (route.request().method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      headers,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        token: 'fake-jwt-token',
-        expires_in: 3600,
-        user,
-      }),
-    });
-  });
 }
 
 async function stubAuthRefreshUnauthorized(page: Page) {
@@ -242,14 +200,38 @@ test.describe('Platform Admin console', () => {
     await expect(page).not.toHaveURL(/.*\/admin/);
   });
 
-  test('platform admin reaches user directory smoke', async ({ page }) => {
+  test('platform admin lands on Overview and reaches user directory', async ({
+    page,
+  }) => {
     test.setTimeout(60000);
 
     await seedSession(page, PLATFORM_ADMIN);
     await stubAuthRefresh(page, PLATFORM_ADMIN);
+    await stubAdminOverview(page);
+    await stubAdminAuditLogs(page);
     await stubAdminUsersList(page, MOCK_DIRECTORY_USERS);
 
     await gotoStable(page, '/admin');
+
+    // /admin renders the Overview; it no longer redirects to /admin/users.
+    await expect(page).toHaveURL(/\/admin\/?(\?.*)?$/, { timeout: 60000 });
+    await expect(
+      page.getByRole('heading', { name: 'Platform overview', level: 1 }),
+    ).toBeVisible({ timeout: 60000 });
+
+    const sections = page.getByRole('navigation', { name: 'Admin sections' });
+    await expect(
+      sections.getByRole('link', { name: 'Overview', exact: true }),
+    ).toBeVisible();
+    await expect(sections.getByRole('link', { name: /^Users/ })).toBeVisible();
+    await expect(
+      sections.getByRole('link', { name: 'Audit log', exact: true }),
+    ).toBeVisible();
+    await expect(
+      sections.getByRole('link', { name: /^Feedback/ }),
+    ).toBeVisible();
+
+    await sections.getByRole('link', { name: /^Users/ }).click();
 
     await expect(page).toHaveURL(/.*\/admin\/users(?:\/|$|\?)/, {
       timeout: 60000,
@@ -288,10 +270,6 @@ test.describe('Platform Admin console', () => {
     });
 
     await expect(table.getByRole('link', { name: 'View' })).toHaveCount(2);
-
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Users' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Audit Log' })).toBeVisible();
   });
 
   test('directory search keeps the user on the users page', async ({
@@ -301,6 +279,7 @@ test.describe('Platform Admin console', () => {
 
     await seedSession(page, PLATFORM_ADMIN);
     await stubAuthRefresh(page, PLATFORM_ADMIN);
+    await stubAdminOverview(page);
     await stubAdminUsersList(page, MOCK_DIRECTORY_USERS);
 
     await gotoStable(page, '/admin/users');

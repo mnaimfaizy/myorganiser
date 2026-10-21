@@ -754,8 +754,10 @@ const models: TsoaRoute.Models = {
         "dataType": "refObject",
         "properties": {
             "users": {"dataType":"double","required":true},
+            "usersJoinedLast7Days": {"dataType":"double","required":true},
             "platformAdmins": {"dataType":"double","required":true},
             "unverified": {"dataType":"double","required":true},
+            "unverifiedOverAWeek": {"dataType":"double","required":true},
             "disabled": {"dataType":"double","required":true},
             "youtubeAccessPlacesUsed": {"dataType":"double","required":true},
             "youtubeAccessPlacesLeft": {"dataType":"double","required":true},

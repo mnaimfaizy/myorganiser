@@ -1869,6 +1869,11 @@
 						"format": "double",
 						"description": "Total number of Users."
 					},
+					"usersJoinedLast7Days": {
+						"type": "number",
+						"format": "double",
+						"description": "Users whose account was created in the last 7 days (created_at >= now − 7 days).\nUsers created before User.created_at existed carry the migration's timestamp, not their real sign-up time."
+					},
 					"platformAdmins": {
 						"type": "number",
 						"format": "double",
@@ -1878,6 +1883,11 @@
 						"type": "number",
 						"format": "double",
 						"description": "Users who have not verified their email."
+					},
+					"unverifiedOverAWeek": {
+						"type": "number",
+						"format": "double",
+						"description": "Users who have not verified their email and whose account was created more than 7 days ago\n(email_verification_timestamp is null AND created_at < now − 7 days).\nUsers created before User.created_at existed carry the migration's timestamp, not their real sign-up time."
 					},
 					"disabled": {
 						"type": "number",
@@ -1907,8 +1917,10 @@
 				},
 				"required": [
 					"users",
+					"usersJoinedLast7Days",
 					"platformAdmins",
 					"unverified",
+					"unverifiedOverAWeek",
 					"disabled",
 					"youtubeAccessPlacesUsed",
 					"youtubeAccessPlacesLeft",
