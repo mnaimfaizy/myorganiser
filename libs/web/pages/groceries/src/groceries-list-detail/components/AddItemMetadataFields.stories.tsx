@@ -34,7 +34,6 @@ export const Default: Story = {
         links: [],
       },
     });
-    const selectedCategory = form.watch('category');
 
     return (
       <Form {...form}>
@@ -43,7 +42,9 @@ export const Default: Story = {
             control={form.control}
             matchingCatalogItems={[]}
             activeSuggestion={0}
-            selectedCategory={selectedCategory}
+            showListbox={false}
+            typedName=""
+            onKeepTypedName={() => undefined}
             onNameChange={() => undefined}
             onNameKeyDown={() => undefined}
             onSelectCatalogItem={() => undefined}
@@ -74,7 +75,6 @@ export const DifferentCategorySelected: Story = {
         links: [],
       },
     });
-    const selectedCategory = form.watch('category');
 
     return (
       <Form {...form}>
@@ -83,7 +83,9 @@ export const DifferentCategorySelected: Story = {
             control={form.control}
             matchingCatalogItems={[]}
             activeSuggestion={0}
-            selectedCategory={selectedCategory}
+            showListbox={false}
+            typedName=""
+            onKeepTypedName={() => undefined}
             onNameChange={() => undefined}
             onNameKeyDown={() => undefined}
             onSelectCatalogItem={() => undefined}
@@ -114,7 +116,6 @@ export const FirstCategorySelected: Story = {
         links: [],
       },
     });
-    const selectedCategory = form.watch('category');
 
     return (
       <Form {...form}>
@@ -123,7 +124,9 @@ export const FirstCategorySelected: Story = {
             control={form.control}
             matchingCatalogItems={[]}
             activeSuggestion={0}
-            selectedCategory={selectedCategory}
+            showListbox={false}
+            typedName=""
+            onKeepTypedName={() => undefined}
             onNameChange={() => undefined}
             onNameKeyDown={() => undefined}
             onSelectCatalogItem={() => undefined}
@@ -155,7 +158,6 @@ export const LastCategorySelected: Story = {
         links: [],
       },
     });
-    const selectedCategory = form.watch('category');
 
     return (
       <Form {...form}>
@@ -164,7 +166,9 @@ export const LastCategorySelected: Story = {
             control={form.control}
             matchingCatalogItems={[]}
             activeSuggestion={0}
-            selectedCategory={selectedCategory}
+            showListbox={false}
+            typedName=""
+            onKeepTypedName={() => undefined}
             onNameChange={() => undefined}
             onNameKeyDown={() => undefined}
             onSelectCatalogItem={() => undefined}
@@ -195,7 +199,6 @@ export const Disabled: Story = {
         links: [],
       },
     });
-    const selectedCategory = form.watch('category');
 
     return (
       <Form {...form}>
@@ -204,7 +207,9 @@ export const Disabled: Story = {
             control={form.control}
             matchingCatalogItems={[]}
             activeSuggestion={0}
-            selectedCategory={selectedCategory}
+            showListbox={false}
+            typedName=""
+            onKeepTypedName={() => undefined}
             onNameChange={() => undefined}
             onNameKeyDown={() => undefined}
             onSelectCatalogItem={() => undefined}

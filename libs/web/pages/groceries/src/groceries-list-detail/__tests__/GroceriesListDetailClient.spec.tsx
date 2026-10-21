@@ -1,337 +1,294 @@
 /*
-  Tests for GroceriesListDetailClient component.
-  - Covers loading state, not-found state, and happy path (list found)
-  - Tests vault state transitions and list lookup by ID
-  - Mocks useGroceriesVault hook, Next.js router, Next.js Link, GroceryListView, and lucide-react
+  Route-level tests for GroceriesListDetailClient on the desktop layout.
+  - Covers the loading and not-found states, the list heading and count line,
+    and the whole-list actions (rename, delete) with their toast and navigation.
+  - Renders the real page hook, desktop view, dialogs, and web-ui (Radix Dialog).
+  - Mocks: useGroceriesVault (controllable vault fake), next/navigation
+    useRouter, useIsMobileState (forced to desktop), and useToast (a spy, because
+    the toast store is module-global and would leak between tests).
 */
 
 /** Mocking rule: place jest.mock calls before any imports */
-
-const mockGroceryListView = jest.fn(
-  (props: { list: { name: string; id: string } }) => (
-    <div data-testid="grocery-list-view">{props.list.name}</div>
-  ),
-);
+const mockToast = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(() => ({ push: jest.fn() })),
+  useRouter: jest.fn(),
 }));
-
-jest.mock('next/link', () => ({
-  __esModule: true,
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: import('react').ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
-jest.mock('@myorganiser/core', () => ({}));
 
 jest.mock('../../shared/hooks', () => ({
   useGroceriesVault: jest.fn(),
+  useGroceriesErrorToast: jest.requireActual(
+    '../../shared/hooks/useGroceriesErrorToast',
+  ).useGroceriesErrorToast,
 }));
 
-jest.mock('../components', () => ({
-  GroceryListView: (props: { list: { name: string; id: string } }) =>
-    mockGroceryListView(props),
-}));
-
-jest.mock('lucide-react', () => ({
-  ArrowLeft: ({ className }: Record<string, unknown>) => (
-    <svg
-      data-testid="arrow-left-icon"
-      className={className as string}
-      viewBox="0 0 24 24"
-    />
-  ),
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
+  useIsMobileState: jest.fn(),
+  useToast: () => ({ toast: mockToast }),
 }));
 
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
-import type { GroceryList } from '@myorganiser/vault-core';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import type {
+  CatalogItem,
+  GroceryList,
+  ListLine,
+} from '@myorganiser/vault-core';
 import type { VaultHandle } from '@myorganiser/web-vault';
+import { useIsMobileState } from '@myorganiser/web-ui';
+import { useRouter } from 'next/navigation';
 import { useGroceriesVault } from '../../shared/hooks';
 import { GroceriesListDetailClient } from '../GroceriesListDetailClient';
 
+// Every fixture was last edited three hours ago, so the activity line is stable.
+const LAST_EDITED = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+const LIST_ID = 'list-1';
+
+const handle = { isUnlocked: true } as unknown as VaultHandle;
 const mockUseGroceriesVault = useGroceriesVault as jest.Mock;
+const mockUseRouter = useRouter as jest.Mock;
+const mockUseIsMobileState = useIsMobileState as jest.Mock;
 
-describe('GroceriesListDetailClient', () => {
-  /* ============================================
-     Test Helpers
-     ============================================ */
+function makeItem(
+  id: string,
+  name: string,
+  overrides: Partial<CatalogItem> = {},
+): CatalogItem {
+  return {
+    id,
+    name,
+    category: 'produce',
+    createdAt: LAST_EDITED,
+    updatedAt: LAST_EDITED,
+    ...overrides,
+  };
+}
 
-  function makeGroceryList(
-    id: string,
-    name: string,
-    itemCount = 0,
-  ): GroceryList {
-    const now = new Date().toISOString();
-    return {
-      id,
-      name,
-      lines: Array.from({ length: itemCount }, (_, i) => ({
-        id: `line-${i}`,
-        catalogItemId: `catalog-${i}`,
-        checked: false,
-        amount: '1',
-        createdAt: now,
-        updatedAt: now,
-      })),
-      createdAt: now,
-      updatedAt: now,
-    };
-  }
+function makeLine(
+  id: string,
+  catalogItemId: string,
+  overrides: Partial<ListLine> = {},
+): ListLine {
+  return {
+    id,
+    catalogItemId,
+    checked: false,
+    createdAt: LAST_EDITED,
+    updatedAt: LAST_EDITED,
+    ...overrides,
+  };
+}
 
-  const handle = { isUnlocked: true } as unknown as VaultHandle;
+function makeList(lines: ListLine[]): GroceryList {
+  return {
+    id: LIST_ID,
+    name: 'Weekly shop',
+    lines,
+    createdAt: LAST_EDITED,
+    updatedAt: LAST_EDITED,
+  };
+}
 
-  function makeVaultState(overrides: Record<string, unknown> = {}) {
-    return {
-      loading: false,
-      lists: [] as GroceryList[],
-      catalog: [],
-      toggleLineChecked: jest.fn(),
-      uncheckAllLines: jest.fn(),
-      removeCheckedLines: jest.fn(),
-      restoreLines: jest.fn(),
-      deleteListLine: jest.fn(),
-      addCatalogItemAndLine: jest.fn(),
-      addExistingCatalogItemToLists: jest.fn(),
-      deleteCatalogItem: jest.fn(),
-      updateCatalogItem: jest.fn(),
-      updateListLine: jest.fn(),
-      ...overrides,
-    };
-  }
+/** Vault fake: every write resolves unless a test overrides it. */
+function makeVault(overrides: Record<string, unknown> = {}) {
+  return {
+    loading: false,
+    lists: [] as GroceryList[],
+    catalog: [] as CatalogItem[],
+    toggleLineChecked: jest.fn().mockResolvedValue(undefined),
+    uncheckAllLines: jest.fn().mockResolvedValue(undefined),
+    removeCheckedLines: jest.fn().mockResolvedValue([]),
+    restoreLines: jest.fn().mockResolvedValue(undefined),
+    deleteListLine: jest.fn().mockResolvedValue(undefined),
+    addCatalogItemAndLine: jest.fn().mockResolvedValue(undefined),
+    addExistingCatalogItemToLists: jest.fn().mockResolvedValue([LIST_ID]),
+    deleteCatalogItem: jest.fn().mockResolvedValue(undefined),
+    updateCatalogItem: jest.fn().mockResolvedValue(undefined),
+    updateListLine: jest.fn().mockResolvedValue(undefined),
+    renameList: jest.fn().mockResolvedValue(undefined),
+    deleteList: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
 
+function renderDetail(listId = LIST_ID) {
+  return render(<GroceriesListDetailClient listId={listId} handle={handle} />);
+}
+
+/** Clicks inside act so the async handler's state updates flush before asserting. */
+async function press(element: HTMLElement) {
+  await act(async () => {
+    fireEvent.click(element);
+  });
+}
+
+describe('GroceriesListDetailClient (desktop)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockToast.mockReset();
+    mockPush.mockReset();
+    mockUseRouter.mockReturnValue({ push: mockPush });
+    mockUseIsMobileState.mockReturnValue(false);
   });
 
-  /* ============================================
-     Loading State Tests
-     ============================================ */
-
-  describe('Loading State', () => {
-    it('should render loading container with aria-busy and aria-label when vault.loading=true', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: true,
-        lists: [],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      const loadingContainer = screen.getByLabelText('Loading grocery list');
-      expect(loadingContainer).toBeInTheDocument();
-      expect(loadingContainer).toHaveAttribute('aria-busy', 'true');
-    });
-
-    it('should not render GroceryListView during loading state', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: true,
-        lists: [],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.queryByTestId('grocery-list-view')).not.toBeInTheDocument();
-    });
-
-    it('should not render "List not found" message during loading state', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: true,
-        lists: [],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.queryByText('List not found')).not.toBeInTheDocument();
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  /* ============================================
-     Not Found State Tests
-     ============================================ */
+  describe('route states', () => {
+    it('shows a busy loading placeholder while the vault loads', () => {
+      mockUseGroceriesVault.mockReturnValue(makeVault({ loading: true }));
 
-  describe('Not Found State', () => {
-    it('should render "List not found" heading when list not found', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [],
-        persistLists: jest.fn(),
-      });
+      renderDetail();
 
-      render(
-        <GroceriesListDetailClient listId="nonexistent-list" handle={handle} />,
+      expect(screen.getByLabelText('Loading grocery list')).toHaveAttribute(
+        'aria-busy',
+        'true',
       );
-
-      expect(screen.getByText('List not found')).toBeInTheDocument();
-    });
-
-    it('should render explanatory message when list not found', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [],
-        persistLists: jest.fn(),
-      });
-
-      render(
-        <GroceriesListDetailClient listId="nonexistent-list" handle={handle} />,
-      );
-
       expect(
-        screen.getByText("The grocery list you're looking for doesn't exist."),
-      ).toBeInTheDocument();
-    });
-
-    it('should render back link with correct href when list not found', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState());
-
-      render(
-        <GroceriesListDetailClient listId="nonexistent-list" handle={handle} />,
-      );
-
-      const backLink = screen.getByRole('link', {
-        name: /back to groceries/i,
-      });
-      expect(backLink).toBeInTheDocument();
-      expect(backLink).toHaveAttribute('href', '/dashboard/groceries');
-      expect(screen.queryByTestId('grocery-list-view')).not.toBeInTheDocument();
-    });
-
-    it('should not render GroceryListView when list not found', () => {
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [],
-        persistLists: jest.fn(),
-      });
-
-      render(
-        <GroceriesListDetailClient listId="nonexistent-list" handle={handle} />,
-      );
-
-      expect(screen.queryByTestId('grocery-list-view')).not.toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Happy Path Tests
-     ============================================ */
-
-  describe('Happy Path - List Found', () => {
-    it('should render GroceryListView when list is found', () => {
-      const list = makeGroceryList('list-1', 'Vegetables', 3);
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [list],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.getByTestId('grocery-list-view')).toBeInTheDocument();
-    });
-
-    it('should pass correct list to GroceryListView component', () => {
-      const list = makeGroceryList('list-1', 'Vegetables', 3);
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [list],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.getByText('Vegetables')).toBeInTheDocument();
-    });
-
-    it('should not render "List not found" message when list is found', () => {
-      const list = makeGroceryList('list-1', 'Vegetables', 3);
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [list],
-        persistLists: jest.fn(),
-      });
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.queryByText('List not found')).not.toBeInTheDocument();
-    });
-
-    it('does not render its own back link when the list is found', () => {
-      const list = makeGroceryList('list-1', 'Vegetables', 3);
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ lists: [list] }));
-
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
-
-      expect(screen.getByTestId('grocery-list-view')).toBeInTheDocument();
-      expect(
-        screen.queryByRole('link', { name: /back to groceries/i }),
+        screen.queryByRole('heading', { level: 1 }),
       ).not.toBeInTheDocument();
     });
 
-    it('passes vault catalog, all lists, and lifecycle handlers to GroceryListView', () => {
-      const list = makeGroceryList('list-1', 'Vegetables', 3);
+    it('shows List not found with a link back to Groceries for an unknown list id', () => {
+      mockUseGroceriesVault.mockReturnValue(
+        makeVault({ lists: [makeList([])] }),
+      );
+
+      renderDetail('missing-list');
+
+      expect(
+        screen.getByRole('heading', { name: 'List not found' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: 'Back to Groceries' }),
+      ).toHaveAttribute('href', '/dashboard/groceries');
+    });
+
+    it('names the page after the list and states its item count and last activity', () => {
       const catalog = [
-        {
-          id: 'catalog-0',
-          name: 'Tomatoes',
-          category: 'produce' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
+        makeItem('cat-1', 'Apples'),
+        makeItem('cat-2', 'Milk', { category: 'dairy' }),
+        makeItem('cat-3', 'Bread', { category: 'bakery' }),
       ];
-      const vault = makeVaultState({ lists: [list], catalog });
+      const lines = [
+        makeLine('line-1', 'cat-1'),
+        makeLine('line-2', 'cat-2'),
+        makeLine('line-3', 'cat-3'),
+      ];
+      mockUseGroceriesVault.mockReturnValue(
+        makeVault({ catalog, lists: [makeList(lines)] }),
+      );
+
+      renderDetail();
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Weekly shop' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('3 items · updated 3 hours ago'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('list actions', () => {
+    it('renames the list through the rename dialog', async () => {
+      const vault = makeVault({ lists: [makeList([])] });
       mockUseGroceriesVault.mockReturnValue(vault);
+      renderDetail();
 
-      render(<GroceriesListDetailClient listId="list-1" handle={handle} />);
+      await press(screen.getByRole('button', { name: 'Rename list' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByRole('textbox'), {
+        target: { value: 'Monthly shop' },
+      });
+      await press(within(dialog).getByRole('button', { name: 'Rename List' }));
 
-      expect(mockGroceryListView).toHaveBeenCalledWith(
-        expect.objectContaining({
-          list,
-          catalog,
-          allLists: [list],
-          onClose: expect.any(Function),
-          onToggleChecked: expect.any(Function),
-          onUncheckAll: expect.any(Function),
-          onRemoveChecked: expect.any(Function),
-          onRestoreLines: expect.any(Function),
-          onDeleteLine: expect.any(Function),
-          onAddItem: expect.any(Function),
-          onAddExistingItem: expect.any(Function),
-          onDeleteFromCatalog: expect.any(Function),
-          onUpdateCatalogItem: expect.any(Function),
-          onUpdateListLine: expect.any(Function),
-        }),
+      await waitFor(() =>
+        expect(vault.renameList).toHaveBeenCalledWith(LIST_ID, 'Monthly shop'),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
       );
     });
 
-    it('should find correct list by ID when multiple lists exist', () => {
-      const list1 = makeGroceryList('list-1', 'Vegetables', 2);
-      const list2 = makeGroceryList('list-2', 'Fruits', 3);
-      const list3 = makeGroceryList('list-3', 'Dairy', 1);
-      mockUseGroceriesVault.mockReturnValue({
-        loading: false,
-        lists: [list1, list2, list3],
-        persistLists: jest.fn(),
+    it('keeps the rename dialog open with an inline error when the rename is rejected', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockUseGroceriesVault.mockReturnValue(
+        makeVault({
+          lists: [makeList([])],
+          renameList: jest.fn().mockRejectedValue(new Error('write failed')),
+        }),
+      );
+      renderDetail();
+
+      await press(screen.getByRole('button', { name: 'Rename list' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByRole('textbox'), {
+        target: { value: 'Monthly shop' },
       });
+      await press(within(dialog).getByRole('button', { name: 'Rename List' }));
 
-      render(<GroceriesListDetailClient listId="list-2" handle={handle} />);
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('dialog')).getByText('Failed to rename list'),
+        ).toBeInTheDocument(),
+      );
+      expect(mockToast).not.toHaveBeenCalled();
+    });
 
-      expect(screen.getByText('Fruits')).toBeInTheDocument();
-      expect(screen.queryByText('Vegetables')).not.toBeInTheDocument();
-      expect(screen.queryByText('Dairy')).not.toBeInTheDocument();
+    it('deletes the list and navigates back to Groceries', async () => {
+      const vault = makeVault({ lists: [makeList([])] });
+      mockUseGroceriesVault.mockReturnValue(vault);
+      renderDetail();
+
+      await press(screen.getByRole('button', { name: 'Delete Grocery List…' }));
+      const dialog = await screen.findByRole('dialog');
+      await press(within(dialog).getByRole('button', { name: 'Delete List' }));
+
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith('/dashboard/groceries'),
+      );
+      expect(vault.deleteList).toHaveBeenCalledWith(LIST_ID);
+    });
+
+    it('shows the error toast and stays on the list when deleting it is rejected', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockUseGroceriesVault.mockReturnValue(
+        makeVault({
+          lists: [makeList([])],
+          deleteList: jest.fn().mockRejectedValue(new Error('write failed')),
+        }),
+      );
+      renderDetail();
+
+      await press(screen.getByRole('button', { name: 'Delete Grocery List…' }));
+      const dialog = await screen.findByRole('dialog');
+      await press(within(dialog).getByRole('button', { name: 'Delete List' }));
+
+      await waitFor(() =>
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Error',
+          description: 'Failed to save your changes. Please try again.',
+          variant: 'destructive',
+        }),
+      );
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          hidden: true,
+          name: 'Weekly shop',
+        }),
+      ).toBeInTheDocument();
     });
   });
 });

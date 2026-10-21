@@ -2,58 +2,59 @@
 
 import {
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
   Input,
+  Textarea,
 } from '@myorganiser/web-ui';
 import type { Control } from 'react-hook-form';
-import { useCallback } from 'react';
-import type { SyntheticEvent } from 'react';
 import type { AddItemFormValues } from '../schemas';
-import { LinksInput } from './LinksInput';
+import { AddItemImageAndLinksFields } from './AddItemImageAndLinksFields';
 
 interface AddItemDetailsFieldsProps {
   control: Control<AddItemFormValues>;
   imageUrl: string;
   isLoading: boolean;
+  /** List mode: Amount is shown and Price each updates the Catalog Item. */
   showAmount?: boolean;
+  /** Image or link validation failed, so the disclosure must open to show it. */
+  hasMoreErrors?: boolean;
 }
 
+/** Amount, price, notes, and the image and links behind a disclosure. */
 export function AddItemDetailsFields({
   control,
   imageUrl,
   isLoading,
   showAmount = true,
+  hasMoreErrors = false,
 }: AddItemDetailsFieldsProps) {
-  const handleImageError = useCallback(
-    (event: SyntheticEvent<HTMLImageElement>) => {
-      event.currentTarget.style.display = 'none';
-    },
-    [],
-  );
-
   return (
     <>
-      <div className={showAmount ? 'grid grid-cols-2 gap-4' : undefined}>
+      <div className="grid gap-3 sm:grid-cols-2">
         {showAmount ? (
           <FormField
             control={control}
             name="amount"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Quantity / Amount
+              <FormItem className="gap-1.5">
+                <FormLabel className="text-body font-semibold text-foreground">
+                  Amount
                 </FormLabel>
                 <FormControl>
                   <Input
                     {...field}
                     placeholder="e.g. 2, 500g"
                     disabled={isLoading}
-                    className="text-base md:text-sm"
+                    className="h-11 text-body"
                   />
                 </FormControl>
+                <FormDescription className="text-caption text-muted-foreground">
+                  Like 2, 500g or 1 dozen
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -63,12 +64,15 @@ export function AddItemDetailsFields({
           control={control}
           name="price"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Estimated Price
+            <FormItem className="gap-1.5">
+              <FormLabel className="text-body font-semibold text-foreground">
+                Price each
               </FormLabel>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-2.5 text-sm font-bold text-muted-foreground">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-body text-muted-foreground"
+                >
                   $
                 </span>
                 <FormControl>
@@ -79,10 +83,15 @@ export function AddItemDetailsFields({
                     step="0.01"
                     min="0"
                     disabled={isLoading}
-                    className="pl-6 text-base md:text-sm"
+                    className="h-11 pl-7 text-body"
                   />
                 </FormControl>
               </div>
+              {showAmount ? (
+                <FormDescription className="text-caption text-muted-foreground">
+                  Updates the Catalog Item
+                </FormDescription>
+              ) : null}
               <FormMessage />
             </FormItem>
           )}
@@ -93,18 +102,18 @@ export function AddItemDetailsFields({
         control={control}
         name="notes"
         render={({ field }) => (
-          <FormItem>
-            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <FormItem className="gap-1.5">
+            <FormLabel className="text-body font-semibold text-foreground">
               Notes
             </FormLabel>
             <FormControl>
-              <textarea
+              <Textarea
                 {...field}
-                placeholder="Add specific brands, sizes or dietary requirements..."
+                placeholder="Brand, size or dietary needs"
                 disabled={isLoading}
-                rows={3}
+                rows={2}
                 maxLength={1000}
-                className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand md:text-sm"
+                className="text-body"
               />
             </FormControl>
             <FormMessage />
@@ -112,50 +121,12 @@ export function AddItemDetailsFields({
         )}
       />
 
-      <FormField
+      <AddItemImageAndLinksFields
         control={control}
-        name="imageUrl"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Image URL{' '}
-              <span className="text-xs font-normal normal-case text-muted-foreground">
-                (optional)
-              </span>
-            </FormLabel>
-            <FormControl>
-              <Input
-                {...field}
-                placeholder="https://example.com/image.jpg"
-                type="url"
-                disabled={isLoading}
-                className="text-base md:text-sm"
-              />
-            </FormControl>
-            <FormMessage />
-            {imageUrl.startsWith('http') && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-border">
-                <img
-                  src={imageUrl}
-                  alt="Item preview"
-                  className="max-h-48 max-w-xs rounded"
-                  onError={handleImageError}
-                />
-              </div>
-            )}
-          </FormItem>
-        )}
+        imageUrl={imageUrl}
+        isLoading={isLoading}
+        hasErrors={hasMoreErrors}
       />
-
-      <FormItem>
-        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Links{' '}
-          <span className="text-xs font-normal normal-case text-muted-foreground">
-            (optional, max 10)
-          </span>
-        </FormLabel>
-        <LinksInput control={control} disabled={isLoading} />
-      </FormItem>
     </>
   );
 }

@@ -89,7 +89,7 @@ async function gotoGroceriesAndUnlock(
   const unlockButton = page.getByRole('button', { name: 'Use passphrase' });
   await expect(
     unlockButton
-      .or(page.getByRole('heading', { name: 'Active trips' }))
+      .or(page.getByRole('heading', { level: 1, name: 'Groceries' }))
       .first(),
   ).toBeVisible({ timeout: 30000 });
 
@@ -103,17 +103,14 @@ async function gotoGroceriesAndUnlock(
   }
 
   // Wait for the Trip Board index to render after unlock
-  await expect(page.getByRole('heading', { name: 'Active trips' })).toBeVisible(
-    { timeout: 30000 },
-  );
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Groceries' }),
+  ).toBeVisible({ timeout: 30000 });
 
   // The heading renders before the decrypted trips do; the board's primary
   // action is what depends on that list having resolved.
   await expect(
-    page
-      .getByRole('button', { name: 'New trip' })
-      .or(page.getByRole('button', { name: 'Create Your First List' }))
-      .first(),
+    page.getByRole('button', { name: 'New list', exact: true }).first(),
   ).toBeVisible({ timeout: 30000 });
 }
 
@@ -355,16 +352,11 @@ async function setupRoutes(page: import('@playwright/test').Page) {
  * Helper to open Create dialog and create a list by UI interactions.
  * Waits for the dialog to close and the list to appear, indicating success.
  */
-async function clickNewTrip(page: import('@playwright/test').Page) {
-  const newTrip = page.getByRole('button', { name: 'New trip' });
-  const createFirst = page.getByRole('button', {
-    name: 'Create Your First List',
-  });
-  if (await newTrip.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await newTrip.click();
-  } else {
-    await createFirst.click();
-  }
+async function clickNewList(page: import('@playwright/test').Page) {
+  await page
+    .getByRole('button', { name: 'New list', exact: true })
+    .first()
+    .click();
 }
 
 function tripCard(page: import('@playwright/test').Page, tripName: string) {
@@ -377,7 +369,7 @@ async function createListViaUI(
   page: import('@playwright/test').Page,
   name: string,
 ) {
-  await clickNewTrip(page);
+  await clickNewList(page);
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -403,9 +395,7 @@ async function openTripActionsMenu(
   tripName: string,
 ) {
   const card = tripCard(page, tripName).first();
-  await card
-    .getByRole('button', { name: `Trip actions for ${tripName}` })
-    .click();
+  await card.getByRole('button', { name: `Actions for ${tripName}` }).click();
 }
 
 test.describe('Groceries (E2E)', () => {
@@ -436,10 +426,10 @@ test.describe('Groceries (E2E)', () => {
       await gotoGroceriesAndUnlock(page, passphrase);
 
       await expect(
-        page.getByRole('heading', { name: 'Active trips' }),
+        page.getByRole('heading', { level: 1, name: 'Groceries' }),
       ).toBeVisible({ timeout: 30000 });
 
-      await clickNewTrip(page);
+      await clickNewList(page);
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByPlaceholder('e.g., Weekly Shopping').fill('Weekly Shop');
 
@@ -484,7 +474,7 @@ test.describe('Groceries (E2E)', () => {
       await createListViaUI(page, 'Weekly Shop');
 
       await openTripActionsMenu(page, 'Weekly Shop');
-      await page.getByRole('menuitem', { name: 'Rename trip' }).click();
+      await page.getByRole('menuitem', { name: 'Rename list' }).click();
 
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
@@ -524,7 +514,9 @@ test.describe('Groceries (E2E)', () => {
       await createListViaUI(page, 'Beta');
 
       await openTripActionsMenu(page, 'Alpha');
-      await page.getByRole('menuitem', { name: 'Delete trip' }).click();
+      await page
+        .getByRole('menuitem', { name: 'Delete Grocery List…' })
+        .click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await expect(page.getByText(/Delete\s+"?Alpha"?/)).toBeVisible();
 
@@ -536,7 +528,9 @@ test.describe('Groceries (E2E)', () => {
       await expect(tripCard(page, 'Alpha')).toBeVisible();
 
       await openTripActionsMenu(page, 'Alpha');
-      await page.getByRole('menuitem', { name: 'Delete trip' }).click();
+      await page
+        .getByRole('menuitem', { name: 'Delete Grocery List…' })
+        .click();
       await page.getByRole('button', { name: 'Delete List' }).click();
 
       await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -573,13 +567,15 @@ test.describe('Groceries (E2E)', () => {
       await expect(tripCard(page, 'Gamma')).toBeVisible();
 
       await openTripActionsMenu(page, 'Beta');
-      await page.getByRole('menuitem', { name: 'Rename trip' }).click();
+      await page.getByRole('menuitem', { name: 'Rename list' }).click();
       await page.getByPlaceholder('e.g., Weekly Shopping').fill('Beta Renamed');
       await page.getByRole('button', { name: 'Rename List' }).click();
       await expect(tripCard(page, 'Beta Renamed')).toBeVisible();
 
       await openTripActionsMenu(page, 'Alpha');
-      await page.getByRole('menuitem', { name: 'Delete trip' }).click();
+      await page
+        .getByRole('menuitem', { name: 'Delete Grocery List…' })
+        .click();
       await page.getByRole('button', { name: 'Delete List' }).click();
 
       await expect(tripCard(page, 'Alpha')).toHaveCount(0);
@@ -612,13 +608,13 @@ test.describe('Groceries (E2E)', () => {
       await waitForOwnedVault(page, E2E_USER_ID);
       await gotoGroceriesAndUnlock(page, passphrase);
 
-      await clickNewTrip(page);
+      await clickNewList(page);
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toHaveCount(0);
 
       await expect(
-        page.getByRole('button', { name: 'New trip' }),
+        page.getByRole('button', { name: 'New list', exact: true }).first(),
       ).toBeVisible();
     });
   });
