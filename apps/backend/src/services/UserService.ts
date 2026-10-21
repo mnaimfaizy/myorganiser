@@ -84,13 +84,64 @@ export interface AdminUserListResult {
   total: number;
 }
 
+/** Options for one page of the Platform Admin Audit Log. */
+export interface AdminAuditLogListOptions {
+  /** Entries where the User is the actor OR the target. */
+  userId?: string;
+  /** Entries whose action is in this list. Empty or absent means every action. */
+  action?: AdminAuditAction[];
+  /** 1-based page. */
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminAuditLogListResult {
+  rows: AdminAuditLogRow[];
+  /** Count matching userId + action, ignoring paging. */
+  total: number;
+}
+
 export type AdminAuditLogRow = {
   id: string;
   actor_user_id: string | null;
   target_user_id: string | null;
+  /** Display name of the actor, or null once User Deletion removed them. */
+  actor_name: string | null;
+  /** Display name of the target, or null once User Deletion removed them. */
+  target_name: string | null;
   action: AdminAuditAction;
   created_at: Date;
 };
+
+/** Relation select for an Admin Audit Log actor or target. */
+const AUDIT_USER_NAME_SELECT = {
+  name: true,
+  first_name: true,
+  last_name: true,
+  email: true,
+} as const;
+
+type AuditUserName = Prisma.UserGetPayload<{
+  select: typeof AUDIT_USER_NAME_SELECT;
+}>;
+
+/**
+ * Display name for an audit entry's User: `name` if it has non-whitespace
+ * content, else `first last` with each part trimmed, else `email`. Close to
+ * the web `formatUserDisplayName`, which trims only the joined string. Null
+ * when the User has been deleted.
+ */
+function auditUserDisplayName(user: AuditUserName | null): string | null {
+  if (!user) {
+    return null;
+  }
+  const name = user.name ?? '';
+  if (name.trim()) {
+    return name;
+  }
+  const combined = `${user.first_name.trim()} ${user.last_name.trim()}`.trim();
+  return combined || user.email;
+}
 
 /** Outcome of User Deletion once the request has been authenticated. */
 export type UserDeletionOutcome =
@@ -518,21 +569,59 @@ class UserService {
   }
 
   /**
-   * List recent Admin Audit Log entries (newest first).
+   * One page of Admin Audit Log entries, newest first (`created_at desc`, then
+   * `id desc` so paging is stable). `total` counts every match of userId +
+   * action, ignoring paging. Actor and target names come from one query.
    */
-  async listAdminAuditLogs(limit = 50): Promise<AdminAuditLogRow[]> {
-    const take = Math.min(Math.max(limit, 1), 200);
-    return this.prisma.adminAuditLog.findMany({
-      take,
-      orderBy: { created_at: 'desc' },
-      select: {
-        id: true,
-        actor_user_id: true,
-        target_user_id: true,
-        action: true,
-        created_at: true,
-      },
-    });
+  async listAdminAuditLogs(
+    options: AdminAuditLogListOptions,
+  ): Promise<AdminAuditLogListResult> {
+    const userWhere: Prisma.AdminAuditLogWhereInput = options.userId
+      ? {
+          OR: [
+            { actor_user_id: options.userId },
+            { target_user_id: options.userId },
+          ],
+        }
+      : {};
+    const actionWhere: Prisma.AdminAuditLogWhereInput =
+      options.action && options.action.length > 0
+        ? { action: { in: options.action } }
+        : {};
+    const where: Prisma.AdminAuditLogWhereInput = {
+      ...userWhere,
+      ...actionWhere,
+    };
+
+    const [entries, total] = await this.prisma.$transaction([
+      this.prisma.adminAuditLog.findMany({
+        where,
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (options.page - 1) * options.pageSize,
+        take: options.pageSize,
+        select: {
+          id: true,
+          actor_user_id: true,
+          target_user_id: true,
+          action: true,
+          created_at: true,
+          actor: { select: AUDIT_USER_NAME_SELECT },
+          target: { select: AUDIT_USER_NAME_SELECT },
+        },
+      }),
+      this.prisma.adminAuditLog.count({ where }),
+    ]);
+
+    const rows: AdminAuditLogRow[] = entries.map((entry) => ({
+      id: entry.id,
+      actor_user_id: entry.actor_user_id,
+      target_user_id: entry.target_user_id,
+      actor_name: auditUserDisplayName(entry.actor),
+      target_name: auditUserDisplayName(entry.target),
+      action: entry.action,
+      created_at: entry.created_at,
+    }));
+    return { rows, total };
   }
 
   async create(user: UserCreationBody): Promise<User> {

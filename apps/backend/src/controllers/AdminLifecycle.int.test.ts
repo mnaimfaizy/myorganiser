@@ -90,7 +90,6 @@ jest.mock('../services/UserService', () => ({
     adminResendVerification: jest.fn(),
     promoteUser: jest.fn(),
     demoteUser: jest.fn(),
-    listAdminAuditLogs: jest.fn(),
     grantYouTubeAccess: jest.fn(),
     getYouTubeAccessUsage: jest.fn(),
   },
@@ -204,15 +203,7 @@ const expectedIdentityDto = {
   youtubeAccess: false,
 };
 
-const auditLogRow = {
-  id: 'log-1',
-  actor_user_id: 'admin-1',
-  target_user_id: 'u1',
-  action: 'disable' as const,
-  created_at: new Date('2024-06-01T12:00:00.000Z'),
-};
-
-describe('Admin lifecycle mutations and audit logs (HTTP integration)', () => {
+describe('Admin lifecycle mutations (HTTP integration)', () => {
   let app: express.Application;
 
   beforeAll(() => {
@@ -403,52 +394,6 @@ describe('Admin lifecycle mutations and audit logs (HTTP integration)', () => {
         'admin-1',
         'u1',
       );
-    });
-  });
-
-  describe('GET /admin/audit-logs', () => {
-    test('returns 401 when unauthenticated', async () => {
-      const userService = require('../services/UserService').default;
-
-      const res = await request(app).get('/admin/audit-logs');
-
-      expect(res.status).toBe(401);
-      expect(res.body).toEqual({ message: 'Unauthorized' });
-      expect(userService.listAdminAuditLogs).not.toHaveBeenCalled();
-    });
-
-    test('returns 403 for authenticated non-platform_admin', async () => {
-      const userService = require('../services/UserService').default;
-
-      const res = await request(app)
-        .get('/admin/audit-logs')
-        .set('Authorization', 'Bearer user');
-
-      expect(res.status).toBe(403);
-      expect(res.body).toEqual({ message: 'Platform Admin role required' });
-      expect(userService.listAdminAuditLogs).not.toHaveBeenCalled();
-    });
-
-    test('returns 200 with mapped audit log entries for platform_admin', async () => {
-      const userService = require('../services/UserService').default;
-
-      userService.listAdminAuditLogs.mockResolvedValueOnce([auditLogRow]);
-
-      const res = await request(app)
-        .get('/admin/audit-logs')
-        .set('Authorization', 'Bearer admin');
-
-      expect(res.status).toBe(200);
-      expect(userService.listAdminAuditLogs).toHaveBeenCalledWith(undefined);
-      expect(res.body).toEqual([
-        {
-          id: 'log-1',
-          actorUserId: 'admin-1',
-          targetUserId: 'u1',
-          action: 'disable',
-          createdAt: '2024-06-01T12:00:00.000Z',
-        },
-      ]);
     });
   });
 

@@ -13,7 +13,7 @@ import {
 } from '../../lib/formatAuditLog';
 import { AUDIT_ACTION_TONE } from '../../lib/overview';
 
-const RECENT_LIMIT = 5;
+const RECENT_PAGE_SIZE = 5;
 
 /**
  * The newest admin audit entries on the desktop Overview. It fetches its own
@@ -30,10 +30,10 @@ export function RecentAdminActivity() {
     let cancelled = false;
 
     createPlatformAdminApi()
-      .listAuditLogs({ limit: RECENT_LIMIT })
+      .listAuditLogs({ pageSize: RECENT_PAGE_SIZE })
       .then((response) => {
         if (cancelled) return;
-        setEntries(response.data);
+        setEntries(response.data.entries);
       })
       .catch(() => {
         if (cancelled) return;

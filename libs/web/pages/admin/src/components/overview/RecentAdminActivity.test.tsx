@@ -21,7 +21,10 @@ jest.mock('next/link', () => {
   };
 });
 
-import type { AdminAuditLogEntry } from '@myorganiser/app-api-client';
+import type {
+  AdminAuditLogEntry,
+  AdminAuditLogListResponse,
+} from '@myorganiser/app-api-client';
 import { act, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
@@ -32,12 +35,24 @@ import { RecentAdminActivity } from './RecentAdminActivity';
 
 const mockListAuditLogs = jest.fn();
 
+function auditPage(entries: AdminAuditLogEntry[]): {
+  data: AdminAuditLogListResponse;
+} {
+  return {
+    data: { entries, total: entries.length, page: 1, pageSize: 5 },
+  };
+}
+
 const sampleEntries: AdminAuditLogEntry[] = [
   {
     id: 'audit-1',
     action: 'disable',
     actorUserId: 'actor-1',
     targetUserId: 'target-1',
+    actorName: 'Actor 1',
+    targetName: 'Target 1',
+    actorDeleted: false,
+    targetDeleted: false,
     createdAt: '2026-07-16T12:00:00.000Z',
   },
   {
@@ -45,6 +60,10 @@ const sampleEntries: AdminAuditLogEntry[] = [
     action: 'youtube_access_grant',
     actorUserId: 'actor-2',
     targetUserId: null,
+    actorName: 'Actor 2',
+    targetName: null,
+    actorDeleted: false,
+    targetDeleted: true,
     createdAt: '2026-07-15T08:30:00.000Z',
   },
 ];
@@ -61,16 +80,16 @@ describe('RecentAdminActivity', () => {
     (createPlatformAdminApi as jest.Mock).mockReturnValue({
       listAuditLogs: mockListAuditLogs,
     });
-    mockListAuditLogs.mockResolvedValue({ data: sampleEntries });
+    mockListAuditLogs.mockResolvedValue(auditPage(sampleEntries));
   });
 
-  it('requests five audit entries with limit 5', async () => {
+  it('requests five audit entries with pageSize 5', async () => {
     await renderActivity();
 
     await screen.findByText('Disable');
 
     expect(mockListAuditLogs).toHaveBeenCalledTimes(1);
-    expect(mockListAuditLogs).toHaveBeenCalledWith({ limit: 5 });
+    expect(mockListAuditLogs).toHaveBeenCalledWith({ pageSize: 5 });
   });
 
   it('renders each row with its formatted action label', async () => {
@@ -110,9 +129,16 @@ describe('RecentAdminActivity', () => {
   });
 
   it('shows "by —" when the entry has no actor', async () => {
-    mockListAuditLogs.mockResolvedValue({
-      data: [{ ...sampleEntries[0], actorUserId: null }],
-    });
+    mockListAuditLogs.mockResolvedValue(
+      auditPage([
+        {
+          ...sampleEntries[0],
+          actorUserId: null,
+          actorName: null,
+          actorDeleted: true,
+        },
+      ]),
+    );
 
     await renderActivity();
 
@@ -120,7 +146,7 @@ describe('RecentAdminActivity', () => {
   });
 
   it('shows the empty message when there are no entries', async () => {
-    mockListAuditLogs.mockResolvedValue({ data: [] });
+    mockListAuditLogs.mockResolvedValue(auditPage([]));
 
     await renderActivity();
 
