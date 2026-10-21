@@ -316,7 +316,9 @@ test.describe('Vault Identity Standoff Reproduction (E2E)', () => {
     await submitButton.click();
 
     // Wait for task to appear in device 1's DOM (local save)
-    await expect(page1.locator('h3', { hasText: T1 })).toBeVisible({
+    await expect(
+      page1.getByRole('checkbox', { name: `Done: ${T1}`, exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
 
@@ -365,7 +367,9 @@ test.describe('Vault Identity Standoff Reproduction (E2E)', () => {
     await expect(submitButton2).toBeVisible();
     await submitButton2.click();
 
-    await expect(page2.locator('h3', { hasText: T2 })).toBeVisible({
+    await expect(
+      page2.getByRole('checkbox', { name: `Done: ${T2}`, exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
 
@@ -435,13 +439,17 @@ test.describe('Vault Identity Standoff Reproduction (E2E)', () => {
     // status to render.
     await page1.evaluate(() => window.dispatchEvent(new Event('focus')));
 
-    // Step 17: Assert sync status trigger (header chip) appears
-    await expect(page1.getByTestId('sync-status-trigger')).toBeVisible({
+    // Step 17: Assert sync status trigger (header chip) appears. The desktop
+    // header and the phone app bar each mount the widget; only one is visible.
+    const syncTrigger = page1
+      .getByTestId('sync-status-trigger')
+      .filter({ visible: true });
+    await expect(syncTrigger).toBeVisible({
       timeout: 30000,
     });
 
     // Step 18: Click the trigger and assert popover contents
-    await page1.getByTestId('sync-status-trigger').click();
+    await syncTrigger.click();
     await expect(page1.getByTestId('sync-status-indicator')).toBeVisible({
       timeout: 30000,
     });
@@ -474,12 +482,14 @@ test.describe('Vault Identity Standoff Reproduction (E2E)', () => {
     // Step 20: Assert original task is readable post-pull and post-navigation
     // This is the proof of "data is still readable" — decrypted fresh from
     // the unchanged local ciphertext under the still-live Master Key.
-    await expect(page1.locator('h3', { hasText: T1 })).toBeVisible({
+    await expect(
+      page1.getByRole('checkbox', { name: `Done: ${T1}`, exact: true }),
+    ).toBeVisible({
       timeout: 60000,
     });
 
     // Step 21: Assert standoff chip persists after round trip
-    await expect(page1.getByTestId('sync-status-trigger')).toBeVisible({
+    await expect(syncTrigger).toBeVisible({
       timeout: 30000,
     });
 

@@ -24,6 +24,8 @@ import { AdminYouTubeAccessController } from './../controllers/AdminYouTubeAcces
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminUsersController } from './../controllers/AdminUsersController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { AdminOverviewController } from './../controllers/AdminOverviewController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminFeedbackController } from './../controllers/AdminFeedbackController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminAuditLogController } from './../controllers/AdminAuditLogController';
@@ -746,6 +748,21 @@ const models: TsoaRoute.Models = {
     "WithdrawYouTubeAccessResponse": {
         "dataType": "refAlias",
         "type": {"dataType":"intersection","subSchemas":[{"ref":"AdminUserIdentity"},{"dataType":"nestedObjectLiteral","nestedProperties":{"youtubeDisconnect":{"ref":"YouTubeDisconnectOutcome","required":true}}}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminOverviewResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "users": {"dataType":"double","required":true},
+            "platformAdmins": {"dataType":"double","required":true},
+            "unverified": {"dataType":"double","required":true},
+            "disabled": {"dataType":"double","required":true},
+            "youtubeAccessPlacesUsed": {"dataType":"double","required":true},
+            "youtubeAccessPlacesLeft": {"dataType":"double","required":true},
+            "youtubeAccessCeiling": {"dataType":"double","required":true},
+            "feedbackReportsReceived": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminFeedbackReporterDto": {
@@ -2728,6 +2745,37 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'withdrawYouTubeAccess',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminOverviewController_getAdminOverview: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+        };
+        app.get('/admin/overview',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminOverviewController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminOverviewController.prototype.getAdminOverview)),
+
+            async function AdminOverviewController_getAdminOverview(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminOverviewController_getAdminOverview, request, response });
+
+                const controller = new AdminOverviewController();
+
+              await templateService.apiHandler({
+                methodName: 'getAdminOverview',
                 controller,
                 response,
                 next,

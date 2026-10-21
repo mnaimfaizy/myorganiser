@@ -4,11 +4,9 @@ import {
   E2E_VAULT_PHRASE,
   expectNoHorizontalOverflow,
   expectSingleH1,
-  login,
-  setupBackend,
-  stubJsonGet,
   type IdentityEntry,
 } from './helpers';
+import { PHONE_VIEWPORT, signInToShell, tabBar } from './helpers/shellLayout';
 
 /**
  * Installed phone shell at 390x844 (issue #1249).
@@ -53,32 +51,18 @@ const IDENTITIES: IdentityEntry[] = [
   },
 ];
 
-const PHONE_VIEWPORT = { width: 390, height: 844 };
-
 /**
- * Sign in and land on the dashboard at phone width. `login()` waits for the
- * tab bar (see waitForDashboardReady) and the mount-time vault work to settle.
- * Navigation after this point is by clicking links only: a `gotoStable` to
- * another dashboard route remounts VaultSessionProvider after login.
+ * Sign in and land on the dashboard at phone width. The shared sign-in stubs
+ * the mount-time reads. Navigation after this point is by clicking links only:
+ * a `gotoStable` to another dashboard route remounts VaultSessionProvider after
+ * login.
  */
 async function signInToPhoneDashboard(page: Page) {
-  setupBackend(page, IDENTITIES);
-  await stubJsonGet(page, /\/feedback\/reports\/?(\?.*)?$/, {
-    items: [],
-    hasChangedSinceLastSeen: false,
+  await signInToShell(page, {
+    email: EMAIL,
+    loginFixture: LOGIN_FIXTURE,
+    identities: IDENTITIES,
   });
-  await stubJsonGet(page, /\/youtube\/availability\/?(\?.*)?$/, {
-    available: false,
-  });
-  await stubJsonGet(page, /\/youtube\/status\/?(\?.*)?$/, {
-    connected: false,
-  });
-  await login(page, EMAIL, LOGIN_FIXTURE);
-  await expect(page).toHaveURL(/.*dashboard/);
-}
-
-function tabBar(page: Page) {
-  return page.getByRole('navigation', { name: 'App sections' });
 }
 
 test.describe('Phone shell (E2E)', () => {

@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { useIsMobile } from './use-mobile';
+import { useIsMobile, useIsMobileState } from './use-mobile';
 
 type MatchMediaFn = (query: string) => MediaQueryList;
 
@@ -92,5 +92,60 @@ describe('useIsMobile', () => {
     });
 
     expect(result.current).toBe(true);
+  });
+
+  it('keeps returning a boolean on every render, including the first', () => {
+    window.innerWidth = 375;
+    const values: unknown[] = [];
+
+    const { result } = renderHook(() => {
+      const isMobile = useIsMobile();
+      values.push(isMobile);
+      return isMobile;
+    });
+
+    expect(values.length).toBeGreaterThan(0);
+    expect(values.every((value) => typeof value === 'boolean')).toBe(true);
+    expect(result.current).toBe(true);
+  });
+});
+
+describe('useIsMobileState', () => {
+  beforeEach(() => {
+    removeMatchMedia();
+  });
+
+  afterEach(() => {
+    window.innerWidth = originalInnerWidth;
+    removeMatchMedia();
+    jest.restoreAllMocks();
+  });
+
+  it('is undefined on the first render, then true at 375px', () => {
+    window.innerWidth = 375;
+    const values: (boolean | undefined)[] = [];
+
+    const { result } = renderHook(() => {
+      const isMobile = useIsMobileState();
+      values.push(isMobile);
+      return isMobile;
+    });
+
+    expect(values[0]).toBeUndefined();
+    expect(result.current).toBe(true);
+  });
+
+  it('is undefined on the first render, then false at 1024px', () => {
+    window.innerWidth = 1024;
+    const values: (boolean | undefined)[] = [];
+
+    const { result } = renderHook(() => {
+      const isMobile = useIsMobileState();
+      values.push(isMobile);
+      return isMobile;
+    });
+
+    expect(values[0]).toBeUndefined();
+    expect(result.current).toBe(false);
   });
 });

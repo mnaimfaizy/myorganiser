@@ -319,6 +319,26 @@ describe('task-workflow', () => {
       expect(tasks[0]).not.toHaveProperty('closedAt');
       expect(adapter.getSavedTasks()?.[0]).not.toHaveProperty('closedAt');
     });
+
+    it('persists estimatedMinutes on the created task', async () => {
+      const adapter = new InMemoryTasksVaultAdapter();
+
+      const { tasks, result } = await addTaskToWorkflow(adapter, [], {
+        title: 'Estimated task',
+        priority: 'medium',
+        status: 'pending',
+        estimatedMinutes: 25,
+      });
+
+      expect(result).toEqual({ ok: true, kind: 'created' });
+      expect(tasks[0]).toMatchObject({
+        id: 'generated-id-1',
+        estimatedMinutes: 25,
+      });
+      expect(adapter.getSavedTasks()?.[0]).toMatchObject({
+        estimatedMinutes: 25,
+      });
+    });
   });
 
   describe('updateTaskInWorkflow', () => {
@@ -454,6 +474,27 @@ describe('task-workflow', () => {
         updatedAt: FIXED_NOW,
       });
       expect(tasks[0]).not.toHaveProperty('closedAt');
+      expect(adapter.getSavedTasks()).toEqual(tasks);
+    });
+
+    it('writes a changed estimatedMinutes to the matching task and persists it', async () => {
+      const task = makeTask({ id: 'task-1', estimatedMinutes: 15 });
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: [task] });
+
+      const { tasks, result } = await updateTaskInWorkflow(
+        adapter,
+        [task],
+        'task-1',
+        {
+          title: task.title,
+          priority: task.priority,
+          status: task.status,
+          estimatedMinutes: 45,
+        },
+      );
+
+      expect(result).toEqual({ ok: true, kind: 'updated' });
+      expect(tasks[0]).toMatchObject({ id: 'task-1', estimatedMinutes: 45 });
       expect(adapter.getSavedTasks()).toEqual(tasks);
     });
   });

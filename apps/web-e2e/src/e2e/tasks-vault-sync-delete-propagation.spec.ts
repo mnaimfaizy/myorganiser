@@ -333,22 +333,31 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
     const seedTaskTitle = `Seed Task ${Date.now()}`;
     const initialTasksEtag = serverBlobEtags.tasks;
 
-    await page1.getByRole('button', { name: 'Add Task' }).first().click();
+    // The header and all-clear card both carry "Add task", so the trigger is the first.
+    await page1
+      .getByRole('button', { name: 'Add task', exact: true })
+      .first()
+      .click();
     await expect(page1.getByRole('dialog')).toBeVisible({ timeout: 30000 });
-    await expect(page1.getByLabel('Title')).toBeVisible({ timeout: 30000 });
+    await expect(page1.getByLabel('Title', { exact: true })).toBeVisible({
+      timeout: 30000,
+    });
 
-    await page1.getByLabel('Title').fill(seedTaskTitle);
+    await page1.getByLabel('Title', { exact: true }).fill(seedTaskTitle);
 
     const submitButton = page1
       .getByRole('dialog')
-      .getByRole('button', { name: 'Add Task' });
+      .getByRole('button', { name: 'Add task', exact: true });
     await expect(submitButton).toBeVisible();
     await submitButton.click();
 
     // Wait for task to appear in ctx1's DOM
-    await expect(page1.locator('h3', { hasText: seedTaskTitle })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(
+      page1.getByRole('checkbox', {
+        name: `Done: ${seedTaskTitle}`,
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30000 });
 
     // Step 11: Poll for push
     await expect
@@ -382,9 +391,12 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
     await unlockWithPassphrase(page2, passphrase);
 
     // Step 18: Assert task is visible in ctx2 after re-navigation and unlock
-    await expect(page2.locator('h3', { hasText: seedTaskTitle })).toBeVisible({
-      timeout: 60000,
-    });
+    await expect(
+      page2.getByRole('checkbox', {
+        name: `Done: ${seedTaskTitle}`,
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 60000 });
 
     // Both contexts now have the same task. Continue to deletion test.
 
@@ -393,26 +405,37 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
     // Step 1 (deletion): Capture etag before delete
     const etagBeforeDelete = serverBlobEtags.tasks;
 
-    // Step 2 (deletion): ctx1 clicks delete button
-    await page1.getByRole('button', { name: 'Delete task' }).click();
+    // Step 2 (deletion): ctx1 opens the task from its title, then clicks
+    // "Delete…" in the detail panel.
+    await page1
+      .getByRole('button', { name: seedTaskTitle, exact: true })
+      .click();
+    await page1
+      .getByRole('complementary', { name: 'Task detail' })
+      .getByRole('button', { name: 'Delete\u2026', exact: true })
+      .click();
 
-    // Step 3 (deletion): Confirm dialog appears and we click Delete
+    // Step 3 (deletion): The shared confirm is an alertdialog; its action is
+    // named for the object, "Delete task", so the button is clicked by that name.
     await expect(
       page1
-        .getByRole('dialog')
+        .getByRole('alertdialog')
         .filter({ hasText: `Delete "${seedTaskTitle}"?` }),
     ).toBeVisible({ timeout: 30000 });
 
     const confirmDelete = page1
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Delete' });
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete task', exact: true });
     await expect(confirmDelete).toBeVisible();
     await confirmDelete.click();
 
     // Step 4 (deletion): Assert task is absent in ctx1
-    await expect(page1.locator('h3', { hasText: seedTaskTitle })).toHaveCount(
-      0,
-    );
+    await expect(
+      page1.getByRole('checkbox', {
+        name: `Done: ${seedTaskTitle}`,
+        exact: true,
+      }),
+    ).toHaveCount(0);
 
     // Step 5 (deletion): Poll for push — tasks blob etag should change
     await expect
@@ -445,9 +468,12 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
     await unlockWithPassphrase(page2, passphrase);
 
     // Step 12 (deletion): Assert task stays deleted in ctx2 (primary proof)
-    await expect(page2.locator('h3', { hasText: seedTaskTitle })).toHaveCount(
-      0,
-    );
+    await expect(
+      page2.getByRole('checkbox', {
+        name: `Done: ${seedTaskTitle}`,
+        exact: true,
+      }),
+    ).toHaveCount(0);
 
     // Step 13 (deletion): Count ctx1's Vault Blob Inventory reads from here on.
     //
@@ -495,9 +521,12 @@ test.describe('Tasks Vault Sync Delete Propagation (E2E)', () => {
     // Step 17 (deletion): Resurrection proof — task absent in ctx1 after
     // the full round trip (if union-by-id merge had resurrected the record,
     // it reappears here).
-    await expect(page1.locator('h3', { hasText: seedTaskTitle })).toHaveCount(
-      0,
-    );
+    await expect(
+      page1.getByRole('checkbox', {
+        name: `Done: ${seedTaskTitle}`,
+        exact: true,
+      }),
+    ).toHaveCount(0);
 
     // Step 18 (deletion): Final assertion — no whole-Vault prompt anywhere
     await expect(page1.getByTestId('vault-standoff-dialog')).toHaveCount(0);

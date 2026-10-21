@@ -8,6 +8,7 @@ export * from './lib/components/Button/Button';
 export * from './lib/components/Calendar/Calendar';
 export * from './lib/components/Card/Card';
 export * from './lib/components/Checkbox/Checkbox';
+export * from './lib/components/ChoiceChip/ChoiceChip';
 export * from './lib/components/Collapsible/Collapsible';
 export * from './lib/components/Combobox/Combobox';
 export * from './lib/components/Command/Command';
