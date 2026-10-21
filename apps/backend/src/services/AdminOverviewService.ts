@@ -5,14 +5,27 @@ import {
 } from '../prisma';
 import userService from './UserService';
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Platform counts for the admin Overview page. Platform Admin only. */
 export interface AdminOverviewResponse {
   /** Total number of Users. */
   users: number;
+  /**
+   * Users whose account was created in the last 7 days (created_at >= now − 7 days).
+   * Users created before User.created_at existed carry the migration's timestamp, not their real sign-up time.
+   */
+  usersJoinedLast7Days: number;
   /** Users whose role is platform_admin. */
   platformAdmins: number;
   /** Users who have not verified their email. */
   unverified: number;
+  /**
+   * Users who have not verified their email and whose account was created more than 7 days ago
+   * (email_verification_timestamp is null AND created_at < now − 7 days).
+   * Users created before User.created_at existed carry the migration's timestamp, not their real sign-up time.
+   */
+  unverifiedOverAWeek: number;
   /** Users who are disabled. */
   disabled: number;
   /** Users ever granted YouTube Access (lifetime, ADR 0129). */
@@ -34,18 +47,32 @@ export class AdminOverviewService {
    * ever-granted query (ADR 0129) lives in one place.
    */
   async getOverview(): Promise<AdminOverviewResponse> {
+    const now = Date.now();
+    const sevenDaysAgo = new Date(now - SEVEN_DAYS_MS);
+
     const [
       users,
+      usersJoinedLast7Days,
       platformAdmins,
       unverified,
+      unverifiedOverAWeek,
       disabled,
       youtubeAccess,
       feedbackReportsReceived,
     ] = await Promise.all([
       this.prisma.user.count(),
+      this.prisma.user.count({
+        where: { created_at: { gte: sevenDaysAgo } },
+      }),
       this.prisma.user.count({ where: { role: 'platform_admin' } }),
       this.prisma.user.count({
         where: { email_verification_timestamp: null },
+      }),
+      this.prisma.user.count({
+        where: {
+          email_verification_timestamp: null,
+          created_at: { lt: sevenDaysAgo },
+        },
       }),
       this.prisma.user.count({ where: { disabled: true } }),
       userService.getYouTubeAccessUsage(),
@@ -56,8 +83,10 @@ export class AdminOverviewService {
 
     return {
       users,
+      usersJoinedLast7Days,
       platformAdmins,
       unverified,
+      unverifiedOverAWeek,
       disabled,
       youtubeAccessPlacesUsed: youtubeAccess.everGranted,
       youtubeAccessPlacesLeft: Math.max(
