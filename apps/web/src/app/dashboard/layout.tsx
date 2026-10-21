@@ -1,3 +1,5 @@
+import type { Viewport } from 'next';
+
 import { SidebarInset, SidebarProvider, Toaster } from '@myorganiser/web-ui';
 
 import {
@@ -6,6 +8,8 @@ import {
   DashboardSidebar,
   FeedbackDialog,
   OfflineNotice,
+  PhoneAppBar,
+  PhoneTabBar,
 } from '@myorganiser/web-pages/dashboard';
 
 import {
@@ -16,6 +20,15 @@ import {
   VaultReconcileRunner,
   VaultSessionProvider,
 } from '@myorganiser/web-vault-ui';
+
+/*
+ * viewport-fit=cover lets env(safe-area-inset-*) report the notch and home
+ * indicator in the Installed Web App. Scoped to the dashboard on purpose:
+ * public pages have no safe-area handling.
+ */
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+};
 
 /*
  * Desktop widths for the navy sidebar: the 272px expanded sidebar and the
@@ -33,7 +46,14 @@ export default function DashboardLayout({
 }) {
   return (
     <DashboardGuard>
-      <SidebarProvider style={SIDEBAR_STYLE}>
+      {/*
+       * On a phone the tab bar sits above the toasts: the Toast viewport reads
+       * --toast-offset from this ancestor, set only while the tab bar is mounted.
+       */}
+      <SidebarProvider
+        style={SIDEBAR_STYLE}
+        className="has-[[data-phone-tab-bar]]:[--toast-offset:calc(88px_+_env(safe-area-inset-bottom))]"
+      >
         <VaultSessionProvider>
           {/*
            * Watches VaultReconcileRunner, VaultMetaConvergeRunner, and
@@ -60,6 +80,7 @@ export default function DashboardLayout({
             <DashboardSidebar />
             <SidebarInset>
               <DashboardHeader />
+              <PhoneAppBar />
               {/*
                * Explains why a save fails while the browser reports no
                * connection. It changes no save path and queues nothing, and
@@ -67,6 +88,7 @@ export default function DashboardLayout({
                */}
               <OfflineNotice />
               {children}
+              <PhoneTabBar />
             </SidebarInset>
             {/* Feedback Dialog is mounted once here because both the sidebar
                 footer and the account menu in the header open it. */}

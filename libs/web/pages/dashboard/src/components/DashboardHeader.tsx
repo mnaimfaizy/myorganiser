@@ -72,7 +72,7 @@ export function DashboardHeader() {
   }
 
   return (
-    <header className="flex min-h-19 flex-wrap items-center gap-3.5 border-b border-border bg-raised-surface px-8 py-3.5 text-foreground">
+    <header className="hidden min-h-19 flex-wrap items-center gap-3.5 border-b border-border bg-raised-surface px-8 py-3.5 text-foreground md:flex">
       <Tooltip>
         <TooltipTrigger asChild>
           <IconButton

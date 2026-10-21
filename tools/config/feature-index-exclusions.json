@@ -5,6 +5,10 @@
     {
       "route": "account",
       "reason": "Platform-level account management route. Not a product feature — administers user settings, profile, and auth — so it has no row in the feature index."
+    },
+    {
+      "route": "more",
+      "reason": "Phone shell navigation screen (the More tab). It links to existing features and account actions and holds no feature of its own, so it has no row in the feature index."
     }
   ]
 }

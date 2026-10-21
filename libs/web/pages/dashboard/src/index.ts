@@ -4,4 +4,7 @@ export { default as DashboardGuard } from './components/DashboardGuard';
 export { DynamicBreadcrumb } from './components/DynamicBreadcrumb';
 export { FeedbackDialog } from './components/FeedbackDialog';
 export { OfflineNotice } from './components/OfflineNotice';
+export { MoreScreen } from './components/phone/MoreScreen';
+export { PhoneAppBar } from './components/phone/PhoneAppBar';
+export { PhoneTabBar } from './components/phone/PhoneTabBar';
 export { default as DashboardPage } from './page';

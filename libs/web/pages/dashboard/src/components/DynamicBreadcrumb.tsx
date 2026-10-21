@@ -31,7 +31,21 @@ const SEGMENT_LABEL_REGISTRY: Record<string, string> = {
   callback: 'Connecting',
   account: 'Account',
   vault: 'Vault',
+  more: 'More',
+  reports: 'Your reports',
+  channels: 'Channels',
 };
+
+/**
+ * The registry label for one URL segment, or null when the segment is not
+ * registered. Own-property lookup, so a segment such as "constructor" is not
+ * mistaken for a label.
+ */
+export function getSegmentLabel(segment: string): string | null {
+  return Object.prototype.hasOwnProperty.call(SEGMENT_LABEL_REGISTRY, segment)
+    ? SEGMENT_LABEL_REGISTRY[segment]
+    : null;
+}
 
 /**
  * Maps URL segments to breadcrumb labels based on cumulative path resolution.
@@ -71,7 +85,7 @@ export function getBreadcrumbItems(pathname: string): BreadcrumbNavItem[] {
   let cumulativePath = '/dashboard';
   for (const segment of segments) {
     cumulativePath += '/' + segment;
-    const label = SEGMENT_LABEL_REGISTRY[segment] || 'Details';
+    const label = getSegmentLabel(segment) ?? 'Details';
     items.push({ label, href: cumulativePath });
   }
 
