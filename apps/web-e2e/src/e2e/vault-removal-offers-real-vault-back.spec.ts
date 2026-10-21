@@ -318,7 +318,9 @@ test.describe('Vault Removal Offers Real Vault Back (E2E)', () => {
     await submitButton.click();
 
     // Wait for task to appear in DOM (local save)
-    await expect(page.locator('h3', { hasText: uniqueTitle })).toBeVisible({
+    await expect(
+      page.getByRole('checkbox', { name: `Done: ${uniqueTitle}`, exact: true }),
+    ).toBeVisible({
       timeout: 30000,
     });
 
@@ -385,7 +387,9 @@ test.describe('Vault Removal Offers Real Vault Back (E2E)', () => {
 
     // Step 14: Assert task reappears after unlock and (if needed) re-navigation
     // The task should be visible in the list, proving the synced vault was recovered
-    await expect(page.locator('h3', { hasText: uniqueTitle })).toBeVisible({
+    await expect(
+      page.getByRole('checkbox', { name: `Done: ${uniqueTitle}`, exact: true }),
+    ).toBeVisible({
       timeout: 60000,
     });
   });
