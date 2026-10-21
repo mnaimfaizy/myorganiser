@@ -45,8 +45,11 @@ export function PhoneAppBar() {
   const screen = getPhoneScreen(pathname);
   const isRoot = screen.type === 'root';
   // The More root carries a bare large title in its page (MorePhone artboard),
-  // so the bar draws no title row, no compact bar and no lock control there.
+  // and the Home root draws its own header (HomePhone artboard). Both get no
+  // title row, no compact bar and no lock control from the bar.
   const isMoreRoot = isRoot && screen.tab === 'more';
+  const isHomeRoot = isRoot && screen.tab === 'home';
+  const hasOwnHeader = isMoreRoot || isHomeRoot;
 
   const session = useOptionalVaultSession();
   const lockState = useVaultLockState();
@@ -108,16 +111,18 @@ export function PhoneAppBar() {
   return (
     <>
       <header className="border-b border-border bg-background pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden">
-        <div className={isMoreRoot ? 'pt-1 pr-2 pl-4' : 'pt-1 pr-2 pb-3 pl-4'}>
+        <div
+          className={hasOwnHeader ? 'pt-1 pr-2 pl-4' : 'pt-1 pr-2 pb-3 pl-4'}
+        >
           <div className="flex h-11 items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center">
               <SyncStatusWidget className={syncClassName} />
             </div>
-            {canLockVault && !scrolledPast && !isMoreRoot && (
+            {canLockVault && !scrolledPast && !hasOwnHeader && (
               <LockVaultButton onClick={lockVault} />
             )}
           </div>
-          {!isMoreRoot && (
+          {!hasOwnHeader && (
             <div ref={titleRowRef} className="flex items-center gap-3">
               <Illustration kind={screen.kind} size={48} />
               <p className="font-display text-display text-foreground">

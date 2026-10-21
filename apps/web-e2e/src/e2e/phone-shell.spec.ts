@@ -106,7 +106,11 @@ test.describe('Phone shell (E2E)', () => {
 
     await signInToPhoneDashboard(page);
     await expect(
-      page.getByText('Quick Actions', { exact: true }),
+      page.getByRole('heading', {
+        level: 2,
+        name: 'Your spaces',
+        exact: true,
+      }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, 'Home');
 

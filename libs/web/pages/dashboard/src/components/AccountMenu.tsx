@@ -26,12 +26,20 @@ import { initialsOf } from '../utils';
 
 const MENU_ITEM_CLASS = 'min-h-10 rounded-item px-2.5 text-body-sm';
 
+export interface AccountMenuProps {
+  /**
+   * `header` is the desktop bar's wide trigger with name and email. `phone` is
+   * the 44px brand square with initials, for the phone Home header.
+   */
+  variant?: 'header' | 'phone';
+}
+
 /**
  * The account menu in the dashboard header. Radix owns the open state. The
  * item handlers do not call preventDefault, so Radix closes the menu after
  * a selection.
  */
-export function AccountMenu() {
+export function AccountMenu({ variant = 'header' }: AccountMenuProps) {
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
@@ -54,28 +62,38 @@ export function AccountMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          className="h-12 gap-2.5 rounded-menu border-border bg-background py-0 pl-1.5 pr-2.5 text-foreground"
-        >
-          <Avatar aria-hidden="true" className="size-9 rounded-control-sm">
-            <AvatarFallback className="rounded-control-sm bg-brand font-display text-control-sm font-bold text-brand-foreground">
-              {initials || <User aria-hidden="true" className="size-4" />}
-            </AvatarFallback>
-          </Avatar>
-          <span className="flex flex-col items-start text-left">
-            <span className="text-body-sm font-semibold text-foreground">
-              {name}
+        {variant === 'phone' ? (
+          <button
+            type="button"
+            aria-label={`Account menu for ${name || email}`}
+            className="flex size-11 items-center justify-center rounded-control bg-brand font-display text-control-sm font-bold text-brand-foreground"
+          >
+            {initials || <User aria-hidden="true" className="size-4" />}
+          </button>
+        ) : (
+          <Button
+            variant="outline"
+            className="h-12 gap-2.5 rounded-menu border-border bg-background py-0 pl-1.5 pr-2.5 text-foreground"
+          >
+            <Avatar aria-hidden="true" className="size-9 rounded-control-sm">
+              <AvatarFallback className="rounded-control-sm bg-brand font-display text-control-sm font-bold text-brand-foreground">
+                {initials || <User aria-hidden="true" className="size-4" />}
+              </AvatarFallback>
+            </Avatar>
+            <span className="flex flex-col items-start text-left">
+              <span className="text-body-sm font-semibold text-foreground">
+                {name}
+              </span>
+              <span className="text-caption font-normal text-muted-foreground">
+                {email}
+              </span>
             </span>
-            <span className="text-caption font-normal text-muted-foreground">
-              {email}
-            </span>
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className="size-3.5 text-foreground-secondary"
-          />
-        </Button>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-3.5 text-foreground-secondary"
+            />
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"

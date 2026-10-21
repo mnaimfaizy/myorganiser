@@ -251,4 +251,65 @@ describe('AccountMenu', () => {
     expect(icon).toBeInTheDocument();
     expect(icon?.parentElement?.textContent).toBe('');
   });
+
+  it('shows the User icon as the phone trigger fallback when the name and email are empty', () => {
+    stubUser({ name: '', email: '' });
+    render(<AccountMenu variant="phone" />);
+
+    // The phone trigger is the only button while the menu is closed.
+    const trigger = screen.getByRole('button', { name: /Account menu for/ });
+    expect(trigger.textContent).toBe('');
+    expect(trigger.querySelector('svg.lucide-user')).toBeInTheDocument();
+  });
+
+  it('renders the phone trigger as a button named for the account, showing the initials only', () => {
+    render(<AccountMenu variant="phone" />);
+
+    const trigger = screen.getByRole('button', {
+      name: 'Account menu for Ada Lovelace',
+    });
+    expect(trigger.textContent).toBe('AL');
+    expect(trigger).not.toHaveTextContent('ada@example.com');
+  });
+
+  it('names the phone trigger by the email when the name is empty, showing its first letter', () => {
+    stubUser({ name: '' });
+    render(<AccountMenu variant="phone" />);
+
+    const trigger = screen.getByRole('button', {
+      name: 'Account menu for ada@example.com',
+    });
+    expect(trigger.textContent).toBe('A');
+  });
+
+  it('opens the same account menu from the phone trigger', async () => {
+    render(<AccountMenu variant="phone" />);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Account menu for Ada Lovelace' }),
+      { key: 'Enter' },
+    );
+
+    const items = await menuItems();
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Account settings',
+      'Vault and backups',
+      'Install the app',
+      'Send feedback',
+      'Your reports',
+      'Admin portal',
+      'Lock vault',
+      'Log out',
+    ]);
+  });
+
+  it('keeps the header trigger with its name and email by default', () => {
+    render(<AccountMenu />);
+
+    expect(
+      screen.queryByRole('button', { name: /Account menu for/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /ada@example\.com/ }),
+    ).toHaveTextContent('Ada Lovelace');
+  });
 });
