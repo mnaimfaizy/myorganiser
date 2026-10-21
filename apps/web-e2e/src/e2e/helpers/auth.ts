@@ -109,11 +109,11 @@ export async function submitLoginForm(
  * so any part of the dashboard shell being on screen proves the shell mounted
  * and the route's own content is rendering — which is what the callers were
  * reaching for when they waited for network quiet after landing on
- * `/dashboard`. The layout renders two sidebar toggles, hence `.first()`.
+ * `/dashboard`. The header's sidebar toggle names itself by what it will do.
  */
 export async function waitForDashboardReady(page: Page): Promise<void> {
   await expect(
-    page.getByRole('button', { name: 'Toggle Sidebar' }).first(),
+    page.getByRole('button', { name: /^(Collapse|Expand|Open) sidebar$/ }),
   ).toBeVisible({ timeout: 60000 });
 }
 

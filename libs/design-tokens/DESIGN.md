@@ -35,8 +35,9 @@ Home hero and the toast are `navy`, with `navy-raised` for a card or divider
 on it. Text on navy takes `navy-foreground`, and meta on navy takes
 `navy-muted-foreground` (6.9:1). An accent on navy is not the light-surface
 accent: a progress fill or a toast action is `navy-accent` (the lighter cyan),
-and a trust mark is `navy-trust`. The `sidebar-*` roles keep today's light
-sidebar until the v2.0 shell replaces it.
+and a trust mark is `navy-trust`. The `sidebar-*` roles are the navy sidebar:
+`sidebar-accent` is `navy-raised` (hover and the vault card), and the active
+pill is `sidebar-primary` violet as a border over a translucent tint of itself.
 
 **Brand violet has a text form and a soft form.** Filled violet (`brand`) is
 the one main create action on a screen and the active-tab underline. Violet as
