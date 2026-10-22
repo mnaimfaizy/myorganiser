@@ -285,7 +285,7 @@
 | `@storybook/test`               | 8.6.19  | Storybook testing utilities (interaction tests)                                                                   |
 | `@storybook/test-runner`        | 0.23.0  | Runs Storybook stories as tests via Playwright                                                                    |
 | `chromatic`                     | 13.3.5  | Visual regression testing and Storybook hosting                                                                   |
-| `vite`                          | 6.4.3   | Build tool — used by Storybook and mobile web                                                                     |
+| `vite`                          | 6.4.4   | Build tool — used by Storybook and mobile web                                                                     |
 
 ---
 
