@@ -31,10 +31,19 @@ interface SubscriptionsTotalsProps {
   variant: 'desktop' | 'phone';
 }
 
-/** "+ US$12.00 + £3.00", one per remaining currency. */
-function joinOtherTotals(others: readonly CurrencyMonthlyTotal[]): string {
+/**
+ * "+ US$12.00 + £3.00", one per remaining currency. `monthsPerPeriod` scales
+ * each Monthly Equivalent (12 for the yearly figure); 1 leaves it unchanged.
+ */
+function joinOtherTotals(
+  others: readonly CurrencyMonthlyTotal[],
+  monthsPerPeriod = 1,
+): string {
   return others
-    .map((t) => `+ ${formatMoney({ amount: t.monthly, currency: t.currency })}`)
+    .map(
+      (t) =>
+        `+ ${formatMoney({ amount: t.monthly * monthsPerPeriod, currency: t.currency })}`,
+    )
     .join(' ');
 }
 
@@ -42,7 +51,8 @@ function joinOtherTotals(others: readonly CurrencyMonthlyTotal[]): string {
  * The Subscriptions totals. Desktop is three cards (each month, each year,
  * next renewal); phone is one navy card. The monthly figure is the first
  * currency's Monthly Equivalent, or the converted figure once the user asks for it. Other
- * currencies are shown as "+ …" rather than being added up silently.
+ * currencies are shown as "+ …" rather than being added up silently, on both the
+ * each-month card and the each-year card (where each is multiplied by 12).
  */
 const SubscriptionsTotals = ({
   totals,
@@ -159,6 +169,11 @@ const SubscriptionsTotals = ({
         <p className="mt-2 font-display text-display tabular-nums text-foreground">
           {formatMoney({ amount: yearly, currency: shownCurrency })}
         </p>
+        {others.length > 0 ? (
+          <p className="mt-2 text-caption text-muted-foreground">
+            {joinOtherTotals(others, 12)}
+          </p>
+        ) : null}
         <p className="mt-2 text-caption text-muted-foreground">
           Monthly, yearly and weekly plans combined
         </p>
