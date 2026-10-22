@@ -9,6 +9,12 @@ interface SyncFreshnessIndicatorProps {
   /** Persisted sync status, or null while it is still being fetched. */
   status: YouTubeSyncStatus | null;
   className?: string;
+  /**
+   * `panel` (default) stacks the last-synced line above the state, right
+   * aligned. `inline` drops the last-synced line, for a page whose header
+   * subtitle already states it, and left-aligns the state beneath.
+   */
+  variant?: 'panel' | 'inline';
 }
 
 const TONE_TEXT_CLASS = {
@@ -43,8 +49,10 @@ const TONE_ICON = {
 export function SyncFreshnessIndicator({
   status,
   className,
+  variant = 'panel',
 }: SyncFreshnessIndicatorProps) {
   const reading = describeSyncFreshness(status);
+  const isInline = variant === 'inline';
   const Icon = TONE_ICON[reading.tone];
 
   // A healthy library announces nothing. The polite region carries only states
@@ -55,13 +63,23 @@ export function SyncFreshnessIndicator({
     : '';
 
   return (
-    <div className={cn('flex max-w-xs flex-col items-end gap-1', className)}>
-      <p className="text-sm text-muted-foreground">{reading.lastSyncedLabel}</p>
+    <div
+      className={cn(
+        'flex max-w-xs flex-col gap-1',
+        isInline ? 'items-start' : 'items-end',
+        className,
+      )}
+    >
+      {!isInline && (
+        <p className="text-body-sm text-muted-foreground">
+          {reading.lastSyncedLabel}
+        </p>
+      )}
 
       {reading.label && (
         <p
           className={cn(
-            'flex items-center gap-1.5 text-sm font-medium',
+            'flex items-center gap-1.5 text-body-sm font-medium',
             TONE_TEXT_CLASS[reading.tone],
           )}
         >
@@ -71,7 +89,12 @@ export function SyncFreshnessIndicator({
       )}
 
       {reading.detail && (
-        <p className="text-right text-xs text-muted-foreground">
+        <p
+          className={cn(
+            'text-caption text-muted-foreground',
+            isInline ? 'text-left' : 'text-right',
+          )}
+        >
           {reading.detail}
         </p>
       )}

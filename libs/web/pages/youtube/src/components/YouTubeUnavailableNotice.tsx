@@ -1,40 +1,68 @@
-import { Button } from '@myorganiser/web-ui';
+'use client';
+
+import { Button, Illustration } from '@myorganiser/web-ui';
+import { requestYouTubeAvailabilityRecheck } from '@myorganiser/web-youtube';
 import Link from 'next/link';
+import { useCallback } from 'react';
 
 interface YouTubeUnavailableNoticeProps {
+  /**
+   * `unavailable`: the availability check answered false (switched off, or no
+   * YouTube Access). `unreachable`: the check itself errored, so the notice
+   * offers Try again. Callers pass `unreachable` when the hook's `error` is set.
+   */
+  reason?: 'unavailable' | 'unreachable';
   /** When set, Back to Dashboard uses this handler (OAuth callback uses router.replace). When omitted, navigate with a Link to /dashboard. */
   onBack?: () => void;
 }
 
 export function YouTubeUnavailableNotice({
+  reason = 'unavailable',
   onBack,
 }: YouTubeUnavailableNoticeProps) {
+  const isUnreachable = reason === 'unreachable';
+
+  const handleRetry = useCallback(() => {
+    requestYouTubeAvailabilityRecheck();
+  }, []);
+
+  const backButton = onBack ? (
+    <Button type="button" variant="outline" onClick={onBack}>
+      Back to Dashboard
+    </Button>
+  ) : (
+    <Button asChild variant="outline">
+      <Link href="/dashboard">Back to Dashboard</Link>
+    </Button>
+  );
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <div className="rounded-full bg-destructive/10 p-4">
-        <svg
-          viewBox="0 0 24 24"
-          className="h-12 w-12 text-destructive"
-          fill="currentColor"
-        >
-          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-        </svg>
+    <div className="flex flex-1 flex-col items-center justify-center p-8">
+      <div
+        role={isUnreachable ? 'status' : undefined}
+        className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-panel border border-border bg-raised-surface p-7 text-center"
+      >
+        <Illustration kind="youtube" size={96} />
+        {isUnreachable ? (
+          <p className="text-label-caps text-muted-foreground">TEMPORARY</p>
+        ) : null}
+        <h1 className="font-display text-title text-foreground">
+          {isUnreachable
+            ? "YouTube can't be reached right now"
+            : 'YouTube is not available right now'}
+        </h1>
+        <p className="text-body text-muted-foreground">
+          {isUnreachable
+            ? "We couldn't check your YouTube connection. Your cached uploads are safe. Try again in a few minutes."
+            : 'Please try again later.'}
+        </p>
+        {isUnreachable ? (
+          <Button type="button" variant="brand" onClick={handleRetry}>
+            Try again
+          </Button>
+        ) : null}
+        {backButton}
       </div>
-      <h2 className="text-xl font-semibold text-foreground">
-        YouTube is not available right now
-      </h2>
-      <p className="max-w-md text-center text-sm text-muted-foreground">
-        Please try again later.
-      </p>
-      {onBack ? (
-        <Button type="button" onClick={onBack}>
-          Back to Dashboard
-        </Button>
-      ) : (
-        <Button asChild>
-          <Link href="/dashboard">Back to Dashboard</Link>
-        </Button>
-      )}
     </div>
   );
 }

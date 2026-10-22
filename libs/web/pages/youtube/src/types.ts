@@ -108,3 +108,6 @@ export interface YouTubeChannelSyncResult {
   lastError: string | null;
   retryAt: string | null;
 }
+
+/** The YouTube layout split: desktop markup, or the phone markup below the 768px shell breakpoint. */
+export type YouTubeLayoutVariant = 'desktop' | 'phone';

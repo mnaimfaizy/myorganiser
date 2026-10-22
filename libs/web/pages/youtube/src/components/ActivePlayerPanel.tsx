@@ -9,6 +9,8 @@ import { YouTubeVideoPlayer } from './YouTubeVideoPlayer';
 interface ActivePlayerPanelProps {
   activeVideoId: string;
   video?: YouTubeVideo;
+  /** The channel the player was opened from, for the section's name. */
+  channelTitle: string;
   onClose: () => void;
   onNearEnd: () => void;
 }
@@ -16,11 +18,12 @@ interface ActivePlayerPanelProps {
 export function ActivePlayerPanel({
   activeVideoId,
   video,
+  channelTitle,
   onClose,
   onNearEnd,
 }: ActivePlayerPanelProps) {
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
+    (e: React.KeyboardEvent<HTMLElement>) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -32,23 +35,11 @@ export function ActivePlayerPanel({
   if (!video) return null;
 
   return (
-    <div
+    <section
+      aria-label={`Playing from ${channelTitle}`}
       onKeyDown={handleKeyDown}
-      className="rounded-lg border border-border bg-card p-4 lg:sticky lg:top-2 lg:z-10"
+      className="flex flex-col overflow-hidden rounded-panel border border-border bg-raised-surface lg:sticky lg:top-2 lg:z-10"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-foreground">{video.title}</h3>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-6 w-6 p-0"
-          aria-label="Close player"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
       <YouTubeVideoPlayer
         key={activeVideoId}
         video={video}
@@ -56,6 +47,21 @@ export function ActivePlayerPanel({
         onNearEnd={onNearEnd}
         defaultPlaying
       />
-    </div>
+      <div className="flex items-start justify-between gap-3 p-4">
+        <h3 className="text-body font-semibold text-foreground">
+          {video.title}
+        </h3>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          className="size-9 shrink-0 p-0"
+          aria-label="Close player"
+        >
+          <X />
+        </Button>
+      </div>
+    </section>
   );
 }

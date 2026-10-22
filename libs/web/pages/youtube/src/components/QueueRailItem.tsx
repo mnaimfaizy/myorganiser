@@ -69,10 +69,10 @@ export function QueueRailItem({
   return (
     <li
       className={cn(
-        'flex items-center gap-2 rounded-lg border p-2 transition-colors motion-reduce:transition-none',
+        'flex items-start gap-3 rounded-control border p-2 transition-colors motion-reduce:transition-none',
         isCurrentlyPlaying
-          ? 'border-brand bg-brand/10'
-          : 'border-border bg-card hover:bg-muted',
+          ? 'border-brand bg-brand-soft'
+          : 'border-border bg-raised-surface hover:bg-muted',
       )}
       aria-current={isCurrentlyPlaying ? 'true' : undefined}
     >
@@ -81,95 +81,102 @@ export function QueueRailItem({
           <img
             src={video.thumbnail}
             alt=""
-            className="h-10 w-10 rounded object-cover"
+            className="h-10 w-[72px] rounded-control-sm object-cover"
           />
         ) : (
-          <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-muted-foreground">
+          <div className="flex h-10 w-[72px] items-center justify-center rounded-control-sm bg-muted text-muted-foreground">
             <span aria-hidden="true">▶</span>
           </div>
         )}
         {isCurrentlyPlaying && (
           <div
-            className="absolute inset-0 rounded bg-black/40 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center rounded-control-sm bg-navy/60"
             aria-hidden="true"
           >
-            <span className="text-xs font-bold text-white">Playing</span>
+            <span className="text-caption font-semibold text-navy-foreground">
+              Playing
+            </span>
           </div>
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start gap-1">
-          <div className="flex-1 min-w-0">
-            <p className="line-clamp-1 text-xs font-medium text-foreground">
-              {video.title}
-            </p>
-            {video.channelTitle && (
-              <p className="line-clamp-1 text-xs text-muted-foreground">
-                {video.channelTitle}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1 shrink-0 text-xs">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="min-w-0">
+          <p className="line-clamp-1 text-body-sm font-semibold text-foreground">
+            {video.title}
+          </p>
+          <p className="flex min-w-0 items-center gap-1 text-caption text-muted-foreground">
             {isCurrentlyPlaying && (
-              <span className="font-semibold text-brand">Now playing</span>
+              <span className="shrink-0 font-semibold text-brand-text">
+                Now playing
+              </span>
             )}
-            <span className="text-muted-foreground">{watchedState}</span>
-          </div>
+            {isCurrentlyPlaying && video.channelTitle && (
+              <span aria-hidden="true">·</span>
+            )}
+            {video.channelTitle && (
+              <span className="line-clamp-1 min-w-0">{video.channelTitle}</span>
+            )}
+            {!isCurrentlyPlaying && (
+              <span className="shrink-0">{watchedState}</span>
+            )}
+          </p>
         </div>
-      </div>
 
-      <div className="flex shrink-0 gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleMoveUpClick}
-          disabled={!canMoveUp}
-          className="min-h-10 min-w-10 p-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
-          aria-label={`Move ${video.title} up`}
-          title={canMoveUp ? `Move ${video.title} up` : 'Cannot move up'}
-        >
-          <ChevronUp className="h-4 w-4" />
-        </Button>
+        <div className="-ml-2 flex items-center gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleMoveUpClick}
+            disabled={!canMoveUp}
+            className="size-9 p-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label={`Move ${video.title} up`}
+            title={canMoveUp ? `Move ${video.title} up` : 'Cannot move up'}
+          >
+            <ChevronUp />
+          </Button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleMoveDownClick}
-          disabled={!canMoveDown}
-          className="min-h-10 min-w-10 p-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
-          aria-label={`Move ${video.title} down`}
-          title={canMoveDown ? `Move ${video.title} down` : 'Cannot move down'}
-        >
-          <ChevronDown className="h-4 w-4" />
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleMoveDownClick}
+            disabled={!canMoveDown}
+            className="size-9 p-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label={`Move ${video.title} down`}
+            title={
+              canMoveDown ? `Move ${video.title} down` : 'Cannot move down'
+            }
+          >
+            <ChevronDown />
+          </Button>
 
-        <Button
-          ref={handleRegisterPlayButton}
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handlePlayClick}
-          onKeyDown={handleRowKeyDown}
-          tabIndex={focusedRowIndex === index ? 0 : -1}
-          className="min-h-10 min-w-10 p-0 text-muted-foreground hover:text-foreground"
-          aria-label={`Play ${video.title}`}
-        >
-          <Play className="h-4 w-4" />
-        </Button>
+          <Button
+            ref={handleRegisterPlayButton}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handlePlayClick}
+            onKeyDown={handleRowKeyDown}
+            tabIndex={focusedRowIndex === index ? 0 : -1}
+            className="size-9 p-0 text-brand-text hover:text-brand-text-strong"
+            aria-label={`Play ${video.title}`}
+          >
+            <Play />
+          </Button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleRemoveClick}
-          className="min-h-10 min-w-10 p-0 text-muted-foreground hover:text-destructive"
-          aria-label={`Remove ${video.title} from queue`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleRemoveClick}
+            className="size-9 p-0 text-muted-foreground hover:text-destructive-text"
+            aria-label={`Remove ${video.title} from queue`}
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </div>
     </li>
   );
