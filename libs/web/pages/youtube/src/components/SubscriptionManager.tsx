@@ -1,18 +1,11 @@
 'use client';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardTitle,
-  Skeleton,
-} from '@myorganiser/web-ui';
-import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatRetryAt, isRetryCooldownActive } from '../hooks';
-import { YOUTUBE_DATA_PRIVACY_BULLETS } from '../lib/dataPrivacyCopy';
 import type { YouTubeSubscription } from '../types';
+import { ChannelsAside } from './ChannelsAside';
+import { ChannelsListCard, type ChannelFilter } from './ChannelsListCard';
 
 interface SubscriptionManagerProps {
   subscriptions: YouTubeSubscription[];
@@ -38,10 +31,33 @@ export function SubscriptionManager({
   syncBusy = false,
 }: SubscriptionManagerProps) {
   const router = useRouter();
+  const [filterText, setFilterText] = useState('');
+  const [filter, setFilter] = useState<ChannelFilter>('all');
+
   const isCooldownActive = !!(
     syncRetryAt && isRetryCooldownActive(syncRetryAt)
   );
   const retryLabel = formatRetryAt(syncRetryAt);
+  const refreshBlockedLabel =
+    isCooldownActive && retryLabel
+      ? `Refresh channels disabled until ${retryLabel}`
+      : undefined;
+
+  const enabledCount = subscriptions.filter((sub) => sub.enabled).length;
+  const counts = {
+    all: subscriptions.length,
+    on: enabledCount,
+    off: subscriptions.length - enabledCount,
+  };
+
+  const needle = filterText.trim().toLowerCase();
+  const visibleChannels = subscriptions.filter((sub) => {
+    const matchesChip =
+      filter === 'all' || (filter === 'on' ? sub.enabled : !sub.enabled);
+    const matchesText =
+      needle === '' || sub.channelTitle.toLowerCase().includes(needle);
+    return matchesChip && matchesText;
+  });
 
   const handleSync = useCallback(() => {
     if (isCooldownActive) return;
@@ -57,111 +73,36 @@ export function SubscriptionManager({
     [router],
   );
 
+  const handleFilterTextChange = useCallback((value: string) => {
+    setFilterText(value);
+  }, []);
+
+  const handleFilterChange = useCallback((next: ChannelFilter) => {
+    setFilter(next);
+  }, []);
+
   return (
-    <Card className="p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle>Subscriptions</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={loading || isCooldownActive || syncBusy}
-            aria-label={
-              isCooldownActive && retryLabel
-                ? `Refresh channels disabled until ${retryLabel}`
-                : undefined
-            }
-            title={
-              isCooldownActive && retryLabel
-                ? `Refresh channels disabled until ${retryLabel}`
-                : undefined
-            }
-          >
-            {loading ? 'Refreshing…' : 'Refresh channels'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRequestDisconnect}
-            disabled={disconnectDisabled}
-            aria-label={
-              disconnectDisabled && disconnectDisabledReason
-                ? disconnectDisabledReason
-                : 'Disconnect YouTube account'
-            }
-            title={
-              disconnectDisabled && disconnectDisabledReason
-                ? disconnectDisabledReason
-                : undefined
-            }
-            className="text-destructive hover:text-destructive"
-          >
-            Disconnect
-          </Button>
-        </div>
-      </div>
-      <div className="text-xs text-muted-foreground">
-        <ul className="list-disc list-inside space-y-0.5 mb-2">
-          {YOUTUBE_DATA_PRIVACY_BULLETS.map((bullet) => (
-            <li key={bullet}>{bullet}</li>
-          ))}
-        </ul>
-        <Link href="/youtube/data-privacy" className="underline">
-          How we store your data
-        </Link>
-      </div>
-      <CardContent className="mt-4">
-        {loading && subscriptions.length === 0 ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full rounded" />
-            ))}
-          </div>
-        ) : subscriptions.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            No subscriptions found. Click &quot;Refresh channels&quot; to import
-            your channels.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {subscriptions.map((sub) => (
-              <li key={sub.id} className="flex items-center gap-3 py-3">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted"
-                  onClick={() => handleSelectChannel(sub.channelId)}
-                >
-                  {sub.channelThumbnail ? (
-                    <img
-                      src={sub.channelThumbnail}
-                      alt={sub.channelTitle}
-                      className="h-8 w-8 rounded-full"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                      {sub.channelTitle.charAt(0)}
-                    </div>
-                  )}
-                  <span className="flex-1 truncate text-sm font-medium">
-                    {sub.channelTitle}
-                  </span>
-                </button>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={sub.enabled}
-                    onChange={() => onToggle(sub.id, !sub.enabled)}
-                    className="peer sr-only"
-                    aria-label={`Toggle subscription for ${sub.channelTitle}`}
-                  />
-                  <div className="peer h-5 w-9 rounded-full bg-muted after:absolute after:start-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-brand peer-checked:after:translate-x-full peer-checked:after:border-card" />
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-5 md:flex-row md:flex-wrap md:items-start">
+      <ChannelsListCard
+        channels={visibleChannels}
+        totalCount={subscriptions.length}
+        counts={counts}
+        filterText={filterText}
+        onFilterTextChange={handleFilterTextChange}
+        filter={filter}
+        onFilterChange={handleFilterChange}
+        loading={loading}
+        onRefresh={handleSync}
+        refreshDisabled={isCooldownActive || syncBusy}
+        refreshBlockedLabel={refreshBlockedLabel}
+        onSelectChannel={handleSelectChannel}
+        onToggle={onToggle}
+      />
+      <ChannelsAside
+        onRequestDisconnect={onRequestDisconnect}
+        disconnectDisabled={disconnectDisabled}
+        disconnectDisabledReason={disconnectDisabledReason}
+      />
+    </div>
   );
 }

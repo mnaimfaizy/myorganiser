@@ -17,13 +17,19 @@ jest.mock('lucide-react', () => ({
   ChevronRight: ({ className }: { className?: string }) => (
     <span className={className} data-testid="chevron-right" />
   ),
+  ChevronUp: ({ className }: { className?: string }) => (
+    <span className={className} data-testid="chevron-up" />
+  ),
+  ChevronDown: ({ className }: { className?: string }) => (
+    <span className={className} data-testid="chevron-down" />
+  ),
 }));
 
 jest.mock('./YouTubeVideoPlayer', () => ({
   YouTubeVideoPlayer: ({
     video,
     watched,
-    onNearEnd: _onNearEnd,
+    onNearEnd,
     onPlay,
     onPlayingChange,
     onPlaybackUnavailable,
@@ -41,6 +47,15 @@ jest.mock('./YouTubeVideoPlayer', () => ({
       onClick={() => onPlayingChange?.(true)}
     >
       Player: {video.title}
+      <button
+        data-testid="mock-near-end"
+        onClick={(e: any) => {
+          e.stopPropagation();
+          onNearEnd?.();
+        }}
+      >
+        near end
+      </button>
       {/* Clicking the surrounding div stands in for an embed state report, so
           each inner control has to stop the click from reaching it. */}
       <button
@@ -74,7 +89,7 @@ jest.mock('./YouTubeVideoPlayer', () => ({
   ),
 }));
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { YouTubeVideo } from '../types';
 import { ShortsPlayerPanel } from './ShortsPlayerPanel';
 
@@ -398,7 +413,7 @@ describe('ShortsPlayerPanel', () => {
   });
 
   describe('watched toggle', () => {
-    it('shows "Mark as Watched" when watched is false', () => {
+    it('shows "Mark watched" when watched is false', () => {
       render(
         <ShortsPlayerPanel
           activeShort={{ ...baseShort, watched: false }}
@@ -412,7 +427,7 @@ describe('ShortsPlayerPanel', () => {
         />,
       );
 
-      expect(screen.getByText('Mark as Watched')).toBeInTheDocument();
+      expect(screen.getByText('Mark watched')).toBeInTheDocument();
     });
 
     it('shows "Mark as New" when watched is true', () => {
@@ -446,7 +461,7 @@ describe('ShortsPlayerPanel', () => {
         />,
       );
 
-      fireEvent.click(screen.getByText('Mark as Watched'));
+      fireEvent.click(screen.getByText('Mark watched'));
       expect(onWatchedToggle).toHaveBeenCalledTimes(1);
     });
 
@@ -463,7 +478,7 @@ describe('ShortsPlayerPanel', () => {
         />,
       );
 
-      expect(screen.getByText('Mark as Watched')).toBeInTheDocument();
+      expect(screen.getByText('Mark watched')).toBeInTheDocument();
     });
   });
 
@@ -637,7 +652,8 @@ describe('ShortsPlayerPanel', () => {
         />,
       );
 
-      expect(screen.getByTestId('player-dQw4w9WgXcQ')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('mock-near-end'));
+      expect(onNearEnd).toHaveBeenCalledTimes(1);
     });
 
     it('forwards the embed reported playing state to onPlayingChange', () => {
@@ -699,6 +715,162 @@ describe('ShortsPlayerPanel', () => {
 
       fireEvent.click(screen.getByTestId('mock-report-unavailable'));
       expect(onPlaybackUnavailable).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('desktop meta line', () => {
+    it('shows the channel, then how long ago the Short was published', () => {
+      const publishedAt = new Date(
+        Date.now() - 3 * 60 * 60 * 1000,
+      ).toISOString();
+      render(
+        <ShortsPlayerPanel
+          activeShort={{ ...baseShort, publishedAt }}
+          activeIndex={0}
+          shortsLength={1}
+          remainingMs={60000}
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      // Same locale and formatter as the component, so the expectation holds in any locale.
+      const expected = new Intl.RelativeTimeFormat(undefined, {
+        numeric: 'auto',
+      }).format(-3, 'hour');
+      const meta = screen.getByText('Test Channel').closest('p');
+      expect(meta?.textContent).toBe(`Test Channel·${expected}`);
+    });
+
+    it('omits the time segment when the publish date cannot be parsed', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={{ ...baseShort, publishedAt: 'not-a-date' }}
+          activeIndex={0}
+          shortsLength={1}
+          remainingMs={60000}
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      const meta = screen.getByText('Test Channel').closest('p');
+      expect(meta?.textContent).toBe('Test Channel');
+    });
+  });
+
+  describe('phone variant', () => {
+    const renderPhone = (
+      onPrevious = jest.fn(),
+      onWatchedToggle = jest.fn(),
+      onNext = jest.fn(),
+    ) =>
+      render(
+        <ShortsPlayerPanel
+          activeShort={baseShort}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={60000}
+          variant="phone"
+          onPrevious={onPrevious}
+          onNext={onNext}
+          onWatchedToggle={onWatchedToggle}
+        />,
+      );
+
+    it('calls onPrevious and onNext from the phone row', () => {
+      const onPrevious = jest.fn();
+      const onNext = jest.fn();
+      renderPhone(onPrevious, jest.fn(), onNext);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Previous Short' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Next Short' }));
+
+      expect(onPrevious).toHaveBeenCalledTimes(1);
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders the Short on a navy stage', () => {
+      const { container } = renderPhone();
+
+      expect(container.firstChild).toHaveClass('bg-navy');
+    });
+
+    it('shows runtime and position once each, on the meta line, with no swipe hint', () => {
+      renderPhone();
+
+      const meta = screen.getByText('Test Channel').closest('p');
+      expect(meta?.textContent).toBe('Test Channel·0:30·3 of 5');
+      expect(screen.getAllByText('0:30')).toHaveLength(1);
+      expect(screen.getAllByText('3 of 5')).toHaveLength(1);
+      expect(screen.queryByText(/swipe/i)).not.toBeInTheDocument();
+    });
+
+    it('omits the runtime segment when the Short has no duration', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={{ ...baseShort, durationSeconds: null }}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={60000}
+          variant="phone"
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      const meta = screen.getByText('Test Channel').closest('p');
+      expect(meta?.textContent).toBe('Test Channel·3 of 5');
+    });
+
+    it('shows the budget warning when the Short is longer than the time left', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={{ ...baseShort, durationSeconds: 120 }}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={60000}
+          variant="phone"
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          'This Short is longer than the time you have left today',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('lays Previous, the watched toggle and Next out in one row with up and down chevrons', () => {
+      renderPhone();
+
+      const previous = screen.getByRole('button', { name: 'Previous Short' });
+      const row = previous.parentElement as HTMLElement;
+      expect(
+        within(row)
+          .getAllByRole('button')
+          .map((b) => b.getAttribute('aria-label') ?? b.textContent),
+      ).toEqual(['Previous Short', 'Mark watched', 'Next Short']);
+      expect(within(previous).getByTestId('chevron-up')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('button', { name: 'Next Short' })).getByTestId(
+          'chevron-down',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('calls onWatchedToggle from the phone row', () => {
+      const onWatchedToggle = jest.fn();
+      renderPhone(jest.fn(), onWatchedToggle);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mark watched' }));
+      expect(onWatchedToggle).toHaveBeenCalledTimes(1);
     });
   });
 });

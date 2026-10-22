@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardTitle } from '@myorganiser/web-ui';
+import { Button, cn, useIsMobileState } from '@myorganiser/web-ui';
 import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -17,21 +17,28 @@ import {
   useYouTubeSyncStatus,
 } from '../hooks';
 import { useYouTubeSyncPoll } from '../hooks/useYouTubeSyncPoll';
+import { describeSyncFreshness } from '../lib/syncFreshness';
 import { isRunLive } from '../lib/syncProgress';
 import { ChannelDirectory } from './ChannelDirectory';
 import { QueueRail } from './QueueRail';
 import { SyncFreshnessIndicator } from './SyncFreshnessIndicator';
 import { SyncProgressPanel } from './SyncProgressPanel';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
+import { YouTubePageHeader } from './YouTubePageHeader';
+import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 
 export function YouTubePageClient() {
-  const { available } = useYouTubeAvailability();
+  const { available, error: availabilityError } = useYouTubeAvailability();
 
   // Availability gate — fail closed. The connection and data hooks live below
   // it, so a User without YouTube Access makes no YouTube request at all.
   if (available !== true) {
-    return <YouTubeUnavailableNotice />;
+    return (
+      <YouTubeUnavailableNotice
+        reason={availabilityError ? 'unreachable' : 'unavailable'}
+      />
+    );
   }
 
   return <YouTubeConnectionState />;
@@ -44,7 +51,7 @@ function YouTubeConnectionState() {
   if (status === 'loading') {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-body text-muted-foreground">Loading…</p>
       </div>
     );
   }
@@ -70,6 +77,7 @@ function ConnectedDashboard() {
   // as the directory's initial selection rather than driving it from the URL,
   // so the User's own clicks are not fighting a stale query string.
   const deepLinkedChannelId = useSearchParams().get('channel');
+  const isPhone = useIsMobileState() === true;
   const subs = useYouTubeSubscriptions();
   const carouselData = useYouTubeCarousel();
   const syncStatus = useYouTubeSyncStatus();
@@ -164,10 +172,16 @@ function ConnectedDashboard() {
   const uploadSyncDisabled =
     carouselData.loading || syncStatus.loading || syncBusy || isCooldownActive;
 
+  const syncSpinning = carouselData.loading || syncStatus.loading || syncBusy;
+
   const retryLabel =
     isCooldownActive && syncStatus.status?.retryAt
       ? (formatRetryAt(syncStatus.status.retryAt) ?? syncStatus.status.retryAt)
       : null;
+
+  const syncButtonLabel = retryLabel
+    ? `Sync uploads disabled until ${retryLabel}`
+    : 'Sync uploads';
 
   const showNoChannelsNote = !subs.loading && subs.subscriptions.length === 0;
 
@@ -176,100 +190,129 @@ function ConnectedDashboard() {
     subs.subscriptions.length > 0 &&
     syncStatus.status?.status === 'never';
 
-  return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <Card className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4 sm:flex-nowrap">
-          <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
-            <CardTitle>Videos</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              aria-label="Shorts — daily time budget applies"
-            >
-              <Link href="/dashboard/youtube/shorts">Shorts</Link>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/youtube/channels">Channels</Link>
-            </Button>
-          </div>
-          <div className="ml-auto flex flex-wrap items-start justify-end gap-2 sm:flex-nowrap">
-            <SyncFreshnessIndicator status={syncStatus.status} />
+  const newUploadCount = library.filter((video) => !video.watched).length;
+  const channelCount = channels.length;
+  const subtitle = [
+    describeSyncFreshness(syncStatus.status).lastSyncedLabel,
+    `${channelCount} ${channelCount === 1 ? 'channel' : 'channels'}`,
+    newUploadCount > 0
+      ? `${newUploadCount} new ${newUploadCount === 1 ? 'upload' : 'uploads'}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSync}
-              disabled={uploadSyncDisabled}
-              aria-label={
-                retryLabel
-                  ? `Sync uploads disabled until ${retryLabel}`
-                  : 'Sync uploads'
-              }
-              title={
-                retryLabel
-                  ? `Sync uploads disabled until ${retryLabel}`
-                  : 'Sync uploads'
-              }
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${carouselData.loading || syncStatus.loading || syncBusy ? 'animate-spin' : ''}`}
-              />
-              Sync uploads
-            </Button>
-          </div>
+  const syncButton = isPhone ? (
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={handleSync}
+      disabled={uploadSyncDisabled}
+      aria-label={syncButtonLabel}
+      title={syncButtonLabel}
+    >
+      <RefreshCw
+        className={cn(
+          syncSpinning && 'animate-spin motion-reduce:animate-none',
+        )}
+      />
+    </Button>
+  ) : (
+    <Button
+      variant="outline"
+      onClick={handleSync}
+      disabled={uploadSyncDisabled}
+      aria-label={syncButtonLabel}
+      title={syncButtonLabel}
+    >
+      <RefreshCw
+        className={cn(
+          syncSpinning && 'animate-spin motion-reduce:animate-none',
+        )}
+      />
+      Sync uploads
+    </Button>
+  );
+
+  return (
+    <div className="flex flex-1 flex-col gap-5 px-4 pb-4 pt-0 md:mx-auto md:w-full md:max-w-[1240px] md:p-8">
+      <div className="flex flex-col gap-3">
+        <YouTubePageHeader
+          title="YouTube"
+          subtitle={subtitle}
+          actions={syncButton}
+          variant={isPhone ? 'phone' : 'desktop'}
+        />
+        <SyncFreshnessIndicator status={syncStatus.status} variant="inline" />
+      </div>
+
+      <YouTubeSectionNav
+        current="videos"
+        variant={isPhone ? 'phone' : 'desktop'}
+        channelCount={subs.loading ? null : subs.subscriptions.length}
+      />
+
+      {showNoChannelsNote && (
+        <div role="status" className="text-body-sm text-muted-foreground">
+          No channels yet.{' '}
+          <Link
+            href="/dashboard/youtube/channels"
+            className="font-semibold text-brand-text underline"
+          >
+            Refresh channels
+          </Link>
         </div>
-        <CardContent className="mt-4 space-y-6">
-          {showNoChannelsNote && (
-            <div role="status" className="text-sm text-muted-foreground">
-              No channels yet.{' '}
-              <Link href="/dashboard/youtube/channels" className="underline">
-                Refresh channels
-              </Link>
+      )}
+      {showNeverSyncedNote && (
+        <div role="status" className="text-body-sm text-muted-foreground">
+          Uploads have not been synced yet. Sync uploads caches the latest 100
+          from each enabled channel.
+        </div>
+      )}
+      {syncStatus.status && <SyncProgressPanel status={syncStatus.status} />}
+      {syncError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="rounded-control border border-destructive-edge bg-destructive-faint p-3 text-body-sm text-destructive-text"
+        >
+          {syncError}
+        </div>
+      )}
+
+      <QueueRail
+        queue={queue}
+        onWatchedToggle={handleWatchedToggle}
+        onPlaybackClaim={handleQueuePlaybackClaim}
+      >
+        {({ player, rail, disclosure }) => (
+          <div className="flex flex-wrap items-start gap-5">
+            <div className="flex min-w-0 flex-[999_1_540px] flex-col gap-5">
+              {player}
+              <div className="md:hidden">{disclosure}</div>
+              <ChannelDirectory
+                channels={channels}
+                loading={carouselData.loading}
+                error={carouselData.error}
+                onRetry={handleDirectoryRetry}
+                onWatchedToggle={handleWatchedToggle}
+                onAddToQueue={queue.add}
+                isQueued={queue.isQueued}
+                queueFull={queue.isFull}
+                playbackSuspended={playbackOwner !== 'directory'}
+                onPlaybackClaim={handleDirectoryPlaybackClaim}
+                initialChannelId={deepLinkedChannelId}
+                onLoadMoreUploads={channelUploads.loadChannel}
+                loadingMoreChannelIds={channelUploads.loadingChannelIds}
+                fullyLoadedChannelIds={channelUploads.fullyLoadedChannelIds}
+              />
             </div>
-          )}
-          {showNeverSyncedNote && (
-            <div role="status" className="text-sm text-muted-foreground">
-              Uploads have not been synced yet. Sync uploads caches the latest
-              100 from each enabled channel.
+            <div className="hidden md:sticky md:top-4 md:block md:flex-[1_1_300px] md:self-start rounded-panel border border-border bg-raised-surface p-4">
+              {rail}
             </div>
-          )}
-          {syncStatus.status && (
-            <SyncProgressPanel status={syncStatus.status} />
-          )}
-          {syncError && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="text-sm text-destructive"
-            >
-              {syncError}
-            </div>
-          )}
-          <QueueRail
-            queue={queue}
-            onWatchedToggle={handleWatchedToggle}
-            onPlaybackClaim={handleQueuePlaybackClaim}
-          />
-          <ChannelDirectory
-            channels={channels}
-            loading={carouselData.loading}
-            error={carouselData.error}
-            onRetry={handleDirectoryRetry}
-            onWatchedToggle={handleWatchedToggle}
-            onAddToQueue={queue.add}
-            isQueued={queue.isQueued}
-            queueFull={queue.isFull}
-            playbackSuspended={playbackOwner !== 'directory'}
-            onPlaybackClaim={handleDirectoryPlaybackClaim}
-            initialChannelId={deepLinkedChannelId}
-            onLoadMoreUploads={channelUploads.loadChannel}
-            loadingMoreChannelIds={channelUploads.loadingChannelIds}
-            fullyLoadedChannelIds={channelUploads.fullyLoadedChannelIds}
-          />
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </QueueRail>
     </div>
   );
 }

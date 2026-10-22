@@ -1,6 +1,6 @@
 'use client';
 
-import { Input, Label } from '@myorganiser/web-ui';
+import { Button, Input, Label } from '@myorganiser/web-ui';
 import { useCallback, useState } from 'react';
 import {
   formatShortsDuration,
@@ -18,9 +18,12 @@ interface ShortsBudgetMeterProps {
   onLimitMinutesChange: (minutes: number) => void;
 }
 
+/** One stepper press moves the daily limit by this many minutes. */
+const LIMIT_STEP_MINUTES = 5;
+
 /**
- * Renders the Shorts Daily Budget meter with progress visualization and
- * a numeric minutes control for the daily limit.
+ * Renders the Shorts Daily Budget meter with progress visualization and a
+ * daily limit control: a −/+ stepper around the numeric minutes input.
  *
  * The progress bar shows time used vs. the limit without relying on color alone.
  * Remaining time is in a polite live region so assistive tech hears meaningful
@@ -28,7 +31,9 @@ interface ShortsBudgetMeterProps {
  * and the locked transition, not every second tick.
  *
  * The limit input immediately fires onChange for any valid number and ignores
- * empty or non-numeric entries — never sends NaN.
+ * empty or non-numeric entries — never sends NaN. The stepper moves the limit
+ * in fixed steps, clamped to the minimum and maximum, and writes the new value
+ * into the same input.
  */
 export function ShortsBudgetMeter({
   spentMs,
@@ -78,78 +83,149 @@ export function ShortsBudgetMeter({
     [onLimitMinutesChange],
   );
 
+  // The stepper starts from what the input shows. If the input holds nothing
+  // usable, it starts from the committed limit instead.
+  const stepLimit = useCallback(
+    (delta: number) => {
+      const typed = parseInt(inputValue, 10);
+      const current =
+        inputValue.trim() !== '' && Number.isFinite(typed)
+          ? typed
+          : Math.round(limitMs / 60_000);
+      const next = Math.min(
+        MAX_SHORTS_LIMIT_MINUTES,
+        Math.max(MIN_SHORTS_LIMIT_MINUTES, current + delta),
+      );
+      setInputValue(String(next));
+      if (next !== current) {
+        onLimitMinutesChange(next);
+      }
+    },
+    [inputValue, limitMs, onLimitMinutesChange],
+  );
+
+  const handleLessMinutes = useCallback(() => {
+    stepLimit(-LIMIT_STEP_MINUTES);
+  }, [stepLimit]);
+
+  const handleMoreMinutes = useCallback(() => {
+    stepLimit(LIMIT_STEP_MINUTES);
+  }, [stepLimit]);
+
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-      {/* Header: time used and remaining */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-foreground">
-            Shorts Daily Budget
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formatShortsDuration(spentMs)} used today
-          </p>
+    <section
+      aria-label="Shorts daily budget"
+      className="flex flex-col gap-4 rounded-panel border border-border bg-card p-4 px-5 md:flex-row md:items-center md:gap-5"
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {/*
+          The visible countdown ticks every second, so it must not be the
+          live region — a screen reader would read it aloud once a second.
+          The announcement below carries the same state at whole-minute
+          granularity, so its text only changes on a coarse step.
+        */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-body-sm">
+          <span className="text-foreground-secondary">
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatShortsDuration(spentMs)}
+            </span>{' '}
+            used today
+          </span>
+          <span className="flex items-baseline gap-2">
+            <span className="font-semibold text-warning-text">
+              {formatShortsDuration(remainingMs)} remaining
+            </span>
+            {metering && (
+              <span className="text-caption text-muted-foreground">
+                (metering…)
+              </span>
+            )}
+          </span>
         </div>
-        <div className="text-right">
-          {/*
-            The visible countdown ticks every second, so it must not be the
-            live region — a screen reader would read it aloud once a second.
-            The announcement below carries the same state at whole-minute
-            granularity, so its text only changes on a coarse step.
-          */}
-          <p className="text-sm font-semibold text-foreground">
-            {formatShortsDuration(remainingMs)} remaining
-          </p>
-          {metering && (
-            <p className="text-xs text-muted-foreground">(metering…)</p>
-          )}
-        </div>
-      </div>
 
-      <p className="sr-only" role="status" aria-live="polite">
-        {announcement}
-      </p>
+        <p className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </p>
 
-      {/* Progress bar: shows usage with text label, not color alone */}
-      <div className="space-y-2">
-        <div className="flex h-6 overflow-hidden rounded-full bg-muted">
+        {/* Progress bar: shows usage with text label, not color alone */}
+        <div
+          role="progressbar"
+          aria-valuenow={usedPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${usedPercent}% of daily Shorts budget used`}
+          className="h-2 overflow-hidden rounded-full bg-muted"
+        >
           <div
             // Reduced motion is honoured in CSS rather than sniffed in JS —
             // the variant tracks the OS preference live, with no effect,
             // no state, and nothing to go stale.
-            className="bg-brand transition-all duration-300 motion-reduce:transition-none"
+            className="h-full rounded-full bg-warning transition-all duration-300 motion-reduce:transition-none"
             style={{ width: `${Math.min(usedPercent, 100)}%` }}
-            role="progressbar"
-            aria-valuenow={usedPercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${usedPercent}% of daily Shorts budget used`}
           />
         </div>
-        <p className="text-xs text-muted-foreground">{usedPercent}% used</p>
+
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-caption text-muted-foreground">
+          <span>Resets at midnight. Long videos have no limit.</span>
+          <span>{usedPercent}% used</span>
+        </div>
       </div>
 
-      {/* Limit control: numeric input */}
-      <div className="space-y-2">
-        <Label htmlFor="shorts-limit-minutes" className="text-sm">
-          Daily limit (minutes)
+      {/* Daily limit: a stepper around the numeric input */}
+      <div className="flex flex-col gap-2 md:items-end">
+        <Label
+          htmlFor="shorts-limit-minutes"
+          className="text-body-sm font-semibold text-foreground"
+        >
+          Daily limit
         </Label>
-        <Input
-          id="shorts-limit-minutes"
-          type="number"
-          inputMode="numeric"
-          min={MIN_SHORTS_LIMIT_MINUTES}
-          max={MAX_SHORTS_LIMIT_MINUTES}
-          value={inputValue}
-          onChange={handleInputChange}
-          className="w-full"
-          // Deliberately editable while locked: raising the limit is the one
-          // sanctioned way to get time back today (PRD #264 user story 18), and
-          // the banner below says so. Disabling it here would make that promise
-          // unactionable. It is not a Hard Stop bypass — the escape the Hard
-          // Stop blocks is leaving for YouTube, not the User's own daily cap.
-        />
-        <p className="text-xs text-muted-foreground">
+        <div className="flex items-center overflow-hidden rounded-control border border-border-strong bg-card">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Five minutes less"
+            onClick={handleLessMinutes}
+          >
+            <span aria-hidden="true" className="text-body font-semibold">
+              −
+            </span>
+          </Button>
+          <Input
+            id="shorts-limit-minutes"
+            type="number"
+            inputMode="numeric"
+            min={MIN_SHORTS_LIMIT_MINUTES}
+            max={MAX_SHORTS_LIMIT_MINUTES}
+            value={inputValue}
+            onChange={handleInputChange}
+            aria-label="Daily limit (minutes)"
+            className="h-11 w-16 border-0 bg-transparent px-0 text-center font-semibold tabular-nums shadow-none md:h-11"
+            // Deliberately editable while locked: raising the limit is the one
+            // sanctioned way to get time back today (PRD #264 user story 18), and
+            // the banner below says so. Disabling it here would make that promise
+            // unactionable. It is not a Hard Stop bypass — the escape the Hard
+            // Stop blocks is leaving for YouTube, not the User's own daily cap.
+          />
+          <span
+            aria-hidden="true"
+            className="pr-1 text-caption text-muted-foreground"
+          >
+            min
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Five minutes more"
+            onClick={handleMoreMinutes}
+          >
+            <span aria-hidden="true" className="text-body font-semibold">
+              +
+            </span>
+          </Button>
+        </div>
+        <p className="text-caption text-muted-foreground">
           Min: {MIN_SHORTS_LIMIT_MINUTES} min • Max: {MAX_SHORTS_LIMIT_MINUTES}{' '}
           min
         </p>
@@ -158,7 +234,7 @@ export function ShortsBudgetMeter({
       {/* Locked state banner with live announcement */}
       {locked && (
         <div
-          className="rounded bg-warning/10 p-2 text-xs text-warning"
+          className="rounded-control-sm bg-warning-soft p-2 text-caption text-warning-text md:basis-full"
           role="status"
           aria-live="polite"
         >
@@ -166,6 +242,6 @@ export function ShortsBudgetMeter({
           back today.
         </div>
       )}
-    </div>
+    </section>
   );
 }

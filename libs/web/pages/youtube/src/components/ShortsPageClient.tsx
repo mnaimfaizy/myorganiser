@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, Skeleton } from '@myorganiser/web-ui';
-import Link from 'next/link';
+import { Button, Skeleton, useIsMobileState } from '@myorganiser/web-ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
   updateVideoWatched,
@@ -14,9 +13,14 @@ import { ShortsEntryWarning } from './ShortsEntryWarning';
 import { ShortsBudgetMeter } from './ShortsBudgetMeter';
 import { ShortsHardStop } from './ShortsHardStop';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
+import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 import { ShortsList } from './ShortsList';
 import { ShortsPlayerPanel } from './ShortsPlayerPanel';
+
+/** The page gutter: the shell provides none inside its content area. */
+const SHORTS_PAGE_CLASS =
+  'mx-auto flex w-full max-w-[1240px] flex-1 flex-col gap-5 px-4 pb-8 pt-4 md:p-8';
 
 /**
  * Shorts page client — orchestrates the focused Shorts watching experience.
@@ -40,19 +44,25 @@ import { ShortsPlayerPanel } from './ShortsPlayerPanel';
  * is false until acknowledged and not locked.
  */
 export function ShortsPageClient() {
-  const { available } = useYouTubeAvailability();
+  const { available, error: availabilityError } = useYouTubeAvailability();
 
   // Availability gate — fail closed. The Shorts list, budget meter and
   // keyboard listener live below it, so a User without YouTube Access makes no
   // YouTube request and starts no budget clock.
   if (available !== true) {
-    return <YouTubeUnavailableNotice />;
+    return (
+      <YouTubeUnavailableNotice
+        reason={availabilityError ? 'unreachable' : 'unavailable'}
+      />
+    );
   }
 
   return <ShortsWatchExperience />;
 }
 
 function ShortsWatchExperience() {
+  const isPhone = useIsMobileState() === true;
+  const variant: 'desktop' | 'phone' = isPhone ? 'phone' : 'desktop';
   const { connected, status } = useYouTubeStatus();
   const {
     shorts,
@@ -230,129 +240,117 @@ function ShortsWatchExperience() {
     return <YouTubeConnectPrompt fallbackHref="/dashboard/youtube" />;
   }
 
-  // Page header
+  // The section navigation carries the page's visible identity; the h1 stays
+  // for the document outline and is visually hidden on both variants, because
+  // the shell draws the title.
   const header = (
-    <div className="border-b border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Shorts</h1>
-          <p className="text-xs text-muted-foreground">
-            Time-capped daily budget. Long-form videos have no limit.
-          </p>
-        </div>
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/youtube">Videos</Link>
-        </Button>
-      </div>
+    <div className="flex flex-col gap-5">
+      <h1 className="sr-only">Shorts</h1>
+      <YouTubeSectionNav current="shorts" variant={variant} />
     </div>
   );
 
   // Entry warning gate
   if (!acknowledged) {
     return (
-      <>
+      <div className={SHORTS_PAGE_CLASS}>
         {header}
-        <div className="flex flex-1 items-center justify-center p-8">
+        <div className="flex flex-1 items-center justify-center">
           <ShortsEntryWarning
             limitMs={budget.limitMs}
             remainingMs={budget.remainingMs}
             onContinue={handleContinueToShorts}
           />
         </div>
-      </>
+      </div>
     );
   }
 
   // Render budget meter in both active and locked states
   const meterSection = (
-    <div className="border-b border-border bg-card p-4">
-      <ShortsBudgetMeter
-        spentMs={budget.spentMs}
-        limitMs={budget.limitMs}
-        remainingMs={budget.remainingMs}
-        usedPercent={budget.usedPercent}
-        locked={budget.locked}
-        metering={budget.metering}
-        onLimitMinutesChange={budget.setLimitMinutes}
-      />
-    </div>
+    <ShortsBudgetMeter
+      spentMs={budget.spentMs}
+      limitMs={budget.limitMs}
+      remainingMs={budget.remainingMs}
+      usedPercent={budget.usedPercent}
+      locked={budget.locked}
+      metering={budget.metering}
+      onLimitMinutesChange={budget.setLimitMinutes}
+    />
   );
 
   // Hard Stop: locked state
   if (budget.locked) {
     return (
-      <>
+      <div className={SHORTS_PAGE_CLASS}>
         {header}
         {meterSection}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
           <ShortsHardStop limitMs={budget.limitMs} />
         </div>
-      </>
+      </div>
     );
   }
 
   // Main content: player + navigation + list
   return (
-    <>
+    <div className={SHORTS_PAGE_CLASS}>
       {header}
       {meterSection}
 
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:gap-4">
-        {/* Loading state */}
-        {loading && !shorts.length ? (
-          <div className="w-full max-w-sm space-y-2">
-            <Skeleton className="aspect-[9/16] rounded-lg" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : error && !shorts.length ? (
-          <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-center">
-            <p className="text-sm font-semibold text-destructive">
-              Failed to load Shorts
-            </p>
-            <p className="mt-1 text-xs text-destructive">{error}</p>
-            <Button onClick={handleRetry} variant="outline" className="mt-3">
-              Retry
-            </Button>
-          </div>
-        ) : shorts.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No Shorts to Watch
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              None of your Enabled Channels have recent Shorts. Visit your
-              long-form videos or check back later.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Player panel — desktop centered, mobile full-width */}
-            <div className="flex flex-1 items-center justify-center">
-              <ShortsPlayerPanel
-                activeShort={activeShort}
-                activeIndex={activeIndex}
-                shortsLength={shorts.length}
-                remainingMs={budget.remainingMs}
-                watched={activeShort?.watched ?? false}
-                onNearEnd={handleNearEnd}
-                onPlaybackStart={handlePlaybackStart}
-                onPlayingChange={handlePlayingChange}
-                onPlaybackUnavailable={handlePlaybackUnavailable}
-                onPrevious={handlePreviousShort}
-                onNext={handleNextShort}
-                onWatchedToggle={handleWatchedToggleClick}
-              />
-            </div>
+      {/* Loading state */}
+      {loading && !shorts.length ? (
+        <div className="flex w-full max-w-sm flex-col gap-2">
+          <Skeleton className="aspect-[340/604] rounded-panel" />
+          <Skeleton className="h-11 w-full rounded-control" />
+        </div>
+      ) : error && !shorts.length ? (
+        <div className="rounded-panel border border-destructive-edge bg-destructive-soft p-4 text-center">
+          <p className="text-body-sm font-semibold text-destructive-text">
+            Failed to load Shorts
+          </p>
+          <p className="mt-1 text-caption text-destructive-text">{error}</p>
+          <Button onClick={handleRetry} variant="outline" className="mt-3">
+            Retry
+          </Button>
+        </div>
+      ) : shorts.length === 0 ? (
+        <div className="rounded-panel border border-border bg-card p-8 text-center">
+          <p className="font-display text-title text-foreground">
+            No Shorts to Watch
+          </p>
+          <p className="mt-2 text-body-sm text-muted-foreground">
+            None of your Enabled Channels have recent Shorts. Visit your
+            long-form videos or check back later.
+          </p>
+        </div>
+      ) : (
+        // Desktop: player row beside the Up next aside from `lg`. Phone and
+        // narrower desktops stack the player above the list.
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-center">
+          <ShortsPlayerPanel
+            activeShort={activeShort}
+            activeIndex={activeIndex}
+            shortsLength={shorts.length}
+            remainingMs={budget.remainingMs}
+            watched={activeShort?.watched ?? false}
+            onNearEnd={handleNearEnd}
+            onPlaybackStart={handlePlaybackStart}
+            onPlayingChange={handlePlayingChange}
+            onPlaybackUnavailable={handlePlaybackUnavailable}
+            onPrevious={handlePreviousShort}
+            onNext={handleNextShort}
+            onWatchedToggle={handleWatchedToggleClick}
+            variant={variant}
+          />
 
-            {/* Side list of all Shorts (responsive: desktop rail + mobile scroller) */}
-            <ShortsList
-              shorts={shorts}
-              selectedShortId={activeShortId}
-              onSelectShort={handleSelectShort}
-            />
-          </>
-        )}
-      </div>
-    </>
+          <ShortsList
+            shorts={shorts}
+            selectedShortId={activeShortId}
+            onSelectShort={handleSelectShort}
+          />
+        </div>
+      )}
+    </div>
   );
 }

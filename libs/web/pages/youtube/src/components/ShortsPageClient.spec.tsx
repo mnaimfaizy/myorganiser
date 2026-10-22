@@ -14,6 +14,8 @@ jest.mock('../hooks', () => ({
 }));
 
 jest.mock('@myorganiser/web-ui', () => ({
+  Illustration: () => null,
+  useIsMobileState: jest.fn(),
   Button: ({ children, asChild, ...props }: any) => {
     if (asChild) return children;
     return <button {...props}>{children}</button>;
@@ -25,9 +27,25 @@ jest.mock('@myorganiser/web-ui', () => ({
     classes.filter(Boolean).join(' '),
 }));
 
+// The section nav is real, and it needs aria-current to reach the DOM.
 jest.mock('next/link', () => {
-  return ({ children, href }: any) => <a href={href}>{children}</a>;
+  return ({ children, href, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
 });
+
+// The availability notice imports the recheck action; the page never calls it.
+jest.mock('@myorganiser/web-youtube', () => ({
+  requestYouTubeAvailabilityRecheck: jest.fn(),
+}));
+
+// The connect prompt calls its own acknowledgement hook, which is outside this
+// page's contract. The page only decides whether to render the prompt.
+jest.mock('./YouTubeConnectPrompt', () => ({
+  YouTubeConnectPrompt: () => <p>Connect Your YouTube Account</p>,
+}));
 
 // Mock ShortsPlayerPanel with a simple div so we can confirm it renders in the
 // unlocked branch, plus buttons standing in for each playback signal the real
@@ -35,12 +53,25 @@ jest.mock('next/link', () => {
 jest.mock('./ShortsPlayerPanel', () => ({
   ShortsPlayerPanel: ({
     activeShort,
+    variant,
+    onNearEnd,
+    onWatchedToggle,
     onPlaybackStart,
     onPlayingChange,
     onPlaybackUnavailable,
   }: any) => (
-    <div data-testid="player-panel">
+    <div
+      data-testid="player-panel"
+      data-variant={variant}
+      data-active-id={activeShort?.videoId}
+    >
       {activeShort ? activeShort.title : 'No short'}
+      <button data-testid="mock-near-end" onClick={() => onNearEnd?.()}>
+        near end
+      </button>
+      <button data-testid="mock-toggle" onClick={() => onWatchedToggle?.()}>
+        toggle watched
+      </button>
       <button data-testid="press-play" onClick={() => onPlaybackStart?.()}>
         press play
       </button>
@@ -94,15 +125,27 @@ jest.mock('./ShortsEntryWarning', () => ({
 }));
 
 jest.mock('./ShortsBudgetMeter', () => ({
-  ShortsBudgetMeter: () => <div data-testid="meter">Meter</div>,
+  ShortsBudgetMeter: ({ onLimitMinutesChange }: any) => (
+    <div data-testid="meter">
+      Meter
+      <button
+        data-testid="set-limit"
+        onClick={() => onLimitMinutesChange?.(15)}
+      >
+        set limit
+      </button>
+    </div>
+  ),
 }));
 
 // Do NOT mock ShortsHardStop — render the real component so link-scan assertions
 // catch any youtube.com hrefs in the actual implementation
 // jest.mock('./ShortsHardStop', ...);
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import {
+  updateVideoWatched,
   useShortsBudget,
   useYouTubeAvailability,
   useYouTubeShorts,
@@ -135,6 +178,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
     (useYouTubeAvailability as jest.Mock).mockReturnValue({
       available: true,
       loading: false,
@@ -147,7 +191,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
   });
 
   describe('locked branch — Hard Stop blocks player and list', () => {
-    it('renders Hard Stop surface with no player, no navigation, no list when locked after acknowledging', () => {
+    it('renders the Hard Stop surface, with no player and no Shorts list, when locked after acknowledging', () => {
       (useShortsBudget as jest.Mock).mockReturnValue({
         spentMs: 3600000,
         limitMs: 3600000,
@@ -193,7 +237,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
   });
 
   describe('unlocked branch — player and list render after acknowledging', () => {
-    it('renders player, navigation, and Shorts list when unlocked after acknowledging', () => {
+    it('renders the player and the Shorts list when unlocked after acknowledging', () => {
       (useShortsBudget as jest.Mock).mockReturnValue({
         spentMs: 0,
         limitMs: 3600000,
@@ -367,7 +411,8 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
       render(<ShortsPageClient />);
 
       expect(screen.getByTestId('entry-continue')).toBeInTheDocument();
-      expect(screen.queryByTestId('player')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('player-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('shorts-list')).not.toBeInTheDocument();
     });
 
     it('shows connection gate when not connected', () => {
@@ -506,14 +551,8 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
       expect(lastMeteringArg()).toBe(false);
     });
 
-    it('does not meter once the budget is locked', () => {
-      (useShortsBudget as jest.Mock).mockReturnValue({
-        ...unlockedBudget,
-        spentMs: 3600000,
-        remainingMs: 0,
-        usedPercent: 100,
-        locked: true,
-      });
+    it('stops metering and shows the Hard Stop when the budget locks after Play was pressed', () => {
+      (useShortsBudget as jest.Mock).mockReturnValue(unlockedBudget);
       (useYouTubeShorts as jest.Mock).mockReturnValue({
         shorts: [mockShort],
         loading: false,
@@ -522,10 +561,302 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
         refresh: jest.fn(),
       });
 
-      render(<ShortsPageClient />);
+      const { rerender } = render(<ShortsPageClient />);
       fireEvent.click(screen.getByTestId('entry-continue'));
+      fireEvent.click(screen.getByTestId('press-play'));
+      expect(lastMeteringArg()).toBe(true);
+
+      (useShortsBudget as jest.Mock).mockReturnValue({
+        ...unlockedBudget,
+        spentMs: 3600000,
+        remainingMs: 0,
+        usedPercent: 100,
+        locked: true,
+      });
+      rerender(<ShortsPageClient />);
 
       expect(lastMeteringArg()).toBe(false);
+      expect(
+        screen.getByRole('status', { name: /exhausted/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('availability check error', () => {
+    it('shows the unreachable notice, with Try again, and makes no Shorts or budget call', () => {
+      (useYouTubeAvailability as jest.Mock).mockReturnValue({
+        available: null,
+        loading: false,
+        error: new Error('network down'),
+      });
+
+      render(<ShortsPageClient />);
+
+      expect(
+        screen.getByRole('heading', {
+          name: "YouTube can't be reached right now",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Try again' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', {
+          name: /YouTube is not available right now/i,
+        }),
+      ).not.toBeInTheDocument();
+      expect(useYouTubeStatus).not.toHaveBeenCalled();
+      expect(useShortsBudget).not.toHaveBeenCalled();
+      expect(useYouTubeShorts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('page states, navigation and wiring', () => {
+    /**
+     * Renders the page on the given state; acknowledges the entry gate unless
+     * told not to. `budget` and `shortsState` override the defaults per test.
+     */
+    const renderShorts = ({
+      locked = false,
+      phone = false,
+      acknowledge = true,
+      budget = {},
+      shortsState = {},
+    }: {
+      locked?: boolean;
+      phone?: boolean;
+      acknowledge?: boolean;
+      budget?: Record<string, unknown>;
+      shortsState?: Record<string, unknown>;
+    } = {}) => {
+      (useIsMobileState as jest.Mock).mockReturnValue(phone);
+      (useShortsBudget as jest.Mock).mockReturnValue({
+        spentMs: locked ? 3600000 : 0,
+        limitMs: 3600000,
+        remainingMs: locked ? 0 : 3600000,
+        usedPercent: locked ? 100 : 0,
+        locked,
+        dayKey: '2026-08-10',
+        metering: false,
+        setLimitMinutes: jest.fn(),
+        ...budget,
+      });
+      (useYouTubeShorts as jest.Mock).mockReturnValue({
+        shorts: [mockShort, mockShort2],
+        loading: false,
+        error: null,
+        updateWatched: jest.fn(),
+        refresh: jest.fn(),
+        ...shortsState,
+      });
+
+      render(<ShortsPageClient />);
+      if (acknowledge) {
+        fireEvent.click(screen.getByTestId('entry-continue'));
+      }
+    };
+
+    it.each([
+      ['entry gate', { acknowledge: false }],
+      ['desktop active', {}],
+      ['phone active', { phone: true }],
+      ['Hard Stop', { locked: true }],
+    ])(
+      'keeps the Shorts h1 visually hidden on the %s state',
+      (_state, options) => {
+        renderShorts(options);
+
+        expect(
+          screen.getByRole('heading', { level: 1, name: 'Shorts' }),
+        ).toHaveClass('sr-only');
+      },
+    );
+
+    it('shows the section nav with Shorts current and Videos and Channels as links, without the old Videos button or subtitle', () => {
+      renderShorts();
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(within(nav).getByRole('link', { name: 'Shorts' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(
+        within(nav).getByRole('link', { name: 'Channels' }),
+      ).toHaveAttribute('href', '/dashboard/youtube/channels');
+      expect(within(nav).getByRole('link', { name: 'Videos' })).toHaveAttribute(
+        'href',
+        '/dashboard/youtube',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Videos' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Time-capped daily budget/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['desktop', false],
+      ['phone', true],
+    ])(
+      'renders the player in the %s variant when the phone breakpoint is %s',
+      (variant, phone) => {
+        renderShorts({ phone });
+
+        expect(screen.getByTestId('player-panel')).toHaveAttribute(
+          'data-variant',
+          variant,
+        );
+      },
+    );
+
+    it('shows Loading… while the connection status is loading', () => {
+      (useYouTubeStatus as jest.Mock).mockReturnValue({
+        connected: false,
+        status: 'loading',
+      });
+      renderShorts({ acknowledge: false });
+
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(screen.queryByTestId('entry-continue')).not.toBeInTheDocument();
+    });
+
+    it('shows skeletons while the first Shorts load is in flight', () => {
+      renderShorts({ shortsState: { shorts: [], loading: true } });
+
+      expect(screen.getAllByTestId('skeleton')).toHaveLength(2);
+      expect(screen.queryByTestId('player-panel')).not.toBeInTheDocument();
+    });
+
+    it('shows the error message with Retry, which refreshes the Shorts', () => {
+      const refresh = jest.fn();
+      renderShorts({
+        shortsState: { shorts: [], error: 'Feed unavailable', refresh },
+      });
+
+      expect(screen.getByText('Failed to load Shorts')).toBeInTheDocument();
+      expect(screen.getByText('Feed unavailable')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the empty state when the Shorts list is empty', () => {
+      renderShorts({ shortsState: { shorts: [] } });
+
+      expect(screen.getByText('No Shorts to Watch')).toBeInTheDocument();
+      expect(screen.queryByTestId('player-panel')).not.toBeInTheDocument();
+    });
+
+    it('moves between Shorts with arrow keys, wrapping from the first to the last', () => {
+      renderShorts();
+      const activeId = () =>
+        screen.getByTestId('player-panel').getAttribute('data-active-id');
+
+      expect(activeId()).toBe('dQw4w9WgXcQ');
+      fireEvent.keyDown(document.body, { key: 'ArrowDown' });
+      expect(activeId()).toBe('video2');
+      fireEvent.keyDown(document.body, { key: 'ArrowDown' });
+      expect(activeId()).toBe('dQw4w9WgXcQ');
+      fireEvent.keyDown(document.body, { key: 'ArrowUp' });
+      expect(activeId()).toBe('video2');
+    });
+
+    it('ignores arrow keys pressed inside an editable field', () => {
+      renderShorts();
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+
+      try {
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        expect(
+          screen.getByTestId('player-panel').getAttribute('data-active-id'),
+        ).toBe('dQw4w9WgXcQ');
+      } finally {
+        input.remove();
+      }
+    });
+
+    it('keeps the player and the local watched mark when the near-end API call fails', async () => {
+      const updateWatched = jest.fn();
+      (updateVideoWatched as jest.Mock).mockRejectedValueOnce(
+        new Error('network down'),
+      );
+      renderShorts({ shortsState: { updateWatched } });
+
+      fireEvent.click(screen.getByTestId('mock-near-end'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(updateWatched).toHaveBeenCalledWith('dQw4w9WgXcQ', true);
+      expect(screen.getByTestId('player-panel')).toBeInTheDocument();
+    });
+
+    it('keeps the player and the local toggle when the toggle API call fails', async () => {
+      const updateWatched = jest.fn();
+      (updateVideoWatched as jest.Mock).mockRejectedValueOnce(
+        new Error('network down'),
+      );
+      renderShorts({ shortsState: { updateWatched } });
+
+      fireEvent.click(screen.getByTestId('mock-toggle'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(updateWatched).toHaveBeenCalledWith('dQw4w9WgXcQ', true);
+      expect(screen.getByTestId('player-panel')).toBeInTheDocument();
+    });
+
+    it('keeps the Shorts list and hides the load error when a refresh fails with Shorts already loaded', () => {
+      renderShorts({ shortsState: { error: 'Refresh failed' } });
+
+      expect(screen.getByTestId('shorts-list')).toBeInTheDocument();
+      expect(
+        screen.queryByText('Failed to load Shorts'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('reports a near-end Short as watched, locally and to the API', () => {
+      const updateWatched = jest.fn();
+      (updateVideoWatched as jest.Mock).mockResolvedValue({
+        ok: true,
+        watched: true,
+      });
+      renderShorts({ shortsState: { updateWatched } });
+
+      fireEvent.click(screen.getByTestId('mock-near-end'));
+
+      expect(updateWatched).toHaveBeenCalledWith('dQw4w9WgXcQ', true);
+      expect(updateVideoWatched).toHaveBeenCalledWith('dQw4w9WgXcQ', true);
+    });
+
+    it('toggles the active Short to the opposite of its current watched state', () => {
+      const updateWatched = jest.fn();
+      (updateVideoWatched as jest.Mock).mockResolvedValue({
+        ok: true,
+        watched: true,
+      });
+      renderShorts({ shortsState: { updateWatched } });
+
+      // First Short is unwatched, so the toggle marks it watched.
+      fireEvent.click(screen.getByTestId('mock-toggle'));
+      expect(updateWatched).toHaveBeenLastCalledWith('dQw4w9WgXcQ', true);
+
+      // The second Short is watched, so the toggle marks it new again.
+      fireEvent.click(screen.getByTestId('short-video2'));
+      fireEvent.click(screen.getByTestId('mock-toggle'));
+      expect(updateWatched).toHaveBeenLastCalledWith('video2', false);
+      expect(updateVideoWatched).toHaveBeenLastCalledWith('video2', false);
+    });
+
+    it('wires the meter limit change to budget.setLimitMinutes', () => {
+      const setLimitMinutes = jest.fn();
+      renderShorts({ budget: { setLimitMinutes } });
+
+      fireEvent.click(screen.getByTestId('set-limit'));
+
+      expect(setLimitMinutes).toHaveBeenCalledWith(15);
     });
   });
 });

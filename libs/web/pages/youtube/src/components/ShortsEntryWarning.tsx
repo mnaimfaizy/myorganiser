@@ -39,24 +39,24 @@ export function ShortsEntryWarning({
   return (
     <Dialog open={true} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="max-w-sm"
+        className="max-w-sm text-center"
         showCloseButton={false}
         onPointerDownOutside={handlePointerDownOutside}
       >
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-display text-title text-foreground">
               Shorts Daily Budget
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-body-sm text-foreground-supporting">
               Shorts are limited to {formatShortsDuration(limitMs)} per day.
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-body-sm text-foreground-supporting">
               You have {formatShortsDuration(remainingMs)} remaining today.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 pt-2">
+          <div className="flex flex-col gap-3">
             <Button onClick={onContinue} className="w-full">
               Continue to Shorts
             </Button>
