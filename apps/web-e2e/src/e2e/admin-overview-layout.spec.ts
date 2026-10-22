@@ -56,7 +56,12 @@ async function openAdminOverview(
     await stubAdminOverview(page);
   }
   await stubAdminAuditLogs(page);
-  await stubJsonGet(page, /\/admin\/users\/?(\?.*)?$/, []);
+  await stubJsonGet(page, /\/admin\/users\/?(\?.*)?$/, {
+    users: [],
+    total: 0,
+    page: 1,
+    pageSize: 25,
+  });
 
   await gotoStable(page, '/admin');
 }
