@@ -49,7 +49,7 @@ export interface LifecycleActionCopy {
   tone: 'default' | 'destructive';
 }
 
-/** One table for every lifecycle action's copy. Titles and sentences are today's wording, kept. */
+/** One table for every lifecycle action's row and confirmation copy. */
 export const LIFECYCLE_ACTION_COPY = {
   disable: {
     rowTitle: 'Disable account',
@@ -177,9 +177,8 @@ export function formatYouTubePlacesLeft(
 }
 
 /**
- * The YouTube Access row's description, with today's loading and error words
- * kept: "Loading…" while pending (no usage, no failure), "Unavailable" when
- * the usage call failed. Once loaded, desktop names the places out of the
+ * The YouTube Access row's description: "Loading…" while pending (no usage,
+ * no failure), "Unavailable" when the usage call failed. Once loaded, desktop names the places out of the
  * ceiling and phone only the places left.
  */
 export function youtubeAccessDescription(

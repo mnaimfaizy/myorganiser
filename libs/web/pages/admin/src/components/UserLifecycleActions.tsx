@@ -206,7 +206,7 @@ export function UserLifecycleActions({
     : null;
   const isBusy = pendingAction !== null;
 
-  // Which action a row offers is decided by the User's state, as before.
+  // Which action a row offers is decided by the User's state.
   const signInAction: LifecycleAction = user.disabled ? 'enable' : 'disable';
   const youtubeAction: LifecycleAction = user.youtubeAccess
     ? 'withdrawYouTubeAccess'
