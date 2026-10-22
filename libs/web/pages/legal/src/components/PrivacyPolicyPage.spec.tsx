@@ -1,22 +1,13 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import PrivacyPolicyPage from './PrivacyPolicyPage';
 
-jest.mock('@myorganiser/web-ui', () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild) return children;
-    return <button {...props}>{children}</button>;
-  },
-  Card: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-  CardContent: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-}));
-
 jest.mock('next/link', () => {
-  return ({ children, href }: any) => <a href={href}>{children}</a>;
+  return ({ children, href, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
 });
 
 describe('PrivacyPolicyPage', () => {
@@ -282,9 +273,12 @@ describe('PrivacyPolicyPage', () => {
       expect(homeLink).toHaveAttribute('href', '/');
     });
 
-    it('should render Terms of Service link', () => {
+    it('should render the Terms of Service action in the main content, linking to /terms', () => {
       render(<PrivacyPolicyPage />);
-      const termsLink = screen.getByRole('link', { name: /Terms of Service/i });
+      // The Legal nav in the header has a Terms of Service link too; scope to main.
+      const termsLink = within(screen.getByRole('main')).getByRole('link', {
+        name: /Terms of Service/i,
+      });
       expect(termsLink).toHaveAttribute('href', '/terms');
     });
   });
@@ -311,6 +305,125 @@ describe('PrivacyPolicyPage', () => {
         name: /YouTube Data Privacy page/i,
       });
       expect(link).not.toHaveAttribute('target');
+    });
+  });
+
+  describe('Page structure', () => {
+    it('should mark the Privacy Policy link as the current page in the Legal nav and leave Terms of Service unmarked', () => {
+      render(<PrivacyPolicyPage />);
+      const legalNav = screen.getByRole('navigation', { name: 'Legal' });
+      expect(
+        within(legalNav).getByRole('link', { name: 'Privacy Policy' }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(
+        within(legalNav).getByRole('link', { name: 'Terms of Service' }),
+      ).not.toHaveAttribute('aria-current');
+    });
+
+    it('should show the Last updated date exactly once', () => {
+      const { container } = render(<PrivacyPolicyPage />);
+      expect(
+        screen.getByText('Last updated: 15 October 2026'),
+      ).toBeInTheDocument();
+      expect(container.textContent?.match(/Last updated/g)).toHaveLength(1);
+    });
+
+    it('should render the footer line about the encrypted vault', () => {
+      render(<PrivacyPolicyPage />);
+      expect(
+        screen.getByText(
+          'Your vault is encrypted on your device. We only ever store ciphertext.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('should list every section in On this page with an anchor to a section headed by the same h2 text', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<PrivacyPolicyPage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      const links = within(toc).getAllByRole('link');
+
+      expect(links.map((link) => link.getAttribute('href'))).toEqual([
+        '#overview',
+        '#mobile-app',
+        '#youtube',
+        '#account-data',
+        '#cookies',
+        '#deleting',
+        '#rights',
+        '#contact',
+        '#changes',
+      ]);
+      for (const link of links) {
+        const id = (link.getAttribute('href') ?? '').slice(1);
+        expect(document.getElementById(id)).toHaveAccessibleName(
+          link.textContent ?? '',
+        );
+      }
+    });
+
+    it('should omit Operator & Contact from the page and the On this page list when no operator is set', () => {
+      render(<PrivacyPolicyPage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      expect(
+        within(toc).queryByRole('link', { name: 'Operator & Contact' }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole('heading', { name: 'Operator & Contact' }),
+      ).toBeNull();
+      expect(document.getElementById('contact')).toBeNull();
+    });
+
+    it('should show Operator & Contact in the page and the On this page list when OPERATOR_NAME is set', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<PrivacyPolicyPage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      expect(
+        within(toc).getByRole('link', { name: 'Operator & Contact' }),
+      ).toHaveAttribute('href', '#contact');
+      expect(
+        screen.getByRole('heading', { name: 'Operator & Contact', level: 2 }),
+      ).toBeInTheDocument();
+    });
+
+    it('should number the sections without a gap when the operator section is absent', () => {
+      render(<PrivacyPolicyPage />);
+      const changes = document.getElementById('changes');
+      expect(changes).not.toBeNull();
+      expect(
+        within(changes as HTMLElement).getByText('08'),
+      ).toBeInTheDocument();
+    });
+
+    it('should number the sections in order, including Operator & Contact, when the operator section is present', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<PrivacyPolicyPage />);
+      const contact = document.getElementById('contact');
+      const changes = document.getElementById('changes');
+      expect(
+        within(contact as HTMLElement).getByText('08'),
+      ).toBeInTheDocument();
+      expect(
+        within(changes as HTMLElement).getByText('09'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('Overview and account data wording', () => {
+    it('should state in the overview that the servers store only the encrypted Vault', () => {
+      const { container } = render(<PrivacyPolicyPage />);
+      const text = container.textContent || '';
+      expect(text).toMatch(
+        /our servers store only the encrypted version, which we cannot read/,
+      );
+    });
+
+    it('should state the account data is stored unencrypted to operate the account', () => {
+      const { container } = render(<PrivacyPolicyPage />);
+      const text = container.textContent || '';
+      expect(text).toMatch(
+        /is stored unencrypted, because we need it to operate your account/,
+      );
     });
   });
 });

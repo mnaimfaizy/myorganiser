@@ -15,6 +15,7 @@ import {
   useCallback,
   useState,
 } from 'react';
+import type { LegalVariant } from '../lib/legal-sections';
 import { OperatorContactFromContext } from './OperatorContactFromContext';
 import { PrivacyPolicyContent } from './PrivacyPolicyContent';
 import { TermsOfServiceContent } from './TermsOfServiceContent';
@@ -22,7 +23,7 @@ import { TermsOfServiceContent } from './TermsOfServiceContent';
 export type LegalDocumentKind = 'terms' | 'privacy';
 
 interface LegalDocumentBodyProps {
-  headingLevel: 'h2' | 'h3';
+  variant: LegalVariant;
   operatorContact?: ReactNode;
   linkTarget?: '_blank';
 }
@@ -89,8 +90,8 @@ export function LegalDocumentDialog({
         </DialogHeader>
         <div className="min-h-0 overflow-y-auto px-6 pb-6">
           <Body
-            headingLevel="h3"
-            operatorContact={<OperatorContactFromContext headingLevel="h3" />}
+            variant="dialog"
+            operatorContact={<OperatorContactFromContext variant="dialog" />}
             linkTarget="_blank"
           />
         </div>

@@ -1,5 +1,5 @@
-import { YouTubeDataPrivacyPage } from '@myorganiser/web-pages/youtube';
+import { YouTubeDataPage } from '@myorganiser/web-pages/legal';
 
 export default function Page() {
-  return <YouTubeDataPrivacyPage />;
+  return <YouTubeDataPage />;
 }

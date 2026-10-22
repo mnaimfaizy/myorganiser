@@ -312,4 +312,29 @@ describe('LegalDocumentDialog', () => {
       });
     });
   });
+
+  describe('dialog variant', () => {
+    it('renders each Terms section as an h3 inside a section, with no numbered badge', async () => {
+      render(<LegalDocumentDialog kind="terms">Terms</LegalDocumentDialog>);
+
+      const dialog = await openDialog('Terms', 'Terms of Service');
+
+      expect(dialog.querySelectorAll('section h3')).toHaveLength(7);
+      expect(dialog.querySelector('section h2')).toBeNull();
+      expect(within(dialog).queryByText(/^0[1-9]$/)).toBeNull();
+    });
+
+    it('renders each Privacy Policy section as an h3 with no numbered badge, and keeps the Last updated line', async () => {
+      render(<LegalDocumentDialog kind="privacy">Privacy</LegalDocumentDialog>);
+
+      const dialog = await openDialog('Privacy', 'Privacy Policy');
+
+      expect(
+        within(dialog).getByText('Last updated: 15 October 2026'),
+      ).toBeInTheDocument();
+      expect(dialog.querySelectorAll('section h3')).toHaveLength(8);
+      expect(dialog.querySelector('section h2')).toBeNull();
+      expect(within(dialog).queryByText(/^0[1-9]$/)).toBeNull();
+    });
+  });
 });

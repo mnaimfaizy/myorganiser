@@ -1,22 +1,13 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import TermsOfServicePage from './TermsOfServicePage';
 
-jest.mock('@myorganiser/web-ui', () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild) return children;
-    return <button {...props}>{children}</button>;
-  },
-  Card: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-  CardContent: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-}));
-
 jest.mock('next/link', () => {
-  return ({ children, href }: any) => <a href={href}>{children}</a>;
+  return ({ children, href, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
 });
 
 describe('TermsOfServicePage', () => {
@@ -85,6 +76,7 @@ describe('TermsOfServicePage', () => {
       const { container } = render(<TermsOfServicePage />);
       const text = container.textContent || '';
       expect(text).toMatch(/breach.*compromise.*security/i);
+      expect(text).toMatch(/bypass/i);
     });
   });
 
@@ -166,9 +158,12 @@ describe('TermsOfServicePage', () => {
       expect(homeLink).toHaveAttribute('href', '/');
     });
 
-    it('should render Privacy Policy link to /privacy', () => {
+    it('should render the Privacy Policy action in the main content, linking to /privacy', () => {
       render(<TermsOfServicePage />);
-      const privacyLink = screen.getByRole('link', { name: /Privacy Policy/i });
+      // The Legal nav in the header has a Privacy Policy link too; scope to main.
+      const privacyLink = within(screen.getByRole('main')).getByRole('link', {
+        name: /Privacy Policy/i,
+      });
       expect(privacyLink).toHaveAttribute('href', '/privacy');
     });
   });
@@ -185,6 +180,99 @@ describe('TermsOfServicePage', () => {
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+  });
+
+  describe('Page structure', () => {
+    it('should mark the Terms of Service link as the current page in the Legal nav and leave Privacy Policy unmarked', () => {
+      render(<TermsOfServicePage />);
+      const legalNav = screen.getByRole('navigation', { name: 'Legal' });
+      expect(
+        within(legalNav).getByRole('link', { name: 'Terms of Service' }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(
+        within(legalNav).getByRole('link', { name: 'Privacy Policy' }),
+      ).not.toHaveAttribute('aria-current');
+    });
+
+    it('should render the footer line about the encrypted vault', () => {
+      render(<TermsOfServicePage />);
+      expect(
+        screen.getByText(
+          'Your vault is encrypted on your device. We only ever store ciphertext.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('should list every section in On this page with an anchor to a section headed by the same h2 text', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<TermsOfServicePage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      const links = within(toc).getAllByRole('link');
+
+      expect(links.map((link) => link.getAttribute('href'))).toEqual([
+        '#acceptance',
+        '#description',
+        '#accounts',
+        '#acceptable-use',
+        '#availability',
+        '#liability',
+        '#changes',
+        '#contact',
+      ]);
+      for (const link of links) {
+        const id = (link.getAttribute('href') ?? '').slice(1);
+        expect(document.getElementById(id)).toHaveAccessibleName(
+          link.textContent ?? '',
+        );
+      }
+    });
+
+    it('should omit Operator & Contact from the page and the On this page list when no operator is set', () => {
+      render(<TermsOfServicePage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      expect(
+        within(toc).queryByRole('link', { name: 'Operator & Contact' }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole('heading', { name: 'Operator & Contact' }),
+      ).toBeNull();
+      expect(document.getElementById('contact')).toBeNull();
+    });
+
+    it('should show Operator & Contact in the page and the On this page list when OPERATOR_NAME is set', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<TermsOfServicePage />);
+      const toc = screen.getByRole('navigation', { name: 'On this page' });
+      expect(
+        within(toc).getByRole('link', { name: 'Operator & Contact' }),
+      ).toHaveAttribute('href', '#contact');
+      expect(
+        screen.getByRole('heading', { name: 'Operator & Contact', level: 2 }),
+      ).toBeInTheDocument();
+    });
+
+    it('should number the sections without a gap when the operator section is absent', () => {
+      render(<TermsOfServicePage />);
+      const changes = document.getElementById('changes');
+      expect(changes).not.toBeNull();
+      expect(
+        within(changes as HTMLElement).getByText('07'),
+      ).toBeInTheDocument();
+    });
+
+    it('should number Operator & Contact 08 when the operator section is present', () => {
+      process.env.OPERATOR_NAME = 'Acme Ops';
+      render(<TermsOfServicePage />);
+      const contact = document.getElementById('contact');
+      expect(
+        within(contact as HTMLElement).getByText('08'),
+      ).toBeInTheDocument();
+    });
+
+    it('should render no Last updated line', () => {
+      render(<TermsOfServicePage />);
+      expect(screen.queryByText(/Last updated/)).toBeNull();
     });
   });
 });

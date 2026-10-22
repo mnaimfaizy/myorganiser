@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@myorganiser/web-ui';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { type MouseEvent, useCallback } from 'react';
@@ -21,7 +20,7 @@ function canReturnInApp(): boolean {
 }
 
 /**
- * Back control shown at the top of the standalone legal pages. Goes back to the
+ * Back control shown in the hero of the standalone legal pages. Goes back to the
  * previous in-app page when there is one; otherwise navigates to Home.
  */
 export function LegalBackLink() {
@@ -32,11 +31,13 @@ export function LegalBackLink() {
   }, []);
 
   return (
-    <Button asChild variant="ghost" size="sm" className="-ml-3">
-      <Link href="/" onClick={handleClick}>
-        <ChevronLeft aria-hidden="true" />
-        Back
-      </Link>
-    </Button>
+    <Link
+      href="/"
+      onClick={handleClick}
+      className="mb-2 inline-flex items-center gap-1.5 rounded-control-sm text-sm font-semibold text-navy-muted-foreground hover:text-navy-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-foreground"
+    >
+      <ChevronLeft aria-hidden="true" className="h-3 w-2 shrink-0" />
+      Back
+    </Link>
   );
 }
