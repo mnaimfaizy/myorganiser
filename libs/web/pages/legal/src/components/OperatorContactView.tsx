@@ -1,29 +1,72 @@
+import {
+  hasOperatorContact,
+  type LegalVariant,
+  OPERATOR_CONTACT_TITLE,
+} from '../lib/legal-sections';
+import { LEGAL_TEXT } from '../lib/legal-styles';
+import { LegalSection } from './LegalSection';
+
 export interface OperatorContactViewProps {
   /** Operator name. Blank or missing values are omitted. */
   name?: string | null;
   /** Operator contact email. Blank or missing values are omitted. */
   email?: string | null;
-  /** Heading level: h2 on the standalone pages, h3 inside a dialog. */
-  headingLevel?: 'h2' | 'h3';
+  /** Where the section renders: the standalone page (default) or the dialog. */
+  variant?: LegalVariant;
+  /** Page variant only: the section number shown in its badge. */
+  number?: string;
 }
 
 /** Pure presentation of the Operator & Contact section. Reads no environment. */
 export function OperatorContactView({
   name,
   email,
-  headingLevel: Heading = 'h2',
+  variant = 'page',
+  number,
 }: OperatorContactViewProps) {
-  const trimmedName = name?.trim();
-  const trimmedEmail = email?.trim();
-
   // If neither is set, render nothing
-  if (!trimmedName && !trimmedEmail) {
+  if (!hasOperatorContact(name, email)) {
     return null;
   }
 
+  const trimmedName = name?.trim();
+  const trimmedEmail = email?.trim();
+
+  if (variant === 'page') {
+    return (
+      <LegalSection
+        id="contact"
+        title={OPERATOR_CONTACT_TITLE}
+        variant="page"
+        number={number}
+      >
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1.5 text-body text-foreground-secondary">
+          {trimmedName && (
+            <>
+              <dt className="font-bold text-foreground">Operator:</dt>
+              <dd className="m-0">{trimmedName}</dd>
+            </>
+          )}
+          {trimmedEmail && (
+            <>
+              <dt className="font-bold text-foreground">Contact:</dt>
+              <dd className="m-0">
+                <a
+                  href={`mailto:${trimmedEmail}`}
+                  className={LEGAL_TEXT.page.link}
+                >
+                  {trimmedEmail}
+                </a>
+              </dd>
+            </>
+          )}
+        </dl>
+      </LegalSection>
+    );
+  }
+
   return (
-    <section className="mt-6">
-      <Heading className="text-base font-semibold">Operator & Contact</Heading>
+    <LegalSection id="contact" title={OPERATOR_CONTACT_TITLE} variant="dialog">
       {trimmedName && (
         <p className="mt-3 text-sm text-muted-foreground">
           <strong>Operator:</strong> {trimmedName}
@@ -38,14 +81,11 @@ export function OperatorContactView({
           }
         >
           <strong>Contact:</strong>{' '}
-          <a
-            href={`mailto:${trimmedEmail}`}
-            className="font-medium underline hover:text-foreground"
-          >
+          <a href={`mailto:${trimmedEmail}`} className={LEGAL_TEXT.dialog.link}>
             {trimmedEmail}
           </a>
         </p>
       )}
-    </section>
+    </LegalSection>
   );
 }

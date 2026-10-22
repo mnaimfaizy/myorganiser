@@ -1,30 +1,46 @@
-import { Button, Card, CardContent } from '@myorganiser/web-ui';
+import { Button } from '@myorganiser/web-ui';
 import Link from 'next/link';
-import { LegalBackLink } from './LegalBackLink';
-import { OperatorContact } from './OperatorContact';
+import {
+  PRIVACY_POLICY_LAST_UPDATED,
+  PRIVACY_POLICY_SECTIONS,
+} from '../lib/legal-sections';
+import { LegalPageActions } from './LegalPageActions';
+import { LegalPageBody } from './LegalPageBody';
+import { LegalPageFooter } from './LegalPageFooter';
+import { LegalPageHeader } from './LegalPageHeader';
+import { LegalPageHero } from './LegalPageHero';
+import { LegalPageLayout } from './LegalPageLayout';
+import { legalPageSections, OperatorContact } from './OperatorContact';
 import { PrivacyPolicyContent } from './PrivacyPolicyContent';
 
 export default function PrivacyPolicyPage() {
+  const { toc, sectionNumbers } = legalPageSections(PRIVACY_POLICY_SECTIONS);
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <Card className="w-full max-w-3xl">
-        <CardContent className="pt-6">
-          <LegalBackLink />
-
-          <h1 className="mt-4 text-lg font-semibold">Privacy Policy</h1>
-
-          <PrivacyPolicyContent operatorContact={<OperatorContact />} />
-
-          <div className="mt-8 flex justify-center gap-3">
-            <Button asChild variant="outline">
-              <Link href="/">Back to Home</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/terms">Terms of Service</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <LegalPageLayout>
+      <LegalPageHeader current="privacy" />
+      <LegalPageHero
+        title="Privacy Policy"
+        illustration="vault"
+        lastUpdated={PRIVACY_POLICY_LAST_UPDATED}
+      />
+      <LegalPageBody toc={toc}>
+        <PrivacyPolicyContent
+          operatorContact={
+            <OperatorContact variant="page" number={sectionNumbers.contact} />
+          }
+          sectionNumbers={sectionNumbers}
+        />
+        <LegalPageActions>
+          <Button asChild variant="outline">
+            <Link href="/">Back to Home</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/terms">Terms of Service</Link>
+          </Button>
+        </LegalPageActions>
+      </LegalPageBody>
+      <LegalPageFooter />
+    </LegalPageLayout>
   );
 }

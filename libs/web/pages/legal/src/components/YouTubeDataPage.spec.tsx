@@ -1,27 +1,18 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
-import YouTubeDataPrivacyClient from './YouTubeDataPrivacyClient';
-
-jest.mock('@myorganiser/web-ui', () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild) return children;
-    return <button {...props}>{children}</button>;
-  },
-  Card: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-  CardContent: ({ children, className }: any) => (
-    <div className={className}>{children}</div>
-  ),
-}));
+import { render, screen, within } from '@testing-library/react';
+import YouTubeDataPage from './YouTubeDataPage';
 
 jest.mock('next/link', () => {
-  return ({ children, href }: any) => <a href={href}>{children}</a>;
+  return ({ children, href, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
 });
 
-describe('YouTubeDataPrivacyClient', () => {
+describe('YouTubeDataPage', () => {
   it('should render the heading "How we store your YouTube data"', () => {
-    render(<YouTubeDataPrivacyClient />);
+    render(<YouTubeDataPage />);
     expect(
       screen.getByRole('heading', {
         name: /How we store your YouTube data/i,
@@ -31,13 +22,13 @@ describe('YouTubeDataPrivacyClient', () => {
   });
 
   it('should render all seven privacy claims', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const listItems = container.querySelectorAll('li');
     expect(listItems).toHaveLength(7);
   });
 
   it('should render metadata-only claim', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/metadata only/i);
     expect(text).toMatch(/titles.*thumbnails.*video IDs/);
@@ -45,20 +36,20 @@ describe('YouTubeDataPrivacyClient', () => {
   });
 
   it('should render Watched is yes/no claim', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/Watched.*simple yes\/no marker/i);
     expect(text).toMatch(/not a viewing history/i);
   });
 
   it('should render latest 100 Cached Uploads claim', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/latest 100.*Cached Uploads/i);
   });
 
   it('should render 30-day disable retention claim', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/disable a channel/i);
     expect(text).toMatch(/30 days/);
@@ -66,7 +57,7 @@ describe('YouTubeDataPrivacyClient', () => {
   });
 
   it('should render disconnect claim: Watched marks deleted immediately with nothing kept for reconnect', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(
       /Disconnecting your YouTube account immediately deletes Followed Channels, Cached Uploads, Watched marks, notification and digest settings, and OAuth tokens/,
@@ -77,21 +68,21 @@ describe('YouTubeDataPrivacyClient', () => {
   });
 
   it('should render Shorts Daily Budget browser-local claim', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/Shorts Daily Budget/i);
     expect(text).toMatch(/tracked locally in your browser/i);
   });
 
   it('should render Vault/E2EE disclaimer', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     expect(text).toMatch(/YouTube metadata is not covered/i);
     expect(text).toMatch(/Vault or end-to-end encryption/i);
   });
 
-  it('should ensure Vault disclaimer is the only occurrence of "not covered"', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+  it('should ensure it is the only occurrence of the Vault disclaimer sentence', () => {
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
     const matches = text.match(
       /not covered by MyOrganiser's Vault or end-to-end encryption/g,
@@ -99,8 +90,8 @@ describe('YouTubeDataPrivacyClient', () => {
     expect(matches).toHaveLength(1);
   });
 
-  it('should contain no other references to Vault or encryption outside the disclaimer', () => {
-    const { container } = render(<YouTubeDataPrivacyClient />);
+  it('should contain no Vault or encryption wording before the disclaimer', () => {
+    const { container } = render(<YouTubeDataPage />);
     const text = container.textContent || '';
 
     // Find the disclaimer sentence position
@@ -115,8 +106,33 @@ describe('YouTubeDataPrivacyClient', () => {
   });
 
   it('should render a back button link to /dashboard/youtube', () => {
-    render(<YouTubeDataPrivacyClient />);
+    render(<YouTubeDataPage />);
     const backLink = screen.getByRole('link', { name: /Back to YouTube/i });
     expect(backLink).toHaveAttribute('href', '/dashboard/youtube');
+  });
+
+  describe('Page structure', () => {
+    it('should render exactly one h1', () => {
+      render(<YouTubeDataPage />);
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+
+    it('should leave both Legal nav links without aria-current', () => {
+      render(<YouTubeDataPage />);
+      const legalNav = screen.getByRole('navigation', { name: 'Legal' });
+      expect(
+        within(legalNav).getByRole('link', { name: 'Privacy Policy' }),
+      ).not.toHaveAttribute('aria-current');
+      expect(
+        within(legalNav).getByRole('link', { name: 'Terms of Service' }),
+      ).not.toHaveAttribute('aria-current');
+    });
+
+    it('should render no On this page navigation', () => {
+      render(<YouTubeDataPage />);
+      expect(
+        screen.queryByRole('navigation', { name: 'On this page' }),
+      ).toBeNull();
+    });
   });
 });
