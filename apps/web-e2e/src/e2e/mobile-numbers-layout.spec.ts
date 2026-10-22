@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   createOwnedVault,
@@ -38,7 +39,8 @@ const IDENTITIES: IdentityEntry[] = [
 ];
 
 // Throwaway fixture: the backend is stubbed in-process, so it guards nothing.
-const VAULT_PASSPHRASE = 'mob-vault-0001';
+// Generated per run so no password-like literal lives in the source.
+const VAULT_PASSPHRASE = `e2e-vault-${randomUUID()}`;
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1000 };
 
