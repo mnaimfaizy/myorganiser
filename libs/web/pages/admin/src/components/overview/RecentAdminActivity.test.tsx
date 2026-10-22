@@ -99,28 +99,28 @@ describe('RecentAdminActivity', () => {
     expect(screen.getByText('Grant YouTube Access')).toBeInTheDocument();
   });
 
-  it('links a target id to its user detail page', async () => {
+  it('links a target name to its user detail page', async () => {
     await renderActivity();
 
-    const link = await screen.findByRole('link', { name: 'target-1' });
+    const link = await screen.findByRole('link', { name: 'Target 1' });
 
     expect(link).toHaveAttribute('href', '/admin/users/target-1');
   });
 
-  it('renders a null target as a dash with no link in that row', async () => {
+  it('renders a deleted target as "Deleted user" with no link in that row', async () => {
     await renderActivity();
 
     await screen.findByText('Grant YouTube Access');
 
     const rows = screen.getAllByRole('listitem');
-    expect(within(rows[1]).getByText('—')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Deleted user')).toBeInTheDocument();
     expect(within(rows[1]).queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('shows the actor as "by <actor>" and the timestamp in a time element', async () => {
+  it('shows the actor as "by <actor name>" and the timestamp in a time element', async () => {
     await renderActivity();
 
-    expect(await screen.findByText('by actor-1')).toBeInTheDocument();
+    expect(await screen.findByText('by Actor 1')).toBeInTheDocument();
 
     const createdAt = sampleEntries[0].createdAt;
     const time = screen.getByText(formatAuditTimestamp(createdAt));
@@ -128,7 +128,7 @@ describe('RecentAdminActivity', () => {
     expect(time).toHaveAttribute('dateTime', createdAt);
   });
 
-  it('shows "by —" when the entry has no actor', async () => {
+  it('shows "by Deleted user" when the entry has no actor', async () => {
     mockListAuditLogs.mockResolvedValue(
       auditPage([
         {
@@ -142,7 +142,7 @@ describe('RecentAdminActivity', () => {
 
     await renderActivity();
 
-    expect(await screen.findByText('by —')).toBeInTheDocument();
+    expect(await screen.findByText('by Deleted user')).toBeInTheDocument();
   });
 
   it('shows the empty message when there are no entries', async () => {
