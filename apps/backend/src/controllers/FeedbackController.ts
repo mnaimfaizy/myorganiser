@@ -17,8 +17,12 @@ import feedbackService, {
   FeedbackReportDto,
   FeedbackReportListItemDto,
 } from '../services/FeedbackService';
-import { FeedbackReportKind } from '../services/feedbackReportConstants';
+import {
+  FeedbackReportKind,
+  FeedbackReportPlatform,
+} from '../services/feedbackReportConstants';
 import { ErrorResponse } from './ErrorResponse';
+import { ValidateErrorJSON } from '../interfaces';
 import { VersionFloorRefusal } from '../types';
 
 /**
@@ -27,8 +31,8 @@ import { VersionFloorRefusal } from '../types';
  * path alone — no query string and no fragment.
  */
 export interface ReportContextRequest {
-  /** Which app sent the report — `web` for the dashboard. */
-  platform: string;
+  /** Which app sent the report: `web` for the dashboard, `ios` or `android` for the mobile app. */
+  platform: FeedbackReportPlatform;
   appVersion: string;
   browser: string;
   operatingSystem: string;
@@ -75,6 +79,7 @@ export class FeedbackController extends Controller {
   @SuccessResponse(201, 'Created')
   @Response<ErrorResponse>(400, 'Invalid Feedback Report')
   @Response<ErrorResponse>(429, 'Too many Feedback Reports')
+  @Response<ValidateErrorJSON>(422, 'Validation Failed')
   public async createReport(
     @Request() req: ExRequest,
     @Body() body: CreateFeedbackReportRequest,

@@ -1011,6 +1011,21 @@ components:
       anyOf:
         - $ref: "#/components/schemas/FeedbackReportDto"
         - $ref: "#/components/schemas/ErrorResponse"
+    FeedbackReportPlatform:
+      type: string
+      enum:
+        - web
+        - ios
+        - android
+      description: >-
+        Which app sent a Feedback Report, as the Report Context platform: `web`
+        for
+
+        the dashboard, `ios` and `android` for the mobile app. The database
+        column
+
+        stays a plain string, so rows stored before this type are still
+        readable.
     ReportContextRequest:
       description: >-
         The Report Context the sender saw before sending. It never carries
@@ -1021,8 +1036,9 @@ components:
         path alone — no query string and no fragment.
       properties:
         platform:
-          type: string
-          description: Which app sent the report — `web` for the dashboard.
+          $ref: "#/components/schemas/FeedbackReportPlatform"
+          description: "Which app sent the report: `web` for the dashboard, `ios` or
+            `android` for the mobile app."
         appVersion:
           type: string
         browser:
@@ -1503,15 +1519,34 @@ components:
         - createdAt
       type: object
       additionalProperties: false
-    ListAdminFeedbackReportsResponse:
-      description: Response body for list feedback reports endpoint.
+    AdminFeedbackReportListResponse:
+      description: >-
+        Response body for the admin feedback report list: one page of reports,
+        and
+
+        the total that matches the filters ignoring paging.
       properties:
         items:
           items:
             $ref: "#/components/schemas/AdminFeedbackReportListItemDto"
           type: array
+        total:
+          type: number
+          format: double
+          description: Count matching the filters, ignoring paging.
+        page:
+          type: number
+          format: double
+          description: Echoed effective 1-based page.
+        pageSize:
+          type: number
+          format: double
+          description: Echoed effective page size.
       required:
         - items
+        - total
+        - page
+        - pageSize
       type: object
       additionalProperties: false
     AdminFeedbackReportContextDto:
@@ -2883,6 +2918,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateErrorJSON"
         "426":
           description: Below the Version Floor
           content:
@@ -3917,55 +3958,73 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListAdminFeedbackReportsResponse"
-        "400":
-          description: Invalid filter
+                $ref: "#/components/schemas/AdminFeedbackReportListResponse"
+        "422":
+          description: Validation Failed
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ValidateErrorJSON"
         "426":
           description: Below the Version Floor
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionFloorRefusal"
-      description: |-
+      description: >-
         List Feedback Reports with optional filters (status, kind, platform,
-        trackingIssueNumber, limit). Newest first. Platform Admin only.
+
+        trackingIssueNumber), newest first, one page at a time. Platform Admin
+        only.
       tags:
         - Platform Admin
       security:
         - jwt:
             - platform_admin
       parameters:
-        - in: query
+        - description: Reports in this Report Status.
+          in: query
           name: status
           required: false
           schema:
             $ref: "#/components/schemas/FeedbackReportStatus"
-        - in: query
+        - description: Reports of this kind.
+          in: query
           name: kind
           required: false
           schema:
             $ref: "#/components/schemas/FeedbackReportKind"
-        - in: query
+        - description: "Reports sent from this app: `web`, `ios` or `android`."
+          in: query
           name: platform
           required: false
           schema:
-            type: string
-        - in: query
+            $ref: "#/components/schemas/FeedbackReportPlatform"
+        - description: Reports linked to this GitHub issue number.
+          in: query
           name: trackingIssueNumber
           required: false
           schema:
-            format: double
-            type: number
-        - in: query
-          name: limit
+            format: int32
+            type: integer
+            minimum: 1
+        - description: 1-based page number. Defaults to 1.
+          in: query
+          name: page
           required: false
           schema:
-            format: double
-            type: number
+            format: int32
+            type: integer
+            minimum: 1
+        - description: Reports per page, 1 to 100. Defaults to 25.
+          in: query
+          name: pageSize
+          required: false
+          schema:
+            format: int32
+            type: integer
+            minimum: 1
+            maximum: 100
   /admin/feedback/reports/{reportId}:
     get:
       operationId: GetFeedbackReport

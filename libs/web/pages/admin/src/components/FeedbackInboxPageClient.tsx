@@ -1,9 +1,10 @@
 'use client';
 
-import type {
-  AdminFeedbackReportListItemDto,
-  FeedbackReportKind,
-  FeedbackReportStatus,
+import {
+  FeedbackReportPlatform,
+  type AdminFeedbackReportListItemDto,
+  type FeedbackReportKind,
+  type FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
 import {
   Badge,
@@ -159,6 +160,18 @@ function FeedbackFilters({
   );
 }
 
+// Stopgap until the inbox pages its list (#1269): one page as large as the
+// API allows, close to the previous first-100 list.
+const INBOX_PAGE_SIZE = 100;
+
+const KNOWN_PLATFORMS: readonly string[] = Object.values(
+  FeedbackReportPlatform,
+);
+
+function isKnownPlatform(value: string): value is FeedbackReportPlatform {
+  return KNOWN_PLATFORMS.includes(value);
+}
+
 export function FeedbackInboxPageClient() {
   const [reports, setReports] = useState<AdminFeedbackReportListItemDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,6 +189,17 @@ export function FeedbackInboxPageClient() {
     setLoading(true);
     setError(null);
 
+    // Stopgap until the platform filter becomes a dropdown (#1269): the API
+    // accepts only a known platform, and free text naming none matches no
+    // report, so the list is empty without asking.
+    const platformText = platformFilter.trim();
+    const platform = isKnownPlatform(platformText) ? platformText : undefined;
+    if (platformText && !platform) {
+      setReports([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const api = createPlatformAdminApi();
 
@@ -189,10 +213,11 @@ export function FeedbackInboxPageClient() {
       const params: Parameters<typeof api.listFeedbackReports>[0] = {
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(kindFilter ? { kind: kindFilter } : {}),
-        ...(platformFilter ? { platform: platformFilter } : {}),
+        ...(platform ? { platform } : {}),
         ...(isValidIssueNumber
           ? { trackingIssueNumber: parsedIssueNumber }
           : {}),
+        pageSize: INBOX_PAGE_SIZE,
       };
 
       const response = await api.listFeedbackReports(params);

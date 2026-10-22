@@ -3,8 +3,10 @@
  * Pure functions for testability; nothing React or Node-specific here.
  */
 
+import type { FeedbackReportPlatform } from '@myorganiser/app-api-client';
+
 export interface ReportContext {
-  platform: string;
+  platform: FeedbackReportPlatform;
   appVersion: string;
   browser: string;
   operatingSystem: string;

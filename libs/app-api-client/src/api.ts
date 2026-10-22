@@ -206,6 +206,24 @@ export interface AdminFeedbackReportListItemDto {
 
 
 /**
+ * Response body for the admin feedback report list: one page of reports, and the total that matches the filters ignoring paging.
+ */
+export interface AdminFeedbackReportListResponse {
+    'items': Array<AdminFeedbackReportListItemDto>;
+    /**
+     * Count matching the filters, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
+/**
  * Admin Feedback Reporter identity.
  */
 export interface AdminFeedbackReporterDto {
@@ -533,6 +551,19 @@ export interface FeedbackReportListItemDto {
 
 
 /**
+ * Which app sent a Feedback Report, as the Report Context platform: `web` for the dashboard, `ios` and `android` for the mobile app. The database column stays a plain string, so rows stored before this type are still readable.
+ */
+
+export const FeedbackReportPlatform = {
+    Web: 'web',
+    Ios: 'ios',
+    Android: 'android',
+} as const;
+
+export type FeedbackReportPlatform = typeof FeedbackReportPlatform[keyof typeof FeedbackReportPlatform];
+
+
+/**
  * Where a Feedback Report stands as its reporter sees it. There is no Duplicate status.
  */
 
@@ -714,12 +745,6 @@ export interface LinkFeedbackReportTrackingIssueRequest {
      */
     'trackingIssueNumber': number;
 }
-/**
- * Response body for list feedback reports endpoint.
- */
-export interface ListAdminFeedbackReportsResponse {
-    'items': Array<AdminFeedbackReportListItemDto>;
-}
 export interface ListFeedbackReportsResponse {
     'items': Array<FeedbackReportListItemDto>;
     'hasChangedSinceLastSeen': boolean;
@@ -898,10 +923,7 @@ export interface ReopenFeedbackReportRequest {
  * The Report Context the sender saw before sending. It never carries screenshots, logs, or anything read from the Vault, and `path` is the page path alone — no query string and no fragment.
  */
 export interface ReportContextRequest {
-    /**
-     * Which app sent the report — `web` for the dashboard.
-     */
-    'platform': string;
+    'platform': FeedbackReportPlatform;
     'appVersion': string;
     'browser': string;
     'operatingSystem': string;
@@ -911,6 +933,8 @@ export interface ReportContextRequest {
      */
     'sentAt': string;
 }
+
+
 export interface ResendVerificationEmailByEmailRequest {
     'email': string;
 }
@@ -2915,16 +2939,17 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
-         * @param {FeedbackReportStatus} [status] 
-         * @param {FeedbackReportKind} [kind] 
-         * @param {string} [platform] 
-         * @param {number} [trackingIssueNumber] 
-         * @param {number} [limit] 
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] Reports in this Report Status.
+         * @param {FeedbackReportKind} [kind] Reports of this kind.
+         * @param {FeedbackReportPlatform} [platform] Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+         * @param {number} [trackingIssueNumber] Reports linked to this GitHub issue number.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Reports per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listFeedbackReports: async (status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listFeedbackReports: async (status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: FeedbackReportPlatform, trackingIssueNumber?: number, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/feedback/reports`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2957,8 +2982,12 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
                 localVarQueryParameter['trackingIssueNumber'] = trackingIssueNumber;
             }
 
-            if (limit !== undefined) {
-                localVarQueryParameter['limit'] = limit;
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -3424,17 +3453,18 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
-         * @param {FeedbackReportStatus} [status] 
-         * @param {FeedbackReportKind} [kind] 
-         * @param {string} [platform] 
-         * @param {number} [trackingIssueNumber] 
-         * @param {number} [limit] 
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] Reports in this Report Status.
+         * @param {FeedbackReportKind} [kind] Reports of this kind.
+         * @param {FeedbackReportPlatform} [platform] Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+         * @param {number} [trackingIssueNumber] Reports linked to this GitHub issue number.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Reports per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listFeedbackReports(status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ListAdminFeedbackReportsResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listFeedbackReports(status, kind, platform, trackingIssueNumber, limit, options);
+        async listFeedbackReports(status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: FeedbackReportPlatform, trackingIssueNumber?: number, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listFeedbackReports(status, kind, platform, trackingIssueNumber, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listFeedbackReports']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -3646,13 +3676,13 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.listAuditLogs(requestParameters.userId, requestParameters.action, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
          * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ListAdminFeedbackReportsResponse> {
-            return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(axios, basePath));
+        listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportListResponse> {
+            return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
          * List/search Users (identity fields only), one page at a time. Platform Admin only.
@@ -3816,15 +3846,35 @@ export interface PlatformAdminApiListAuditLogsRequest {
  * Request parameters for listFeedbackReports operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListFeedbackReportsRequest {
+    /**
+     * Reports in this Report Status.
+     */
     readonly status?: FeedbackReportStatus
 
+    /**
+     * Reports of this kind.
+     */
     readonly kind?: FeedbackReportKind
 
-    readonly platform?: string
+    /**
+     * Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+     */
+    readonly platform?: FeedbackReportPlatform
 
+    /**
+     * Reports linked to this GitHub issue number.
+     */
     readonly trackingIssueNumber?: number
 
-    readonly limit?: number
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Reports per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
@@ -4031,13 +4081,13 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
-     * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+     * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
      * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

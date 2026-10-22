@@ -563,10 +563,15 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"union","subSchemas":[{"ref":"FeedbackReportDto"},{"ref":"ErrorResponse"}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportPlatform": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["web"]},{"dataType":"enum","enums":["ios"]},{"dataType":"enum","enums":["android"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ReportContextRequest": {
         "dataType": "refObject",
         "properties": {
-            "platform": {"dataType":"string","required":true},
+            "platform": {"ref":"FeedbackReportPlatform","required":true},
             "appVersion": {"dataType":"string","required":true},
             "browser": {"dataType":"string","required":true},
             "operatingSystem": {"dataType":"string","required":true},
@@ -816,10 +821,13 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ListAdminFeedbackReportsResponse": {
+    "AdminFeedbackReportListResponse": {
         "dataType": "refObject",
         "properties": {
             "items": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminFeedbackReportListItemDto"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -2835,9 +2843,10 @@ export function RegisterRoutes(app: Router) {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
                 status: {"in":"query","name":"status","ref":"FeedbackReportStatus"},
                 kind: {"in":"query","name":"kind","ref":"FeedbackReportKind"},
-                platform: {"in":"query","name":"platform","dataType":"string"},
-                trackingIssueNumber: {"in":"query","name":"trackingIssueNumber","dataType":"double"},
-                limit: {"in":"query","name":"limit","dataType":"double"},
+                platform: {"in":"query","name":"platform","ref":"FeedbackReportPlatform"},
+                trackingIssueNumber: {"in":"query","name":"trackingIssueNumber","dataType":"integer","validators":{"isInt":{"errorMsg":"trackingIssueNumber"},"minimum":{"value":1}}},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/feedback/reports',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),

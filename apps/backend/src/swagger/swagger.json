@@ -1434,12 +1434,21 @@
 					}
 				]
 			},
+			"FeedbackReportPlatform": {
+				"type": "string",
+				"enum": [
+					"web",
+					"ios",
+					"android"
+				],
+				"description": "Which app sent a Feedback Report, as the Report Context platform: `web` for\nthe dashboard, `ios` and `android` for the mobile app. The database column\nstays a plain string, so rows stored before this type are still readable."
+			},
 			"ReportContextRequest": {
 				"description": "The Report Context the sender saw before sending. It never carries\nscreenshots, logs, or anything read from the Vault, and `path` is the page\npath alone — no query string and no fragment.",
 				"properties": {
 					"platform": {
-						"type": "string",
-						"description": "Which app sent the report — `web` for the dashboard."
+						"$ref": "#/components/schemas/FeedbackReportPlatform",
+						"description": "Which app sent the report: `web` for the dashboard, `ios` or `android` for the mobile app."
 					},
 					"appVersion": {
 						"type": "string"
@@ -2070,18 +2079,36 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ListAdminFeedbackReportsResponse": {
-				"description": "Response body for list feedback reports endpoint.",
+			"AdminFeedbackReportListResponse": {
+				"description": "Response body for the admin feedback report list: one page of reports, and\nthe total that matches the filters ignoring paging.",
 				"properties": {
 					"items": {
 						"items": {
 							"$ref": "#/components/schemas/AdminFeedbackReportListItemDto"
 						},
 						"type": "array"
+					},
+					"total": {
+						"type": "number",
+						"format": "double",
+						"description": "Count matching the filters, ignoring paging."
+					},
+					"page": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective 1-based page."
+					},
+					"pageSize": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective page size."
 					}
 				},
 				"required": [
-					"items"
+					"items",
+					"total",
+					"page",
+					"pageSize"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -4240,6 +4267,16 @@
 							}
 						}
 					},
+					"422": {
+						"description": "Validation Failed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidateErrorJSON"
+								}
+							}
+						}
+					},
 					"426": {
 						"description": "Below the Version Floor",
 						"content": {
@@ -5917,17 +5954,17 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ListAdminFeedbackReportsResponse"
+									"$ref": "#/components/schemas/AdminFeedbackReportListResponse"
 								}
 							}
 						}
 					},
-					"400": {
-						"description": "Invalid filter",
+					"422": {
+						"description": "Validation Failed",
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ErrorResponse"
+									"$ref": "#/components/schemas/ValidateErrorJSON"
 								}
 							}
 						}
@@ -5943,7 +5980,7 @@
 						}
 					}
 				},
-				"description": "List Feedback Reports with optional filters (status, kind, platform,\ntrackingIssueNumber, limit). Newest first. Platform Admin only.",
+				"description": "List Feedback Reports with optional filters (status, kind, platform,\ntrackingIssueNumber), newest first, one page at a time. Platform Admin only.",
 				"tags": [
 					"Platform Admin"
 				],
@@ -5956,6 +5993,7 @@
 				],
 				"parameters": [
 					{
+						"description": "Reports in this Report Status.",
 						"in": "query",
 						"name": "status",
 						"required": false,
@@ -5964,6 +6002,7 @@
 						}
 					},
 					{
+						"description": "Reports of this kind.",
 						"in": "query",
 						"name": "kind",
 						"required": false,
@@ -5972,29 +6011,46 @@
 						}
 					},
 					{
+						"description": "Reports sent from this app: `web`, `ios` or `android`.",
 						"in": "query",
 						"name": "platform",
 						"required": false,
 						"schema": {
-							"type": "string"
+							"$ref": "#/components/schemas/FeedbackReportPlatform"
 						}
 					},
 					{
+						"description": "Reports linked to this GitHub issue number.",
 						"in": "query",
 						"name": "trackingIssueNumber",
 						"required": false,
 						"schema": {
-							"format": "double",
-							"type": "number"
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
 						}
 					},
 					{
+						"description": "1-based page number. Defaults to 1.",
 						"in": "query",
-						"name": "limit",
+						"name": "page",
 						"required": false,
 						"schema": {
-							"format": "double",
-							"type": "number"
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
+						}
+					},
+					{
+						"description": "Reports per page, 1 to 100. Defaults to 25.",
+						"in": "query",
+						"name": "pageSize",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
 						}
 					}
 				]

@@ -5,13 +5,17 @@ import {
   FEEDBACK_REPORT_STATUSES,
   FEEDBACK_REPORT_KIND_RULES,
   FEEDBACK_RELEASE_TAG_REFUSAL_MESSAGE,
+  FEEDBACK_REPORT_LIST_DEFAULT_PAGE_SIZE,
+  FEEDBACK_REPORT_LIST_MAX_PAGE_SIZE,
   TRACKING_ISSUE_LINKED_STATUS,
   REOPENED_STATUS,
   isFeedbackReportStatus,
   parseReleaseTag,
   isFeedbackReportKind,
+  isFeedbackReportPlatform,
   FeedbackReportStatus,
   FeedbackReportKind,
+  FeedbackReportPlatform,
   FeedbackReportStatusRule,
 } from './feedbackReportConstants';
 import { AdminAuditAction } from '../types';
@@ -83,14 +87,27 @@ type AdminServiceResult<T> =
   | { ok: false; status: 400 | 404; body: { message: string } };
 
 /**
- * Input for filtering admin feedback reports. All fields are optional.
+ * Input for filtering and paging admin feedback reports. All fields are
+ * optional; page and pageSize fall back to 1 and the default page size.
  */
 interface AdminFeedbackReportFilters {
   status?: unknown;
   kind?: unknown;
   platform?: unknown;
   trackingIssueNumber?: unknown;
-  limit?: unknown;
+  page?: unknown;
+  pageSize?: unknown;
+}
+
+/**
+ * One page of admin Feedback Reports, newest first, with the total that
+ * matches the filters ignoring paging.
+ */
+interface AdminFeedbackReportListPage {
+  items: AdminFeedbackReportListItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 /**
@@ -366,13 +383,20 @@ export class AdminFeedbackService {
   }
 
   /**
-   * List Feedback Reports with optional filters, newest first. All filters are
-   * optional and unknown-tolerant. Unrecognised status or kind values result
-   * in a 400.
+   * List Feedback Reports with optional filters, newest first, one page at a
+   * time. The controller's validators answer bad HTTP input with 422 first;
+   * this method refuses the same values with 400 for any direct caller.
+   *
+   * Refuses with 400 if:
+   * - The status, kind, or platform is not a member of its table
+   * - The tracking issue number is not a positive integer
+   * - The page is not a positive integer, or the page size is outside 1 to 100
+   *
+   * A page past the end returns no items with the real total.
    */
   async listReports(
     filters: AdminFeedbackReportFilters,
-  ): Promise<AdminServiceResult<{ items: AdminFeedbackReportListItemDto[] }>> {
+  ): Promise<AdminServiceResult<AdminFeedbackReportListPage>> {
     // Validate and parse status filter if provided
     let statusFilter: FeedbackReportStatus | undefined;
     if (filters.status !== undefined) {
@@ -399,33 +423,61 @@ export class AdminFeedbackService {
       kindFilter = filters.kind;
     }
 
-    // Parse and validate limit
-    let limit = 100;
-    if (filters.limit !== undefined) {
-      const parsed = Number(filters.limit);
-      if (!Number.isInteger(parsed) || parsed < 1) {
-        limit = 100;
-      } else {
-        limit = Math.min(parsed, 200);
+    // Validate and parse platform filter if provided
+    let platformFilter: FeedbackReportPlatform | undefined;
+    if (filters.platform !== undefined) {
+      if (!isFeedbackReportPlatform(filters.platform)) {
+        return {
+          ok: false,
+          status: 400,
+          body: { message: 'Invalid report platform.' },
+        };
       }
+      platformFilter = filters.platform;
     }
 
-    // Parse tracking issue number filter if provided
+    // Validate and parse tracking issue number filter if provided. A value
+    // that is not a positive integer is refused, never silently dropped, so a
+    // filter the caller meant cannot quietly widen the list.
     let trackingIssueFilter: number | undefined;
     if (filters.trackingIssueNumber !== undefined) {
       const parsed = Number(filters.trackingIssueNumber);
-      if (Number.isInteger(parsed) && parsed > 0) {
-        trackingIssueFilter = parsed;
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return {
+          ok: false,
+          status: 400,
+          body: { message: 'Enter the tracking issue number.' },
+        };
       }
+      trackingIssueFilter = parsed;
     }
 
-    // Parse platform filter if provided
-    let platformFilter: string | undefined;
-    if (filters.platform !== undefined) {
-      const text = trimString(filters.platform);
-      if (text) {
-        platformFilter = text;
-      }
+    // Validate and parse paging. Defaults are page 1 and the default page size.
+    const page = filters.page === undefined ? 1 : Number(filters.page);
+    if (!Number.isInteger(page) || page < 1) {
+      return {
+        ok: false,
+        status: 400,
+        body: { message: 'The page must be 1 or more.' },
+      };
+    }
+
+    const pageSize =
+      filters.pageSize === undefined
+        ? FEEDBACK_REPORT_LIST_DEFAULT_PAGE_SIZE
+        : Number(filters.pageSize);
+    if (
+      !Number.isInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > FEEDBACK_REPORT_LIST_MAX_PAGE_SIZE
+    ) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          message: `The page size must be between 1 and ${FEEDBACK_REPORT_LIST_MAX_PAGE_SIZE}.`,
+        },
+      };
     }
 
     // Build where clause
@@ -436,28 +488,37 @@ export class AdminFeedbackService {
     if (trackingIssueFilter !== undefined)
       where.tracking_issue_number = trackingIssueFilter;
 
-    const items = await this.prisma.feedbackReport.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        kind: true,
-        status: true,
-        title: true,
-        context_platform: true,
-        tracking_issue_number: true,
-        reporter_user_id: true,
-        status_changed_at: true,
-        created_at: true,
-        reporter: REPORT_WITH_REPORTER.reporter,
-      },
-    });
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.feedbackReport.count({ where }),
+      this.prisma.feedbackReport.findMany({
+        where,
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          title: true,
+          context_platform: true,
+          tracking_issue_number: true,
+          reporter_user_id: true,
+          status_changed_at: true,
+          created_at: true,
+          reporter: REPORT_WITH_REPORTER.reporter,
+        },
+      }),
+    ]);
 
     return {
       ok: true,
       status: 200,
-      body: { items: items.map(toListItemDto) },
+      body: {
+        items: rows.map(toListItemDto),
+        total,
+        page,
+        pageSize,
+      },
     };
   }
 
