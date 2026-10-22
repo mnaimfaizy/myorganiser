@@ -3,7 +3,7 @@
 > **Single source of truth** for installed package versions and canonical technology choices.
 > All agent instruction files and documentation must reference this file rather than declaring versions inline.
 > Owned and kept current by the **DepSync** agent/skill — do not edit versions manually.
-> Last synced from `package.json` on 2026-10-22.
+> Last synced from `package.json` on 2026-10-23.
 
 > **Reading this file as an agent:** it is a lookup table, not a briefing. Read
 > the one section you need. Component work needs
@@ -30,7 +30,7 @@
 
 | Package     | Version | Purpose                                                |
 | ----------- | ------- | ------------------------------------------------------ |
-| `next`      | 16.3.8  | App framework — App Router, server components, routing |
+| `next`      | 16.4.2  | App framework — App Router, server components, routing |
 | `react`     | 19.2.3  | UI rendering                                           |
 | `react-dom` | 19.2.3  | DOM renderer for React                                 |
 
