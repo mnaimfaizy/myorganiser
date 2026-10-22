@@ -45,7 +45,7 @@ export type VaultUnlockSecret = 'passphrase' | 'recovery-key';
  */
 type PassphraseResetPromptAnswer = 'skipped' | 'completed';
 
-type VaultSessionContextValue = {
+export type VaultSessionContextValue = {
   masterKeyBytes: Uint8Array | null;
   /**
    * Null while locked. Set with the Master Key when unlocking, and cleared
@@ -119,9 +119,13 @@ type VaultSessionContextValue = {
   absentEvidence: VaultAbsentEvidenceState;
 };
 
-const VaultSessionContext = createContext<VaultSessionContextValue | null>(
-  null,
-);
+/**
+ * Exported so a story can mount a chosen session value — locked, unlocked, or
+ * a given sync reading — without the IndexedDB-backed provider. App code
+ * mounts `VaultSessionProvider`, never this context directly.
+ */
+export const VaultSessionContext =
+  createContext<VaultSessionContextValue | null>(null);
 
 export interface VaultSessionProviderProps {
   children: React.ReactNode;
