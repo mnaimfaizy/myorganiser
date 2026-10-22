@@ -1,6 +1,7 @@
 import type { AdminAuditAction } from '@myorganiser/app-api-client';
 
-const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
+/** Every action's label. Its keys are the action list the filters read (ADR 0053). */
+export const AUDIT_ACTION_LABELS = {
   disable: 'Disable',
   enable: 'Enable',
   force_logout: 'Force logout',
@@ -14,7 +15,7 @@ const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   feedback_tracking_issue_unlink: 'Unlink Tracking Issue',
   feedback_manual_delivery: 'Mark Feedback Report Delivered',
   feedback_reopen: 'Reopen Feedback Report',
-};
+} as const satisfies Record<AdminAuditAction, string>;
 
 export function formatAuditAction(action: AdminAuditAction): string {
   return AUDIT_ACTION_LABELS[action];

@@ -1,78 +1,124 @@
 'use client';
 
-import type { AdminAuditLogEntry } from '@myorganiser/app-api-client';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@myorganiser/web-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useIsMobileState } from '@myorganiser/web-ui';
 
-import { createPlatformAdminApi } from '../lib/apiClient';
-import { formatAuditAction, formatAuditTimestamp } from '../lib/formatAuditLog';
+import { useAuditLog } from '../hooks/use-audit-log';
+import { AUDIT_LOG_MESSAGES, type AuditLogVariant } from '../lib/auditLog';
+import { AuditLogFilterChips } from './audit/AuditLogFilterChips';
+import { AuditLogFilterSheet } from './audit/AuditLogFilterSheet';
+import { AuditLogFilters } from './audit/AuditLogFilters';
+import { AuditLogHeader } from './audit/AuditLogHeader';
+import { AuditLogPager } from './audit/AuditLogPager';
+import { AuditLogPhoneList } from './audit/AuditLogPhoneList';
+import { AuditLogTable } from './audit/AuditLogTable';
 
+/**
+ * The admin audit log. Desktop pages through a filterable table; phone appends
+ * a day-grouped list behind a filter sheet. The state lives in `useAuditLog`,
+ * and its setters pass straight through to the children.
+ */
 export function AuditLogPageClient() {
-  const [entries, setEntries] = useState<AdminAuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Until the breakpoint is known, only the header and a placeholder render.
+  // The hook still runs, so it is unconditional.
+  const isPhone = useIsMobileState();
+  const variant: AuditLogVariant = isPhone ? 'phone' : 'desktop';
+  const {
+    entries,
+    total,
+    page,
+    pageSize,
+    actions,
+    user,
+    filtered,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    hasMore,
+    toggleAction,
+    setUser,
+    clearFilters,
+    goToPage,
+    loadMore,
+  } = useAuditLog({
+    mode: isPhone ? 'append' : 'pages',
+  });
 
-  const loadAuditLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const api = createPlatformAdminApi();
-      const response = await api.listAuditLogs({ pageSize: 50 });
-      setEntries(response.data.entries);
-    } catch {
-      setError('Unable to load audit log. Please try again.');
-      setEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadAuditLogs();
-  }, [loadAuditLogs]);
+  // No pager while the first load is pending (total is still 0) or on error.
+  const showPager = !error && total > 0;
+  const emptyMessage = filtered
+    ? AUDIT_LOG_MESSAGES.filteredEmpty
+    : AUDIT_LOG_MESSAGES.empty;
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <h1 className="text-2xl font-semibold tracking-tight">Admin Audit Log</h1>
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 p-4 md:gap-5 md:p-8">
+      <AuditLogHeader variant={variant}>
+        {isPhone === true ? (
+          <AuditLogFilterSheet
+            actions={actions}
+            user={user}
+            onToggleAction={toggleAction}
+            onUserChange={setUser}
+            onClear={clearFilters}
+          />
+        ) : null}
+      </AuditLogHeader>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : error ? (
-        <p className="text-sm text-destructive">{error}</p>
-      ) : entries.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No audit log entries yet.
-        </p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Target</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.map((entry) => (
-              <TableRow key={entry.id}>
-                <TableCell>{formatAuditTimestamp(entry.createdAt)}</TableCell>
-                <TableCell>{formatAuditAction(entry.action)}</TableCell>
-                <TableCell>{entry.actorUserId}</TableCell>
-                <TableCell>{entry.targetUserId}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      {isPhone === undefined ? (
+        <div aria-hidden="true" className="min-h-96" />
+      ) : null}
+
+      {isPhone === false ? (
+        <>
+          <AuditLogFilters
+            actions={actions}
+            user={user}
+            onToggleAction={toggleAction}
+            onUserChange={setUser}
+            onClear={clearFilters}
+          />
+          <AuditLogTable
+            entries={entries}
+            loading={loading}
+            error={error}
+            emptyMessage={emptyMessage}
+            footer={
+              showPager ? (
+                <AuditLogPager
+                  page={page}
+                  pageSize={pageSize}
+                  shownCount={entries.length}
+                  total={total}
+                  filtered={filtered}
+                  onPageChange={goToPage}
+                />
+              ) : null
+            }
+          />
+        </>
+      ) : null}
+
+      {isPhone === true ? (
+        <>
+          <AuditLogFilterChips
+            actions={actions}
+            user={user}
+            onToggleAction={toggleAction}
+            onUserChange={setUser}
+          />
+          <AuditLogPhoneList
+            entries={entries}
+            total={total}
+            loading={loading}
+            loadingMore={loadingMore}
+            error={error}
+            loadMoreError={loadMoreError}
+            hasMore={hasMore}
+            emptyMessage={emptyMessage}
+            onLoadMore={loadMore}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

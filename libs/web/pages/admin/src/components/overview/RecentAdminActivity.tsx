@@ -7,18 +7,21 @@ import * as React from 'react';
 
 import { createPlatformAdminApi } from '../../lib/apiClient';
 import { ADMIN_SECTIONS } from '../../lib/adminNav';
+import { auditParty } from '../../lib/auditLog';
 import {
   formatAuditAction,
   formatAuditTimestamp,
 } from '../../lib/formatAuditLog';
 import { AUDIT_ACTION_TONE } from '../../lib/overview';
+import { AuditPartyName } from '../audit/AuditPartyName';
 
 const RECENT_PAGE_SIZE = 5;
 
 /**
  * The newest admin audit entries on the desktop Overview. It fetches its own
- * five entries; the shell's single overview request does not cover it. Ids are
- * the raw ids, as the Audit log page shows them.
+ * five entries; the shell's single overview request does not cover it. Parties
+ * are shown by name, as the Audit log page shows them; a deleted User reads
+ * "Deleted user".
  */
 export function RecentAdminActivity() {
   const headingId = React.useId();
@@ -95,18 +98,13 @@ export function RecentAdminActivity() {
                 {formatAuditAction(entry.action)}
               </StatusPill>
               <div className="flex min-w-0 flex-1 flex-col">
-                {entry.targetUserId !== null ? (
-                  <Link
-                    href={`${ADMIN_SECTIONS.users.url}/${entry.targetUserId}`}
-                    className="block min-w-0 truncate text-body-sm font-medium text-brand-text hover:underline"
-                  >
-                    {entry.targetUserId}
-                  </Link>
-                ) : (
-                  <span className="text-body-sm text-muted-foreground">—</span>
-                )}
+                <AuditPartyName
+                  entry={entry}
+                  side="target"
+                  className="block min-w-0 truncate text-body-sm font-medium text-brand-text"
+                />
                 <span className="truncate text-caption text-muted-foreground">
-                  {`by ${entry.actorUserId ?? '—'}`}
+                  {`by ${auditParty(entry, 'actor').name}`}
                 </span>
               </div>
               <time

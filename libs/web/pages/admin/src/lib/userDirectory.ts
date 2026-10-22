@@ -132,19 +132,23 @@ export function isAdminUserSort(value: string): value is AdminUserSort {
  * "2 Sep"; the year is appended (" 2025") only when it differs from `now`'s
  * year. The day and the three-letter month come from en-US formatToParts,
  * because en-GB prints "Sept" for September. Local time zone, as before.
+ * Shared by the user directory and the audit log.
  */
-export function formatJoinedDate(iso: string, now: Date = new Date()): string {
-  const joined = new Date(iso);
+export function formatDayMonth(date: Date, now: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
-  }).formatToParts(joined);
+  }).formatToParts(date);
   const day = parts.find((part) => part.type === 'day')?.value ?? '';
   const month = parts.find((part) => part.type === 'month')?.value ?? '';
   const base = `${day} ${month}`;
-  return joined.getFullYear() === now.getFullYear()
+  return date.getFullYear() === now.getFullYear()
     ? base
-    : `${base} ${joined.getFullYear()}`;
+    : `${base} ${date.getFullYear()}`;
+}
+
+export function formatJoinedDate(iso: string, now: Date = new Date()): string {
+  return formatDayMonth(new Date(iso), now);
 }
 
 /** "Showing 1–25 of 148"; zero rows reads "Showing 0 of {total}". */
