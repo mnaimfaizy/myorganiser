@@ -64,7 +64,7 @@ export function MoreScreen() {
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
-  const initials = initialsOf(name) || email.charAt(0).toUpperCase();
+  const initials = initialsOf(name, email);
   const youtubeVisible = useYouTubeNavVisible();
   const [hasUnreadReports, setHasUnreadReports] = useState(false);
 

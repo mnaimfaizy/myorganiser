@@ -37,8 +37,7 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
-  // With no name the email's first letter stands in.
-  const initials = initialsOf(name) || email.charAt(0).toUpperCase();
+  const initials = initialsOf(name, email);
 
   const router = useRouter();
   const { toast } = useToast();

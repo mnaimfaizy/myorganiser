@@ -13,7 +13,7 @@ export function AccountProfileHeader({
   email,
 }: AccountProfileHeaderProps) {
   const displayName = name || email;
-  const initials = initialsOf(name) || email.charAt(0).toUpperCase();
+  const initials = initialsOf(name, email);
 
   if (variant === 'phone') {
     return (

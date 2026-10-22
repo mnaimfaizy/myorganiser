@@ -46,7 +46,7 @@ export function AccountMenu({ variant = 'header' }: AccountMenuProps) {
   const session = useOptionalVaultSession();
   // Initials come from the name; with no name the email's first letter stands in,
   // and with neither the avatar shows an icon rather than empty text.
-  const initials = initialsOf(name) || email.charAt(0).toUpperCase();
+  const initials = initialsOf(name, email);
   const canLockVault = useVaultLockState() === 'unlocked';
 
   const lockVault = useCallback(() => {

@@ -102,4 +102,20 @@ describe('initialsOf', () => {
     expect(initialsOf('')).toBe('');
     expect(initialsOf('   ')).toBe('');
   });
+
+  it('prefers the name over the email when both are given', () => {
+    expect(initialsOf('Ada Lovelace', 'zed@example.com')).toBe('AL');
+  });
+
+  it('falls back to the upper-cased first letter of the email when the name is empty', () => {
+    expect(initialsOf('', 'ada@example.com')).toBe('A');
+  });
+
+  it('falls back to the email when the name is only spaces', () => {
+    expect(initialsOf('   ', 'bob@example.com')).toBe('B');
+  });
+
+  it('returns an empty string when both the name and the email are empty', () => {
+    expect(initialsOf('', '')).toBe('');
+  });
 });

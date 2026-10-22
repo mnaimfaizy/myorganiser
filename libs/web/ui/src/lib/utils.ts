@@ -70,14 +70,16 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * The first letter of up to two words in a name, upper-cased, for an avatar.
- * An empty or blank name gives an empty string; callers add their own fallback.
+ * With no usable name the email's first letter stands in; with neither, an
+ * empty string.
  */
-export function initialsOf(name: string): string {
-  return name
+export function initialsOf(name: string, email = ''): string {
+  const fromName = name
     .split(' ')
     .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+  return fromName || email.charAt(0).toUpperCase();
 }
