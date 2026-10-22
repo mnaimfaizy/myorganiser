@@ -10,7 +10,7 @@ import { formatDayMonth, formatShowingRange } from './userDirectory';
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */
 export const FEEDBACK_INBOX_PAGE_SIZE = 25;
 
-/** The strings the inbox shows in its body states. Today's wording, kept. */
+/** The strings the inbox shows in its body states. */
 export const FEEDBACK_INBOX_MESSAGES = {
   loading: 'Loading…',
   error: 'Unable to load feedback reports. Please try again.',
@@ -57,7 +57,7 @@ export const NO_FEEDBACK_INBOX_FILTERS: FeedbackInboxFilters = {
 
 /**
  * The issue number the Tracking issue field filters by, or `undefined` when
- * the text is not a whole number from 1. Such text is ignored, as today.
+ * the text is not a whole number from 1. Such text does not filter.
  */
 export function parseTrackingIssueFilter(text: string): number | undefined {
   const trimmed = text.trim();

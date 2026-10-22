@@ -16,7 +16,7 @@ export interface ReportContextProps {
 interface ContextRow {
   label: string;
   value: string | null | undefined;
-  /** Platform and Sent at always show, as they do today. */
+  /** Platform and Sent at always show. */
   required: boolean;
 }
 

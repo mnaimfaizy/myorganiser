@@ -73,7 +73,7 @@ const RECEIVED: FeedbackReportStatus = 'received';
  * Owns the inbox's Status, Kind, Platform and Tracking issue filters, and
  * paging, and fetches the list. Every filter change resets to page 1 and
  * replaces the list. Tracking issue text that is not a whole number from 1 is
- * ignored, as today, so typing it changes no request.
+ * ignored, so typing it changes no request.
  *
  * Pending and error flags are derived, not stored. A result is settled only
  * when its request key matches the current key, so a stale response can never
