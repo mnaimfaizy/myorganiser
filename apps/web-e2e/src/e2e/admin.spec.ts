@@ -1,3 +1,4 @@
+import type { AdminUserIdentity } from '@myorganiser/app-api-client';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { gotoStable, routeApi } from './helpers';
 import {
@@ -7,6 +8,7 @@ import {
   type PersonaUser,
 } from './helpers/adminSession';
 import { stubAdminAuditLogs, stubAdminOverview } from './helpers/adminOverview';
+import { stubAdminUsers } from './helpers/adminUsers';
 
 /**
  * Platform Admin console — access control + Overview landing + user directory
@@ -16,21 +18,11 @@ import { stubAdminAuditLogs, stubAdminOverview } from './helpers/adminOverview';
  * - `/auth/refresh` returns the seeded persona or 401 for guests (OPTIONS + GET/POST).
  * - `GET /admin/overview` returns fixed counts (OPTIONS + GET).
  * - `GET /admin/audit-logs` returns fixed entries (OPTIONS + GET).
- * - `GET /admin/users` returns one page of mock AdminUserIdentity rows (OPTIONS + GET).
+ * - `GET /admin/users` returns one page of mock AdminUserIdentity rows, filtered
+ *   by `q` (OPTIONS + GET). See `helpers/adminUsers.ts`.
  *
  * No live third-party services or admin mutation endpoints.
  */
-
-interface AdminUserIdentityRow {
-  id: string;
-  name: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: 'user' | 'platform_admin';
-  disabled: boolean;
-  emailVerified: boolean;
-}
 
 async function stubAuthRefreshUnauthorized(page: Page) {
   const refreshUrl = /\/auth\/refresh\/?(\?.*)?$/;
@@ -53,86 +45,29 @@ async function stubAuthRefreshUnauthorized(page: Page) {
   });
 }
 
-function filterDirectoryUsers(
-  users: AdminUserIdentityRow[],
-  query: string | null,
-): AdminUserIdentityRow[] {
-  const q = query?.trim().toLowerCase();
-  if (!q) {
-    return users;
-  }
-
-  return users.filter((user) => {
-    const haystack = [
-      user.name,
-      user.email,
-      user.firstName,
-      user.lastName,
-      `${user.firstName} ${user.lastName}`,
-    ]
-      .join(' ')
-      .toLowerCase();
-
-    return haystack.includes(q);
-  });
+/** The Users section: a region of one link per row. */
+function getDirectoryRows(page: Page): Locator {
+  return page.getByRole('region', { name: 'Users', exact: true });
 }
 
-async function stubAdminUsersList(page: Page, users: AdminUserIdentityRow[]) {
-  const adminUsersUrl = /\/admin\/users\/?(\?.*)?$/;
-
-  await routeApi(page, adminUsersUrl, async (route) => {
-    const origin = new URL(page.url() || 'http://localhost:4200').origin;
-    const headers = corsHeaders(origin);
-    const request = route.request();
-
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-
-    if (request.method() !== 'GET') {
-      await route.continue();
-      return;
-    }
-
-    const url = new URL(request.url());
-    const matches = filterDirectoryUsers(users, url.searchParams.get('q'));
-    const payload = {
-      users: matches,
-      total: matches.length,
-      page: 1,
-      pageSize: 25,
-    };
-
-    await route.fulfill({
-      status: 200,
-      headers,
-      contentType: 'application/json',
-      body: JSON.stringify(payload),
-    });
-  });
-}
-
-function getUsersDirectoryTable(page: Page): Locator {
-  return page.getByRole('table');
-}
-
+/**
+ * One directory row is one link whose accessible name carries the name, the
+ * email, the role pill, the status pill, and the join date.
+ */
 async function expectDirectoryRow(
-  table: Locator,
+  directory: Locator,
   displayName: string,
   expected: {
     email: string;
     roleLabel: string;
-    disabledLabel: string;
-    emailVerifiedLabel: string;
+    statusLabel: string;
   },
 ) {
-  const row = table.getByRole('row').filter({ hasText: displayName });
-  await expect(row).toBeVisible();
+  const row = directory.getByRole('link', { name: displayName });
+  await expect(row).toHaveCount(1);
   await expect(row).toContainText(expected.email);
   await expect(row).toContainText(expected.roleLabel);
-  await expect(row).toContainText(expected.disabledLabel);
-  await expect(row).toContainText(expected.emailVerifiedLabel);
+  await expect(row).toContainText(expected.statusLabel);
 }
 
 const NORMAL_USER: PersonaUser = {
@@ -155,7 +90,7 @@ const PLATFORM_ADMIN: PersonaUser = {
   disabled: false,
 };
 
-const MOCK_DIRECTORY_USERS: AdminUserIdentityRow[] = [
+const MOCK_DIRECTORY_USERS: AdminUserIdentity[] = [
   {
     id: 'u-1',
     name: 'Ada Lovelace',
@@ -165,6 +100,8 @@ const MOCK_DIRECTORY_USERS: AdminUserIdentityRow[] = [
     role: 'user',
     disabled: false,
     emailVerified: true,
+    youtubeAccess: false,
+    createdAt: '2026-09-02T09:00:00.000Z',
   },
   {
     id: 'a-1',
@@ -175,6 +112,8 @@ const MOCK_DIRECTORY_USERS: AdminUserIdentityRow[] = [
     role: 'platform_admin',
     disabled: false,
     emailVerified: true,
+    youtubeAccess: false,
+    createdAt: '2026-08-15T09:00:00.000Z',
   },
 ];
 
@@ -215,7 +154,7 @@ test.describe('Platform Admin console', () => {
     await stubAuthRefresh(page, PLATFORM_ADMIN);
     await stubAdminOverview(page);
     await stubAdminAuditLogs(page);
-    await stubAdminUsersList(page, MOCK_DIRECTORY_USERS);
+    await stubAdminUsers(page, MOCK_DIRECTORY_USERS);
 
     await gotoStable(page, '/admin');
 
@@ -247,35 +186,24 @@ test.describe('Platform Admin console', () => {
       page.getByRole('heading', { name: 'Users', level: 1 }),
     ).toBeVisible({ timeout: 60000 });
 
-    const table = getUsersDirectoryTable(page);
-    await expect(table).toBeVisible();
+    const directory = getDirectoryRows(page);
+    await expect(directory).toBeVisible();
 
-    for (const column of [
-      'Name',
-      'Email',
-      'Role',
-      'Disabled',
-      'Email verified',
-    ]) {
-      await expect(
-        table.getByRole('columnheader', { name: column, exact: true }),
-      ).toBeVisible();
-    }
-
-    await expectDirectoryRow(table, 'Ada Lovelace', {
+    await expectDirectoryRow(directory, 'Ada Lovelace', {
       email: 'ada@example.com',
       roleLabel: 'User',
-      disabledLabel: 'No',
-      emailVerifiedLabel: 'Yes',
+      statusLabel: 'Active',
     });
-    await expectDirectoryRow(table, 'Admin One', {
+    await expectDirectoryRow(directory, 'Admin One', {
       email: 'admin@example.com',
-      roleLabel: 'Platform Admin',
-      disabledLabel: 'No',
-      emailVerifiedLabel: 'Yes',
+      roleLabel: 'Admin',
+      statusLabel: 'Active',
     });
 
-    await expect(table.getByRole('link', { name: 'View' })).toHaveCount(2);
+    await expect(directory.getByRole('link')).toHaveCount(2);
+    await expect(
+      directory.getByRole('link', { name: 'Ada Lovelace' }),
+    ).toHaveAttribute('href', '/admin/users/u-1');
   });
 
   test('directory search keeps the user on the users page', async ({
@@ -286,7 +214,7 @@ test.describe('Platform Admin console', () => {
     await seedSession(page, PLATFORM_ADMIN);
     await stubAuthRefresh(page, PLATFORM_ADMIN);
     await stubAdminOverview(page);
-    await stubAdminUsersList(page, MOCK_DIRECTORY_USERS);
+    const requests = await stubAdminUsers(page, MOCK_DIRECTORY_USERS);
 
     await gotoStable(page, '/admin/users');
 
@@ -305,16 +233,16 @@ test.describe('Platform Admin console', () => {
       page.getByRole('heading', { name: 'Users', level: 1 }),
     ).toBeVisible();
 
-    const table = getUsersDirectoryTable(page);
-    await expect(table).toBeVisible({ timeout: 60000 });
-    await expectDirectoryRow(table, 'Ada Lovelace', {
+    const directory = getDirectoryRows(page);
+    await expect(directory).toBeVisible({ timeout: 60000 });
+    await expectDirectoryRow(directory, 'Ada Lovelace', {
       email: 'ada@example.com',
       roleLabel: 'User',
-      disabledLabel: 'No',
-      emailVerifiedLabel: 'Yes',
+      statusLabel: 'Active',
     });
     await expect(
-      table.getByRole('row').filter({ hasText: 'Admin One' }),
+      directory.getByRole('link', { name: 'Admin One' }),
     ).toHaveCount(0, { timeout: 60000 });
+    expect(requests.at(-1)).toMatchObject({ q: 'Ada', page: '1' });
   });
 });
