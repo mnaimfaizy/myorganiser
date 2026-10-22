@@ -120,3 +120,15 @@ export function isValidPhoneLength(
   const digits = phoneNumber.replace(/\D/g, '');
   return digits.length === country.digitCount;
 }
+
+/**
+ * The country name for a calling code. Several countries share a code (+1 is
+ * the United States and Canada), so their names are joined with " / ". Undefined
+ * for a code that is not in the list.
+ */
+export function countryNameForCode(code: string): string | undefined {
+  const names = COUNTRY_CALLING_CODES.filter((c) => c.code === code).map(
+    (c) => c.country,
+  );
+  return names.length > 0 ? names.join(' / ') : undefined;
+}

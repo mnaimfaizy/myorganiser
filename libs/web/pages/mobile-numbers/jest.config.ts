@@ -7,4 +7,5 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../../../coverage/libs/web/pages/mobile-numbers',
+  setupFilesAfterEnv: ['@testing-library/jest-dom'],
 };

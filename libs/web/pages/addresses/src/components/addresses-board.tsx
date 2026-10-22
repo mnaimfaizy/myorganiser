@@ -2,11 +2,11 @@
 
 import type { AddressRecord } from '@myorganiser/vault-core';
 import { ConfirmDialog, IconButton, ListGroup } from '@myorganiser/web-ui';
+import { CopyStatus, useExpiringCopy } from '@myorganiser/web-usage-locations';
 import { Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 
 import type { AddressesPageController } from '../hooks/use-addresses-page';
-import { useExpiringCopy } from '../hooks/use-expiring-copy';
 import {
   type AddressListFilter,
   countAddressesByStatus,
@@ -30,9 +30,6 @@ export interface AddressesBoardProps {
 
 const DESKTOP_CONTAINER = 'mx-auto flex w-full max-w-310 flex-col gap-5.5 p-8';
 const PHONE_CONTAINER = 'flex flex-col gap-3.5 pt-1 pb-24';
-/** The copy confirmation. Its live region stays mounted; the pill is drawn only while a message is set. */
-const COPY_STATUS =
-  'fixed bottom-6 left-1/2 z-20 flex min-h-12 -translate-x-1/2 items-center rounded-control bg-navy px-4 text-body-sm font-semibold text-navy-foreground shadow-toast';
 const NO_MATCHES = 'text-body-sm text-muted-foreground';
 
 /**
@@ -204,11 +201,7 @@ export function AddressesBoard({ page, variant }: AddressesBoardProps) {
         )}
       </div>
     );
-    statusRegion = (
-      <div role="status" className={copyMessage ? COPY_STATUS : undefined}>
-        {copyMessage}
-      </div>
-    );
+    statusRegion = <CopyStatus message={copyMessage} variant="floating" />;
   }
 
   return (

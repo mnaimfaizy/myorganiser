@@ -1,14 +1,23 @@
-import {
-  Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@myorganiser/web-ui';
+import { Combobox, Input, Label } from '@myorganiser/web-ui';
 import { ChangeEvent, useCallback } from 'react';
-import { COUNTRY_CALLING_CODES } from '../data/countryCodes';
+import {
+  COUNTRY_CALLING_CODES,
+  countryNameForCode,
+} from '../data/countryCodes';
+
+/**
+ * One option per calling code. +1 is shared by the United States and Canada,
+ * so the option names both, and the value stays unique for the picker.
+ */
+const COUNTRY_CODE_OPTIONS = Array.from(
+  new Set(COUNTRY_CALLING_CODES.map((c) => c.code)),
+).map((code) => {
+  const flag = COUNTRY_CALLING_CODES.find((c) => c.code === code)?.flag ?? '';
+  return {
+    value: code,
+    label: `${flag} ${countryNameForCode(code) ?? code} (${code})`,
+  };
+});
 
 export interface MobileNumberFormFieldsProps {
   label: string;
@@ -74,18 +83,16 @@ export function MobileNumberFormFields(props: MobileNumberFormFieldsProps) {
           <Label htmlFor="mobile-country-code" className="text-sm font-medium">
             Country Code
           </Label>
-          <Select value={countryCode} onValueChange={onCountryCodeChange}>
-            <SelectTrigger id="mobile-country-code" className="h-11">
-              <SelectValue placeholder="Select country code" />
-            </SelectTrigger>
-            <SelectContent>
-              {COUNTRY_CALLING_CODES.map((c) => (
-                <SelectItem key={`${c.code}-${c.country}`} value={c.code}>
-                  {c.flag} {c.country} ({c.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            id="mobile-country-code"
+            value={countryCode}
+            onValueChange={onCountryCodeChange}
+            options={COUNTRY_CODE_OPTIONS}
+            placeholder="Select country code"
+            searchPlaceholder="Search countries..."
+            emptyText="No countries found."
+            className="h-11"
+          />
           {fieldErrors?.countryCode && (
             <p className="text-sm font-medium text-destructive">
               {fieldErrors.countryCode}

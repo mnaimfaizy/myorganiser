@@ -5,12 +5,13 @@ import {
   AddressStatusEnum,
   type AddressRecord,
   type AddressStatus,
-  type UsageLocationRecord,
 } from '@myorganiser/vault-core';
 import { useToast } from '@myorganiser/web-ui';
 import {
   type PlaceFormValues,
-  usageLocationFormValuesToRecordFields,
+  removePlace,
+  setPlaceChanged,
+  upsertPlace,
 } from '@myorganiser/web-usage-locations';
 import {
   normalizeAddresses,
@@ -207,30 +208,16 @@ export function useAddressesPage(handle: VaultHandle): AddressesPageController {
       editingId: string | null,
     ) => {
       const now = new Date().toISOString();
-      const fields = usageLocationFormValuesToRecordFields(values);
 
       await persist(
         patchAddress(items, addressId, (address) => ({
-          usageLocations: editingId
-            ? address.usageLocations.map((loc) =>
-                loc.id === editingId
-                  ? {
-                      ...loc,
-                      ...fields,
-                      changedAt:
-                        values.changed && !loc.changed ? now : loc.changedAt,
-                    }
-                  : loc,
-              )
-            : [
-                {
-                  id: randomId(),
-                  ...fields,
-                  createdAt: now,
-                  changedAt: values.changed ? now : undefined,
-                } satisfies UsageLocationRecord,
-                ...address.usageLocations,
-              ],
+          usageLocations: upsertPlace(
+            address.usageLocations,
+            values,
+            editingId,
+            now,
+            randomId,
+          ),
         })),
       );
       toast({
@@ -249,16 +236,11 @@ export function useAddressesPage(handle: VaultHandle): AddressesPageController {
       try {
         await persist(
           patchAddress(items, addressId, (address) => ({
-            usageLocations: address.usageLocations.map((loc) =>
-              loc.id === locationId
-                ? {
-                    ...loc,
-                    changed,
-                    // As the edit form does: ticking stamps today, unticking
-                    // keeps the date it was last updated.
-                    changedAt: changed && !loc.changed ? now : loc.changedAt,
-                  }
-                : loc,
+            usageLocations: setPlaceChanged(
+              address.usageLocations,
+              locationId,
+              changed,
+              now,
             ),
           })),
         );
@@ -275,9 +257,7 @@ export function useAddressesPage(handle: VaultHandle): AddressesPageController {
       try {
         await persist(
           patchAddress(items, addressId, (address) => ({
-            usageLocations: address.usageLocations.filter(
-              (l) => l.id !== locationId,
-            ),
+            usageLocations: removePlace(address.usageLocations, locationId),
           })),
         );
       } catch {

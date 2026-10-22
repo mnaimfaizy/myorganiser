@@ -5,6 +5,7 @@ import type {
   UsageLocationRecord,
 } from '@myorganiser/vault-core';
 import { Button, Illustration, StatusPill } from '@myorganiser/web-ui';
+import { PlacesCard } from '@myorganiser/web-usage-locations';
 
 import { getGoogleMapsUrl } from '../utils/addressHelpers';
 import {
@@ -14,7 +15,6 @@ import {
 } from '../utils/address-summary';
 import { ADDRESS_STATUS_PILL } from '../utils/presentation';
 import { AddressCopyList } from './address-copy-list';
-import { AddressPlacesCard } from './address-places-card';
 
 export interface AddressDetailProps {
   address: AddressRecord;
@@ -140,8 +140,9 @@ export function AddressDetail({
           </section>
         </div>
 
-        <AddressPlacesCard
-          address={address}
+        <PlacesCard
+          locations={address.usageLocations}
+          noun="address"
           today={today}
           pendingPlaceIds={pendingPlaceIds}
           onAddPlace={onAddPlace}

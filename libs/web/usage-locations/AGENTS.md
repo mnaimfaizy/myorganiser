@@ -2,7 +2,7 @@
 
 ## Scope
 
-The Usage Location UI that Addresses and Mobile numbers share: the add-place dialog, its form schema, and the labels for the organisation-type, update-method and priority vocabularies. A page library passes its subject and noun; everything else is written once here.
+The Usage Location UI that Addresses and Mobile numbers share: the add-place dialog, its form schema, the labels for the organisation-type, update-method and priority vocabularies, the Places checklist (`PlacesCard` on desktop, `PlacesPhone` on phone), and the copy-to-clipboard action with its 60-second confirmation (`useExpiringCopy`). A page library passes its subject and noun; everything else is written once here.
 
 ## Commands
 

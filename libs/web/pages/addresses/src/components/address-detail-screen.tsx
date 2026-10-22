@@ -5,12 +5,12 @@ import type {
   UsageLocationRecord,
 } from '@myorganiser/vault-core';
 import { Button, StatusPill } from '@myorganiser/web-ui';
+import { CopyStatus, PlacesPhone } from '@myorganiser/web-usage-locations';
 
 import { getGoogleMapsUrl } from '../utils/addressHelpers';
 import { addressPhoneCopyFields } from '../utils/address-summary';
 import { ADDRESS_STATUS_PILL } from '../utils/presentation';
 import { AddressCopyList } from './address-copy-list';
-import { AddressPlacesPhone } from './address-places-phone';
 
 export interface AddressDetailScreenProps {
   address: AddressRecord;
@@ -33,9 +33,6 @@ export interface AddressDetailScreenProps {
 
 const PHONE_CONTAINER =
   'flex min-h-full flex-1 flex-col gap-4 pt-1 pb-[calc(6rem_+_env(safe-area-inset-bottom))]';
-/** The copy confirmation: a navy pill above the bottom edge and any toast. */
-const PHONE_COPY_STATUS =
-  'fixed inset-x-4 bottom-[calc(var(--toast-offset,0px)+1.5rem)] z-20 flex min-h-13 items-center rounded-control bg-navy px-4 text-body font-semibold text-navy-foreground shadow-toast';
 
 /**
  * The phone Address detail, pushed over the Addresses list. The shell draws
@@ -100,8 +97,8 @@ export function AddressDetailScreen({
         </Button>
       </div>
 
-      <AddressPlacesPhone
-        address={address}
+      <PlacesPhone
+        locations={address.usageLocations}
         pendingPlaceIds={pendingPlaceIds}
         onAddPlace={onAddPlace}
         onEditPlace={onEditPlace}
@@ -126,12 +123,7 @@ export function AddressDetailScreen({
         </Button>
       </div>
 
-      <div
-        role="status"
-        className={copyMessage ? PHONE_COPY_STATUS : undefined}
-      >
-        {copyMessage}
-      </div>
+      <CopyStatus message={copyMessage} variant="phone" />
     </div>
   );
 }

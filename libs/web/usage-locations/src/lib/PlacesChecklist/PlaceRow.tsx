@@ -14,10 +14,13 @@ import {
 } from '@myorganiser/web-ui';
 import { MoreHorizontal } from 'lucide-react';
 
-import { formatPlaceMeta } from '../utils/address-summary';
-import { PLACE_PRIORITY_PILL, PLACE_UPDATED_PILL } from '../utils/presentation';
+import {
+  formatPlaceMeta,
+  PLACE_PRIORITY_PILL,
+  PLACE_UPDATED_PILL,
+} from './placeChecklist';
 
-export interface AddressPlaceRowProps {
+export interface PlaceRowProps {
   location: UsageLocationRecord;
   today: Date;
   /** True while this row's tick is being saved. */
@@ -28,14 +31,14 @@ export interface AddressPlaceRowProps {
 }
 
 /** One line on the desktop Places checklist: tick it, read it, or open its menu. */
-export function AddressPlaceRow({
+export function PlaceRow({
   location,
   today,
   pending,
   onSetChanged,
   onEdit,
   onRequestDelete,
-}: AddressPlaceRowProps) {
+}: PlaceRowProps) {
   const pillSpec = location.changed
     ? PLACE_UPDATED_PILL
     : PLACE_PRIORITY_PILL[location.priority];
