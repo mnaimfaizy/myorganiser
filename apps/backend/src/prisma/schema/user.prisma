@@ -50,7 +50,7 @@ model User {
   /// Stable per-User secret used in the Fix Notice unsubscribe link, minted
   /// lazily on first send (mirrors YouTubeNotificationSettings.unsubscribeToken).
   fix_notice_unsubscribe_token    String?   @unique
-  /// When the User account was created. Rows that existed before this column was added carry the migration's timestamp, not their real sign-up time.
+  /// When the User account was created. Rows that existed before this column was added were backfilled from the creation time in their cuid id (migration 20261022120000_backfill_user_created_at_from_id).
   created_at                      DateTime  @default(now())
 
   encrypted_vault               EncryptedVault?
