@@ -35,7 +35,7 @@ export function UserDirectoryList({
   return (
     <section
       aria-label="Users"
-      className="overflow-hidden rounded-panel border border-border bg-raised-surface shadow-card"
+      className="overflow-hidden rounded-panel border border-border bg-raised-surface"
     >
       <div
         aria-hidden="true"

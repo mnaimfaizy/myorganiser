@@ -56,11 +56,12 @@ export interface UserDirectoryStatusChip {
   status: UserDirectoryStatus | undefined;
 }
 
+/** "All", then one chip per status in the pills table, in its order. */
 export const USER_STATUS_CHIPS: readonly UserDirectoryStatusChip[] = [
   { label: 'All', status: undefined },
-  { label: 'Active', status: 'active' },
-  { label: 'Unverified', status: 'unverified' },
-  { label: 'Disabled', status: 'disabled' },
+  ...(Object.keys(USER_STATUS_PILLS) as UserDirectoryStatus[]).map(
+    (status) => ({ label: USER_STATUS_PILLS[status].label, status }),
+  ),
 ];
 
 export interface UserDirectoryRoleChip {
@@ -68,10 +69,13 @@ export interface UserDirectoryRoleChip {
   role: UserRole | undefined;
 }
 
+/** "Any", then one chip per role in the pills table, in its order. */
 export const USER_ROLE_CHIPS: readonly UserDirectoryRoleChip[] = [
   { label: 'Any', role: undefined },
-  { label: 'Admin', role: 'platform_admin' },
-  { label: 'User', role: 'user' },
+  ...(Object.keys(USER_ROLE_PILLS) as UserRole[]).map((role) => ({
+    label: USER_ROLE_PILLS[role].label,
+    role,
+  })),
 ];
 
 export type UserDirectoryPhoneChipId =

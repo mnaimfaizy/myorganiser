@@ -340,4 +340,65 @@ describe('useUserDirectory', () => {
     expect(lastListParams().page).toBe(2);
     expect(result.current.page).toBe(2);
   });
+
+  it('keeps the loaded rows and flags a failed append while loadMoreError is set, and makes loadMore a no-op', async () => {
+    const page1 = usersRange(1, 25);
+    mockListUsers.mockImplementation((params: { page: number }) =>
+      params.page === 2
+        ? Promise.reject(new Error('network down'))
+        : Promise.resolve(listResponse(page1, 60)),
+    );
+
+    const { result } = renderHook(() => useUserDirectory({ mode: 'append' }));
+    await waitFor(() => expect(result.current.users).toEqual(page1));
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(result.current.loadMoreError).toBe(true));
+
+    expect(result.current.users).toEqual(page1);
+    expect(result.current.total).toBe(60);
+    expect(result.current.error).toBe(false);
+    expect(result.current.loadingMore).toBe(false);
+
+    const callsBefore = mockListUsers.mock.calls.length;
+
+    act(() => {
+      result.current.loadMore();
+    });
+
+    expect(mockListUsers).toHaveBeenCalledTimes(callsBefore);
+  });
+
+  it('clears loadMoreError and replaces the list when a filter change resolves', async () => {
+    const page1 = usersRange(1, 25);
+    const active = usersRange(200, 3);
+    mockListUsers.mockImplementation(
+      (params: { page: number; status?: string }) => {
+        if (params.page === 2) return Promise.reject(new Error('network down'));
+        if (params.status === 'active')
+          return Promise.resolve(listResponse(active, 3));
+        return Promise.resolve(listResponse(page1, 30));
+      },
+    );
+
+    const { result } = renderHook(() => useUserDirectory({ mode: 'append' }));
+    await waitFor(() => expect(result.current.users).toEqual(page1));
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(result.current.loadMoreError).toBe(true));
+
+    act(() => {
+      result.current.setStatus('active');
+    });
+
+    await waitFor(() => expect(result.current.users).toEqual(active));
+    expect(result.current.loadMoreError).toBe(false);
+    expect(result.current.status).toBe('active');
+    expect(result.current.total).toBe(3);
+    expect(result.current.loading).toBe(false);
+  });
 });

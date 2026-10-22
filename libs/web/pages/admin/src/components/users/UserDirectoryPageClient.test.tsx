@@ -469,5 +469,37 @@ describe('UserDirectoryPageClient', () => {
         );
       expect(userLinks).toHaveLength(30);
     });
+
+    it('keeps the 25 rows and shows the load error when the next page fails, and hides the scroll-for-more count', async () => {
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+      mockListUsers.mockImplementation(({ page }: { page: number }) =>
+        page === 1
+          ? Promise.resolve(listResponse(usersRange(1, 25), 60, 1))
+          : Promise.reject(new Error('network down')),
+      );
+
+      renderDirectory();
+      await screen.findByText('Scroll for more · 25 of 60');
+
+      const observer = createdObservers[createdObservers.length - 1];
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer as unknown as IntersectionObserver,
+        );
+      });
+
+      await screen.findByText('Unable to load users. Please try again.');
+      expect(
+        screen.queryByText('Scroll for more · 25 of 60'),
+      ).not.toBeInTheDocument();
+      const userLinks = screen
+        .getAllByRole('link')
+        .filter((link) =>
+          link.getAttribute('href')?.startsWith('/admin/users/'),
+        );
+      expect(userLinks).toHaveLength(25);
+    });
   });
 });

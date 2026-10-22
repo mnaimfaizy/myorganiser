@@ -22,6 +22,8 @@ export interface UserDirectoryPhoneListProps {
   loading: boolean;
   loadingMore: boolean;
   error: boolean;
+  /** The last append failed. The rows stay; the sentinel does not retry. */
+  loadMoreError: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
 }
@@ -36,6 +38,7 @@ export function UserDirectoryPhoneList({
   loading,
   loadingMore,
   error,
+  loadMoreError,
   hasMore,
   onLoadMore,
 }: UserDirectoryPhoneListProps) {
@@ -46,10 +49,12 @@ export function UserDirectoryPhoneList({
     const node = sentinelRef.current;
 
     // jsdom has no IntersectionObserver; there the list simply does not grow.
+    // After a failed append the sentinel stays quiet: no retry loop.
     if (
       node !== null &&
       hasMore &&
       !loadingMore &&
+      !loadMoreError &&
       typeof IntersectionObserver !== 'undefined'
     ) {
       observer = new IntersectionObserver((entries) => {
@@ -61,7 +66,7 @@ export function UserDirectoryPhoneList({
     }
 
     return () => observer?.disconnect();
-  }, [hasMore, loadingMore, onLoadMore]);
+  }, [hasMore, loadingMore, loadMoreError, onLoadMore]);
 
   const countLabel =
     users.length === 0
@@ -123,7 +128,11 @@ export function UserDirectoryPhoneList({
         )}
       </div>
       <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-      {countLabel !== null ? (
+      {loadMoreError ? (
+        <p className="text-center text-caption text-destructive">
+          {USER_DIRECTORY_MESSAGES.error}
+        </p>
+      ) : countLabel !== null ? (
         <p className="text-center text-caption text-muted-foreground">
           {countLabel}
         </p>

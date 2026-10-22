@@ -36,6 +36,8 @@ export interface UserDirectoryState {
   /** An append (phone) fetch is in flight. */
   loadingMore: boolean;
   error: boolean;
+  /** The last append failed. The rows are kept; cleared by any filter change. */
+  loadMoreError: boolean;
   hasMore: boolean;
   /** Applies the trimmed query. Empty means no query. */
   setQuery: (raw: string) => void;
@@ -60,7 +62,10 @@ interface UserDirectorySettled {
   key: string | null;
   users: AdminUserIdentity[];
   total: number;
+  /** A replace failed: the list is blank and the error shows. */
   error: boolean;
+  /** An append failed: the rows loaded so far are kept. */
+  appendError: boolean;
 }
 
 const NO_USERS: AdminUserIdentity[] = [];
@@ -101,6 +106,7 @@ export function useUserDirectory({
     users: NO_USERS,
     total: 0,
     error: false,
+    appendError: false,
   });
 
   useEffect(() => {
@@ -124,11 +130,29 @@ export function useUserDirectory({
           users: append ? [...previous.users, ...data.users] : data.users,
           total: data.total,
           error: false,
+          appendError: false,
         }));
       })
       .catch(() => {
         if (cancelled) return;
-        setSettled({ key: requestKey, users: NO_USERS, total: 0, error: true });
+        setSettled((previous) =>
+          append
+            ? // A failed append keeps the rows and total already loaded.
+              {
+                key: requestKey,
+                users: previous.users,
+                total: previous.total,
+                error: false,
+                appendError: true,
+              }
+            : {
+                key: requestKey,
+                users: NO_USERS,
+                total: 0,
+                error: true,
+                appendError: false,
+              },
+        );
       });
 
     return () => {
@@ -140,6 +164,7 @@ export function useUserDirectory({
   const loadingMore = pending && append;
   const loading = pending && !loadingMore;
   const error = !pending && settled.error;
+  const loadMoreError = !pending && settled.appendError;
   const users = settled.error ? NO_USERS : settled.users;
   const total = settled.total;
 
@@ -203,10 +228,12 @@ export function useUserDirectory({
 
   const hasMore = page * USER_DIRECTORY_PAGE_SIZE < total;
 
+  // A failed append is not retried by a loop: loadMore holds until a filter,
+  // query, or sort change replaces the request.
   const loadMore = useCallback(() => {
-    if (!hasMore || pending) return;
+    if (!hasMore || pending || loadMoreError) return;
     setPaging({ mode, page: page + 1, append: true });
-  }, [hasMore, pending, mode, page]);
+  }, [hasMore, pending, loadMoreError, mode, page]);
 
   return {
     users,
@@ -220,6 +247,7 @@ export function useUserDirectory({
     loading,
     loadingMore,
     error,
+    loadMoreError,
     hasMore,
     setQuery,
     setStatus,

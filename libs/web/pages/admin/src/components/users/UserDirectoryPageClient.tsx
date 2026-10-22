@@ -33,6 +33,7 @@ export function UserDirectoryPageClient() {
     loading,
     loadingMore,
     error,
+    loadMoreError,
     hasMore,
     setQuery,
     setStatus,
@@ -107,6 +108,7 @@ export function UserDirectoryPageClient() {
             loading={loading}
             loadingMore={loadingMore}
             error={error}
+            loadMoreError={loadMoreError}
             hasMore={hasMore}
             onLoadMore={loadMore}
           />
