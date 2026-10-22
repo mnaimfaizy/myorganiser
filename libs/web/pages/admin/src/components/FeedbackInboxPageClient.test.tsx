@@ -5,10 +5,34 @@ jest.mock('../lib/apiClient', () => ({
   createPlatformAdminApi: jest.fn(),
 }));
 
-// Mock scrollIntoView which jsdom doesn't support
-Element.prototype.scrollIntoView = jest.fn();
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
+  useIsMobileState: jest.fn(),
+}));
 
-import type { AdminFeedbackReportListItemDto } from '@myorganiser/app-api-client';
+jest.mock('next/link', () => {
+  const React = require('react');
+
+  return {
+    __esModule: true,
+    default: ({
+      children,
+      href,
+      ...props
+    }: {
+      children: React.ReactNode;
+      href: string;
+    }) => React.createElement('a', { href, ...props }, children),
+  };
+});
+
+import type {
+  AdminFeedbackReportListItemDto,
+  FeedbackReportKind,
+  FeedbackReportPlatform,
+  FeedbackReportStatus,
+} from '@myorganiser/app-api-client';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import {
   fireEvent,
   render,
@@ -20,25 +44,45 @@ import '@testing-library/jest-dom';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
 import {
-  formatFeedbackReportStatus,
+  FEEDBACK_INBOX_PAGE_SIZE,
+  formatFeedbackPhoneSent,
+  formatFeedbackReportPlatform,
+} from '../lib/feedbackInbox';
+import {
   formatFeedbackReportKind,
+  formatFeedbackReportStatus,
 } from '../lib/formatFeedbackReport';
 
 import { FeedbackInboxPageClient } from './FeedbackInboxPageClient';
 
+// jsdom has no pointer capture or scrollIntoView, which Radix Select and Dialog call.
+Element.prototype.scrollIntoView = jest.fn();
+Element.prototype.hasPointerCapture = jest.fn(() => false);
+Element.prototype.releasePointerCapture = jest.fn();
+
 const mockListFeedbackReports = jest.fn();
 
-// Mirrors the component's stopgap page size (#1269 replaces it with paging).
-const INBOX_PAGE_SIZE = 100;
+/** The request shape the hook sends. Unset filters are `undefined`. */
+interface ListParams {
+  status?: FeedbackReportStatus;
+  kind?: FeedbackReportKind;
+  platform?: FeedbackReportPlatform;
+  trackingIssueNumber?: number;
+  page?: number;
+  pageSize: number;
+}
 
-function responseFor(items: AdminFeedbackReportListItemDto[]) {
+/** The second request on mount: `pageSize: 1`, read only for its total. */
+const RECEIVED_TOTAL = 6;
+const UNFILTERED_TOTAL = 30;
+
+function listPage(
+  items: AdminFeedbackReportListItemDto[],
+  total: number,
+  page = 1,
+) {
   return {
-    data: {
-      items,
-      total: items.length,
-      page: 1,
-      pageSize: INBOX_PAGE_SIZE,
-    },
+    data: { items, total, page, pageSize: FEEDBACK_INBOX_PAGE_SIZE },
   };
 }
 
@@ -81,387 +125,502 @@ const sampleReports: AdminFeedbackReportListItemDto[] = [
   },
 ];
 
+/** Fills page 1 to a full 25 rows, so the range reads "1–25 of 30". */
+const fillerReports: AdminFeedbackReportListItemDto[] = Array.from(
+  { length: FEEDBACK_INBOX_PAGE_SIZE - sampleReports.length },
+  (_, index) => ({
+    id: `filler-${index + 1}`,
+    title: `Filler report ${index + 1}`,
+    kind: 'suggestion',
+    status: 'received',
+    platform: 'web',
+    trackingIssueNumber: null,
+    reporterUserId: null,
+    reporter: null,
+    statusChangedAt: null,
+    createdAt: '2026-10-14T09:00:00.000Z',
+  }),
+);
+
+const firstPage = [...sampleReports, ...fillerReports];
+
+const laterPage: AdminFeedbackReportListItemDto[] = Array.from(
+  { length: UNFILTERED_TOTAL - FEEDBACK_INBOX_PAGE_SIZE },
+  (_, index) => ({
+    id: `later-${index + 1}`,
+    title: `Later report ${index + 1}`,
+    kind: 'bug_report',
+    status: 'received',
+    platform: 'ios',
+    trackingIssueNumber: null,
+    reporterUserId: null,
+    reporter: null,
+    statusChangedAt: null,
+    createdAt: '2026-10-13T09:00:00.000Z',
+  }),
+);
+
+function hasFilter(params: ListParams): boolean {
+  return (
+    params.status !== undefined ||
+    params.kind !== undefined ||
+    params.platform !== undefined ||
+    params.trackingIssueNumber !== undefined
+  );
+}
+
+/** Narrows the sample reports the way the API would, for any filter that is set. */
+function matchesFilters(
+  report: AdminFeedbackReportListItemDto,
+  params: ListParams,
+): boolean {
+  return (
+    (params.status === undefined || report.status === params.status) &&
+    (params.kind === undefined || report.kind === params.kind) &&
+    (params.platform === undefined || report.platform === params.platform) &&
+    (params.trackingIssueNumber === undefined ||
+      report.trackingIssueNumber === params.trackingIssueNumber)
+  );
+}
+
+function respond(params: ListParams) {
+  if (params.pageSize === 1) return listPage([], RECEIVED_TOTAL);
+  if (hasFilter(params)) {
+    const matches = sampleReports.filter((report) =>
+      matchesFilters(report, params),
+    );
+    return listPage(matches, matches.length);
+  }
+  if (params.page === 2) return listPage(laterPage, UNFILTERED_TOTAL, 2);
+  return listPage(firstPage, UNFILTERED_TOTAL, 1);
+}
+
+function lastListParams(): ListParams {
+  const calls = mockListFeedbackReports.mock.calls;
+  return calls[calls.length - 1][0] as ListParams;
+}
+
 describe('FeedbackInboxPageClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (createPlatformAdminApi as jest.Mock).mockReturnValue({
       listFeedbackReports: mockListFeedbackReports,
     });
-    mockListFeedbackReports.mockResolvedValue(responseFor(sampleReports));
-  });
-
-  it('calls listFeedbackReports with only pageSize on mount', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('renders table rows with report titles and kinds', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Add dark mode')).toBeInTheDocument();
-    expect(screen.getByText('Lost data after sync')).toBeInTheDocument();
-    expect(
-      screen.getAllByText(formatFeedbackReportKind('bug_report')),
-    ).toHaveLength(2);
-    expect(
-      screen.getByText(formatFeedbackReportKind('suggestion')),
-    ).toBeInTheDocument();
-  });
-
-  it('opens status filter dropdown and refetches when status is selected', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    const statusTrigger = screen.getByRole('combobox', { name: 'Status' });
-    fireEvent.click(statusTrigger);
-
-    const plannedOption = await screen.findByRole('option', {
-      name: formatFeedbackReportStatus('planned'),
-    });
-    fireEvent.click(plannedOption);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        status: 'planned',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('opens kind filter dropdown and refetches when kind is selected', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    const kindTrigger = screen.getByRole('combobox', { name: 'Kind' });
-    fireEvent.click(kindTrigger);
-
-    const bugOption = await screen.findByRole('option', {
-      name: formatFeedbackReportKind('bug_report'),
-    });
-    fireEvent.click(bugOption);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        kind: 'bug_report',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('clears status filter when All statuses is selected', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    // First select a status
-    let statusTrigger = screen.getByRole('combobox', { name: 'Status' });
-    fireEvent.click(statusTrigger);
-    const plannedOption = await screen.findByRole('option', {
-      name: formatFeedbackReportStatus('planned'),
-    });
-    fireEvent.click(plannedOption);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        status: 'planned',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    // Then select "All statuses"
-    statusTrigger = screen.getByRole('combobox', { name: 'Status' });
-    fireEvent.click(statusTrigger);
-    const allOption = await screen.findByRole('option', {
-      name: 'All statuses',
-    });
-    fireEvent.click(allOption);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('refetches with platform filter when platform text is entered', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    const platformInput = screen.getByPlaceholderText(
-      'Any platform',
-    ) as HTMLInputElement;
-    fireEvent.change(platformInput, { target: { value: 'web' } });
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        platform: 'web',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('trims a known platform before sending it to the API', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    const platformInput = screen.getByPlaceholderText(
-      'Any platform',
-    ) as HTMLInputElement;
-    fireEvent.change(platformInput, { target: { value: '  ios  ' } });
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        platform: 'ios',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('shows the empty state without calling the API for an unknown platform', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
-    });
-    const callsBeforeInput = mockListFeedbackReports.mock.calls.length;
-
-    const platformInput = screen.getByPlaceholderText(
-      'Any platform',
-    ) as HTMLInputElement;
-    fireEvent.change(platformInput, { target: { value: 'mobile' } });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('No feedback reports match these filters.'),
-      ).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(mockListFeedbackReports).toHaveBeenCalledTimes(callsBeforeInput);
-    expect(mockListFeedbackReports).not.toHaveBeenCalledWith(
-      expect.objectContaining({ platform: 'mobile' }),
+    mockListFeedbackReports.mockImplementation((params: ListParams) =>
+      Promise.resolve(respond(params)),
     );
   });
 
-  it('treats a platform with the wrong case as unknown and does not call the API for it', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
+  describe('desktop', () => {
+    beforeEach(() => {
+      (useIsMobileState as jest.Mock).mockReturnValue(false);
     });
-    const callsBeforeInput = mockListFeedbackReports.mock.calls.length;
 
-    const platformInput = screen.getByPlaceholderText(
-      'Any platform',
-    ) as HTMLInputElement;
-    fireEvent.change(platformInput, { target: { value: 'Web' } });
+    it('renders one Feedback heading and a subtitle with the Received count from the second request', async () => {
+      render(<FeedbackInboxPageClient />);
 
-    await waitFor(() => {
       expect(
-        screen.getByText('No feedback reports match these filters.'),
+        screen.getByRole('heading', { level: 1, name: 'Feedback' }),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          /Bug Reports and Suggestions, newest first\. 6 are Received and waiting for triage\./,
+        ),
+      ).toBeInTheDocument();
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        status: 'received',
+        pageSize: 1,
+      });
+    });
+
+    it('links each title to its report, shows the kind, status, and raw platform, and links a tracking issue to GitHub in a new tab (or a dash)', async () => {
+      render(<FeedbackInboxPageClient />);
+
+      const titleLink = await screen.findByRole('link', {
+        name: 'App crashes on login',
+      });
+      expect(titleLink).toHaveAttribute('href', '/admin/feedback/report-1');
+
+      const row = titleLink.closest('tr') as HTMLElement;
+      expect(within(row).getByText('Bug report')).toBeInTheDocument();
+      expect(within(row).getByText('Received')).toBeInTheDocument();
+      expect(within(row).getByText('web')).toBeInTheDocument();
+      expect(within(row).getByText('—')).toBeInTheDocument();
+
+      const issueRow = (
+        await screen.findByRole('link', { name: 'Add dark mode' })
+      ).closest('tr') as HTMLElement;
+      const issueLink = within(issueRow).getByRole('link', { name: /^42/ });
+      expect(issueLink).toHaveAttribute(
+        'href',
+        'https://github.com/mnaimfaizy/myorganiser/issues/42',
+      );
+      expect(issueLink).toHaveAttribute('target', '_blank');
+    });
+
+    it('links the sender to their user page, with the email beneath a named sender, and shows Deleted for a removed reporter', async () => {
+      render(<FeedbackInboxPageClient />);
+
+      const row = (
+        await screen.findByRole('link', { name: 'App crashes on login' })
+      ).closest('tr') as HTMLElement;
+      expect(
+        within(row).getByRole('link', { name: 'Test User' }),
+      ).toHaveAttribute('href', '/admin/users/user-123');
+      expect(within(row).getByText('test@example.com')).toBeInTheDocument();
+
+      // Unnamed sender: the email is the link text, with no second copy beneath.
+      const unnamedRow = screen
+        .getByRole('link', { name: 'Add dark mode' })
+        .closest('tr') as HTMLElement;
+      expect(
+        within(unnamedRow).getByRole('link', { name: 'another@example.com' }),
+      ).toHaveAttribute('href', '/admin/users/user-456');
+      expect(
+        within(unnamedRow).getAllByText('another@example.com'),
+      ).toHaveLength(1);
+
+      const deletedRow = screen
+        .getByRole('link', { name: 'Lost data after sync' })
+        .closest('tr') as HTMLElement;
+      expect(within(deletedRow).getByText('Deleted')).toBeInTheDocument();
+      expect(
+        within(deletedRow)
+          .getAllByRole('link')
+          .map((link) => link.getAttribute('href')),
+      ).toEqual(['/admin/feedback/report-3']);
+    });
+
+    it('sends the Status, Kind, and Platform selections, each on page 1', async () => {
+      render(<FeedbackInboxPageClient />);
+      await screen.findByRole('link', { name: 'App crashes on login' });
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportStatus('planned'),
+        }),
+      );
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({ status: 'planned', page: 1 }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Kind' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportKind('bug_report'),
+        }),
+      );
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({ kind: 'bug_report', page: 1 }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Platform' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportPlatform('ios'),
+        }),
+      );
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({
+            status: 'planned',
+            kind: 'bug_report',
+            platform: 'ios',
+            page: 1,
+            pageSize: FEEDBACK_INBOX_PAGE_SIZE,
+          }),
+        );
+      });
+    });
+
+    it('ignores non-numeric tracking issue text and sends a whole number as trackingIssueNumber', async () => {
+      render(<FeedbackInboxPageClient />);
+      await screen.findByRole('link', { name: 'App crashes on login' });
+      const callsBefore = mockListFeedbackReports.mock.calls.length;
+
+      const issueInput = screen.getByPlaceholderText(
+        'Issue number',
+      ) as HTMLInputElement;
+      fireEvent.change(issueInput, { target: { value: 'abc' } });
+      expect(issueInput).toHaveValue('abc');
+      expect(mockListFeedbackReports).toHaveBeenCalledTimes(callsBefore);
+
+      fireEvent.change(issueInput, { target: { value: '42' } });
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({ trackingIssueNumber: 42, page: 1 }),
+        );
+      });
+    });
+
+    it('clears every filter and refetches without filters when Clear filters is clicked', async () => {
+      render(<FeedbackInboxPageClient />);
+      await screen.findByRole('link', { name: 'App crashes on login' });
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportStatus('planned'),
+        }),
+      );
+      fireEvent.click(screen.getByRole('combobox', { name: 'Kind' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportKind('bug_report'),
+        }),
+      );
+      fireEvent.click(screen.getByRole('combobox', { name: 'Platform' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportPlatform('ios'),
+        }),
+      );
+      const issueInput = screen.getByPlaceholderText(
+        'Issue number',
+      ) as HTMLInputElement;
+      fireEvent.change(issueInput, { target: { value: '42' } });
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({
+            status: 'planned',
+            kind: 'bug_report',
+            platform: 'ios',
+            trackingIssueNumber: 42,
+          }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+      await waitFor(() => {
+        expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+          page: 1,
+          pageSize: FEEDBACK_INBOX_PAGE_SIZE,
+        });
+      });
+      expect(
+        screen.getByRole('combobox', { name: 'Status' }),
+      ).toHaveTextContent('All statuses');
+      expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveTextContent(
+        'All kinds',
+      );
+      expect(
+        screen.getByRole('combobox', { name: 'Platform' }),
+      ).toHaveTextContent('Any platform');
+      expect(issueInput).toHaveValue('');
+    });
+
+    it('shows the unfiltered range with Newer disabled on page 1', async () => {
+      render(<FeedbackInboxPageClient />);
+
+      expect(
+        await screen.findByText('Showing 1–25 of 30 reports'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Newer' })).toBeDisabled();
+    });
+
+    it('says "matching reports" in the range under a filter', async () => {
+      render(<FeedbackInboxPageClient />);
+      await screen.findByRole('link', { name: 'App crashes on login' });
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportStatus('planned'),
+        }),
+      );
+
+      expect(
+        await screen.findByText('Showing 1–1 of 1 matching reports'),
       ).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(mockListFeedbackReports).toHaveBeenCalledTimes(callsBeforeInput);
-    expect(mockListFeedbackReports).not.toHaveBeenCalledWith(
-      expect.objectContaining({ platform: 'Web' }),
-    );
-  });
+    it('pages forward with Older (Older disabled on the last page) and back with Newer to page 1', async () => {
+      render(<FeedbackInboxPageClient />);
+      const older = await screen.findByRole('button', { name: 'Older' });
+      expect(older).toBeEnabled();
 
-  it('refetches with trackingIssueNumber as a number when valid issue number is entered', async () => {
-    render(<FeedbackInboxPageClient />);
+      fireEvent.click(older);
 
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
+      await waitFor(() => {
+        expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+          page: 2,
+          pageSize: FEEDBACK_INBOX_PAGE_SIZE,
+        });
       });
-    });
-
-    const issueInput = screen.getByPlaceholderText(
-      'Issue number',
-    ) as HTMLInputElement;
-    fireEvent.change(issueInput, { target: { value: '42' } });
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        trackingIssueNumber: 42,
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('excludes trackingIssueNumber from request when issue field has invalid value', async () => {
-    mockListFeedbackReports.mockClear();
-    mockListFeedbackReports.mockResolvedValue(responseFor([]));
-
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    const issueInput = screen.getByPlaceholderText(
-      'Issue number',
-    ) as HTMLInputElement;
-    // Type a negative number (HTML number input doesn't prevent entry, but the onChange handler parses it)
-    fireEvent.change(issueInput, { target: { value: '-1' } });
-
-    await waitFor(() => {
-      // Negative numbers should be excluded from the request
-      const calls = mockListFeedbackReports.mock.calls;
-      const lastCall = calls[calls.length - 1];
-      expect(lastCall[0]).not.toHaveProperty('trackingIssueNumber');
-    });
-  });
-
-  it('clears all filters and refetches with empty request when Clear filters is clicked', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    // Set a known platform filter
-    const platformFilterInput = screen.getByPlaceholderText(
-      'Any platform',
-    ) as HTMLInputElement;
-    fireEvent.change(platformFilterInput, { target: { value: 'android' } });
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        platform: 'android',
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-
-    // Click Clear filters
-    const clearButton = screen.getByRole('button', { name: 'Clear filters' });
-    fireEvent.click(clearButton);
-
-    await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
-        pageSize: INBOX_PAGE_SIZE,
-      });
-    });
-  });
-
-  it('renders the sender name as a link to /admin/users/<id> and shows the email in the same cell', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
-    });
-
-    const row = screen.getByText('App crashes on login').closest('tr');
-    expect(row).not.toBeNull();
-    const senderLink = within(row as HTMLElement).getByRole('link', {
-      name: 'Test User',
-    });
-    expect(senderLink).toHaveAttribute('href', '/admin/users/user-123');
-    expect(
-      within(row as HTMLElement).getByText('test@example.com'),
-    ).toBeInTheDocument();
-  });
-
-  it('renders the sender email as the link text when the reporter has no name', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Add dark mode')).toBeInTheDocument();
-    });
-
-    const row = screen.getByText('Add dark mode').closest('tr');
-    expect(row).not.toBeNull();
-    const senderLink = within(row as HTMLElement).getByRole('link', {
-      name: 'another@example.com',
-    });
-    expect(senderLink).toHaveAttribute('href', '/admin/users/user-456');
-    expect(
-      within(row as HTMLElement).getAllByText('another@example.com'),
-    ).toHaveLength(1);
-  });
-
-  it('renders a null reporter as "Deleted" with no link to a user', async () => {
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Lost data after sync')).toBeInTheDocument();
-    });
-
-    const row = screen.getByText('Lost data after sync').closest('tr');
-    expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText('Deleted')).toBeInTheDocument();
-    // The only link left in the row is the report title.
-    expect(
-      within(row as HTMLElement)
-        .getAllByRole('link')
-        .map((link) => link.getAttribute('href')),
-    ).toEqual(['/admin/feedback/report-3']);
-  });
-
-  it('shows empty state when API returns no reports', async () => {
-    mockListFeedbackReports.mockResolvedValue(responseFor([]));
-
-    render(<FeedbackInboxPageClient />);
-
-    await waitFor(() => {
       expect(
-        screen.getByText('No feedback reports match these filters.'),
+        await screen.findByText('Showing 26–30 of 30 reports'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Older' })).toBeDisabled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Newer' }));
+
+      await waitFor(() => {
+        expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+          page: 1,
+          pageSize: FEEDBACK_INBOX_PAGE_SIZE,
+        });
+      });
+      expect(
+        await screen.findByText('Showing 1–25 of 30 reports'),
       ).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    it('shows the loading wording while the first request is pending', async () => {
+      mockListFeedbackReports.mockImplementation((params: ListParams) =>
+        params.pageSize === 1
+          ? Promise.resolve(listPage([], RECEIVED_TOTAL))
+          : new Promise(() => {}),
+      );
+
+      render(<FeedbackInboxPageClient />);
+      // Let the Received-count request settle inside act.
+      await screen.findByText(/are Received and waiting for triage/);
+
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('navigation', { name: 'Pages' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the error wording and no pager when the list request rejects', async () => {
+      mockListFeedbackReports.mockImplementation((params: ListParams) =>
+        params.pageSize === 1
+          ? Promise.resolve(listPage([], RECEIVED_TOTAL))
+          : Promise.reject(new Error('Network error')),
+      );
+
+      render(<FeedbackInboxPageClient />);
+
+      expect(
+        await screen.findByText(
+          'Unable to load feedback reports. Please try again.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('navigation', { name: 'Pages' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the empty wording and no pager when no report matches', async () => {
+      mockListFeedbackReports.mockImplementation((params: ListParams) =>
+        Promise.resolve(
+          params.pageSize === 1
+            ? listPage([], RECEIVED_TOTAL)
+            : listPage([], 0),
+        ),
+      );
+
+      render(<FeedbackInboxPageClient />);
+
+      expect(
+        await screen.findByText('No feedback reports match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('navigation', { name: 'Pages' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
-  it('shows error message when listFeedbackReports rejects', async () => {
-    mockListFeedbackReports.mockRejectedValue(new Error('Network error'));
+  describe('phone', () => {
+    beforeEach(() => {
+      (useIsMobileState as jest.Mock).mockReturnValue(true);
+    });
 
-    render(<FeedbackInboxPageClient />);
+    it('starts with All statuses pressed, and pressing Received sends that status and flips the pressed chip', async () => {
+      render(<FeedbackInboxPageClient />);
 
-    await waitFor(() => {
+      const toolbar = screen.getByRole('toolbar', { name: 'Status' });
+      const allChip = within(toolbar).getByRole('button', {
+        name: 'All statuses',
+      });
+      const receivedChip = within(toolbar).getByRole('button', {
+        name: 'Received',
+      });
+      expect(allChip).toHaveAttribute('aria-pressed', 'true');
+      expect(receivedChip).toHaveAttribute('aria-pressed', 'false');
+
+      fireEvent.click(receivedChip);
+
+      await waitFor(() => {
+        expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+          status: 'received',
+          page: 1,
+          pageSize: FEEDBACK_INBOX_PAGE_SIZE,
+        });
+      });
+      expect(receivedChip).toHaveAttribute('aria-pressed', 'true');
+      expect(allChip).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('shows the phone caption, a row that links to its report with a summary line, and the scroll count', async () => {
+      render(<FeedbackInboxPageClient />);
+
       expect(
-        screen.getByText('Unable to load feedback reports. Please try again.'),
+        await screen.findByText('6 Received, waiting for triage'),
+      ).toBeInTheDocument();
+
+      const link = await screen.findByRole('link', {
+        name: /App crashes on login/,
+      });
+      expect(link).toHaveAttribute('href', '/admin/feedback/report-1');
+      expect(
+        within(link).getByText(
+          `${formatFeedbackReportKind('bug_report')} · Test User · ${formatFeedbackPhoneSent('2026-10-17T10:00:00.000Z')}`,
+        ),
+      ).toBeInTheDocument();
+
+      expect(
+        screen.getByText('Scroll for more · 25 of 30'),
       ).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    it('shows the error wording and no scroll count when the list request rejects', async () => {
+      mockListFeedbackReports.mockImplementation((params: ListParams) =>
+        params.pageSize === 1
+          ? Promise.resolve(listPage([], RECEIVED_TOTAL))
+          : Promise.reject(new Error('Network error')),
+      );
+
+      render(<FeedbackInboxPageClient />);
+
+      expect(
+        await screen.findByText(
+          'Unable to load feedback reports. Please try again.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Scroll for more/)).not.toBeInTheDocument();
+    });
+
+    it('applies a Kind chosen in the filter sheet, shows the count on the trigger, and closes to a 1 of 1 footer', async () => {
+      render(<FeedbackInboxPageClient />);
+      await screen.findByRole('link', { name: /App crashes on login/ });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+      fireEvent.click(await screen.findByRole('combobox', { name: 'Kind' }));
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: formatFeedbackReportKind('suggestion'),
+        }),
+      );
+
+      await waitFor(() => {
+        expect(lastListParams()).toEqual(
+          expect.objectContaining({ kind: 'suggestion', page: 1 }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      expect(
+        await screen.findByRole('button', { name: 'Filters · 1' }),
+      ).toBeInTheDocument();
+      expect(await screen.findByText('1 of 1')).toBeInTheDocument();
+    });
   });
 });

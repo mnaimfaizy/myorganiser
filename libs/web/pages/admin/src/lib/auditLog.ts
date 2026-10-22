@@ -68,7 +68,10 @@ function localDayKey(date: Date): string {
 }
 
 /** "Today" or "Yesterday" for a local day; `null` for any other day. */
-function relativeDayLabel(date: Date, now: Date): 'Today' | 'Yesterday' | null {
+export function relativeDayLabel(
+  date: Date,
+  now: Date,
+): 'Today' | 'Yesterday' | null {
   const key = localDayKey(date);
   if (key === localDayKey(now)) return 'Today';
 

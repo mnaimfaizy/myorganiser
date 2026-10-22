@@ -111,27 +111,35 @@ export function TrackingIssueForm({
     [report, onUpdated, form, clearError, setError, setMessage],
   );
 
+  // Read in the body, so the form subscribes to submit state for the button.
+  const isSubmitting = form.formState.isSubmitting;
+
   if (report.trackingIssueNumber) {
     return (
       <div className="space-y-3">
-        <div className="text-sm">
+        <div className="text-body-sm">
           <p className="font-medium">Tracking Issue:</p>
           <NewTabLink
             href={trackingIssueUrl(report.trackingIssueNumber)}
-            className="text-primary hover:underline"
+            className="font-semibold text-brand-text hover:underline"
           >
             #{report.trackingIssueNumber}
           </NewTabLink>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body-sm text-destructive">{error}</p>}
         {message?.kind === 'linked' && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body-sm text-muted-foreground">
             Issue #{message.issueNumber} linked. The report is now Planned.
           </p>
         )}
 
-        <Button variant="outline" onClick={handleUnlink} disabled={isUnlinking}>
+        <Button
+          variant="outline"
+          className="w-full md:w-auto"
+          onClick={handleUnlink}
+          disabled={isUnlinking}
+        >
           {isUnlinking ? 'Unlinking…' : 'Unlink'}
         </Button>
       </div>
@@ -140,16 +148,34 @@ export function TrackingIssueForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex flex-col gap-4"
+      >
         <FormField
           control={form.control}
           name="trackingIssueNumber"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Issue number</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="Issue number" {...field} />
-              </FormControl>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start">
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="Issue number"
+                    className="md:min-w-0 md:flex-1"
+                    {...field}
+                  />
+                </FormControl>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="w-full md:w-auto md:shrink-0"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Linking…' : 'Link issue'}
+                </Button>
+              </div>
               <FormDescription>
                 Linking a tracking issue sets the report to Planned.
               </FormDescription>
@@ -158,18 +184,10 @@ export function TrackingIssueForm({
           )}
         />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body-sm text-destructive">{error}</p>}
         {message?.kind === 'unlinked' && (
-          <p className="text-sm text-muted-foreground">Issue unlinked.</p>
+          <p className="text-body-sm text-muted-foreground">Issue unlinked.</p>
         )}
-
-        <Button
-          type="submit"
-          variant="outline"
-          disabled={form.formState.isSubmitting}
-        >
-          {form.formState.isSubmitting ? 'Linking…' : 'Link issue'}
-        </Button>
       </form>
     </Form>
   );

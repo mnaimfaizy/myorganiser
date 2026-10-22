@@ -168,19 +168,27 @@ export function ChangeStatusForm({ report, onUpdated }: ChangeStatusFormProps) {
             <FormItem>
               <FormLabel>Status note</FormLabel>
               <FormControl>
-                <Textarea placeholder="Explain the decision..." {...field} />
+                <Textarea
+                  rows={3}
+                  placeholder="Explain the decision..."
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body-sm text-destructive">{error}</p>}
         {saved && (
-          <p className="text-sm text-muted-foreground">Status updated.</p>
+          <p className="text-body-sm text-muted-foreground">Status updated.</p>
         )}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button
+          type="submit"
+          className="w-full md:w-auto"
+          disabled={form.formState.isSubmitting}
+        >
           {form.formState.isSubmitting ? 'Updating…' : 'Update status'}
         </Button>
       </form>
