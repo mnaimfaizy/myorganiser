@@ -59,15 +59,15 @@ export function AuditLogFilterSheet({
           {triggerLabel}
         </Button>
       </BottomSheetTrigger>
-      <BottomSheetContent>
-        <BottomSheetHeader>
+      <BottomSheetContent className="max-h-[85dvh]">
+        <BottomSheetHeader className="shrink-0">
           <BottomSheetTitle>Filters</BottomSheetTitle>
           <BottomSheetDescription className="text-caption text-muted-foreground">
             Narrow the audit log by action or user.
           </BottomSheetDescription>
         </BottomSheetHeader>
 
-        <div className="flex max-h-[85dvh] flex-col gap-4 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-body-sm font-semibold text-muted-foreground">
               Action
@@ -106,7 +106,7 @@ export function AuditLogFilterSheet({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             type="button"
             variant="ghost"

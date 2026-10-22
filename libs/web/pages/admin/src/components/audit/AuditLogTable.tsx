@@ -18,7 +18,7 @@ export interface AuditLogTableProps {
 }
 
 const ROW_GRID =
-  'grid grid-cols-[150px_140px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-5';
+  'grid grid-cols-[150px_220px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-5';
 
 /**
  * The desktop audit log, drawn as a card of grid rows. Rows are not links, so

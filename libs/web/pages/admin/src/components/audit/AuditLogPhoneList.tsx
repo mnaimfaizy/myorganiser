@@ -101,7 +101,7 @@ export function AuditLogPhoneList({
       ) : (
         groups.map((group) => (
           <div key={group.key} className="flex flex-col gap-2">
-            <h2 className="text-label-caps text-muted-foreground">
+            <h2 className="text-label-caps uppercase text-muted-foreground">
               {group.label}
             </h2>
             <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-raised-surface">
