@@ -5,14 +5,16 @@ jest.mock('../lib/apiClient', () => ({
   createPlatformAdminApi: jest.fn(),
 }));
 
-jest.mock('@myorganiser/web-ui', () => {
-  const actual = jest.requireActual('@myorganiser/web-ui');
+jest.mock('@myorganiser/auth', () => ({
+  ...jest.requireActual('@myorganiser/auth'),
+  getCurrentUser: jest.fn(),
+}));
 
-  return {
-    ...actual,
-    useToast: jest.fn(),
-  };
-});
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
+  useIsMobileState: jest.fn(),
+  useToast: jest.fn(),
+}));
 
 jest.mock('next/navigation', () => ({
   useParams: jest.fn(),
@@ -34,19 +36,32 @@ jest.mock('next/link', () => {
   };
 });
 
-import type { AdminUserIdentity } from '@myorganiser/app-api-client';
-import { useToast } from '@myorganiser/web-ui';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type {
+  AdminAuditLogEntry,
+  AdminAuditLogListResponse,
+  AdminUserIdentity,
+} from '@myorganiser/app-api-client';
+import { getCurrentUser } from '@myorganiser/auth';
+import { useIsMobileState, useToast } from '@myorganiser/web-ui';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { useParams } from 'next/navigation';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
+import { AUDIT_LOG_MESSAGES } from '../lib/auditLog';
 
 import { UserDetailPageClient } from './UserDetailPageClient';
 
 const mockGetUserById = jest.fn();
 const mockGetYouTubeAccessUsage = jest.fn();
 const mockGrantYouTubeAccess = jest.fn();
+const mockListAuditLogs = jest.fn();
 const mockToast = jest.fn();
 
 const userWithPhone: AdminUserIdentity = {
@@ -76,11 +91,19 @@ const userWithoutPhone: AdminUserIdentity = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
-// "YouTube Access" text is a required admin field and button label. Any other
-// YouTube-labelled content (tokens, watched marks, channel data, sync state)
-// is still treated as sensitive.
+const emptyAuditPage: AdminAuditLogListResponse = {
+  entries: [],
+  total: 0,
+  page: 1,
+  pageSize: 25,
+};
+
+// "YouTube Access" is a required admin field and button label. The Platform
+// Admin row describes its own scope with "Never vault contents.", so the vault
+// pattern names the data the page must never hold rather than the bare word.
+// Other YouTube-labelled content (tokens, channel data, sync state) stays sensitive.
 const SENSITIVE_PATTERNS = [
-  /vault/i,
+  /vault (blob|ciphertext|key|data)/i,
   /youtube(?! access)/i,
   /refresh token/i,
   /channel id/i,
@@ -100,13 +123,6 @@ function expectNoSensitiveContent(container: HTMLElement) {
   }
 }
 
-function expectDefinitionValue(label: string, value: string) {
-  const term = screen.getByText(label);
-  const definition = term.nextElementSibling;
-
-  expect(definition).toHaveTextContent(value);
-}
-
 function createAxios404Error() {
   return Object.assign(new Error('Not Found'), {
     isAxiosError: true,
@@ -114,53 +130,75 @@ function createAxios404Error() {
   });
 }
 
+function createAuditEntry(index: number): AdminAuditLogEntry {
+  return {
+    id: `entry-${index}`,
+    actorUserId: 'admin-1',
+    targetUserId: 'u-2',
+    actorName: `Actor ${index}`,
+    targetName: 'Grace Hopper',
+    actorDeleted: false,
+    targetDeleted: false,
+    action: 'disable',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function resetPageMocks() {
+  mockGetUserById.mockReset();
+  mockGetYouTubeAccessUsage.mockReset();
+  mockGrantYouTubeAccess.mockReset();
+  mockListAuditLogs.mockReset();
+  mockToast.mockReset();
+
+  (createPlatformAdminApi as jest.Mock).mockReset();
+  (createPlatformAdminApi as jest.Mock).mockReturnValue({
+    listUsers: jest.fn(),
+    getUserById: mockGetUserById,
+    getYouTubeAccessUsage: mockGetYouTubeAccessUsage,
+    grantYouTubeAccess: mockGrantYouTubeAccess,
+    listAuditLogs: mockListAuditLogs,
+  });
+  (useToast as jest.Mock).mockReset();
+  (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
+  (useIsMobileState as jest.Mock).mockReset();
+  (useIsMobileState as jest.Mock).mockReturnValue(false);
+  (getCurrentUser as jest.Mock).mockReset();
+  (useParams as jest.Mock).mockReset();
+  (useParams as jest.Mock).mockReturnValue({ userId: 'u-2' });
+
+  mockGetUserById.mockResolvedValue({ data: userWithPhone });
+  mockGetYouTubeAccessUsage.mockResolvedValue({
+    data: { everGranted: 18, ceiling: 25 },
+  });
+  mockListAuditLogs.mockResolvedValue({ data: emptyAuditPage });
+}
+
 describe('UserDetailPageClient', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (createPlatformAdminApi as jest.Mock).mockReturnValue({
-      listUsers: jest.fn(),
-      getUserById: mockGetUserById,
-      getYouTubeAccessUsage: mockGetYouTubeAccessUsage,
-      grantYouTubeAccess: mockGrantYouTubeAccess,
-    });
-    (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
-    (useParams as jest.Mock).mockReturnValue({ userId: 'u-2' });
-    mockGetUserById.mockResolvedValue({ data: userWithPhone });
-    mockGetYouTubeAccessUsage.mockResolvedValue({
-      data: { everGranted: 3, ceiling: 25 },
-    });
+    resetPageMocks();
   });
 
-  it('loads user detail and renders identity fields', async () => {
+  it('renders the display name, the email and phone in the meta line, and the All users link', async () => {
     render(<UserDetailPageClient />);
-
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(mockGetUserById).toHaveBeenCalledWith({ userId: 'u-2' });
-    });
 
     await waitFor(() => {
       expect(
         screen.getByRole('heading', { name: 'Grace Hopper' }),
       ).toBeInTheDocument();
     });
-    expectDefinitionValue('ID', 'u-2');
-    expectDefinitionValue('Name', 'Grace Hopper');
-    expectDefinitionValue('Email', 'grace@example.com');
-    expectDefinitionValue('First name', 'Grace');
-    expectDefinitionValue('Last name', 'Hopper');
-    expectDefinitionValue('Phone', '+1-555-0100');
-    expectDefinitionValue('Role', 'User');
-    expectDefinitionValue('Disabled', 'Yes');
-    expectDefinitionValue('Email verified', 'No');
-    expect(screen.getByRole('link', { name: 'Back to users' })).toHaveAttribute(
+
+    expect(screen.getByText(/grace@example\.com/)).toHaveTextContent(
+      'grace@example.com · +1-555-0100 · Joined',
+    );
+    expect(screen.getByRole('link', { name: 'All users' })).toHaveAttribute(
       'href',
       '/admin/users',
     );
+    expect(mockGetUserById).toHaveBeenCalledWith({ userId: 'u-2' });
   });
 
-  it('hides the phone field when phone is absent', async () => {
+  it('omits the phone from the meta line when phone is absent', async () => {
     (useParams as jest.Mock).mockReturnValue({ userId: 'u-1' });
     mockGetUserById.mockResolvedValue({ data: userWithoutPhone });
 
@@ -172,7 +210,9 @@ describe('UserDetailPageClient', () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.queryByText('Phone')).not.toBeInTheDocument();
+    expect(screen.getByText(/ada@example\.com/)).toHaveTextContent(
+      /^ada@example\.com · Joined /,
+    );
   });
 
   it('shows User not found when the API returns 404', async () => {
@@ -209,19 +249,19 @@ describe('UserDetailPageClient', () => {
     expect(mockGetUserById).not.toHaveBeenCalled();
   });
 
-  it('does not surface vault, YouTube secret, or operational fields', async () => {
+  it('does not surface the vault ciphertext, YouTube OAuth token, password or master key', async () => {
     const secretFieldValues = [
-      'SECRET_VAULT_BLOB',
-      'ya29.secret-token',
-      'should-never-appear',
+      'SECRET_BLOB',
+      'yt-sentinel',
+      'never-shown',
       'mk-secret',
     ] as const;
 
     const bloatedUser = {
       ...userWithPhone,
-      vaultCiphertext: 'SECRET_VAULT_BLOB',
-      youtubeOAuthToken: 'ya29.secret-token',
-      password: 'should-never-appear',
+      vaultCiphertext: 'SECRET_BLOB',
+      youtubeOAuthToken: 'yt-sentinel',
+      password: 'never-shown',
       masterKey: 'mk-secret',
     } as AdminUserIdentity;
 
@@ -235,9 +275,9 @@ describe('UserDetailPageClient', () => {
       ).toBeInTheDocument();
     });
 
-    expectDefinitionValue('Email', 'grace@example.com');
-    expectDefinitionValue('Role', 'User');
-    expectDefinitionValue('Phone', '+1-555-0100');
+    expect(screen.getByText(/grace@example\.com/)).toHaveTextContent(
+      'grace@example.com · +1-555-0100',
+    );
 
     for (const secretValue of secretFieldValues) {
       expect(container.textContent).not.toContain(secretValue);
@@ -246,72 +286,59 @@ describe('UserDetailPageClient', () => {
     expectNoSensitiveContent(container);
   });
 
-  it.each([
-    { youtubeAccess: false, expected: 'No' },
-    { youtubeAccess: true, expected: 'Yes' },
-  ])(
-    'shows YouTube Access as $expected when youtubeAccess is $youtubeAccess',
-    async ({ youtubeAccess, expected }) => {
-      mockGetUserById.mockResolvedValue({
-        data: { ...userWithPhone, youtubeAccess },
-      });
-
-      render(<UserDetailPageClient />);
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('heading', { name: 'Grace Hopper' }),
-        ).toBeInTheDocument();
-      });
-      expectDefinitionValue('YouTube Access', expected);
-    },
-  );
-
-  it('shows the ever-granted count against the ceiling', async () => {
+  it('shows the places left once the usage call resolves', async () => {
     render(<UserDetailPageClient />);
 
     await waitFor(() => {
-      expectDefinitionValue('YouTube Access places used', '3 of 25');
+      expect(
+        screen.getByText('Not granted · 7 of 25 places left'),
+      ).toBeInTheDocument();
     });
     expect(mockGetYouTubeAccessUsage).toHaveBeenCalledTimes(1);
   });
 
-  it('shows Loading… for places used while the usage call is pending', async () => {
+  it('shows Loading… in the YouTube Access row while the usage call is pending', async () => {
     mockGetYouTubeAccessUsage.mockReturnValue(new Promise(() => undefined));
 
     render(<UserDetailPageClient />);
 
     await waitFor(() => {
-      expectDefinitionValue('YouTube Access places used', 'Loading…');
+      expect(screen.getByText('Not granted · Loading…')).toBeInTheDocument();
     });
   });
 
-  it('shows Unavailable for places used when the usage call fails and keeps the rest of the page', async () => {
+  it('shows Unavailable in the YouTube Access row when the usage call fails, and keeps the email and the Grant button on screen', async () => {
     mockGetYouTubeAccessUsage.mockRejectedValue(new Error('Network error'));
 
     render(<UserDetailPageClient />);
 
     await waitFor(() => {
-      expectDefinitionValue('YouTube Access places used', 'Unavailable');
+      expect(screen.getByText('Not granted · Unavailable')).toBeInTheDocument();
     });
-    expectDefinitionValue('Email', 'grace@example.com');
+    expect(screen.getByText(/grace@example\.com/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Grant YouTube Access' }),
     ).toBeInTheDocument();
   });
 
-  it('reloads the ever-granted count after a grant updates the user without a page reload', async () => {
-    const grantedUser = { ...userWithPhone, youtubeAccess: true };
-    mockGrantYouTubeAccess.mockResolvedValue({ data: grantedUser });
+  it('reloads YouTube usage and the audit log after a grant', async () => {
+    mockGrantYouTubeAccess.mockResolvedValue({
+      data: { ...userWithPhone, youtubeAccess: true },
+    });
 
     render(<UserDetailPageClient />);
 
     await waitFor(() => {
-      expectDefinitionValue('YouTube Access places used', '3 of 25');
+      expect(
+        screen.getByText('Not granted · 7 of 25 places left'),
+      ).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(mockListAuditLogs).toHaveBeenCalledTimes(1);
     });
 
     mockGetYouTubeAccessUsage.mockResolvedValue({
-      data: { everGranted: 4, ceiling: 25 },
+      data: { everGranted: 19, ceiling: 25 },
     });
 
     fireEvent.click(
@@ -320,12 +347,137 @@ describe('UserDetailPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
 
     await waitFor(() => {
-      expectDefinitionValue('YouTube Access', 'Yes');
-    });
-    await waitFor(() => {
-      expectDefinitionValue('YouTube Access places used', '4 of 25');
+      expect(
+        screen.getByText('Granted · 6 of 25 places left'),
+      ).toBeInTheDocument();
     });
     expect(mockGrantYouTubeAccess).toHaveBeenCalledWith({ userId: 'u-2' });
     expect(mockGetYouTubeAccessUsage).toHaveBeenCalledTimes(2);
+    expect(mockListAuditLogs).toHaveBeenCalledTimes(2);
+    expect(mockListAuditLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ userId: 'u-2' }),
+    );
+  });
+});
+
+describe('UserDetailPageClient identity, activity, and layout', () => {
+  beforeEach(() => {
+    resetPageMocks();
+  });
+
+  it('shows the status, role, and YouTube Access pills for a granted user', async () => {
+    (useParams as jest.Mock).mockReturnValue({ userId: 'u-1' });
+    mockGetUserById.mockResolvedValue({
+      data: { ...userWithoutPhone, youtubeAccess: true },
+    });
+
+    render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Ada Lovelace' }),
+      ).toBeInTheDocument();
+    });
+
+    const identity = screen.getByRole('region', { name: 'Identity' });
+    expect(within(identity).getByText('Active')).toBeInTheDocument();
+    expect(within(identity).getByText('Admin')).toBeInTheDocument();
+    expect(within(identity).getByText('YouTube Access')).toBeInTheDocument();
+  });
+
+  it('shows the self-guard note only when the signed-in admin is the viewed User', async () => {
+    (getCurrentUser as jest.Mock).mockReturnValue({ id: 'u-2' });
+
+    const self = render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Grace Hopper' }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("You can't disable or demote yourself."),
+    ).toBeInTheDocument();
+
+    self.unmount();
+    (getCurrentUser as jest.Mock).mockReturnValue({ id: 'someone-else' });
+
+    render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Grace Hopper' }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText("You can't disable or demote yourself."),
+    ).not.toBeInTheDocument();
+  });
+
+  it('queries the audit log for this User and shows five of seven entries with a Full audit log link', async () => {
+    mockListAuditLogs.mockResolvedValue({
+      data: {
+        entries: [1, 2, 3, 4, 5, 6, 7].map(createAuditEntry),
+        total: 7,
+        page: 1,
+        pageSize: 25,
+      },
+    });
+
+    render(<UserDetailPageClient />);
+
+    const activity = await screen.findByRole('region', {
+      name: 'Recent activity',
+    });
+
+    await waitFor(() => {
+      expect(within(activity).getAllByRole('listitem')).toHaveLength(5);
+    });
+    expect(mockListAuditLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u-2' }),
+    );
+    expect(within(activity).getByText('Actor 5')).toBeInTheDocument();
+    expect(within(activity).queryByText('Actor 6')).not.toBeInTheDocument();
+    expect(
+      within(activity).getByRole('link', { name: 'Full audit log' }),
+    ).toHaveAttribute('href', '/admin/audit-logs');
+  });
+
+  it('shows the empty message when there is no activity, and the error message when the audit log fails', async () => {
+    const empty = render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No activity yet.')).toBeInTheDocument();
+    });
+
+    empty.unmount();
+    mockListAuditLogs.mockRejectedValue(new Error('Network error'));
+
+    render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText(AUDIT_LOG_MESSAGES.error)).toBeInTheDocument();
+    });
+  });
+
+  it('renders the Access and Sign-in groups and the Users back link on phone', async () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(true);
+
+    render(<UserDetailPageClient />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Grace Hopper' }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('heading', { name: 'Access' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Sign-in' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute(
+      'href',
+      '/admin/users',
+    );
   });
 });

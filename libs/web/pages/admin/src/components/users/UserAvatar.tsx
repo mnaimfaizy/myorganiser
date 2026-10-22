@@ -3,7 +3,7 @@ import { cn } from '@myorganiser/web-ui';
 
 import { avatarFillFor, userInitials } from '../../lib/userDirectory';
 
-export type UserAvatarSize = 36 | 40;
+export type UserAvatarSize = 36 | 40 | 56 | 72;
 
 export interface UserAvatarProps {
   user: AdminUserIdentity;
@@ -13,6 +13,9 @@ export interface UserAvatarProps {
 const SIZE_CLASSES: Record<UserAvatarSize, string> = {
   36: 'size-9 text-caption',
   40: 'size-10 text-control-sm',
+  // The User detail header: 56 on phone, 72 on desktop.
+  56: 'size-14 font-display text-title',
+  72: 'size-18 font-display text-title-lg',
 };
 
 /** A decorative initials circle. The name beside it carries the meaning. */
