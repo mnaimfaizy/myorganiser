@@ -34,7 +34,7 @@ export function LegalBackLink() {
     <Link
       href="/"
       onClick={handleClick}
-      className="mb-2 inline-flex items-center gap-1.5 rounded-control-sm text-sm font-semibold text-navy-muted-foreground hover:text-navy-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-foreground"
+      className="mb-2 inline-flex items-center gap-1.5 rounded-control-sm text-body-sm font-semibold text-navy-muted-foreground hover:text-navy-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-foreground"
     >
       <ChevronLeft aria-hidden="true" className="h-3 w-2 shrink-0" />
       Back

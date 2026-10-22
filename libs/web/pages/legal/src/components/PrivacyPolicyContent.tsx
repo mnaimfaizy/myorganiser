@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import {
-  legalSectionTitle,
+  legalSectionAccessors,
   type LegalVariant,
   PRIVACY_POLICY_LAST_UPDATED,
   PRIVACY_POLICY_SECTIONS,
+  type PrivacyPolicySectionId,
 } from '../lib/legal-sections';
 import { LEGAL_TEXT } from '../lib/legal-styles';
 import { LegalSection } from './LegalSection';
@@ -18,8 +19,8 @@ export interface PrivacyPolicyContentProps {
   operatorContact?: ReactNode;
   /** Set to '_blank' inside the Sign up dialog so in-document links keep the form mounted. */
   linkTarget?: '_blank';
-  /** Page variant only: section number by anchor id, from numberLegalSections. */
-  sectionNumbers?: Readonly<Record<string, string>>;
+  /** Page variant only: section number by anchor id, from legalPageSections. */
+  sectionNumbers?: Partial<Record<PrivacyPolicySectionId, string>>;
 }
 
 export function PrivacyPolicyContent({
@@ -29,9 +30,11 @@ export function PrivacyPolicyContent({
   sectionNumbers,
 }: PrivacyPolicyContentProps) {
   const text = LEGAL_TEXT[variant];
-  const title = (id: string) => legalSectionTitle(PRIVACY_POLICY_SECTIONS, id);
-  const numberOf = (id: string) =>
-    variant === 'page' ? sectionNumbers?.[id] : undefined;
+  const { title, numberOf } = legalSectionAccessors(
+    PRIVACY_POLICY_SECTIONS,
+    variant,
+    sectionNumbers,
+  );
 
   return (
     <>

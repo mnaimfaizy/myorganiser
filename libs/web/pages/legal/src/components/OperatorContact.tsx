@@ -1,4 +1,9 @@
-import type { LegalVariant } from '../lib/legal-sections';
+import {
+  hasOperatorContact,
+  type LegalSectionEntry,
+  type LegalVariant,
+  numberLegalSections,
+} from '../lib/legal-sections';
 import { OperatorContactView } from './OperatorContactView';
 
 export interface OperatorContactProps {
@@ -21,4 +26,25 @@ export function OperatorContact({ variant, number }: OperatorContactProps) {
       number={number}
     />
   );
+}
+
+/**
+ * Server-side numbering for a standalone legal page. Reads the operator env vars
+ * to decide whether the contact section is kept, then returns the TOC entries and
+ * the section number by id.
+ */
+export function legalPageSections<Id extends string>(
+  sections: readonly LegalSectionEntry<Id>[],
+) {
+  const toc = numberLegalSections(sections, {
+    hasOperator: hasOperatorContact(
+      process.env.OPERATOR_NAME,
+      process.env.OPERATOR_CONTACT_EMAIL,
+    ),
+  });
+  const sectionNumbers: Partial<Record<Id, string>> = {};
+  for (const section of toc) {
+    sectionNumbers[section.id] = section.number;
+  }
+  return { toc, sectionNumbers };
 }

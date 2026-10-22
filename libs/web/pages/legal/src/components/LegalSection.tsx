@@ -44,7 +44,7 @@ export function LegalSection({
     >
       <h2
         id={`h-${id}`}
-        className="flex items-center gap-3 font-display text-[21px] font-bold leading-7 text-foreground"
+        className="flex items-center gap-3 font-display text-title text-foreground"
       >
         {number && (
           <span aria-hidden="true" className={LEGAL_NUMBER_BADGE}>

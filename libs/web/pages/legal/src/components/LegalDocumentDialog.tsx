@@ -15,12 +15,10 @@ import {
   useCallback,
   useState,
 } from 'react';
-import type { LegalVariant } from '../lib/legal-sections';
+import type { LegalDocumentKind, LegalVariant } from '../lib/legal-sections';
 import { OperatorContactFromContext } from './OperatorContactFromContext';
 import { PrivacyPolicyContent } from './PrivacyPolicyContent';
 import { TermsOfServiceContent } from './TermsOfServiceContent';
-
-export type LegalDocumentKind = 'terms' | 'privacy';
 
 interface LegalDocumentBodyProps {
   variant: LegalVariant;

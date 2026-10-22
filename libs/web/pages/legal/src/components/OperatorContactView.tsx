@@ -1,9 +1,10 @@
-import { LegalSection } from './LegalSection';
 import {
-  OPERATOR_CONTACT_TITLE,
+  hasOperatorContact,
   type LegalVariant,
+  OPERATOR_CONTACT_TITLE,
 } from '../lib/legal-sections';
 import { LEGAL_TEXT } from '../lib/legal-styles';
+import { LegalSection } from './LegalSection';
 
 export interface OperatorContactViewProps {
   /** Operator name. Blank or missing values are omitted. */
@@ -23,13 +24,13 @@ export function OperatorContactView({
   variant = 'page',
   number,
 }: OperatorContactViewProps) {
-  const trimmedName = name?.trim();
-  const trimmedEmail = email?.trim();
-
   // If neither is set, render nothing
-  if (!trimmedName && !trimmedEmail) {
+  if (!hasOperatorContact(name, email)) {
     return null;
   }
+
+  const trimmedName = name?.trim();
+  const trimmedEmail = email?.trim();
 
   if (variant === 'page') {
     return (
@@ -39,7 +40,7 @@ export function OperatorContactView({
         variant="page"
         number={number}
       >
-        <dl className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1.5 text-base leading-[26px] text-foreground-secondary">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1.5 text-body text-foreground-secondary">
           {trimmedName && (
             <>
               <dt className="font-bold text-foreground">Operator:</dt>

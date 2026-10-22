@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import {
-  legalSectionTitle,
+  legalSectionAccessors,
   type LegalVariant,
   TERMS_OF_SERVICE_SECTIONS,
+  type TermsOfServiceSectionId,
 } from '../lib/legal-sections';
 import { LEGAL_TEXT } from '../lib/legal-styles';
 import { LegalSection } from './LegalSection';
@@ -12,8 +13,8 @@ export interface TermsOfServiceContentProps {
   variant?: LegalVariant;
   /** Operator & Contact section, supplied by the host page or dialog. */
   operatorContact?: ReactNode;
-  /** Page variant only: section number by anchor id, from numberLegalSections. */
-  sectionNumbers?: Readonly<Record<string, string>>;
+  /** Page variant only: section number by anchor id, from legalPageSections. */
+  sectionNumbers?: Partial<Record<TermsOfServiceSectionId, string>>;
 }
 
 export function TermsOfServiceContent({
@@ -22,10 +23,11 @@ export function TermsOfServiceContent({
   sectionNumbers,
 }: TermsOfServiceContentProps) {
   const text = LEGAL_TEXT[variant];
-  const title = (id: string) =>
-    legalSectionTitle(TERMS_OF_SERVICE_SECTIONS, id);
-  const numberOf = (id: string) =>
-    variant === 'page' ? sectionNumbers?.[id] : undefined;
+  const { title, numberOf } = legalSectionAccessors(
+    TERMS_OF_SERVICE_SECTIONS,
+    variant,
+    sectionNumbers,
+  );
   // The dialog stacks its sections with space-y-4 rather than per-paragraph margins.
   const dialogStack = variant === 'dialog' ? 'space-y-4' : undefined;
 
@@ -70,7 +72,7 @@ export function TermsOfServiceContent({
             rel="noopener noreferrer"
             className={text.link}
           >
-            YouTube Terms of Service
+            YouTube Terms of Service <span aria-hidden="true">↗</span>
           </a>
           .
         </p>

@@ -1,46 +1,39 @@
 import { Button } from '@myorganiser/web-ui';
 import Link from 'next/link';
-import {
-  numberLegalSections,
-  TERMS_OF_SERVICE_SECTIONS,
-} from '../lib/legal-sections';
+import { TERMS_OF_SERVICE_SECTIONS } from '../lib/legal-sections';
+import { LegalPageActions } from './LegalPageActions';
+import { LegalPageBody } from './LegalPageBody';
+import { LegalPageFooter } from './LegalPageFooter';
+import { LegalPageHeader } from './LegalPageHeader';
+import { LegalPageHero } from './LegalPageHero';
 import { LegalPageLayout } from './LegalPageLayout';
-import { OperatorContact } from './OperatorContact';
+import { legalPageSections, OperatorContact } from './OperatorContact';
 import { TermsOfServiceContent } from './TermsOfServiceContent';
 
 export default function TermsOfServicePage() {
-  const hasOperator = Boolean(
-    process.env.OPERATOR_NAME?.trim() ||
-    process.env.OPERATOR_CONTACT_EMAIL?.trim(),
-  );
-  const sections = numberLegalSections(TERMS_OF_SERVICE_SECTIONS, {
-    hasOperator,
-  });
-  const sectionNumbers = Object.fromEntries(
-    sections.map((section) => [section.id, section.number]),
-  );
+  const { toc, sectionNumbers } = legalPageSections(TERMS_OF_SERVICE_SECTIONS);
 
   return (
     <LegalPageLayout>
-      <LegalPageLayout.Header current="terms" />
-      <LegalPageLayout.Hero title="Terms of Service" illustration="tasks" />
-      <LegalPageLayout.Body toc={sections}>
+      <LegalPageHeader current="terms" />
+      <LegalPageHero title="Terms of Service" illustration="tasks" />
+      <LegalPageBody toc={toc}>
         <TermsOfServiceContent
           operatorContact={
             <OperatorContact variant="page" number={sectionNumbers.contact} />
           }
           sectionNumbers={sectionNumbers}
         />
-        <LegalPageLayout.Actions>
+        <LegalPageActions>
           <Button asChild variant="outline">
             <Link href="/">Back to Home</Link>
           </Button>
           <Button asChild>
             <Link href="/privacy">Privacy Policy</Link>
           </Button>
-        </LegalPageLayout.Actions>
-      </LegalPageLayout.Body>
-      <LegalPageLayout.Footer />
+        </LegalPageActions>
+      </LegalPageBody>
+      <LegalPageFooter />
     </LegalPageLayout>
   );
 }

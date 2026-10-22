@@ -50,7 +50,7 @@ export function YouTubePrivacySection({
           rel="noopener noreferrer"
           className={text.link}
         >
-          Google Privacy Policy
+          Google Privacy Policy <span aria-hidden="true">↗</span>
         </a>
         .
       </p>
@@ -79,7 +79,7 @@ export function YouTubePrivacySection({
           rel="noopener noreferrer"
           className={text.link}
         >
-          Google API Services User Data Policy
+          Google API Services User Data Policy <span aria-hidden="true">↗</span>
         </a>
         , including the Limited Use requirements.
       </p>
@@ -94,7 +94,7 @@ export function YouTubePrivacySection({
           rel="noopener noreferrer"
           className={text.link}
         >
-          Google security settings
+          Google security settings <span aria-hidden="true">↗</span>
         </a>
         . Disconnecting revokes MyOrganiser&apos;s access at Google and
         immediately deletes your stored tokens, followed channels, cached
