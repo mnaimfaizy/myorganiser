@@ -1,384 +1,286 @@
 'use client';
 
+import type { UsageLocationRecord } from '@myorganiser/vault-core';
+import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
 import {
-  MobileNumberRecord,
-  OrganisationTypeEnum,
-  PriorityEnum,
-  UpdateMethodEnum,
-  UsageLocationRecord,
-} from '@myorganiser/vault-core';
-import { Button, ConfirmDeleteDialog, useToast } from '@myorganiser/web-ui';
-import {
-  normalizeMobileNumbers,
-  saveVaultRecords,
-  type VaultHandle,
-} from '@myorganiser/web-vault';
-import { useLocalVaultRevision, VaultGate } from '@myorganiser/web-vault-ui';
-import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+  PlaceDialog,
+  type PlaceFormValues,
+  PlaceSheet,
+  useExpiringCopy,
+} from '@myorganiser/web-usage-locations';
+import type { VaultHandle } from '@myorganiser/web-vault';
+import { VaultGate } from '@myorganiser/web-vault-ui';
+import { useRouter } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 
-import { type AddMobileNumberFormValues } from '../schemas/mobileNumber';
-import { mobileNumberFormValuesToRecordFields } from '../schemas/mobileNumber';
-import {
-  type UsageLocationFormValues,
-  usageLocationFormValuesToRecordFields,
-} from '../schemas/usageLocation';
-import { parseEnumValue } from '../utils/enumUtils';
-import { randomId } from '../utils/randomId';
-import { BackToMobileNumbersLink } from './BackToMobileNumbersLink';
+import { useMobileNumbersPage } from '../hooks/use-mobile-numbers-page';
+import type { AddMobileNumberFormValues } from '../schemas/mobileNumber';
+import { formatMobileNumber } from '../utils/formatMobileNumber';
+import { describeMobileNumberDeletion } from '../utils/mobile-summary';
+import { MobileNumberDetail } from './mobile-number-detail';
+import { MobileNumberDetailScreen } from './mobile-number-detail-screen';
 import { MobileNumberDetailLoading } from './MobileNumberDetailLoading';
 import { MobileNumberDetailNotFound } from './MobileNumberDetailNotFound';
-import { MobileNumberDetailsCard } from './MobileNumberDetailsCard';
 import { MobileNumberEditDialog } from './MobileNumberEditDialog';
-import { UsageLocationDialog } from './UsageLocationDialog';
-import { UsageLocationsTable } from './UsageLocationsTable';
 
-interface MobileNumberDetailsInnerProps {
+const MOBILE_NUMBERS_HREF = '/dashboard/mobile-numbers';
+
+export interface MobileNumberDetailPageClientProps {
+  params: { id: string };
+}
+
+interface MobileNumberDetailInnerProps {
   handle: VaultHandle;
   mobileNumberId: string;
 }
 
-function MobileNumberDetailsInner(props: MobileNumberDetailsInnerProps) {
-  const { toast } = useToast();
+interface PlaceDialogState {
+  open: boolean;
+  /** null means add; a record means edit with that record loaded. */
+  location: UsageLocationRecord | null;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [mobileNumbers, setMobileNumbers] = useState<MobileNumberRecord[]>([]);
-  const [editingMobileNumber, setEditingMobileNumber] = useState(false);
-  const [usageLocationDialog, setUsageLocationDialog] = useState<{
-    open: boolean;
-    location: UsageLocationRecord | null;
-  }>({ open: false, location: null });
-  const [deletingLocation, setDeletingLocation] =
+/**
+ * The Mobile Number detail route. The page owns every dialog, sheet and
+ * confirm, and the vault writes come from `useMobileNumbersPage`, so the
+ * desktop and the phone detail share one set of behaviours.
+ */
+function MobileNumberDetailInner({
+  handle,
+  mobileNumberId,
+}: MobileNumberDetailInnerProps) {
+  const router = useRouter();
+  const page = useMobileNumbersPage(handle);
+  const { copy, message: copyMessage } = useExpiringCopy();
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop detail on the first frame.
+  const isPhone = useIsMobileState();
+
+  const {
+    items,
+    loading,
+    updateMobileNumber,
+    deleteMobileNumber,
+    saveLocation,
+    setLocationChanged,
+    deleteLocation,
+  } = page;
+  const item = items.find((x) => x.id === mobileNumberId);
+  const today = new Date();
+
+  const [editing, setEditing] = useState(false);
+  const [placeDialog, setPlaceDialog] = useState<PlaceDialogState>({
+    open: false,
+    location: null,
+  });
+  const [deletingPlace, setDeletingPlace] =
     useState<UsageLocationRecord | null>(null);
+  const [deletingNumber, setDeletingNumber] = useState(false);
+  const [pendingPlaceIds, setPendingPlaceIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // Set while the Mobile Number is being deleted, so the not-found state does
+  // not flash in the moment before the explicit navigation back to the list.
+  const leavingRef = useRef(false);
 
-  const mobileNumberRecord =
-    mobileNumbers.find((x) => x.id === props.mobileNumberId) ?? null;
-  const usageLocations = useMemo(
-    () => mobileNumberRecord?.usageLocations ?? [],
-    [mobileNumberRecord],
+  const handleRequestEdit = useCallback(() => {
+    setEditing(true);
+  }, []);
+
+  const handleEditOpenChange = useCallback((open: boolean) => {
+    setEditing(open);
+  }, []);
+
+  const handleSubmitEdit = useCallback(
+    (id: string, values: AddMobileNumberFormValues) =>
+      updateMobileNumber(id, values),
+    [updateMobileNumber],
   );
 
-  const persist = useCallback(
-    async (next: MobileNumberRecord[]) => {
+  const handleCopyNumber = useCallback(() => {
+    if (!item) return;
+    void copy('', formatMobileNumber(item));
+  }, [copy, item]);
+
+  const handleAddPlace = useCallback(() => {
+    setPlaceDialog({ open: true, location: null });
+  }, []);
+
+  const handleEditPlace = useCallback((location: UsageLocationRecord) => {
+    setPlaceDialog({ open: true, location });
+  }, []);
+
+  const handlePlaceOpenChange = useCallback((open: boolean) => {
+    // The location is kept so the dialog does not change its title while it closes.
+    setPlaceDialog((state) => ({ ...state, open }));
+  }, []);
+
+  const handleSubmitPlace = useCallback(
+    async (values: PlaceFormValues, editingId: string | null) => {
+      // A rejection keeps the dialog open for a retry.
+      await saveLocation(mobileNumberId, values, editingId);
+      setPlaceDialog((state) => ({ ...state, open: false }));
+    },
+    [mobileNumberId, saveLocation],
+  );
+
+  const handleSetPlaceChanged = useCallback(
+    async (locationId: string, changed: boolean) => {
+      setPendingPlaceIds((prev) => new Set(prev).add(locationId));
       try {
-        await saveVaultRecords(props.handle, 'mobileNumbers', next);
-        setMobileNumbers(next);
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        toast({
-          title: 'Failed to save',
-          description: message,
-          variant: 'destructive',
+        await setLocationChanged(mobileNumberId, locationId, changed);
+      } finally {
+        setPendingPlaceIds((prev) => {
+          const next = new Set(prev);
+          next.delete(locationId);
+          return next;
         });
-        throw e;
       }
     },
-    [props.handle, toast],
+    [mobileNumberId, setLocationChanged],
   );
 
-  const persistUsageLocations = useCallback(
-    async (next: UsageLocationRecord[]) => {
-      const nextMobileNumbers = mobileNumbers.map((x) =>
-        x.id === props.mobileNumberId
-          ? { ...x, usageLocations: next, updatedAt: new Date().toISOString() }
-          : x,
-      );
-      return persist(nextMobileNumbers);
-    },
-    [mobileNumbers, props.mobileNumberId, persist],
-  );
-
-  // Which record the loading view has already been shown for. A reload is
-  // not a first load, and only a first load may blank the page.
-  const loadedKeyRef = useRef<string | null>(null);
-  const loadKey = props.mobileNumberId;
-
-  // Convergence replaces the Local Vault without passing through this
-  // component, so the revision is the only thing that says the Ciphertext
-  // behind this record moved. Saving here rewrites the whole list, so a stale
-  // read is what gets written back over the record that arrived (#587).
-  const revision = useLocalVaultRevision();
-
-  useEffect(() => {
-    let isActive = true;
-
-    // A reload triggered by convergence must not put the page back into its
-    // loading state. The render returns the loading view while `loading` is
-    // true, which unmounts every open dialog — edit, usage location, confirm
-    // delete — and throws away whatever the User was typing in it. Only a
-    // first load, or a move to a different record, earns that.
-    const isFirstLoad = loadedKeyRef.current !== loadKey;
-    loadedKeyRef.current = loadKey;
-
-    if (isFirstLoad) {
-      queueMicrotask(() => {
-        if (!isActive) return;
-        setLoading(true);
-        setNotFound(false);
-      });
-    }
-
-    props.handle
-      .loadDecryptedData<unknown>({
-        type: 'mobileNumbers',
-        defaultValue: [],
-      })
-      .then(async (raw) => {
-        if (!isActive) return;
-        const normalized = normalizeMobileNumbers(raw);
-        const found = normalized.value.find(
-          (x) => x.id === props.mobileNumberId,
-        );
-        if (!found) {
-          if (isActive) setNotFound(true);
-          return;
-        }
-        // Recomputed on every read rather than only cleared up front, because
-        // a reload no longer resets it — a record that convergence brought
-        // back must stop reading as not found.
-        if (isActive) setNotFound(false);
-
-        if (isActive) {
-          setMobileNumbers(normalized.value);
-        }
-
-        if (normalized.changed) {
-          await saveVaultRecords(
-            props.handle,
-            'mobileNumbers',
-            normalized.value,
-          );
-        }
-      })
-      .catch(() => {
-        if (!isActive) return;
-        toast({
-          title: 'Failed to load mobile number',
-          description: 'Could not decrypt saved data.',
-          variant: 'destructive',
-        });
-      })
-      .finally(() => {
-        if (isActive) setLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [props.mobileNumberId, props.handle, toast, revision]);
-
-  const handleEditMobileNumber = useCallback(() => {
-    setEditingMobileNumber(true);
-  }, []);
-
-  const handleSaveEditMobileNumber = useCallback(
-    async (id: string, values: AddMobileNumberFormValues) => {
-      const next = mobileNumbers.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              ...mobileNumberFormValuesToRecordFields(values),
-              updatedAt: new Date().toISOString(),
-            }
-          : x,
-      );
-
-      await persist(next);
-      toast({
-        title: 'Saved',
-        description: 'Mobile number updated (encrypted).',
-      });
-    },
-    [mobileNumbers, persist, toast],
-  );
-
-  const handleAddLocation = useCallback(() => {
-    setUsageLocationDialog({ open: true, location: null });
-  }, []);
-
-  const handleEditLocation = useCallback((location: UsageLocationRecord) => {
-    setUsageLocationDialog({ open: true, location });
-  }, []);
-
-  const handleSubmitUsageLocation = useCallback(
-    async (values: UsageLocationFormValues, editingId: string | null) => {
-      const now = new Date().toISOString();
-      const baseFields = usageLocationFormValuesToRecordFields(values);
-
-      let updatedLocations: UsageLocationRecord[];
-
-      if (editingId) {
-        // Edit existing location
-        updatedLocations = usageLocations.map((loc) =>
-          loc.id === editingId
-            ? {
-                ...loc,
-                ...baseFields,
-                organisationType: parseEnumValue(
-                  OrganisationTypeEnum,
-                  baseFields.orgType,
-                  OrganisationTypeEnum.Other,
-                ),
-                updateMethod: parseEnumValue(
-                  UpdateMethodEnum,
-                  baseFields.updateMethod,
-                  UpdateMethodEnum.Online,
-                ),
-                priority: parseEnumValue(
-                  PriorityEnum,
-                  baseFields.priority,
-                  PriorityEnum.Normal,
-                ),
-                changedAt: values.changed && !loc.changed ? now : loc.changedAt,
-              }
-            : loc,
-        );
-      } else {
-        // Add new location
-        const next: UsageLocationRecord = {
-          id: randomId(),
-          ...baseFields,
-          organisationType: parseEnumValue(
-            OrganisationTypeEnum,
-            baseFields.orgType,
-            OrganisationTypeEnum.Other,
-          ),
-          updateMethod: parseEnumValue(
-            UpdateMethodEnum,
-            baseFields.updateMethod,
-            UpdateMethodEnum.Online,
-          ),
-          priority: parseEnumValue(
-            PriorityEnum,
-            baseFields.priority,
-            PriorityEnum.Normal,
-          ),
-          createdAt: now,
-          changedAt: values.changed ? now : undefined,
-        };
-        updatedLocations = [next, ...usageLocations];
-      }
-
-      await persistUsageLocations(updatedLocations);
-      toast({
-        title: editingId ? 'Updated' : 'Saved',
-        description: editingId
-          ? 'Usage location updated successfully (encrypted).'
-          : 'Usage location saved (encrypted).',
-      });
-    },
-    [usageLocations, persistUsageLocations, toast],
-  );
-
-  const handleRequestDeleteLocation = useCallback(
+  const handleRequestDeletePlace = useCallback(
     (location: UsageLocationRecord) => {
-      setDeletingLocation(location);
+      setDeletingPlace(location);
     },
     [],
   );
 
-  const handleConfirmDeleteLocation = useCallback(async () => {
-    if (!deletingLocation) return;
-    try {
-      const updatedLocations = usageLocations.filter(
-        (l) => l.id !== deletingLocation.id,
-      );
-      await persistUsageLocations(updatedLocations);
-      toast({
-        title: 'Deleted',
-        description: 'Usage location deleted successfully.',
-      });
-      setDeletingLocation(null);
-    } catch {
-      // persist already toasted; leave dialog open for retry
-    }
-  }, [deletingLocation, usageLocations, persistUsageLocations, toast]);
-
-  const handleDeleteLocationDialogOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setDeletingLocation(null);
-    }
+  const handleDeletePlaceOpenChange = useCallback((open: boolean) => {
+    if (!open) setDeletingPlace(null);
   }, []);
 
-  const handleUsageLocationDialogOpenChange = useCallback((_open: boolean) => {
-    // Always close when called (Radix Dialog calls this with false on dismiss)
-    setUsageLocationDialog({ open: false, location: null });
+  const handleConfirmDeletePlace = useCallback(async () => {
+    if (!deletingPlace) return;
+    // On failure the dialog stays open so the User can retry.
+    const deleted = await deleteLocation(mobileNumberId, deletingPlace.id);
+    if (deleted) setDeletingPlace(null);
+  }, [deleteLocation, deletingPlace, mobileNumberId]);
+
+  const handleRequestDeleteNumber = useCallback(() => {
+    setDeletingNumber(true);
   }, []);
+
+  const handleDeleteNumberOpenChange = useCallback((open: boolean) => {
+    setDeletingNumber(open);
+  }, []);
+
+  const handleConfirmDeleteNumber = useCallback(async () => {
+    leavingRef.current = true;
+    const deleted = await deleteMobileNumber(mobileNumberId);
+    if (deleted) {
+      setDeletingNumber(false);
+      router.push(MOBILE_NUMBERS_HREF);
+    } else {
+      // Stay on the detail with the dialog open, so the User can retry.
+      leavingRef.current = false;
+    }
+  }, [deleteMobileNumber, mobileNumberId, router]);
+
+  if (isPhone === undefined) {
+    return null;
+  }
 
   if (loading) {
     return <MobileNumberDetailLoading />;
   }
 
-  if (notFound || !mobileNumberRecord) {
-    return <MobileNumberDetailNotFound />;
+  if (!item) {
+    return leavingRef.current ? null : <MobileNumberDetailNotFound />;
   }
 
+  const placeFormProps = {
+    open: placeDialog.open,
+    location: placeDialog.location,
+    existingLocations: item.usageLocations,
+    subject: `${item.label} (${formatMobileNumber(item)})`,
+    noun: 'number' as const,
+    onOpenChange: handlePlaceOpenChange,
+    onSubmit: handleSubmitPlace,
+  };
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <BackToMobileNumbersLink />
-
-      <MobileNumberDetailsCard
-        mobileNumberRecord={mobileNumberRecord}
-        onEdit={handleEditMobileNumber}
-      />
-
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Usage Locations</h2>
-        <Button onClick={handleAddLocation} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Location
-        </Button>
-      </div>
-
-      <UsageLocationsTable
-        usageLocations={usageLocations}
-        onEdit={handleEditLocation}
-        onRequestDelete={handleRequestDeleteLocation}
-        onAddLocation={handleAddLocation}
-      />
+    <>
+      {isPhone ? (
+        <MobileNumberDetailScreen
+          item={item}
+          copyMessage={copyMessage}
+          pendingPlaceIds={pendingPlaceIds}
+          onEdit={handleRequestEdit}
+          onCopyNumber={handleCopyNumber}
+          onAddPlace={handleAddPlace}
+          onEditPlace={handleEditPlace}
+          onSetPlaceChanged={handleSetPlaceChanged}
+          onRequestDeletePlace={handleRequestDeletePlace}
+          onRequestDelete={handleRequestDeleteNumber}
+        />
+      ) : (
+        <MobileNumberDetail
+          item={item}
+          today={today}
+          copyMessage={copyMessage}
+          pendingPlaceIds={pendingPlaceIds}
+          onEdit={handleRequestEdit}
+          onCopyNumber={handleCopyNumber}
+          onAddPlace={handleAddPlace}
+          onEditPlace={handleEditPlace}
+          onSetPlaceChanged={handleSetPlaceChanged}
+          onRequestDeletePlace={handleRequestDeletePlace}
+          onRequestDelete={handleRequestDeleteNumber}
+        />
+      )}
 
       <MobileNumberEditDialog
-        open={editingMobileNumber}
-        mobileNumber={mobileNumberRecord}
-        onOpenChange={setEditingMobileNumber}
-        onSave={handleSaveEditMobileNumber}
+        open={editing}
+        mobileNumber={item}
+        onOpenChange={handleEditOpenChange}
+        onSave={handleSubmitEdit}
       />
 
-      <UsageLocationDialog
-        open={usageLocationDialog.open}
-        location={usageLocationDialog.location}
-        existingLocations={usageLocations}
-        onOpenChange={handleUsageLocationDialogOpenChange}
-        onSubmit={handleSubmitUsageLocation}
-      />
+      {isPhone ? (
+        <PlaceSheet {...placeFormProps} />
+      ) : (
+        <PlaceDialog {...placeFormProps} />
+      )}
 
-      <ConfirmDeleteDialog
-        open={deletingLocation !== null}
-        onOpenChange={handleDeleteLocationDialogOpenChange}
-        title={
-          deletingLocation
-            ? `Delete "${deletingLocation.organisationName}"?`
-            : ''
-        }
-        description="This action cannot be undone. This usage location will be permanently removed from this mobile number."
-        onConfirm={handleConfirmDeleteLocation}
-      />
-    </div>
+      {deletingPlace ? (
+        <ConfirmDialog
+          open
+          onOpenChange={handleDeletePlaceOpenChange}
+          title={`Delete "${deletingPlace.organisationName}"?`}
+          description="This action cannot be undone. This usage location will be permanently removed from this mobile number."
+          confirmLabel="Delete place"
+          tone="destructive"
+          onConfirm={handleConfirmDeletePlace}
+        />
+      ) : null}
+
+      {deletingNumber ? (
+        <ConfirmDialog
+          open
+          onOpenChange={handleDeleteNumberOpenChange}
+          title={`Delete "${item.label}"?`}
+          description={describeMobileNumberDeletion(item)}
+          confirmLabel="Delete mobile number"
+          tone="destructive"
+          onConfirm={handleConfirmDeleteNumber}
+        />
+      ) : null}
+    </>
   );
 }
 
-export function MobileNumberDetailPageClient(props: {
-  params: { id: string };
-}) {
+export function MobileNumberDetailPageClient({
+  params,
+}: MobileNumberDetailPageClientProps) {
   return (
     <VaultGate title="Mobile Number">
-      {({ handle }) => (
-        <MobileNumberDetailsInner
-          handle={handle!}
-          mobileNumberId={props.params.id}
-        />
-      )}
+      {({ handle }) =>
+        handle ? (
+          <MobileNumberDetailInner handle={handle} mobileNumberId={params.id} />
+        ) : null
+      }
     </VaultGate>
   );
 }

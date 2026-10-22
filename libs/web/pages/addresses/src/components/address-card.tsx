@@ -11,11 +11,12 @@ import {
   Progress,
   StatusPill,
 } from '@myorganiser/web-ui';
+import { placeProgress } from '@myorganiser/web-usage-locations';
 import { ArrowRight, Copy, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback } from 'react';
 
-import { formatAddressLines, placeProgress } from '../utils/address-summary';
+import { formatAddressLines } from '../utils/address-summary';
 import { ADDRESS_STATUS_PILL } from '../utils/presentation';
 
 export interface AddressCardProps {
@@ -30,7 +31,7 @@ export function AddressCard({
   onCopy,
   onRequestDelete,
 }: AddressCardProps) {
-  const { done, total, left } = placeProgress(address);
+  const { done, total, left } = placeProgress(address.usageLocations);
   const complete = total > 0 && done === total;
   const pill = ADDRESS_STATUS_PILL[address.status];
   const detailHref = `/dashboard/addresses/${address.id}`;

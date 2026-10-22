@@ -1,16 +1,12 @@
 import {
   AddressStatusEnum,
-  PriorityEnum,
   type AddressRecord,
   type AddressStatus,
-  type Priority,
-  type UsageLocationRecord,
 } from '@myorganiser/vault-core';
 import {
-  ORGANISATION_TYPE_LABELS,
-  UPDATE_METHOD_LABELS,
+  formatShortDate,
+  placeProgress,
 } from '@myorganiser/web-usage-locations';
-import { format, isSameYear, isValid, parseISO } from 'date-fns';
 
 import { formatAddress } from './formatAddress';
 import { isStructuredAddress } from './addressHelpers';
@@ -18,28 +14,10 @@ import { isStructuredAddress } from './addressHelpers';
 /** The list's status chips: every Address, or only one status. */
 export type AddressListFilter = 'all' | AddressStatus;
 
-/** The detail checklist's chips: every Usage Location, or only the ones not yet updated. */
-export type PlaceListFilter = 'all' | 'todo';
-
-/** How far an Address's change-of-address checklist has got. */
-export interface PlaceProgress {
-  /** Usage Locations already updated. */
-  done: number;
-  total: number;
-  /** Usage Locations still to update. */
-  left: number;
-}
-
 /** One line on the copy list: what it is, and the text that goes on the clipboard. */
 export interface CopyField {
   label: string;
   value: string;
-}
-
-export function placeProgress(address: AddressRecord): PlaceProgress {
-  const total = address.usageLocations.length;
-  const done = address.usageLocations.filter((l) => l.changed).length;
-  return { done, total, left: total - done };
 }
 
 export function countAddressesByStatus(
@@ -58,7 +36,10 @@ export function countAddressesByStatus(
 
 /** Usage Locations still to update, across every Address. */
 export function countPlacesToUpdate(items: readonly AddressRecord[]): number {
-  return items.reduce((sum, a) => sum + placeProgress(a).left, 0);
+  return items.reduce(
+    (sum, a) => sum + placeProgress(a.usageLocations).left,
+    0,
+  );
 }
 
 function plural(count: number, one: string, many: string): string {
@@ -189,22 +170,6 @@ export function addressPhoneCopyFields(item: AddressRecord): CopyField[] {
   return fields.flatMap(([label, value]) => (value ? [{ label, value }] : []));
 }
 
-function parseDate(iso: string | undefined): Date | null {
-  if (!iso) return null;
-  const date = parseISO(iso);
-  return isValid(date) ? date : null;
-}
-
-/** "3 Oct" this year, "3 Oct 2025" in any other; null for a missing or bad date. */
-export function formatShortDate(
-  iso: string | undefined,
-  today: Date,
-): string | null {
-  const date = parseDate(iso);
-  if (!date) return null;
-  return format(date, isSameYear(date, today) ? 'd MMM' : 'd MMM yyyy');
-}
-
 /** The detail header line, e.g. "Updated 3 Oct · encrypted on this device". */
 export function formatAddressUpdatedLine(
   item: AddressRecord,
@@ -216,72 +181,6 @@ export function formatAddressUpdatedLine(
   return added
     ? `Added ${added} · encrypted on this device`
     : 'Encrypted on this device';
-}
-
-/**
- * The desktop place row's second line, e.g. "Government · online · updated
- * 2 Oct". The method is lower case because it reads as part of a phrase.
- */
-export function formatPlaceMeta(
-  location: UsageLocationRecord,
-  today: Date,
-): string {
-  const parts = [
-    ORGANISATION_TYPE_LABELS[location.organisationType],
-    UPDATE_METHOD_LABELS[location.updateMethod].toLowerCase(),
-  ];
-  if (location.changed) {
-    const on = formatShortDate(location.changedAt, today);
-    parts.push(on ? `updated ${on}` : 'updated');
-  }
-  return parts.join(' · ');
-}
-
-/** The phone place row's second line, e.g. "Online · link saved". */
-export function formatPlacePhoneMeta(location: UsageLocationRecord): string {
-  const method = UPDATE_METHOD_LABELS[location.updateMethod];
-  return location.link ? `${method} · link saved` : method;
-}
-
-/** Highest first, so the most urgent place to update sits at the top. */
-const PRIORITY_RANK = {
-  [PriorityEnum.High]: 0,
-  [PriorityEnum.Medium]: 1,
-  [PriorityEnum.Normal]: 2,
-  [PriorityEnum.Low]: 3,
-} as const satisfies Record<Priority, number>;
-
-/**
- * The checklist order: places still to update first, most urgent first; then
- * the updated ones. Ties keep their saved order.
- */
-export function sortPlaces(
-  locations: readonly UsageLocationRecord[],
-): UsageLocationRecord[] {
-  return locations
-    .map((location, index) => ({ location, index }))
-    .sort((a, b) => {
-      if (a.location.changed !== b.location.changed) {
-        return a.location.changed ? 1 : -1;
-      }
-      if (!a.location.changed) {
-        const rank =
-          PRIORITY_RANK[a.location.priority] -
-          PRIORITY_RANK[b.location.priority];
-        if (rank !== 0) return rank;
-      }
-      return a.index - b.index;
-    })
-    .map(({ location }) => location);
-}
-
-export function filterPlaces(
-  locations: readonly UsageLocationRecord[],
-  filter: PlaceListFilter,
-): UsageLocationRecord[] {
-  return filter === 'todo'
-    ? locations.filter((l) => !l.changed)
-    : [...locations];
 }
 
 /** The delete confirmation's description, saying how many places go too. */

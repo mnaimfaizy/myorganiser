@@ -13,20 +13,13 @@ import {
   describeAddressDeletion,
   describeDangerZone,
   filterAddresses,
-  filterPlaces,
   formatAddressForCopy,
   formatAddressLines,
   formatAddressShortLine,
   formatAddressUpdatedLine,
   formatAddressesPhoneSummary,
   formatAddressesSummary,
-  formatPlacePhoneMeta,
-  formatPlaceMeta,
-  formatShortDate,
-  placeProgress,
-  sortPlaces,
   type AddressListFilter,
-  type PlaceProgress,
 } from './address-summary';
 
 const TODAY = new Date(2026, 9, 22, 12);
@@ -128,29 +121,6 @@ const filterFixture = [
 
 const ids = <T extends { id: string }>(items: readonly T[]): string[] =>
   items.map((item) => item.id);
-
-describe('placeProgress', () => {
-  it.each<[string, AddressRecord, PlaceProgress]>([
-    [
-      'a mix of updated and open places',
-      makeAddress({
-        usageLocations: [
-          makeLocation({ changed: true }),
-          makeLocation({ changed: false }),
-          makeLocation({ changed: false }),
-        ],
-      }),
-      { done: 1, total: 3, left: 2 },
-    ],
-    [
-      'an address with no places',
-      makeAddress(),
-      { done: 0, total: 0, left: 0 },
-    ],
-  ])('counts places for %s', (_label, address, expected) => {
-    expect(placeProgress(address)).toEqual(expected);
-  });
-});
 
 describe('header summaries', () => {
   it('formats the desktop and phone lines with singular and plural forms', () => {
@@ -301,15 +271,6 @@ describe('copy fields', () => {
 });
 
 describe('dates', () => {
-  it.each<[string | undefined, string | null]>([
-    [isoOn(2026, 9, 3), '3 Oct'],
-    [isoOn(2025, 9, 3), '3 Oct 2025'],
-    [undefined, null],
-    ['not a date', null],
-  ])('formats %s as %s', (iso, expected) => {
-    expect(formatShortDate(iso, TODAY)).toBe(expected);
-  });
-
   it.each<[string, Partial<AddressRecord>, string]>([
     [
       'an updatedAt, preferred over createdAt',
@@ -328,103 +289,6 @@ describe('dates', () => {
     ],
   ])('builds the updated line from %s', (_label, dates, expected) => {
     expect(formatAddressUpdatedLine(makeAddress(dates), TODAY)).toBe(expected);
-  });
-});
-
-describe('place meta lines', () => {
-  it.each<[string, UsageLocationRecord, string]>([
-    [
-      'an unchanged place',
-      makeLocation({
-        organisationType: OrganisationTypeEnum.Government,
-        updateMethod: UpdateMethodEnum.Online,
-      }),
-      'Government · online',
-    ],
-    [
-      'a changed place with changedAt',
-      makeLocation({
-        organisationType: OrganisationTypeEnum.Utility,
-        updateMethod: UpdateMethodEnum.InPerson,
-        changed: true,
-        changedAt: isoOn(2026, 9, 2),
-      }),
-      'Utility · in person · updated 2 Oct',
-    ],
-    [
-      'a changed place without changedAt',
-      makeLocation({
-        organisationType: OrganisationTypeEnum.Utility,
-        updateMethod: UpdateMethodEnum.InPerson,
-        changed: true,
-      }),
-      'Utility · in person · updated',
-    ],
-  ])('formats the desktop meta for %s', (_label, location, expected) => {
-    expect(formatPlaceMeta(location, TODAY)).toBe(expected);
-  });
-
-  it.each<[string, UsageLocationRecord, string]>([
-    [
-      'no link',
-      makeLocation({ updateMethod: UpdateMethodEnum.Online }),
-      'Online',
-    ],
-    [
-      'a saved link',
-      makeLocation({
-        updateMethod: UpdateMethodEnum.Online,
-        link: 'https://example.com/account',
-      }),
-      'Online · link saved',
-    ],
-  ])('formats the phone meta for %s', (_label, location, expected) => {
-    expect(formatPlacePhoneMeta(location)).toBe(expected);
-  });
-});
-
-describe('sortPlaces and filterPlaces', () => {
-  it('puts places still to update first, most urgent first, then updated places in saved order', () => {
-    const sorted = sortPlaces([
-      makeLocation({ id: 'p1', changed: true, priority: PriorityEnum.High }),
-      makeLocation({ id: 'p2', changed: false, priority: PriorityEnum.Low }),
-      makeLocation({ id: 'p3', changed: false, priority: PriorityEnum.High }),
-      makeLocation({ id: 'p4', changed: false, priority: PriorityEnum.Medium }),
-      makeLocation({ id: 'p5', changed: true, priority: PriorityEnum.Low }),
-      makeLocation({ id: 'p6', changed: false, priority: PriorityEnum.Normal }),
-    ]);
-    expect(ids(sorted)).toEqual(['p3', 'p4', 'p6', 'p2', 'p1', 'p5']);
-  });
-
-  it('keeps ties in saved order and leaves the input array unchanged', () => {
-    const input = [
-      makeLocation({ id: 'q1', changed: false, priority: PriorityEnum.Normal }),
-      makeLocation({ id: 'q2', changed: true }),
-      makeLocation({ id: 'q3', changed: false, priority: PriorityEnum.Normal }),
-      makeLocation({ id: 'q4', changed: false, priority: PriorityEnum.High }),
-      makeLocation({ id: 'q5', changed: true }),
-    ];
-    const before = ids(input);
-
-    const sorted = sortPlaces(input);
-
-    expect(ids(sorted)).toEqual(['q4', 'q1', 'q3', 'q2', 'q5']);
-    expect(ids(input)).toEqual(before);
-    expect(sorted).not.toBe(input);
-  });
-
-  it('keeps only places not yet updated for todo, and returns a copy for all', () => {
-    const places = [
-      makeLocation({ id: 'a', changed: false }),
-      makeLocation({ id: 'b', changed: true }),
-      makeLocation({ id: 'c', changed: false }),
-    ];
-
-    expect(ids(filterPlaces(places, 'todo'))).toEqual(['a', 'c']);
-
-    const all = filterPlaces(places, 'all');
-    expect(ids(all)).toEqual(['a', 'b', 'c']);
-    expect(all).not.toBe(places);
   });
 });
 

@@ -15,7 +15,7 @@ import {
   COPY_EXPIRY_SECONDS,
   COPY_FAILED_MESSAGE,
   useExpiringCopy,
-} from './use-expiring-copy';
+} from './useExpiringCopy';
 
 const CONFIRMATION_MS = 4000;
 
@@ -65,6 +65,19 @@ describe('useExpiringCopy', () => {
     });
 
     expect(result.current.message).toBeNull();
+  });
+
+  it('announces a copy with no label as "Copied" and still writes the value', async () => {
+    const { result } = renderHook(() => useExpiringCopy());
+
+    let copied: boolean | undefined;
+    await act(async () => {
+      copied = await result.current.copy('', '+61 412 345 678');
+    });
+
+    expect(writeText).toHaveBeenCalledWith('+61 412 345 678');
+    expect(copied).toBe(true);
+    expect(result.current.message).toBe('Copied — clears in 60 s');
   });
 
   it(`clears the clipboard once, after ${COPY_EXPIRY_SECONDS} s, by writing an empty string`, async () => {

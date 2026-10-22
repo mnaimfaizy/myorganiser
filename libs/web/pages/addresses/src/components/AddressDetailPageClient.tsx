@@ -10,6 +10,7 @@ import {
   PlaceDialog,
   PlaceSheet,
   type PlaceFormValues,
+  useExpiringCopy,
 } from '@myorganiser/web-usage-locations';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
@@ -17,7 +18,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
 import { useAddressesPage } from '../hooks/use-addresses-page';
-import { useExpiringCopy } from '../hooks/use-expiring-copy';
 import type { AddAddressFormValues } from '../schemas/address';
 import {
   describeAddressDeletion,

@@ -1,23 +1,23 @@
 'use client';
 
-import type {
-  AddressRecord,
-  UsageLocationRecord,
-} from '@myorganiser/vault-core';
+import type { UsageLocationRecord } from '@myorganiser/vault-core';
 import { Button, ChoiceChip, Progress } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
+import type { PlaceNoun } from '../PlaceDialog/PlaceDialog';
+import { PlaceRow } from './PlaceRow';
 import {
   filterPlaces,
   type PlaceListFilter,
   placeProgress,
   sortPlaces,
-} from '../utils/address-summary';
-import { AddressPlaceRow } from './address-place-row';
+} from './placeChecklist';
 
-export interface AddressPlacesCardProps {
-  address: AddressRecord;
+export interface PlacesCardProps {
+  /** The Usage Locations of the subject: an Address's places, or a mobile number's. */
+  locations: readonly UsageLocationRecord[];
+  noun: PlaceNoun;
   today: Date;
   /** Usage Locations whose tick is being saved; their checkboxes are disabled. */
   pendingPlaceIds: ReadonlySet<string>;
@@ -27,8 +27,6 @@ export interface AddressPlacesCardProps {
   onRequestDeletePlace: (location: UsageLocationRecord) => void;
 }
 
-const HEADING_PLACES = 'address-places-heading';
-
 /** The checklist chips, in chip order. */
 const PLACE_FILTER_LABELS = {
   all: 'All',
@@ -37,24 +35,41 @@ const PLACE_FILTER_LABELS = {
 
 const PLACE_FILTER_KEYS = Object.keys(PLACE_FILTER_LABELS) as PlaceListFilter[];
 
+/** The words that differ between the Address and mobile number pages. */
+const PLACES_COPY = {
+  address: {
+    subtitle: 'Everyone who needs to know about this address',
+    emptyLine:
+      'Add every organisation that needs to be told about this address.',
+  },
+  number: {
+    subtitle: 'Everyone who has this number on file',
+    emptyLine:
+      'Add every organisation that needs to be told about this mobile number.',
+  },
+} as const satisfies Record<PlaceNoun, { subtitle: string; emptyLine: string }>;
+
 /**
- * The Places checklist on the desktop Address detail: how far the Address has
- * got, the filter chips, and one row per Usage Location to tick, edit or delete.
+ * The Places checklist on the desktop detail: how far the subject has got, the
+ * filter chips, and one row per Usage Location to tick, edit or delete.
  */
-export function AddressPlacesCard({
-  address,
+export function PlacesCard({
+  locations,
+  noun,
   today,
   pendingPlaceIds,
   onAddPlace,
   onEditPlace,
   onSetPlaceChanged,
   onRequestDeletePlace,
-}: AddressPlacesCardProps) {
+}: PlacesCardProps) {
   const [placeFilter, setPlaceFilter] = useState<PlaceListFilter>('all');
+  const headingId = useId();
+  const copy = PLACES_COPY[noun];
 
-  const { done, total, left } = placeProgress(address);
+  const { done, total, left } = placeProgress(locations);
   const complete = total > 0 && done === total;
-  const places = filterPlaces(sortPlaces(address.usageLocations), placeFilter);
+  const places = filterPlaces(sortPlaces(locations), placeFilter);
   const placeCounts = { all: total, todo: left } satisfies Record<
     PlaceListFilter,
     number
@@ -62,20 +77,20 @@ export function AddressPlacesCard({
 
   return (
     <section
-      aria-labelledby={HEADING_PLACES}
+      aria-labelledby={headingId}
       className="flex min-w-0 basis-130 grow-999 flex-col overflow-hidden rounded-panel border border-border bg-card shadow-card"
     >
       <div className="flex flex-col gap-3 border-b border-border p-5">
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col">
             <h2
-              id={HEADING_PLACES}
+              id={headingId}
               className="font-display text-title text-foreground"
             >
               Places to update
             </h2>
             <p className="text-caption text-muted-foreground">
-              Everyone who needs to know about this address
+              {copy.subtitle}
             </p>
           </div>
           <Button variant="brand" onClick={onAddPlace}>
@@ -128,9 +143,7 @@ export function AddressPlacesCard({
       {total === 0 ? (
         <div className="flex flex-col items-start gap-2 p-5">
           <p className="font-semibold text-foreground">No places yet</p>
-          <p className="text-body-sm text-muted-foreground">
-            Add every organisation that needs to be told about this address.
-          </p>
+          <p className="text-body-sm text-muted-foreground">{copy.emptyLine}</p>
           <Button variant="brand" onClick={onAddPlace}>
             <Plus aria-hidden="true" />
             Add place
@@ -143,7 +156,7 @@ export function AddressPlacesCard({
       ) : (
         <ul className="flex flex-col">
           {places.map((location) => (
-            <AddressPlaceRow
+            <PlaceRow
               key={location.id}
               location={location}
               today={today}

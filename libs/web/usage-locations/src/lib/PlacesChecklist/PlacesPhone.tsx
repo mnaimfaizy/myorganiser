@@ -1,9 +1,6 @@
 'use client';
 
-import type {
-  AddressRecord,
-  UsageLocationRecord,
-} from '@myorganiser/vault-core';
+import type { UsageLocationRecord } from '@myorganiser/vault-core';
 import {
   Button,
   Checkbox,
@@ -22,18 +19,20 @@ import {
   cn,
 } from '@myorganiser/web-ui';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 
 import {
   filterPlaces,
   formatPlacePhoneMeta,
+  PLACE_PRIORITY_PILL,
+  PLACE_UPDATED_PILL,
   placeProgress,
   sortPlaces,
-} from '../utils/address-summary';
-import { PLACE_PRIORITY_PILL, PLACE_UPDATED_PILL } from '../utils/presentation';
+} from './placeChecklist';
 
-export interface AddressPlacesPhoneProps {
-  address: AddressRecord;
+export interface PlacesPhoneProps {
+  /** The Usage Locations of the subject: an Address's places, or a mobile number's. */
+  locations: readonly UsageLocationRecord[];
   /** Usage Locations whose tick is being saved; their checkboxes are disabled. */
   pendingPlaceIds: ReadonlySet<string>;
   onAddPlace: () => void;
@@ -41,8 +40,6 @@ export interface AddressPlacesPhoneProps {
   onSetPlaceChanged: (locationId: string, changed: boolean) => void;
   onRequestDeletePlace: (location: UsageLocationRecord) => void;
 }
-
-const HEADING_PLACES = 'address-places-heading';
 
 interface PlaceChecklistRowProps {
   location: UsageLocationRecord;
@@ -120,31 +117,33 @@ function PlaceChecklistRow({
 
 /**
  * The phone "Places to update" section: the count line, the Add action, the
- * progress bar, the checklist of places still to update, and the collapsed Updated disclosure.
+ * progress bar, the checklist of places still to update, and the collapsed
+ * Updated disclosure.
  */
-export function AddressPlacesPhone({
-  address,
+export function PlacesPhone({
+  locations,
   pendingPlaceIds,
   onAddPlace,
   onEditPlace,
   onSetPlaceChanged,
   onRequestDeletePlace,
-}: AddressPlacesPhoneProps) {
+}: PlacesPhoneProps) {
   const [showUpdated, setShowUpdated] = useState(false);
+  const headingId = useId();
   const handleUpdatedOpenChange = useCallback((open: boolean) => {
     setShowUpdated(open);
   }, []);
 
-  const { done, total } = placeProgress(address);
-  const ordered = sortPlaces(address.usageLocations);
+  const { done, total } = placeProgress(locations);
+  const ordered = sortPlaces(locations);
   const toDo = filterPlaces(ordered, 'todo');
   const updated = ordered.filter((location) => location.changed);
 
   return (
-    <section aria-labelledby={HEADING_PLACES} className="flex flex-col gap-2">
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <div className="flex items-end justify-between gap-3">
         <h2
-          id={HEADING_PLACES}
+          id={headingId}
           className="text-label-caps text-foreground-secondary"
         >
           {total === 0

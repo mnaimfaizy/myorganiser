@@ -15,8 +15,9 @@ export const COPY_FAILED_MESSAGE =
 export interface ExpiringCopy {
   /**
    * Writes `value` to the clipboard and announces `${label} copied — clears
-   * in 60 s`. Resolves false, and announces `COPY_FAILED_MESSAGE`, when the
-   * browser refuses the write.
+   * in 60 s`, or `Copied — clears in 60 s` when `label` is empty. Resolves
+   * false, and announces `COPY_FAILED_MESSAGE`, when the browser refuses the
+   * write.
    */
   copy: (label: string, value: string) => Promise<boolean>;
   /** The live confirmation, or null once it has faded. */
@@ -97,7 +98,11 @@ export function useExpiringCopy(): ExpiringCopy {
       }
 
       scheduleClear();
-      announce(`${label} copied — clears in ${COPY_EXPIRY_SECONDS} s`);
+      announce(
+        label
+          ? `${label} copied — clears in ${COPY_EXPIRY_SECONDS} s`
+          : `Copied — clears in ${COPY_EXPIRY_SECONDS} s`,
+      );
       return true;
     },
     [announce],

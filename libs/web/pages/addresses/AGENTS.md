@@ -24,13 +24,14 @@ the detail page the record already lives on.
 
 - `hooks/use-addresses-page.ts` — every vault read and write for the list and the detail route,
   with the toasts. Components consume its controller; they do not write the vault themselves.
-- `hooks/use-expiring-copy.ts` — the copy-to-clipboard action and its 60-second confirmation.
-- `utils/address-summary.ts` — pure presentation helpers (copy fields, progress, sorting, filtering,
-  deletion wording). `utils/presentation.ts` holds the status and priority pill tables.
+- `utils/address-summary.ts` — pure presentation helpers (copy fields, filtering, deletion wording).
+  `utils/presentation.ts` holds the status pill table.
 - `components/AddressDetailPageClient.tsx` owns the dialog, sheet, confirm and leaving state for the
   detail route. `address-detail.tsx` is the desktop view and `address-detail-screen.tsx` the phone
   view; both are presentational and take their callbacks as props.
-- `libs/web/usage-locations` owns the place form (`PlaceDialog`, `PlaceSheet`, `usePlaceForm`).
+- `libs/web/usage-locations` owns the place form (`PlaceDialog`, `PlaceSheet`, `usePlaceForm`), the
+  Places checklist (`PlacesCard`, `PlacesPhone`, and the progress and sorting helpers they use), and the
+  copy action (`useExpiringCopy`). This page passes its Address's `usageLocations` and `noun="address"`.
 
 ## Do
 

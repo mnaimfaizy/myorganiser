@@ -2,13 +2,11 @@
 
 import type { AddressRecord } from '@myorganiser/vault-core';
 import { ListGroupRow, StatusPill, cn } from '@myorganiser/web-ui';
+import { placeProgress } from '@myorganiser/web-usage-locations';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
-import {
-  formatAddressShortLine,
-  placeProgress,
-} from '../utils/address-summary';
+import { formatAddressShortLine } from '../utils/address-summary';
 import { ADDRESS_STATUS_PILL } from '../utils/presentation';
 
 export interface AddressRowProps {
@@ -17,7 +15,7 @@ export interface AddressRowProps {
 
 /** One Address on the phone list: a navigation row to its detail page. */
 export function AddressRow({ address }: AddressRowProps) {
-  const { done, total } = placeProgress(address);
+  const { done, total } = placeProgress(address.usageLocations);
   const complete = total > 0 && done === total;
   const pill = ADDRESS_STATUS_PILL[address.status];
 
