@@ -1,167 +1,106 @@
 'use client';
 
-import type {
-  AdminUserIdentity,
-  YouTubeAccessUsageResponse,
-} from '@myorganiser/app-api-client';
-import { Button } from '@myorganiser/web-ui';
-import { isAxiosError } from 'axios';
+import { getCurrentUser } from '@myorganiser/auth';
+import { cn, useIsMobileState } from '@myorganiser/web-ui';
+import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import { createPlatformAdminApi } from '../lib/apiClient';
-import {
-  formatBooleanLabel,
-  formatUserDisplayName,
-  formatUserRole,
-} from '../lib/formatUserIdentity';
+import { useAdminUser } from '../hooks/use-admin-user';
+import { ADMIN_SECTIONS } from '../lib/adminNav';
+import type { UserDetailVariant } from '../lib/userDetail';
+import { UserIdentityCard } from './user-detail/UserIdentityCard';
+import { UserRecentActivity } from './user-detail/UserRecentActivity';
 import { UserLifecycleActions } from './UserLifecycleActions';
 
-interface UserIdentityFieldProps {
-  label: string;
-  value: string;
-}
+const PAGE_CLASS: Record<UserDetailVariant, string> = {
+  desktop: 'mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-8',
+  phone: 'mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-4 py-3',
+};
 
-function UserIdentityField({ label, value }: UserIdentityFieldProps) {
-  return (
-    <div className="grid gap-1">
-      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm">{value}</dd>
-    </div>
-  );
-}
+const ACTIONS_CLASS: Record<UserDetailVariant, string> = {
+  desktop:
+    'grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] items-start gap-5',
+  phone: 'flex flex-col gap-3',
+};
 
-function formatYouTubeAccessPlaces(
-  usage: YouTubeAccessUsageResponse | null,
-  usageFailed: boolean,
-): string {
-  if (usage) {
-    return `${usage.everGranted} of ${usage.ceiling}`;
-  }
-
-  return usageFailed ? 'Unavailable' : 'Loading…';
-}
-
+/**
+ * The admin User detail page. Identity, then the lifecycle actions (two cards
+ * on desktop, stacked groups on phone), then recent activity. The layout is
+ * chosen once the breakpoint is known; until then only a placeholder shows.
+ */
 export function UserDetailPageClient() {
   const params = useParams();
   const userId =
     typeof params.userId === 'string' ? params.userId : params.userId?.[0];
 
-  const [user, setUser] = useState<AdminUserIdentity | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [youtubeUsage, setYouTubeUsage] =
-    useState<YouTubeAccessUsageResponse | null>(null);
-  const [youtubeUsageFailed, setYouTubeUsageFailed] = useState(false);
+  const isPhone = useIsMobileState();
+  const {
+    user,
+    setUser,
+    loading,
+    notFound,
+    error,
+    youtubeUsage,
+    youtubeUsageFailed,
+  } = useAdminUser(userId);
 
-  const youtubeAccess = user?.youtubeAccess;
-
-  const loadYouTubeUsage = useCallback(async () => {
-    try {
-      const api = createPlatformAdminApi();
-      const response = await api.getYouTubeAccessUsage();
-      setYouTubeUsage(response.data);
-      setYouTubeUsageFailed(false);
-    } catch {
-      setYouTubeUsage(null);
-      setYouTubeUsageFailed(true);
-    }
+  // Each completed lifecycle action bumps this. Recent activity is keyed on it,
+  // so it remounts and refetches the audit log that now holds the new entry.
+  const [activityRevision, setActivityRevision] = useState(0);
+  const handleActionCompleted = useCallback(() => {
+    setActivityRevision((revision) => revision + 1);
   }, []);
 
-  const loadUser = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    setNotFound(false);
+  if (isPhone === undefined) {
+    return <div aria-hidden="true" className="min-h-96" />;
+  }
 
-    try {
-      const api = createPlatformAdminApi();
-      const response = await api.getUserById({ userId: id });
-      setUser(response.data);
-    } catch (err) {
-      setUser(null);
-
-      if (isAxiosError(err) && err.response?.status === 404) {
-        setNotFound(true);
-      } else {
-        setError('Unable to load user. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      setNotFound(true);
-      return;
-    }
-
-    void loadUser(userId);
-  }, [loadUser, userId]);
-
-  useEffect(() => {
-    if (youtubeAccess === undefined) {
-      return;
-    }
-
-    void loadYouTubeUsage();
-  }, [loadYouTubeUsage, youtubeAccess]);
+  const variant: UserDetailVariant = isPhone ? 'phone' : 'desktop';
+  const currentUserId = getCurrentUser()?.id;
+  const isSelf = user !== null && user.id === currentUserId;
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" asChild>
-          <Link href="/admin/users">Back to users</Link>
-        </Button>
-      </div>
+    <div className={PAGE_CLASS[variant]}>
+      <Link
+        href={ADMIN_SECTIONS.users.url}
+        className={cn(
+          'inline-flex items-center gap-1.5 text-brand-text',
+          isPhone ? 'min-h-11 text-body' : 'text-body-sm font-semibold',
+        )}
+      >
+        <ChevronLeft aria-hidden="true" className="size-3.5 shrink-0" />
+        {isPhone ? 'Users' : 'All users'}
+      </Link>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-body-sm text-muted-foreground">Loading…</p>
       ) : notFound ? (
-        <p className="text-sm text-muted-foreground">User not found.</p>
+        <p className="text-body-sm text-muted-foreground">User not found.</p>
       ) : error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-body-sm text-destructive">{error}</p>
       ) : user ? (
         <>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {formatUserDisplayName(user)}
-          </h1>
+          <UserIdentityCard user={user} variant={variant} />
 
-          <dl className="grid max-w-xl gap-4">
-            <UserIdentityField label="ID" value={user.id} />
-            <UserIdentityField label="Name" value={user.name} />
-            <UserIdentityField label="Email" value={user.email} />
-            <UserIdentityField label="First name" value={user.firstName} />
-            <UserIdentityField label="Last name" value={user.lastName} />
-            {user.phone ? (
-              <UserIdentityField label="Phone" value={user.phone} />
-            ) : null}
-            <UserIdentityField label="Role" value={formatUserRole(user.role)} />
-            <UserIdentityField
-              label="Disabled"
-              value={formatBooleanLabel(user.disabled)}
+          <div className={ACTIONS_CLASS[variant]}>
+            <UserLifecycleActions
+              user={user}
+              onUserUpdated={setUser}
+              isSelf={isSelf}
+              youtubeUsage={youtubeUsage}
+              youtubeUsageFailed={youtubeUsageFailed}
+              variant={variant}
+              onActionCompleted={handleActionCompleted}
             />
-            <UserIdentityField
-              label="Email verified"
-              value={formatBooleanLabel(user.emailVerified)}
-            />
-            <UserIdentityField
-              label="YouTube Access"
-              value={formatBooleanLabel(user.youtubeAccess)}
-            />
-            <UserIdentityField
-              label="YouTube Access places used"
-              value={formatYouTubeAccessPlaces(
-                youtubeUsage,
-                youtubeUsageFailed,
-              )}
-            />
-          </dl>
+          </div>
 
-          <UserLifecycleActions user={user} onUserUpdated={setUser} />
+          <UserRecentActivity
+            key={activityRevision}
+            userId={user.id}
+            variant={variant}
+          />
         </>
       ) : null}
     </div>

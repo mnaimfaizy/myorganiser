@@ -2,154 +2,42 @@
 
 import type {
   AdminUserIdentity,
+  YouTubeAccessUsageResponse,
   YouTubeDisconnectOutcome,
 } from '@myorganiser/app-api-client';
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  useToast,
-} from '@myorganiser/web-ui';
-import { useCallback, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
+import { cn, ConfirmDialog, useToast } from '@myorganiser/web-ui';
+import { useCallback, useId, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
 import { getApiErrorMessage } from '../lib/apiErrorMessage';
 import { formatUserDisplayName } from '../lib/formatUserIdentity';
-
-type LifecycleAction =
-  | 'disable'
-  | 'enable'
-  | 'forceLogout'
-  | 'resendVerification'
-  | 'promote'
-  | 'demote'
-  | 'grantYouTubeAccess'
-  | 'withdrawYouTubeAccess';
+import {
+  CONFIRM_AUDIT_NOTE,
+  emailVerificationDescription,
+  LIFECYCLE_ACTION_COPY,
+  lifecycleRowDescription,
+  type LifecycleAction,
+  type LifecycleActionCopy,
+  platformAdminDescription,
+  SELF_GUARD_NOTE,
+  type UserDetailVariant,
+  youtubeAccessDescription,
+} from '../lib/userDetail';
+import { UserActionRow } from './user-detail/UserActionRow';
 
 interface UserLifecycleActionsProps {
   user: AdminUserIdentity;
   onUserUpdated: (user: AdminUserIdentity) => void;
+  /** The signed-in admin is this User. Disable and demote are then blocked. */
+  isSelf: boolean;
+  youtubeUsage: YouTubeAccessUsageResponse | null;
+  /** The usage call failed. With no usage and no failure, the row reads as loading. */
+  youtubeUsageFailed: boolean;
+  variant: UserDetailVariant;
+  /** Called after each action's API call succeeds. Lets the page refresh what the action changed. */
+  onActionCompleted?: (action: LifecycleAction) => void;
 }
-
-interface LifecycleConfirmDialogProps {
-  isOpen: boolean;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  destructive?: boolean;
-  isLoading?: boolean;
-  onClose: () => void;
-  onConfirm: () => Promise<void>;
-}
-
-interface ActionDefinition {
-  id: LifecycleAction;
-  label: string;
-  loadingLabel: string;
-  confirmTitle: string;
-  confirmDescription: string;
-  confirmLabel: string;
-  destructive?: boolean;
-  variant: 'default' | 'destructive' | 'outline';
-  isVisible: (user: AdminUserIdentity) => boolean;
-}
-
-const ACTION_DEFINITIONS: ActionDefinition[] = [
-  {
-    id: 'disable',
-    label: 'Disable',
-    loadingLabel: 'Disabling…',
-    confirmTitle: 'Disable user?',
-    confirmDescription:
-      'This will prevent the user from signing in until they are re-enabled.',
-    confirmLabel: 'Disable user',
-    destructive: true,
-    variant: 'destructive',
-    isVisible: (targetUser) => !targetUser.disabled,
-  },
-  {
-    id: 'enable',
-    label: 'Enable',
-    loadingLabel: 'Enabling…',
-    confirmTitle: 'Enable user?',
-    confirmDescription: 'This will allow the user to sign in again.',
-    confirmLabel: 'Enable user',
-    variant: 'outline',
-    isVisible: (targetUser) => targetUser.disabled,
-  },
-  {
-    id: 'forceLogout',
-    label: 'Force logout',
-    loadingLabel: 'Revoking…',
-    confirmTitle: 'Force logout?',
-    confirmDescription:
-      'This will revoke all active sessions for this user immediately.',
-    confirmLabel: 'Force logout',
-    variant: 'outline',
-    isVisible: () => true,
-  },
-  {
-    id: 'resendVerification',
-    label: 'Resend verification',
-    loadingLabel: 'Sending…',
-    confirmTitle: 'Resend verification email?',
-    confirmDescription: 'This will send a new verification email to the user.',
-    confirmLabel: 'Resend email',
-    variant: 'outline',
-    isVisible: (targetUser) => !targetUser.emailVerified,
-  },
-  {
-    id: 'promote',
-    label: 'Promote',
-    loadingLabel: 'Promoting…',
-    confirmTitle: 'Promote to Platform Admin?',
-    confirmDescription:
-      'This will grant Platform Admin privileges to this user.',
-    confirmLabel: 'Promote user',
-    variant: 'outline',
-    isVisible: (targetUser) => targetUser.role !== 'platform_admin',
-  },
-  {
-    id: 'demote',
-    label: 'Demote',
-    loadingLabel: 'Demoting…',
-    confirmTitle: 'Demote Platform Admin?',
-    confirmDescription:
-      'This will remove Platform Admin privileges from this user.',
-    confirmLabel: 'Demote user',
-    destructive: true,
-    variant: 'destructive',
-    isVisible: (targetUser) => targetUser.role === 'platform_admin',
-  },
-  {
-    id: 'grantYouTubeAccess',
-    label: 'Grant YouTube Access',
-    loadingLabel: 'Granting…',
-    confirmTitle: 'Grant YouTube Access?',
-    confirmDescription:
-      'This will let the user connect and use YouTube in MyOrganiser. A first grant uses one of the limited YouTube Access places.',
-    confirmLabel: 'Grant access',
-    variant: 'outline',
-    isVisible: (targetUser) => !targetUser.youtubeAccess,
-  },
-  {
-    id: 'withdrawYouTubeAccess',
-    label: 'Withdraw YouTube Access',
-    loadingLabel: 'Withdrawing…',
-    confirmTitle: 'Withdraw YouTube Access?',
-    confirmDescription:
-      "This will end the user's YouTube connection and revoke MyOrganiser's access at Google. Their YouTube data will be deleted: followed channels, cached uploads, watched marks and digest settings. Nothing is kept for a later reconnect.",
-    confirmLabel: 'Withdraw access',
-    destructive: true,
-    variant: 'destructive',
-    isVisible: (targetUser) => targetUser.youtubeAccess,
-  },
-];
 
 const WITHDRAW_YOUTUBE_ACCESS_TOAST = {
   completed: {
@@ -182,78 +70,165 @@ function getResendSuccessMessage(data: unknown): string {
   return 'Verification email sent';
 }
 
-function LifecycleConfirmDialog({
-  isOpen,
-  title,
-  description,
-  confirmLabel,
-  destructive = false,
-  isLoading = false,
-  onClose,
-  onConfirm,
-}: LifecycleConfirmDialogProps) {
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        onClose();
-      }
-    },
-    [onClose],
-  );
+interface LifecycleGroupProps {
+  headingId: string;
+  title: string;
+  /** Sign-in actions carry the danger border and the destructive heading ink. */
+  danger?: boolean;
+  variant: UserDetailVariant;
+  /** The self-guard note. Inside the card on desktop, under it on phone. */
+  footer?: ReactNode;
+  children: ReactNode;
+}
 
-  const handleConfirm = useCallback(async () => {
-    await onConfirm();
-  }, [onConfirm]);
+/** A labelled group of rows. Desktop is a card with its heading inside; phone is a caps heading over a card. */
+function LifecycleGroup({
+  headingId,
+  title,
+  danger = false,
+  variant,
+  footer,
+  children,
+}: LifecycleGroupProps) {
+  if (variant === 'desktop') {
+    return (
+      <section
+        aria-labelledby={headingId}
+        className={cn(
+          'flex flex-col rounded-panel border bg-raised-surface',
+          danger ? 'border-destructive-edge' : 'border-border',
+        )}
+      >
+        <h2
+          id={headingId}
+          className={cn(
+            'px-6 pt-5 pb-2 font-display text-title',
+            danger ? 'text-destructive-text' : 'text-foreground',
+          )}
+        >
+          {title}
+        </h2>
+        {/* The last row carries 20px bottom padding: 14px from the row plus 6px here.
+            With the self-note present, the note is last and keeps its own padding. */}
+        {footer ? children : <div className="pb-1.5">{children}</div>}
+        {footer}
+      </section>
+    );
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] md:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2 pt-2 sm:gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant={destructive ? 'destructive' : 'default'}
-            onClick={handleConfirm}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Working…' : confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <section aria-labelledby={headingId} className="flex flex-col gap-1.5">
+      <h2
+        id={headingId}
+        className="text-label-caps uppercase text-muted-foreground"
+      >
+        {title}
+      </h2>
+      <div
+        className={cn(
+          'flex flex-col overflow-hidden rounded-xl border bg-raised-surface',
+          danger ? 'border-destructive-edge' : 'border-border',
+        )}
+      >
+        {children}
+      </div>
+      {footer}
+    </section>
+  );
+}
+
+interface LifecycleRowProps {
+  action: LifecycleAction;
+  variant: UserDetailVariant;
+  /** Omit for the rows whose text is in the copy table. */
+  description?: string;
+  tone?: 'default' | 'danger';
+  disabled: boolean;
+  describedBy?: string;
+  pendingAction: LifecycleAction | null;
+  onOpen: (action: LifecycleAction) => void;
+}
+
+/** One action's row, with its copy taken from the table. */
+function LifecycleRow({
+  action,
+  variant,
+  description,
+  tone = 'default',
+  disabled,
+  describedBy,
+  pendingAction,
+  onOpen,
+}: LifecycleRowProps) {
+  const copy: LifecycleActionCopy = LIFECYCLE_ACTION_COPY[action];
+  const isPending = pendingAction === action;
+
+  return (
+    <UserActionRow
+      title={copy.rowTitle}
+      description={
+        description ?? lifecycleRowDescription(action, variant) ?? ''
+      }
+      actionLabel={variant === 'phone' ? copy.phoneLabel : copy.desktopLabel}
+      actionAriaLabel={copy.ariaLabel}
+      tone={tone}
+      disabled={disabled}
+      describedBy={describedBy}
+      busyLabel={isPending ? copy.loadingLabel : undefined}
+      onAction={() => onOpen(action)}
+      variant={variant}
+    />
   );
 }
 
 export function UserLifecycleActions({
   user,
   onUserUpdated,
+  isSelf,
+  youtubeUsage,
+  youtubeUsageFailed,
+  variant,
+  onActionCompleted,
 }: UserLifecycleActionsProps) {
   const { toast } = useToast();
+  const isPhone = variant === 'phone';
+  const accessHeadingId = useId();
+  const signInHeadingId = useId();
+  const noteId = useId();
   const [pendingAction, setPendingAction] = useState<LifecycleAction | null>(
     null,
   );
   const [openAction, setOpenAction] = useState<LifecycleAction | null>(null);
 
-  const visibleActions = useMemo(
-    () => ACTION_DEFINITIONS.filter((action) => action.isVisible(user)),
-    [user],
-  );
+  const displayName = formatUserDisplayName(user);
+  const openCopy: LifecycleActionCopy | null = openAction
+    ? LIFECYCLE_ACTION_COPY[openAction]
+    : null;
+  const isBusy = pendingAction !== null;
 
-  const openActionDefinition = useMemo(
-    () => ACTION_DEFINITIONS.find((action) => action.id === openAction) ?? null,
-    [openAction],
-  );
+  // Which action a row offers is decided by the User's state, as before.
+  const signInAction: LifecycleAction = user.disabled ? 'enable' : 'disable';
+  const youtubeAction: LifecycleAction = user.youtubeAccess
+    ? 'withdrawYouTubeAccess'
+    : 'grantYouTubeAccess';
+  const adminAction: LifecycleAction =
+    user.role === 'platform_admin' ? 'demote' : 'promote';
+
+  // The self-guard covers disable and demote. Enable never applies to a signed-in self.
+  const disableBlockedBySelf = isSelf && signInAction === 'disable';
+  const demoteBlockedBySelf = isSelf && adminAction === 'demote';
+  const selfNote = isSelf ? (
+    <p
+      id={noteId}
+      className={
+        isPhone
+          ? 'px-1 text-caption text-muted-foreground'
+          : 'border-t border-border-subtle px-6 pt-3 pb-4.5 text-caption text-muted-foreground'
+      }
+    >
+      {SELF_GUARD_NOTE}
+    </p>
+  ) : null;
 
   const handleCloseDialog = useCallback(() => {
     if (pendingAction) {
@@ -263,22 +238,18 @@ export function UserLifecycleActions({
     setOpenAction(null);
   }, [pendingAction]);
 
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        handleCloseDialog();
+      }
+    },
+    [handleCloseDialog],
+  );
+
   const handleOpenAction = useCallback((action: LifecycleAction) => {
     setOpenAction(action);
   }, []);
-
-  const handleActionButtonClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      const action = event.currentTarget.dataset.action as
-        | LifecycleAction
-        | undefined;
-
-      if (action) {
-        handleOpenAction(action);
-      }
-    },
-    [handleOpenAction],
-  );
 
   const executeAction = useCallback(
     async (action: LifecycleAction) => {
@@ -339,8 +310,10 @@ export function UserLifecycleActions({
           }
         }
 
+        onActionCompleted?.(action);
         setOpenAction(null);
       } catch (err) {
+        // The dialog stays open: it closes only on success.
         toast({
           title: 'Action failed',
           description: getApiErrorMessage(err),
@@ -350,7 +323,7 @@ export function UserLifecycleActions({
         setPendingAction(null);
       }
     },
-    [onUserUpdated, toast, user.id],
+    [onActionCompleted, onUserUpdated, toast, user.id],
   );
 
   const handleConfirmAction = useCallback(async () => {
@@ -361,45 +334,90 @@ export function UserLifecycleActions({
     await executeAction(openAction);
   }, [executeAction, openAction]);
 
-  const isBusy = pendingAction !== null;
-
   return (
-    <section className="max-w-xl">
-      <h2 className="mb-3 text-lg font-semibold tracking-tight">Actions</h2>
-      <p className="mb-3 text-sm text-muted-foreground">
-        Manage lifecycle actions for {formatUserDisplayName(user)}.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {visibleActions.map((action) => {
-          const isActive = pendingAction === action.id;
+    <>
+      <LifecycleGroup
+        headingId={accessHeadingId}
+        title="Access"
+        variant={variant}
+      >
+        <div className="flex flex-col">
+          <LifecycleRow
+            action={youtubeAction}
+            variant={variant}
+            description={youtubeAccessDescription(
+              user.youtubeAccess,
+              youtubeUsage,
+              youtubeUsageFailed,
+              variant,
+            )}
+            disabled={isBusy}
+            pendingAction={pendingAction}
+            onOpen={handleOpenAction}
+          />
+          <LifecycleRow
+            action={adminAction}
+            variant={variant}
+            description={platformAdminDescription(user.role, variant)}
+            disabled={isBusy || demoteBlockedBySelf}
+            describedBy={demoteBlockedBySelf ? noteId : undefined}
+            pendingAction={pendingAction}
+            onOpen={handleOpenAction}
+          />
+          <LifecycleRow
+            action="resendVerification"
+            variant={variant}
+            description={emailVerificationDescription(user.emailVerified)}
+            disabled={isBusy || user.emailVerified}
+            pendingAction={pendingAction}
+            onOpen={handleOpenAction}
+          />
+        </div>
+      </LifecycleGroup>
 
-          return (
-            <Button
-              key={action.id}
-              type="button"
-              variant={action.variant}
-              data-action={action.id}
-              disabled={isBusy}
-              onClick={handleActionButtonClick}
-            >
-              {isActive ? action.loadingLabel : action.label}
-            </Button>
-          );
-        })}
-      </div>
+      <LifecycleGroup
+        headingId={signInHeadingId}
+        title={isPhone ? 'Sign-in' : 'Sign-in actions'}
+        danger
+        variant={variant}
+        footer={selfNote}
+      >
+        <div className="flex flex-col">
+          <LifecycleRow
+            action="forceLogout"
+            variant={variant}
+            tone={isPhone ? 'danger' : 'default'}
+            disabled={isBusy}
+            pendingAction={pendingAction}
+            onOpen={handleOpenAction}
+          />
+          <LifecycleRow
+            action={signInAction}
+            variant={variant}
+            tone={user.disabled ? 'default' : 'danger'}
+            disabled={isBusy || disableBlockedBySelf}
+            describedBy={disableBlockedBySelf ? noteId : undefined}
+            pendingAction={pendingAction}
+            onOpen={handleOpenAction}
+          />
+        </div>
+      </LifecycleGroup>
 
-      {openActionDefinition ? (
-        <LifecycleConfirmDialog
-          isOpen={openAction !== null}
-          title={openActionDefinition.confirmTitle}
-          description={openActionDefinition.confirmDescription}
-          confirmLabel={openActionDefinition.confirmLabel}
-          destructive={openActionDefinition.destructive}
-          isLoading={pendingAction === openActionDefinition.id}
-          onClose={handleCloseDialog}
+      {openCopy ? (
+        <ConfirmDialog
+          open
+          onOpenChange={handleOpenChange}
+          title={openCopy.confirmTitle(displayName)}
+          description={openCopy.confirmDescription}
+          confirmLabel={openCopy.confirmLabel}
+          tone={openCopy.tone}
           onConfirm={handleConfirmAction}
-        />
+        >
+          <p className="text-caption text-muted-foreground">
+            {CONFIRM_AUDIT_NOTE}
+          </p>
+        </ConfirmDialog>
       ) : null}
-    </section>
+    </>
   );
 }
