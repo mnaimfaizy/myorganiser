@@ -245,8 +245,11 @@ test.describe('Feedback Report sending', () => {
     // Navigate to Your reports page
     await gotoStable(page, '/dashboard/account/reports');
 
-    // Assert the page title is visible
-    await expect(page.getByText('Your reports')).toBeVisible({
+    // Assert we landed on Your reports. The v2 shell repeats the title in its
+    // breadcrumb, title rows and card, so match the breadcrumb's current page.
+    await expect(
+      page.getByRole('link', { name: 'Your reports', exact: true }),
+    ).toHaveAttribute('aria-current', 'page', {
       timeout: 60000,
     });
 
