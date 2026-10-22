@@ -9,8 +9,9 @@ const config: StorybookConfig = {
     '../src/lib/**/*.@(mdx|stories.@(js|jsx|ts|tsx))',
     '../../vault-ui/src/lib/**/*.@(mdx|stories.@(js|jsx|ts|tsx))',
     '../../usage-locations/src/lib/**/*.@(mdx|stories.@(js|jsx|ts|tsx))',
-    // Page-library components. Added for the groceries selection states, whose
-    // affordance is carried by colour — the one failure mode Jest cannot see.
+    // Page-library components an issue names (STORYBOOK-PATTERNS §1): the
+    // groceries selection states, whose affordance is carried by colour — the
+    // one failure mode Jest cannot see — and the dashboard shell chrome.
     '../../pages/*/src/**/*.@(mdx|stories.@(js|jsx|ts|tsx))',
   ],
   addons: ['@storybook/addon-essentials', '@storybook/addon-interactions'],
