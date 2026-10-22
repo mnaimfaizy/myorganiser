@@ -31,6 +31,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
@@ -368,5 +369,101 @@ describe('DeleteAccountSection', () => {
       (screen.getByTestId('delete-account-confirmation') as HTMLInputElement)
         .value,
     ).toBe('');
+  });
+
+  describe('desktop step eyebrow', () => {
+    it('labels the first step of the desktop dialog as Step 1 of 2', async () => {
+      renderSection();
+
+      const dialog = await openDialog();
+
+      expect(within(dialog).getByText('Step 1 of 2')).toBeInTheDocument();
+    });
+  });
+
+  describe('phone variant', () => {
+    function renderPhoneSection() {
+      return render(<DeleteAccountSection variant="phone" />);
+    }
+
+    it('shows the row with its description and opens the Step 1 sheet', async () => {
+      renderPhoneSection();
+
+      const row = screen.getByTestId('delete-account-button');
+      expect(row).toHaveTextContent('Delete account…');
+      expect(row).toHaveTextContent(
+        'Deleting your account removes the account itself',
+      );
+
+      const dialog = await openDialog();
+
+      expect(within(dialog).getByText('Step 1 of 2')).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole('heading', { name: 'Delete account' }),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByTestId('escape-copy-button')).toBeVisible();
+    });
+
+    it('moves to Step 2 from Continue without a copy with labelled password and confirmation fields', async () => {
+      renderPhoneSection();
+      const dialog = await openDialog();
+
+      fireEvent.click(screen.getByTestId('delete-account-continue'));
+      await screen.findByTestId('delete-account-password');
+
+      expect(within(dialog).getByText('Step 2 of 2')).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole('heading', {
+          name: 'Confirm account deletion',
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Account password')).toBe(
+        screen.getByTestId('delete-account-password'),
+      );
+      expect(screen.getByLabelText('Type DELETE to confirm')).toBe(
+        screen.getByTestId('delete-account-confirmation'),
+      );
+    });
+
+    it('shows both required messages and does not call the API when submitted empty', async () => {
+      renderPhoneSection();
+      await openDialog();
+      await continueToConfirm();
+
+      submitConfirm();
+
+      expect(
+        await screen.findByText('Enter your password.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Type DELETE to confirm.')).toBeInTheDocument();
+      expect(mockDeleteMe).not.toHaveBeenCalled();
+    });
+
+    it('returns to Step 1 from Back', async () => {
+      renderPhoneSection();
+      await openDialog();
+      await continueToConfirm();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(
+        await screen.findByTestId('escape-copy-button'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+      expect(screen.queryByTestId('delete-account-password')).toBeNull();
+    });
+
+    it('switches the continue button to Continue after a successful Escape Copy download', async () => {
+      renderPhoneSection();
+      await openDialog();
+
+      fireEvent.click(screen.getByTestId('escape-copy-button'));
+
+      expect(await screen.findByText('Escape Copy downloaded.')).toBeVisible();
+      expect(mockExportVaultNow).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('delete-account-continue').textContent).toBe(
+        'Continue',
+      );
+    });
   });
 });
