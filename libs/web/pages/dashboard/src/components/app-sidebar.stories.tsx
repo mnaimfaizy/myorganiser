@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { expect, waitFor, within } from '@storybook/test';
 
 import { AppSidebar } from './app-sidebar';
-import {
-  DESKTOP_PARAMETERS,
-  withShell,
-  type ShellParameters,
-} from './shell-story-fixtures';
+import { DESKTOP_PARAMETERS, shell, withShell } from './shell-story-fixtures';
 
 /** The desktop sidebar as the dashboard layout mounts it. */
 function SidebarInShell() {
@@ -31,10 +27,6 @@ const meta: Meta<typeof SidebarInShell> = {
 export default meta;
 type Story = StoryObj<typeof SidebarInShell>;
 
-function shell(overrides: ShellParameters): { shell: ShellParameters } {
-  return { shell: overrides };
-}
-
 /** The one link in the Sections nav marked as the current page. */
 function expectActiveLink(canvasElement: HTMLElement, href: string): void {
   const nav = within(canvasElement).getByRole('navigation', {
@@ -52,7 +44,7 @@ function vaultRegion(canvasElement: HTMLElement): HTMLElement {
 
 /** Artboard AppSidebar: active Home, vault unlocked, synced. */
 export const ExpandedHomeUnlocked: Story = {
-  parameters: { shell: { pathname: '/dashboard' } },
+  parameters: shell({ pathname: '/dashboard' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard');
     const region = vaultRegion(canvasElement);
@@ -103,7 +95,7 @@ export const ExpandedSyncPending: Story = {
 
 /** Artboard AppSidebar, active = tasks. */
 export const ActiveTasks: Story = {
-  parameters: { shell: { pathname: '/dashboard/tasks' } },
+  parameters: shell({ pathname: '/dashboard/tasks' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/tasks');
   },
@@ -111,7 +103,7 @@ export const ActiveTasks: Story = {
 
 /** Artboard AppSidebar, active = groceries. */
 export const ActiveGroceries: Story = {
-  parameters: { shell: { pathname: '/dashboard/groceries' } },
+  parameters: shell({ pathname: '/dashboard/groceries' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/groceries');
   },
@@ -119,7 +111,7 @@ export const ActiveGroceries: Story = {
 
 /** A sub-route keeps its section active, as the Navigation artboard shows. */
 export const ActiveGroceriesDetail: Story = {
-  parameters: { shell: { pathname: '/dashboard/groceries/list-1' } },
+  parameters: shell({ pathname: '/dashboard/groceries/list-1' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/groceries');
   },
@@ -127,7 +119,7 @@ export const ActiveGroceriesDetail: Story = {
 
 /** Artboard AppSidebar, active = subscriptions. */
 export const ActiveSubscriptions: Story = {
-  parameters: { shell: { pathname: '/dashboard/subscriptions' } },
+  parameters: shell({ pathname: '/dashboard/subscriptions' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/subscriptions');
   },
@@ -135,7 +127,7 @@ export const ActiveSubscriptions: Story = {
 
 /** Artboard AppSidebar, active = addresses. */
 export const ActiveAddresses: Story = {
-  parameters: { shell: { pathname: '/dashboard/addresses' } },
+  parameters: shell({ pathname: '/dashboard/addresses' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/addresses');
   },
@@ -143,7 +135,7 @@ export const ActiveAddresses: Story = {
 
 /** Artboard AppSidebar, active = mobile. */
 export const ActiveMobileNumbers: Story = {
-  parameters: { shell: { pathname: '/dashboard/mobile-numbers' } },
+  parameters: shell({ pathname: '/dashboard/mobile-numbers' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/mobile-numbers');
   },
@@ -151,7 +143,7 @@ export const ActiveMobileNumbers: Story = {
 
 /** Artboard AppSidebar, active = vault. */
 export const ActiveVault: Story = {
-  parameters: { shell: { pathname: '/dashboard/vault' } },
+  parameters: shell({ pathname: '/dashboard/vault' }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/vault');
   },
@@ -162,7 +154,7 @@ export const ActiveVault: Story = {
  * carries aria-current.
  */
 export const NoActiveItem: Story = {
-  parameters: { shell: { pathname: '/dashboard/account' } },
+  parameters: shell({ pathname: '/dashboard/account' }),
   play: async ({ canvasElement }) => {
     const nav = within(canvasElement).getByRole('navigation', {
       name: 'Sections',
@@ -176,9 +168,10 @@ export const NoActiveItem: Story = {
  * tooltip. The groceries tile is the current page.
  */
 export const CollapsedRail: Story = {
-  parameters: {
-    shell: { pathname: '/dashboard/groceries', sidebarOpen: false },
-  },
+  parameters: shell({
+    pathname: '/dashboard/groceries',
+    sidebarOpen: false,
+  }),
   play: async ({ canvasElement }) => {
     expectActiveLink(canvasElement, '/dashboard/groceries');
     const nav = within(canvasElement).getByRole('navigation', {

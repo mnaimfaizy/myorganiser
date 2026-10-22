@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { expect, userEvent, waitFor, within } from '@storybook/test';
 
 import { DashboardHeader } from './DashboardHeader';
-import {
-  DESKTOP_PARAMETERS,
-  withShell,
-  type ShellParameters,
-} from './shell-story-fixtures';
+import { DESKTOP_PARAMETERS, shell, withShell } from './shell-story-fixtures';
 
 /** The header as the dashboard layout mounts it, at desktop width. */
 function HeaderInShell() {
@@ -31,10 +27,6 @@ const meta: Meta<typeof HeaderInShell> = {
 
 export default meta;
 type Story = StoryObj<typeof HeaderInShell>;
-
-function shell(overrides: ShellParameters): { shell: ShellParameters } {
-  return { shell: overrides };
-}
 
 /** Opens the account menu. Radix opens on pointer down, so this clicks. */
 async function openAccountMenu(

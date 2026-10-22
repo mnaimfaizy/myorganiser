@@ -4,6 +4,7 @@ import { expect, within } from '@storybook/test';
 import {
   PHONE_PARAMETERS,
   PHONE_FRAME_CLASS_NAME,
+  shell,
   withShell,
 } from '../shell-story-fixtures';
 import { PhoneTabBar } from './PhoneTabBar';
@@ -43,7 +44,7 @@ function expectCurrentTab(canvasElement: HTMLElement, label: string): void {
 
 /** Artboard TabBar, active = home. */
 export const HomeTab: Story = {
-  parameters: { shell: { pathname: '/dashboard' } },
+  parameters: shell({ pathname: '/dashboard' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'Home');
   },
@@ -51,7 +52,7 @@ export const HomeTab: Story = {
 
 /** Artboard TabBar, active = tasks. */
 export const TasksTab: Story = {
-  parameters: { shell: { pathname: '/dashboard/tasks' } },
+  parameters: shell({ pathname: '/dashboard/tasks' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'Tasks');
   },
@@ -59,7 +60,7 @@ export const TasksTab: Story = {
 
 /** Artboard TabBar, active = groceries. */
 export const GroceriesTab: Story = {
-  parameters: { shell: { pathname: '/dashboard/groceries' } },
+  parameters: shell({ pathname: '/dashboard/groceries' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'Groceries');
   },
@@ -67,7 +68,7 @@ export const GroceriesTab: Story = {
 
 /** Artboard TabBar, active = vault. */
 export const VaultTab: Story = {
-  parameters: { shell: { pathname: '/dashboard/vault' } },
+  parameters: shell({ pathname: '/dashboard/vault' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'Vault');
   },
@@ -75,7 +76,7 @@ export const VaultTab: Story = {
 
 /** Artboard TabBar, active = more. Sections off the bar also mark More. */
 export const MoreTab: Story = {
-  parameters: { shell: { pathname: '/dashboard/more' } },
+  parameters: shell({ pathname: '/dashboard/more' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'More');
   },
@@ -86,7 +87,7 @@ export const MoreTab: Story = {
  * bar stays, and More stays current because Account belongs to More.
  */
 export const AccountKeepsTabBar: Story = {
-  parameters: { shell: { pathname: '/dashboard/account' } },
+  parameters: shell({ pathname: '/dashboard/account' }),
   play: async ({ canvasElement }) => {
     expectCurrentTab(canvasElement, 'More');
   },

@@ -4,6 +4,7 @@ import { expect, waitFor, within } from '@storybook/test';
 import {
   PHONE_PARAMETERS,
   PHONE_FRAME_CLASS_NAME,
+  shell,
   withShell,
 } from '../shell-story-fixtures';
 import { PhoneAppBar } from './PhoneAppBar';
@@ -33,7 +34,7 @@ type Story = StoryObj<typeof AppBarInFrame>;
 
 /** Artboard PhoneNav, TAB ROOT · LARGE TITLE: lock control while unlocked. */
 export const TabRootUnlocked: Story = {
-  parameters: { shell: { pathname: '/dashboard/groceries' } },
+  parameters: shell({ pathname: '/dashboard/groceries' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(canvas.getByText('Groceries', { selector: 'p' })).toBeVisible();
@@ -46,7 +47,7 @@ export const TabRootUnlocked: Story = {
 
 /** Tab root while locked: the title shows, and no lock control. */
 export const TabRootLocked: Story = {
-  parameters: { shell: { pathname: '/dashboard/tasks', vault: 'locked' } },
+  parameters: shell({ pathname: '/dashboard/tasks', vault: 'locked' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(canvas.getByText('Tasks', { selector: 'p' })).toBeVisible();
@@ -60,7 +61,7 @@ export const TabRootLocked: Story = {
  * control goes away at the same moment, so there is exactly one.
  */
 export const TabRootScrolledPast: Story = {
-  parameters: { shell: { pathname: '/dashboard/tasks' } },
+  parameters: shell({ pathname: '/dashboard/tasks' }),
   render: function Render() {
     return (
       <div className={PHONE_FRAME_CLASS_NAME}>
@@ -87,7 +88,7 @@ export const TabRootScrolledPast: Story = {
 
 /** PhoneNav, PUSHED SCREEN: back link with the parent's label, then a title. */
 export const PushedWithBack: Story = {
-  parameters: { shell: { pathname: '/dashboard/addresses' } },
+  parameters: shell({ pathname: '/dashboard/addresses' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(canvas.getByRole('link', { name: 'Back to More' })).toHaveAttribute(
@@ -104,7 +105,7 @@ export const PushedWithBack: Story = {
  * own: the page supplies one, as the artboard's "Weekly shop" does.
  */
 export const PushedNestedScreen: Story = {
-  parameters: { shell: { pathname: '/dashboard/groceries/list-1' } },
+  parameters: shell({ pathname: '/dashboard/groceries/list-1' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(

@@ -4,6 +4,7 @@ import { expect, within } from '@storybook/test';
 import {
   PHONE_PARAMETERS,
   PHONE_FRAME_CLASS_NAME,
+  shell,
   withShell,
 } from '../shell-story-fixtures';
 import { PhoneTabBar } from './PhoneTabBar';
@@ -42,7 +43,7 @@ type Story = StoryObj<typeof MoreInFrame>;
  * "Updated" badge is not asserted either: it needs the reports call to succeed.
  */
 export const MemberRoot: Story = {
-  parameters: { shell: { pathname: '/dashboard/more' } },
+  parameters: shell({ pathname: '/dashboard/more' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(
@@ -70,9 +71,7 @@ export const MemberRoot: Story = {
  * to /admin, a deliberate departure from the artboard (PRD #1241).
  */
 export const PlatformAdminRoot: Story = {
-  parameters: {
-    shell: { pathname: '/dashboard/more', role: 'platform_admin' },
-  },
+  parameters: shell({ pathname: '/dashboard/more', role: 'platform_admin' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(canvas.getByRole('link', { name: 'Admin portal' })).toHaveAttribute(

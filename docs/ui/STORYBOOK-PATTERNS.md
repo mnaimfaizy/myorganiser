@@ -40,7 +40,7 @@ export default meta;
 type Story = StoryObj<typeof Card>;
 ```
 
-`title` is `Components/<Name>` for UI Primitives — the sidebar grouping depends on it. Vault UI Components use `Vault/<Name>` (see `LastBackupCard`). `tags: ['autodocs']` is standard for every story file here.
+`title` is `Components/<Name>` for UI Primitives — the sidebar grouping depends on it. Vault UI Components use `Vault/<Name>` (see `LastBackupCard`). The dashboard shell's page-library stories (§1) use `Dashboard/Shell/<Name>`, so the chrome sits together. `tags: ['autodocs']` is standard for every story file here.
 
 ## 3. Pattern A — single component with CVA variants
 

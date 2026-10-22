@@ -10,9 +10,12 @@
  * `computeVaultSyncStatus` makes, each with a healthy answer, so the header
  * and sidebar show their synced reading. Nothing here is a Vault: no
  * ciphertext, no key material beyond a zeroed placeholder.
+ *
+ * MoreScreen's reports call and the YouTube availability check (sidebar and
+ * More) still go out, unauthenticated. They always resolve to "no badge" and
+ * "YouTube hidden", so the stories are deterministic, not live-data dependent.
  */
 import type { Decorator } from '@storybook/react';
-import { VaultBlobType } from '@myorganiser/app-api-client';
 import {
   AppRouterContext,
   type AppRouterInstance,
@@ -22,6 +25,7 @@ import type {
   VaultHandle,
   VaultPullTrigger,
   VaultSyncQueue,
+  VaultSyncQueueStatus,
 } from '@myorganiser/web-vault';
 import { SidebarProvider } from '@myorganiser/web-ui';
 import {
@@ -105,6 +109,10 @@ function writeCurrentUser(
   name: string,
   email: string,
 ): void {
+  // First name is the text before the first space; the rest is the last name.
+  const space = name.indexOf(' ');
+  const firstName = space === -1 ? name : name.slice(0, space);
+  const lastName = space === -1 ? '' : name.slice(space + 1);
   // Written on every render of a shell story, so one story's user never
   // leaks into the next.
   window.localStorage.setItem(
@@ -113,8 +121,8 @@ function writeCurrentUser(
       id: 'user-sam-miller',
       name,
       email,
-      firstName: 'Sam',
-      lastName: 'Miller',
+      firstName,
+      lastName,
       role,
       disabled: false,
     }),
@@ -137,6 +145,13 @@ const NOOP_ROUTER: AppRouterInstance = {
 };
 
 /**
+ * The blob type a queue reports, taken from the queue's own status type so
+ * the fakes need no import from the API client (STORYBOOK-PATTERNS §10).
+ */
+type QueueBlobType = VaultSyncQueueStatus['unsentTypes'][number];
+const TASKS_BLOB_TYPE: QueueBlobType = 'tasks';
+
+/**
  * Sync fakes that give one reading. Each field answers a read that
  * `computeVaultSyncStatus` makes; the rule that wins is the kind shown:
  *   - session-ended: queue.sessionEnded (outranks everything)
@@ -155,10 +170,10 @@ function createSyncFakes(
     observedVaultIdentity: () => undefined,
   } as unknown as VaultHandle;
   const queueStatus = {
-    unsentTypes: unsent ? [VaultBlobType.Tasks] : [],
+    unsentTypes: unsent ? [TASKS_BLOB_TYPE] : [],
     sessionEnded: reading === 'session-ended',
     terminalFailures:
-      reading === 'failed' ? [{ type: VaultBlobType.Tasks, status: 422 }] : [],
+      reading === 'failed' ? [{ type: TASKS_BLOB_TYPE, status: 422 }] : [],
     retryScheduled: reading === 'retrying',
   };
   const syncQueue = {
@@ -248,18 +263,26 @@ export function ShellStoryFixtures({
 }
 
 /**
+ * The `parameters` value for a shell story: `parameters: shell({ pathname })`.
+ * Every shell story uses it, so the settings are always under `shell`.
+ */
+export function shell(settings: ShellParameters): { shell: ShellParameters } {
+  return { shell: settings };
+}
+
+/**
  * Wraps a shell story in `ShellStoryFixtures`. Reads its settings from
  * `parameters.shell`, which every story sets.
  */
 export const withShell: Decorator = (Story, context) => {
-  const shell = context.parameters.shell as ShellParameters | undefined;
-  if (!shell) {
+  const settings = context.parameters.shell as ShellParameters | undefined;
+  if (!settings) {
     throw new Error(
       'withShell: a shell story must set parameters.shell (pathname at least).',
     );
   }
   return (
-    <ShellStoryFixtures shell={shell}>
+    <ShellStoryFixtures shell={settings}>
       <Story />
     </ShellStoryFixtures>
   );
