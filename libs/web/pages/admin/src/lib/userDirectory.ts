@@ -121,7 +121,7 @@ export const USER_SORT_VALUES = Object.keys(
 ) as AdminUserSort[];
 
 export function isAdminUserSort(value: string): value is AdminUserSort {
-  return value in USER_SORT_LABELS;
+  return Object.prototype.hasOwnProperty.call(USER_SORT_LABELS, value);
 }
 
 /**
