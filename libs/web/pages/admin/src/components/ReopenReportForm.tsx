@@ -87,6 +87,7 @@ export function ReopenReportForm({
               <FormLabel>Status note</FormLabel>
               <FormControl>
                 <Textarea
+                  rows={3}
                   placeholder="Explain why this report is being reopened..."
                   {...field}
                 />
@@ -99,9 +100,14 @@ export function ReopenReportForm({
           )}
         />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body-sm text-destructive">{error}</p>}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full border-destructive text-destructive-text hover:bg-destructive-faint md:w-auto"
+          disabled={form.formState.isSubmitting}
+        >
           {form.formState.isSubmitting ? 'Processing…' : 'Reopen report'}
         </Button>
       </form>

@@ -1,6 +1,7 @@
 'use client';
 
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
+import { NewTabLink } from '@myorganiser/web-ui';
 import { useCallback } from 'react';
 
 import { useReportScoped } from '../hooks/use-report-scoped';
@@ -8,11 +9,14 @@ import {
   deliveredStatusForKind,
   formatFeedbackReportStatus,
   isFinalStatus,
+  trackingIssueUrl,
 } from '../lib/formatFeedbackReport';
 import { ChangeStatusForm } from './ChangeStatusForm';
 import { MarkDeliveredForm } from './MarkDeliveredForm';
 import { ReopenReportForm } from './ReopenReportForm';
 import { TrackingIssueForm } from './TrackingIssueForm';
+import { TriagePanel } from './feedback/report/TriagePanel';
+import { TriageSection } from './feedback/report/TriageSection';
 
 interface FeedbackReportTriageActionsProps {
   report: AdminFeedbackReportDetailDto;
@@ -41,52 +45,61 @@ export function FeedbackReportTriageActions({
     const releaseClause = report.releaseTag ? ` in ${report.releaseTag}` : '';
 
     return (
-      <section className="max-w-2xl space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">Triage</h2>
-        <p className="text-sm text-muted-foreground">
-          This report is {statusLabel}
-          {releaseClause}. It stays final unless you reopen it.
-        </p>
+      <TriagePanel>
+        <TriageSection>
+          <p className="rounded-xl border border-trust-edge bg-trust-faint px-3.5 py-3 text-body-sm text-trust-text">
+            This report is {statusLabel}
+            {releaseClause}. It stays final unless you reopen it.
+          </p>
+          {report.trackingIssueNumber ? (
+            <p className="text-body-sm">
+              <span className="font-semibold">Tracking Issue:</span>{' '}
+              <NewTabLink
+                href={trackingIssueUrl(report.trackingIssueNumber)}
+                className="font-semibold text-brand-text hover:underline"
+              >
+                #{report.trackingIssueNumber}
+              </NewTabLink>
+            </p>
+          ) : null}
+        </TriageSection>
 
-        <div className="space-y-4">
-          <h3 className="text-base font-semibold tracking-tight">Reopen</h3>
-          <p className="text-sm text-muted-foreground">
+        <TriageSection title="Reopen">
+          <p className="text-body-sm text-muted-foreground">
             Reopen a report that was marked by mistake. It goes back to Under
             review and its Release is cleared.
           </p>
           <ReopenReportForm report={report} onReopened={handleReopened} />
-        </div>
-      </section>
+        </TriageSection>
+      </TriagePanel>
     );
   }
 
   return (
-    <section className="max-w-2xl space-y-8">
+    <TriagePanel>
       {reopened && (
-        <p className="text-sm text-muted-foreground">
-          Report reopened. It is back in Under review.
-        </p>
+        <TriageSection>
+          <p className="text-body-sm text-muted-foreground">
+            Report reopened. It is back in Under review.
+          </p>
+        </TriageSection>
       )}
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">Change status</h2>
+      <TriageSection title="Change status">
         <ChangeStatusForm report={report} onUpdated={onUpdated} />
-      </div>
+      </TriageSection>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">Tracking issue</h2>
+      <TriageSection title="Tracking issue">
         <TrackingIssueForm report={report} onUpdated={onUpdated} />
-      </div>
+      </TriageSection>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Mark{' '}
-          {formatFeedbackReportStatus(
-            deliveredStatusForKind(report.kind),
-          ).toLowerCase()}
-        </h2>
+      <TriageSection
+        title={`Mark ${formatFeedbackReportStatus(
+          deliveredStatusForKind(report.kind),
+        ).toLowerCase()}`}
+      >
         <MarkDeliveredForm report={report} onUpdated={onUpdated} />
-      </div>
-    </section>
+      </TriageSection>
+    </TriagePanel>
   );
 }

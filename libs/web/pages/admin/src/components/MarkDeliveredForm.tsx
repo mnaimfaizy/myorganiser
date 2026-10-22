@@ -110,9 +110,13 @@ export function MarkDeliveredForm({
           )}
         />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body-sm text-destructive">{error}</p>}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button
+          type="submit"
+          className="w-full bg-trust text-trust-foreground hover:bg-trust/90 active:bg-trust-text md:w-auto"
+          disabled={form.formState.isSubmitting}
+        >
           {form.formState.isSubmitting ? 'Processing…' : buttonLabel}
         </Button>
       </form>

@@ -13,7 +13,13 @@ import {
   FEEDBACK_REPORT_TEXT_MAX_LENGTH,
   formatFeedbackReportCap,
 } from '@myorganiser/core';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { useState } from 'react';
 
@@ -188,6 +194,98 @@ describe('FeedbackReportTriageActions', () => {
         screen.getByText(
           'This report is shipped. It stays final unless you reopen it.',
         ),
+      ).toBeInTheDocument();
+    });
+
+    it('shows the tracking issue as a new-tab link in the final note when one is linked', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{
+            ...bugReportFixture,
+            status: 'fixed' as const,
+            releaseTag: 'v1.4.0',
+            trackingIssueNumber: 42,
+          }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(screen.getByText('Tracking Issue:')).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: /^#42\b/ });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://github.com/mnaimfaizy/myorganiser/issues/42',
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+    });
+
+    it('omits the tracking issue line from the final note when no issue is linked', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{
+            ...bugReportFixture,
+            status: 'fixed' as const,
+            releaseTag: 'v1.4.0',
+            trackingIssueNumber: null,
+          }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      expect(screen.queryByText('Tracking Issue:')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: /^#\d+/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('triage region', () => {
+    it('names the open-report aside Triage and sets each action heading at level 3', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={bugReportFixture}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      const triage = screen.getByRole('complementary', { name: 'Triage' });
+      expect(
+        within(triage).getByRole('heading', {
+          level: 3,
+          name: 'Change status',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(triage).getByRole('heading', {
+          level: 3,
+          name: 'Tracking issue',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(triage).getByRole('heading', { level: 3, name: 'Mark fixed' }),
+      ).toBeInTheDocument();
+    });
+
+    it('names the final-report aside Triage and keeps the note and Reopen heading inside it', () => {
+      render(
+        <FeedbackReportTriageActions
+          report={{
+            ...bugReportFixture,
+            status: 'fixed' as const,
+            releaseTag: 'v1.4.0',
+          }}
+          onUpdated={mockOnUpdated}
+        />,
+      );
+
+      const triage = screen.getByRole('complementary', { name: 'Triage' });
+      expect(
+        within(triage).getByText(
+          'This report is fixed in v1.4.0. It stays final unless you reopen it.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(triage).getByRole('heading', { level: 3, name: 'Reopen' }),
       ).toBeInTheDocument();
     });
   });
@@ -983,7 +1081,7 @@ describe('FeedbackReportTriageActions', () => {
         ),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('heading', { name: 'Reopen' }),
+        screen.getByRole('heading', { level: 3, name: 'Reopen' }),
       ).toBeInTheDocument();
       expect(screen.getByText('Status note')).toBeInTheDocument();
       expect(
