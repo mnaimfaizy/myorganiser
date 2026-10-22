@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   useSidebar,
   useToast,
+  initialsOf,
 } from '@myorganiser/web-ui';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -27,18 +28,6 @@ export interface AdminAccountMenuProps {
   variant: 'header' | 'phone';
 }
 
-/** Initials from the name; with no name the email's first letter stands in. */
-function initialsOf(name: string, email: string): string {
-  const fromName = name
-    .split(' ')
-    .filter((part) => part.length > 0)
-    .map((part) => part.charAt(0))
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-  return fromName || email.charAt(0).toUpperCase();
-}
-
 /**
  * The admin account menu. Its only item is Log out, which keeps the admin
  * shell's own logic: the admin page lib cannot import the dashboard's
@@ -48,7 +37,8 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
   const currentUser = getCurrentUser();
   const name = currentUser?.name ?? '';
   const email = currentUser?.email ?? '';
-  const initials = initialsOf(name, email);
+  // With no name the email's first letter stands in.
+  const initials = initialsOf(name) || email.charAt(0).toUpperCase();
 
   const router = useRouter();
   const { toast } = useToast();

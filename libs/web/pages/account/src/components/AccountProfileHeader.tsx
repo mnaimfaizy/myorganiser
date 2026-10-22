@@ -1,4 +1,5 @@
-import { initialsOf, type AccountVariant } from '../account-view';
+import { initialsOf } from '@myorganiser/web-ui';
+import type { AccountVariant } from '../account-view';
 
 interface AccountProfileHeaderProps {
   variant: AccountVariant;

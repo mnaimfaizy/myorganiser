@@ -13,20 +13,6 @@ export const PHONE_ROW_SELECT_TRIGGER_CLASS =
   'h-auto w-auto shrink-0 border-transparent bg-transparent px-0 text-body text-muted-foreground [&>span]:overflow-visible [&>span]:whitespace-normal';
 
 /**
- * The first letter of up to two words in a name, upper-cased, for an avatar.
- * Copy of the dashboard helper: a page may not import from another page.
- */
-export function initialsOf(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-/**
  * The one-line summary of the latest export. `null` while loading, so the
  * caller can draw a placeholder instead of text.
  */

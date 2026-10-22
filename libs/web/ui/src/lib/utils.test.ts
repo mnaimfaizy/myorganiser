@@ -1,6 +1,7 @@
 import * as path from 'path';
 import {
   cn,
+  initialsOf,
   RADIUS_STEPS,
   SHADOW_STEPS,
   SPACING_STEPS,
@@ -73,5 +74,32 @@ describe('shared theme sync', () => {
 
   it('matches the spacing keys of the shared Tailwind theme', () => {
     expect([...SPACING_STEPS]).toEqual(Object.keys(theme.spacing));
+  });
+});
+
+describe('initialsOf', () => {
+  it('returns two upper-case initials for a two-word name', () => {
+    expect(initialsOf('Ada Lovelace')).toBe('AL');
+  });
+
+  it('keeps only the first two initials of a longer name', () => {
+    expect(initialsOf('Mary Anne Jane Smith')).toBe('MA');
+  });
+
+  it('returns one letter for a single-word name', () => {
+    expect(initialsOf('Cher')).toBe('C');
+  });
+
+  it('upper-cases lower-case input', () => {
+    expect(initialsOf('ada lovelace')).toBe('AL');
+  });
+
+  it('ignores repeated and leading spaces', () => {
+    expect(initialsOf('  Ada   Lovelace')).toBe('AL');
+  });
+
+  it('returns an empty string for an empty or blank name', () => {
+    expect(initialsOf('')).toBe('');
+    expect(initialsOf('   ')).toBe('');
   });
 });

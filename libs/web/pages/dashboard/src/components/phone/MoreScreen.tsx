@@ -5,13 +5,16 @@ import { User } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
-import { Illustration, type IllustrationKind } from '@myorganiser/web-ui';
+import {
+  Illustration,
+  type IllustrationKind,
+  initialsOf,
+} from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../../lib/apiClient';
 import { openFeedbackDialog } from '../../hooks/use-feedback-dialog';
 import { useLogOut } from '../../hooks/use-log-out';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
-import { initialsOf } from '../../utils';
 
 interface MoreLink {
   id: string;

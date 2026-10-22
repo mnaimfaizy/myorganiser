@@ -15,6 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  initialsOf,
 } from '@myorganiser/web-ui';
 import {
   useOptionalVaultSession,
@@ -22,7 +23,6 @@ import {
 } from '@myorganiser/web-vault-ui';
 import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { useLogOut } from '../hooks/use-log-out';
-import { initialsOf } from '../utils';
 
 const MENU_ITEM_CLASS = 'min-h-10 rounded-item px-2.5 text-body-sm';
 

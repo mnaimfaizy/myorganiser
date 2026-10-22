@@ -2,7 +2,7 @@ import type {
   LatestBackupRecord,
   LatestBackupState,
 } from './hooks/useLatestBackup';
-import { backupSummaryLine, initialsOf } from './account-view';
+import { backupSummaryLine } from './account-view';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 
@@ -18,33 +18,6 @@ function loadedState(createdAt: string, source = 'manual'): LatestBackupState {
   };
   return { status: 'loaded', record };
 }
-
-describe('initialsOf', () => {
-  it('returns two upper-case initials for a two-word name', () => {
-    expect(initialsOf('Ada Lovelace')).toBe('AL');
-  });
-
-  it('keeps only the first two initials of a longer name', () => {
-    expect(initialsOf('Mary Anne Jane Smith')).toBe('MA');
-  });
-
-  it('returns one letter for a single-word name', () => {
-    expect(initialsOf('Cher')).toBe('C');
-  });
-
-  it('upper-cases lower-case input', () => {
-    expect(initialsOf('ada lovelace')).toBe('AL');
-  });
-
-  it('ignores repeated and leading spaces', () => {
-    expect(initialsOf('  Ada   Lovelace')).toBe('AL');
-  });
-
-  it('returns an empty string for an empty or blank name', () => {
-    expect(initialsOf('')).toBe('');
-    expect(initialsOf('   ')).toBe('');
-  });
-});
 
 describe('backupSummaryLine', () => {
   it('returns null while the latest backup is loading', () => {
