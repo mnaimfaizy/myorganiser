@@ -100,15 +100,40 @@ export type AdminAuditAction =
   | 'feedback_manual_delivery'
   | 'feedback_reopen';
 
-/** Platform Admin Audit Log entry returned by list APIs. */
+/**
+ * Platform Admin Audit Log entry returned by list APIs. Every action targets a
+ * User (admin actions the acted-on User, feedback actions the reporter) and the
+ * actor is always set at write time, so a null id only arises from User
+ * Deletion's `onDelete: SetNull`. That is what `actorDeleted` and
+ * `targetDeleted` report; the matching name is null once the User is gone.
+ */
 export interface AdminAuditLogEntry {
   id: string;
   /** Null once the acting User has been removed by User Deletion. */
   actorUserId: string | null;
   /** Null once the affected User has been removed by User Deletion. */
   targetUserId: string | null;
+  /** Display name of the acting User, or null once they are deleted. */
+  actorName: string | null;
+  /** Display name of the affected User, or null once they are deleted. */
+  targetName: string | null;
+  /** True when `actorUserId` is null (User Deletion removed the actor). */
+  actorDeleted: boolean;
+  /** True when `targetUserId` is null (User Deletion removed the target). */
+  targetDeleted: boolean;
   action: AdminAuditAction;
   createdAt: Date;
+}
+
+/** One page of the Platform Admin Audit Log. */
+export interface AdminAuditLogListResponse {
+  entries: AdminAuditLogEntry[];
+  /** Count matching the userId + action filters, ignoring paging. */
+  total: number;
+  /** Echoed effective 1-based page. */
+  page: number;
+  /** Echoed effective page size. */
+  pageSize: number;
 }
 
 /** Why `DELETE /users/me` refused a User Deletion (403 or 409). */

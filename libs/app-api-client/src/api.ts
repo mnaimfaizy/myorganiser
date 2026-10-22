@@ -84,7 +84,7 @@ export type AdminAuditAction = typeof AdminAuditAction[keyof typeof AdminAuditAc
 
 
 /**
- * Platform Admin Audit Log entry returned by list APIs.
+ * Platform Admin Audit Log entry returned by list APIs. Every action targets a User (admin actions the acted-on User, feedback actions the reporter) and the actor is always set at write time, so a null id only arises from User Deletion\'s `onDelete: SetNull`. That is what `actorDeleted` and `targetDeleted` report; the matching name is null once the User is gone.
  */
 export interface AdminAuditLogEntry {
     'id': string;
@@ -96,11 +96,45 @@ export interface AdminAuditLogEntry {
      * Null once the affected User has been removed by User Deletion.
      */
     'targetUserId': string | null;
+    /**
+     * Display name of the acting User, or null once they are deleted.
+     */
+    'actorName': string | null;
+    /**
+     * Display name of the affected User, or null once they are deleted.
+     */
+    'targetName': string | null;
+    /**
+     * True when `actorUserId` is null (User Deletion removed the actor).
+     */
+    'actorDeleted': boolean;
+    /**
+     * True when `targetUserId` is null (User Deletion removed the target).
+     */
+    'targetDeleted': boolean;
     'action': AdminAuditAction;
     'createdAt': string;
 }
 
 
+/**
+ * One page of the Platform Admin Audit Log.
+ */
+export interface AdminAuditLogListResponse {
+    'entries': Array<AdminAuditLogEntry>;
+    /**
+     * Count matching the userId + action filters, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
 /**
  * Admin Feedback Report Context details.
  */
@@ -2828,12 +2862,15 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
-         * @param {number} [limit] 
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
+         * @param {string} [userId] Entries where this User is the actor OR the target.
+         * @param {Array<AdminAuditAction>} [action] Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Entries per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listAuditLogs: async (limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listAuditLogs: async (userId?: string, action?: Array<AdminAuditAction>, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/audit-logs`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2850,8 +2887,20 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
-            if (limit !== undefined) {
-                localVarQueryParameter['limit'] = limit;
+            if (userId !== undefined) {
+                localVarQueryParameter['userId'] = userId;
+            }
+
+            if (action) {
+                localVarQueryParameter['action'] = action;
+            }
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -3360,13 +3409,16 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
-         * @param {number} [limit] 
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
+         * @param {string} [userId] Entries where this User is the actor OR the target.
+         * @param {Array<AdminAuditAction>} [action] Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Entries per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listAuditLogs(limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AdminAuditLogEntry>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listAuditLogs(limit, options);
+        async listAuditLogs(userId?: string, action?: Array<AdminAuditAction>, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminAuditLogListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listAuditLogs(userId, action, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listAuditLogs']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -3585,13 +3637,13 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.linkFeedbackReportTrackingIssue(requestParameters.reportId, requestParameters.linkFeedbackReportTrackingIssueRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
          * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<Array<AdminAuditLogEntry>> {
-            return localVarFp.listAuditLogs(requestParameters.limit, options).then((request) => request(axios, basePath));
+        listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminAuditLogListResponse> {
+            return localVarFp.listAuditLogs(requestParameters.userId, requestParameters.action, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
          * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
@@ -3739,7 +3791,25 @@ export interface PlatformAdminApiLinkFeedbackReportTrackingIssueRequest {
  * Request parameters for listAuditLogs operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListAuditLogsRequest {
-    readonly limit?: number
+    /**
+     * Entries where this User is the actor OR the target.
+     */
+    readonly userId?: string
+
+    /**
+     * Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+     */
+    readonly action?: Array<AdminAuditAction>
+
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Entries per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
@@ -3951,13 +4021,13 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
-     * List recent Admin Audit Log entries (newest first). Platform Admin only.
+     * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
      * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listAuditLogs(requestParameters.limit, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listAuditLogs(requestParameters.userId, requestParameters.action, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

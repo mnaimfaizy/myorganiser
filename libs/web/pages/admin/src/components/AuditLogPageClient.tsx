@@ -25,8 +25,8 @@ export function AuditLogPageClient() {
 
     try {
       const api = createPlatformAdminApi();
-      const response = await api.listAuditLogs({ limit: 50 });
-      setEntries(response.data);
+      const response = await api.listAuditLogs({ pageSize: 50 });
+      setEntries(response.data.entries);
     } catch {
       setError('Unable to load audit log. Please try again.');
       setEntries([]);

@@ -5,7 +5,10 @@ jest.mock('../lib/apiClient', () => ({
   createPlatformAdminApi: jest.fn(),
 }));
 
-import type { AdminAuditLogEntry } from '@myorganiser/app-api-client';
+import type {
+  AdminAuditLogEntry,
+  AdminAuditLogListResponse,
+} from '@myorganiser/app-api-client';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
@@ -16,12 +19,29 @@ import { AuditLogPageClient } from './AuditLogPageClient';
 
 const mockListAuditLogs = jest.fn();
 
+function auditPage(entries: AdminAuditLogEntry[]): {
+  data: AdminAuditLogListResponse;
+} {
+  return {
+    data: {
+      entries,
+      total: entries.length,
+      page: 1,
+      pageSize: 50,
+    },
+  };
+}
+
 const sampleEntries: AdminAuditLogEntry[] = [
   {
     id: 'audit-1',
     action: 'disable',
     actorUserId: 'actor-1',
     targetUserId: 'target-1',
+    actorName: 'Actor 1',
+    targetName: 'Target 1',
+    actorDeleted: false,
+    targetDeleted: false,
     createdAt: '2026-07-16T12:00:00.000Z',
   },
   {
@@ -29,6 +49,10 @@ const sampleEntries: AdminAuditLogEntry[] = [
     action: 'force_logout',
     actorUserId: 'actor-2',
     targetUserId: 'target-2',
+    actorName: 'Actor 2',
+    targetName: 'Target 2',
+    actorDeleted: false,
+    targetDeleted: false,
     createdAt: '2026-07-15T08:30:00.000Z',
   },
   {
@@ -36,6 +60,10 @@ const sampleEntries: AdminAuditLogEntry[] = [
     action: 'resend_verification',
     actorUserId: 'actor-3',
     targetUserId: 'target-3',
+    actorName: 'Actor 3',
+    targetName: 'Target 3',
+    actorDeleted: false,
+    targetDeleted: false,
     createdAt: '2026-07-14T16:45:00.000Z',
   },
 ];
@@ -46,12 +74,12 @@ describe('AuditLogPageClient', () => {
     (createPlatformAdminApi as jest.Mock).mockReturnValue({
       listAuditLogs: mockListAuditLogs,
     });
-    mockListAuditLogs.mockResolvedValue({ data: sampleEntries });
+    mockListAuditLogs.mockResolvedValue(auditPage(sampleEntries));
   });
 
-  it('shows loading state on mount and calls listAuditLogs with limit 50', async () => {
-    let resolveLoad!: (value: { data: AdminAuditLogEntry[] }) => void;
-    const pendingLoad = new Promise<{ data: AdminAuditLogEntry[] }>(
+  it('shows loading state on mount and calls listAuditLogs with pageSize 50', async () => {
+    let resolveLoad!: (value: { data: AdminAuditLogListResponse }) => void;
+    const pendingLoad = new Promise<{ data: AdminAuditLogListResponse }>(
       (resolve) => {
         resolveLoad = resolve;
       },
@@ -65,10 +93,10 @@ describe('AuditLogPageClient', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
 
-    resolveLoad({ data: sampleEntries });
+    resolveLoad(auditPage(sampleEntries));
 
     await waitFor(() => {
-      expect(mockListAuditLogs).toHaveBeenCalledWith({ limit: 50 });
+      expect(mockListAuditLogs).toHaveBeenCalledWith({ pageSize: 50 });
     });
 
     await waitFor(() => {
@@ -83,7 +111,7 @@ describe('AuditLogPageClient', () => {
       expect(screen.getByText('Disable')).toBeInTheDocument();
     });
 
-    expect(mockListAuditLogs).toHaveBeenCalledWith({ limit: 50 });
+    expect(mockListAuditLogs).toHaveBeenCalledWith({ pageSize: 50 });
     expect(screen.getByText('Time')).toBeInTheDocument();
     expect(screen.getByText('Action')).toBeInTheDocument();
     expect(screen.getByText('Actor')).toBeInTheDocument();
@@ -100,13 +128,17 @@ describe('AuditLogPageClient', () => {
   });
 
   it('renders the YouTube access grant and withdraw actions with their labels', async () => {
-    mockListAuditLogs.mockResolvedValue({
-      data: [
+    mockListAuditLogs.mockResolvedValue(
+      auditPage([
         {
           id: 'audit-yt-grant',
           action: 'youtube_access_grant',
           actorUserId: 'actor-yt',
           targetUserId: 'target-yt',
+          actorName: 'Actor',
+          targetName: 'Target',
+          actorDeleted: false,
+          targetDeleted: false,
           createdAt: '2026-10-14T09:00:00.000Z',
         },
         {
@@ -114,10 +146,14 @@ describe('AuditLogPageClient', () => {
           action: 'youtube_access_withdraw',
           actorUserId: 'actor-yt',
           targetUserId: 'target-yt',
+          actorName: 'Actor',
+          targetName: 'Target',
+          actorDeleted: false,
+          targetDeleted: false,
           createdAt: '2026-10-14T10:00:00.000Z',
         },
-      ],
-    });
+      ]),
+    );
 
     render(<AuditLogPageClient />);
 
@@ -134,17 +170,21 @@ describe('AuditLogPageClient', () => {
 
   it('formats timestamps with the same Intl options as formatAuditTimestamp', async () => {
     const timestamp = '2026-07-16T12:00:00.000Z';
-    mockListAuditLogs.mockResolvedValue({
-      data: [
+    mockListAuditLogs.mockResolvedValue(
+      auditPage([
         {
           id: 'audit-ts',
           action: 'enable',
           actorUserId: 'actor-ts',
           targetUserId: 'target-ts',
+          actorName: 'Actor',
+          targetName: 'Target',
+          actorDeleted: false,
+          targetDeleted: false,
           createdAt: timestamp,
         },
-      ],
-    });
+      ]),
+    );
 
     render(<AuditLogPageClient />);
 
@@ -156,7 +196,7 @@ describe('AuditLogPageClient', () => {
   });
 
   it('shows empty state when the API returns no entries', async () => {
-    mockListAuditLogs.mockResolvedValue({ data: [] });
+    mockListAuditLogs.mockResolvedValue(auditPage([]));
 
     render(<AuditLogPageClient />);
 
@@ -164,7 +204,7 @@ describe('AuditLogPageClient', () => {
       expect(screen.getByText('No audit log entries yet.')).toBeInTheDocument();
     });
 
-    expect(mockListAuditLogs).toHaveBeenCalledWith({ limit: 50 });
+    expect(mockListAuditLogs).toHaveBeenCalledWith({ pageSize: 50 });
     expect(screen.queryByText('Time')).not.toBeInTheDocument();
   });
 
@@ -179,7 +219,7 @@ describe('AuditLogPageClient', () => {
       ).toBeInTheDocument();
     });
 
-    expect(mockListAuditLogs).toHaveBeenCalledWith({ limit: 50 });
+    expect(mockListAuditLogs).toHaveBeenCalledWith({ pageSize: 50 });
     expect(screen.queryByText('Time')).not.toBeInTheDocument();
     expect(screen.queryByText('Disable')).not.toBeInTheDocument();
   });
@@ -200,7 +240,7 @@ describe('AuditLogPageClient', () => {
       masterKey: 'mk-secret',
     } as AdminAuditLogEntry;
 
-    mockListAuditLogs.mockResolvedValue({ data: [bloatedEntry] });
+    mockListAuditLogs.mockResolvedValue(auditPage([bloatedEntry]));
 
     const { container } = render(<AuditLogPageClient />);
 

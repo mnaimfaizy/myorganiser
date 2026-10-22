@@ -1672,7 +1672,18 @@ components:
         - feedback_manual_delivery
         - feedback_reopen
     AdminAuditLogEntry:
-      description: Platform Admin Audit Log entry returned by list APIs.
+      description: >-
+        Platform Admin Audit Log entry returned by list APIs. Every action
+        targets a
+
+        User (admin actions the acted-on User, feedback actions the reporter)
+        and the
+
+        actor is always set at write time, so a null id only arises from User
+
+        Deletion's `onDelete: SetNull`. That is what `actorDeleted` and
+
+        `targetDeleted` report; the matching name is null once the User is gone.
       properties:
         id:
           type: string
@@ -1684,6 +1695,20 @@ components:
           type: string
           nullable: true
           description: Null once the affected User has been removed by User Deletion.
+        actorName:
+          type: string
+          nullable: true
+          description: Display name of the acting User, or null once they are deleted.
+        targetName:
+          type: string
+          nullable: true
+          description: Display name of the affected User, or null once they are deleted.
+        actorDeleted:
+          type: boolean
+          description: True when `actorUserId` is null (User Deletion removed the actor).
+        targetDeleted:
+          type: boolean
+          description: True when `targetUserId` is null (User Deletion removed the target).
         action:
           $ref: "#/components/schemas/AdminAuditAction"
         createdAt:
@@ -1693,8 +1718,38 @@ components:
         - id
         - actorUserId
         - targetUserId
+        - actorName
+        - targetName
+        - actorDeleted
+        - targetDeleted
         - action
         - createdAt
+      type: object
+      additionalProperties: false
+    AdminAuditLogListResponse:
+      description: One page of the Platform Admin Audit Log.
+      properties:
+        entries:
+          items:
+            $ref: "#/components/schemas/AdminAuditLogEntry"
+          type: array
+        total:
+          type: number
+          format: double
+          description: Count matching the userId + action filters, ignoring paging.
+        page:
+          type: number
+          format: double
+          description: Echoed effective 1-based page.
+        pageSize:
+          type: number
+          format: double
+          description: Echoed effective page size.
+      required:
+        - entries
+        - total
+        - page
+        - pageSize
       type: object
       additionalProperties: false
   securitySchemes:
@@ -4193,28 +4248,71 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/AdminAuditLogEntry"
-                type: array
+                $ref: "#/components/schemas/AdminAuditLogListResponse"
+        "422":
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateErrorJSON"
         "426":
           description: Below the Version Floor
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionFloorRefusal"
-      description: List recent Admin Audit Log entries (newest first). Platform Admin only.
+      description: >-
+        List Admin Audit Log entries (newest first), one page at a time.
+        Platform
+
+        Admin only. Each entry carries the actor and target display names; a
+
+        deleted User (User Deletion) has a null id,
+        `actorDeleted`/`targetDeleted`
+
+        true, and a null name. Every action targets a User, and the actor is
+        always
+
+        set at write time, so a null id only comes from User Deletion.
       tags:
         - Platform Admin
       security:
         - jwt:
             - platform_admin
       parameters:
-        - in: query
-          name: limit
+        - description: Entries where this User is the actor OR the target.
+          in: query
+          name: userId
           required: false
           schema:
-            format: double
-            type: number
+            type: string
+        - description: |-
+            Entries whose action is in this list. Repeat the parameter
+            for several actions (`?action=disable&action=enable`).
+          in: query
+          name: action
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/AdminAuditAction"
+        - description: 1-based page number. Defaults to 1.
+          in: query
+          name: page
+          required: false
+          schema:
+            format: int32
+            type: integer
+            minimum: 1
+        - description: Entries per page, 1 to 100. Defaults to 25.
+          in: query
+          name: pageSize
+          required: false
+          schema:
+            format: int32
+            type: integer
+            minimum: 1
+            maximum: 100
 servers:
   - url: http://localhost:3000/api/v1/
     description: Local server

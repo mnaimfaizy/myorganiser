@@ -905,8 +905,23 @@ const models: TsoaRoute.Models = {
             "id": {"dataType":"string","required":true},
             "actorUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
             "targetUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "actorName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "targetName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "actorDeleted": {"dataType":"boolean","required":true},
+            "targetDeleted": {"dataType":"boolean","required":true},
             "action": {"ref":"AdminAuditAction","required":true},
             "createdAt": {"dataType":"datetime","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminAuditLogListResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "entries": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminAuditLogEntry"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -3050,7 +3065,10 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAdminAuditLogController_listAuditLogs: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
-                limit: {"in":"query","name":"limit","dataType":"double"},
+                userId: {"in":"query","name":"userId","dataType":"string"},
+                action: {"in":"query","name":"action","dataType":"array","array":{"dataType":"refAlias","ref":"AdminAuditAction"}},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/audit-logs',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),

@@ -1,5 +1,6 @@
 import type {
   AdminAuditLogEntry,
+  AdminAuditLogListResponse,
   AdminOverviewResponse,
 } from '@myorganiser/app-api-client';
 import { type Page } from '@playwright/test';
@@ -34,6 +35,10 @@ export const ADMIN_AUDIT_FIXTURE: AdminAuditLogEntry[] = [
     id: 'al-1',
     actorUserId: 'a-session',
     targetUserId: 'u-1',
+    actorName: 'Session Admin',
+    targetName: 'User One',
+    actorDeleted: false,
+    targetDeleted: false,
     action: 'promote',
     createdAt: '2026-10-20T09:00:00.000Z',
   },
@@ -41,6 +46,10 @@ export const ADMIN_AUDIT_FIXTURE: AdminAuditLogEntry[] = [
     id: 'al-2',
     actorUserId: 'a-session',
     targetUserId: null,
+    actorName: 'Session Admin',
+    targetName: null,
+    actorDeleted: false,
+    targetDeleted: true,
     action: 'youtube_access_grant',
     createdAt: '2026-10-19T09:00:00.000Z',
   },
@@ -77,5 +86,11 @@ export async function stubAdminAuditLogs(
   page: Page,
   entries: AdminAuditLogEntry[] = ADMIN_AUDIT_FIXTURE,
 ) {
-  await stubJsonGet(page, AUDIT_LOGS_URL, entries);
+  const body: AdminAuditLogListResponse = {
+    entries,
+    total: entries.length,
+    page: 1,
+    pageSize: 25,
+  };
+  await stubJsonGet(page, AUDIT_LOGS_URL, body);
 }

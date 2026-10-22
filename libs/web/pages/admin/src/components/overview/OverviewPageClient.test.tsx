@@ -84,7 +84,9 @@ describe('OverviewPageClient', () => {
       listAuditLogs: mockListAuditLogs,
     });
     mockGetAdminOverview.mockResolvedValue({ data: overviewFixture });
-    mockListAuditLogs.mockResolvedValue({ data: [] });
+    mockListAuditLogs.mockResolvedValue({
+      data: { entries: [], total: 0, page: 1, pageSize: 5 },
+    });
   });
 
   it('shows the loading status before the overview resolves', async () => {

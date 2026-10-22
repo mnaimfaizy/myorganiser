@@ -596,49 +596,6 @@ describe('UserService lifecycle', () => {
     });
   });
 
-  describe('listAdminAuditLogs', () => {
-    test('returns newest-first rows and clamps limit between 1 and 200', async () => {
-      const rows = [
-        {
-          id: 'log-2',
-          actor_user_id: ACTOR_ID,
-          target_user_id: TARGET_ID,
-          action: 'disable',
-          created_at: new Date('2025-06-02T00:00:00.000Z'),
-        },
-        {
-          id: 'log-1',
-          actor_user_id: ACTOR_ID,
-          target_user_id: TARGET_ID,
-          action: 'enable',
-          created_at: new Date('2025-06-01T00:00:00.000Z'),
-        },
-      ];
-      mockPrisma.adminAuditLog.findMany.mockResolvedValue(rows);
-
-      const result = await userService.listAdminAuditLogs(500);
-
-      expect(result).toEqual(rows);
-      expect(mockPrisma.adminAuditLog.findMany).toHaveBeenCalledWith({
-        take: 200,
-        orderBy: { created_at: 'desc' },
-        select: {
-          id: true,
-          actor_user_id: true,
-          target_user_id: true,
-          action: true,
-          created_at: true,
-        },
-      });
-
-      mockPrisma.adminAuditLog.findMany.mockClear();
-      await userService.listAdminAuditLogs(0);
-      expect(mockPrisma.adminAuditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 1 }),
-      );
-    });
-  });
-
   describe('refreshToken', () => {
     const refreshSecret = 'refresh-key-01';
     let previousSecret: string | undefined;
