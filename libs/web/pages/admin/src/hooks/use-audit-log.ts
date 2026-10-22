@@ -20,7 +20,7 @@ export type AuditLogMode = 'pages' | 'append';
 export interface UseAuditLogOptions {
   mode: AuditLogMode;
   /**
-   * Locks the log to one User (the User detail page). The user filter is then
+   * Locks the log to one User, for a page about that User. The user filter is then
    * fixed and `setUser` does nothing.
    */
   userId?: string;

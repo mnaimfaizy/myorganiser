@@ -10,7 +10,7 @@ import { AUDIT_ACTION_TONE } from '../../lib/overview';
 export interface AuditActionPillProps {
   action: AdminAuditAction;
   variant: AuditLogVariant;
-  /** Extra classes, merged last. The Overview adds its own centring this way. */
+  /** Extra classes, merged last. */
   className?: string;
 }
 

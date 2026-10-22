@@ -15,7 +15,7 @@ import { AuditLogTable } from './audit/AuditLogTable';
 /**
  * The admin audit log. Desktop pages through a filterable table; phone appends
  * a day-grouped list behind a filter sheet. The state lives in `useAuditLog`,
- * and its setters are stable, so they pass straight through to the children.
+ * and its setters pass straight through to the children.
  */
 export function AuditLogPageClient() {
   // Until the breakpoint is known, only the header and a placeholder render.
