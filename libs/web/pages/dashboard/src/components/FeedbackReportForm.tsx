@@ -26,6 +26,7 @@ import {
 import { readReportContext, type ReportContext } from '../utils/reportContext';
 import { createFeedbackApi } from '../lib/apiClient';
 import {
+  FEEDBACK_DIALOG_DESCRIPTION,
   FEEDBACK_KIND_CHOICES,
   feedbackFormSchema,
   type FeedbackFormValues,
@@ -240,7 +241,7 @@ export function FeedbackReportForm({
             <div className="flex items-center gap-3">
               <Illustration kind="feedback" size={48} />
               <BottomSheetDescription className="m-0 text-body-sm text-foreground-supporting">
-                Help us improve MyOrganiser by sharing your thoughts.
+                {FEEDBACK_DIALOG_DESCRIPTION}
               </BottomSheetDescription>
             </div>
           )}

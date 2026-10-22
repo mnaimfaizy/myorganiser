@@ -18,6 +18,7 @@ import {
   useFeedbackDialogOpen,
   setFeedbackDialogOpen,
 } from '../hooks/use-feedback-dialog';
+import { FEEDBACK_DIALOG_DESCRIPTION } from '../schemas/feedback-report';
 import { FeedbackReportForm } from './FeedbackReportForm';
 
 export function FeedbackDialog() {
@@ -64,9 +65,7 @@ export function FeedbackDialog() {
           <Illustration kind="feedback" size={48} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <DialogTitle>Send feedback</DialogTitle>
-            <DialogDescription>
-              Help us improve MyOrganiser by sharing your thoughts.
-            </DialogDescription>
+            <DialogDescription>{FEEDBACK_DIALOG_DESCRIPTION}</DialogDescription>
           </div>
         </DialogHeader>
 

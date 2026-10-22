@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import { Plus } from 'lucide-react';
 
 import {
@@ -20,10 +19,6 @@ export interface YourReportsHeaderProps {
 }
 
 export function YourReportsHeader({ variant }: YourReportsHeaderProps) {
-  const handleSendFeedback = useCallback(() => {
-    openFeedbackDialog();
-  }, []);
-
   if (variant === 'phone') {
     // The app shell draws the pushed title, so the h1 is visually hidden.
     return (
@@ -37,7 +32,7 @@ export function YourReportsHeader({ variant }: YourReportsHeaderProps) {
           variant="brand"
           label="Send feedback"
           icon={<Plus />}
-          onClick={handleSendFeedback}
+          onClick={openFeedbackDialog}
         />
       </div>
     );
@@ -52,7 +47,7 @@ export function YourReportsHeader({ variant }: YourReportsHeaderProps) {
         </h1>
         <p className="text-body text-muted-foreground">{SUBTITLE}</p>
       </div>
-      <Button variant="brand" onClick={handleSendFeedback}>
+      <Button variant="brand" onClick={openFeedbackDialog}>
         Send feedback
       </Button>
     </div>

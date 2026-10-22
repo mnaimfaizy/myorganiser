@@ -41,6 +41,10 @@ const FEEDBACK_KIND_VALUES = Object.keys(FEEDBACK_KIND_CHOICES) as [
   ...FeedbackReportKind[],
 ];
 
+/** The intro line shared by the desktop Dialog and the phone BottomSheet. */
+export const FEEDBACK_DIALOG_DESCRIPTION =
+  'Help us improve MyOrganiser by sharing your thoughts.';
+
 export const feedbackFormSchema = z.object({
   kind: z.enum(FEEDBACK_KIND_VALUES),
   title: z

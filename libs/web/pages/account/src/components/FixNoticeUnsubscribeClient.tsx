@@ -1,7 +1,7 @@
 'use client';
 
 import { getApiBaseUrl } from '@myorganiser/core';
-import { AppLogo, Button, Illustration } from '@myorganiser/web-ui';
+import { AppLogo, Button, Illustration, cn } from '@myorganiser/web-ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,6 +12,7 @@ interface StatusCopy {
   heading: string;
   text: string;
   cta: { label: string; href: string } | null;
+  retry: boolean;
   headingClassName?: string;
 }
 
@@ -25,21 +26,25 @@ const STATUS_COPY = {
     heading: 'Updating your notification preferences…',
     text: 'Please wait while we process your request.',
     cta: null,
+    retry: false,
   },
   done: {
     heading: 'Fix Notices turned off',
     text: 'You will no longer receive an email when one of your Feedback Reports is fixed or shipped. You can still see the outcome any time on your reports page.',
     cta: REPORTS_CTA,
+    retry: false,
   },
   'invalid-link': {
     heading: 'Link no longer valid',
     text: 'This unsubscribe link has expired or is no longer valid. You can manage your Feedback Report notifications from your account.',
     cta: { label: 'Go to account settings', href: '/dashboard/account' },
+    retry: false,
   },
   error: {
     heading: 'Something went wrong',
     text: "We couldn't process your request. Please try again or visit your reports page.",
     cta: REPORTS_CTA,
+    retry: true,
     headingClassName: 'text-destructive-text',
   },
 } as const satisfies Record<Status, StatusCopy>;
@@ -122,15 +127,18 @@ export default function FixNoticeUnsubscribeClient() {
       >
         <Illustration kind="feedback" size={96} />
         <h1
-          className={`font-display text-title-lg text-foreground ${copy.headingClassName ?? ''}`.trim()}
+          className={cn(
+            'font-display text-title-lg text-foreground',
+            copy.headingClassName,
+          )}
         >
           {copy.heading}
         </h1>
         <p className="text-body-sm text-foreground-supporting">{copy.text}</p>
 
-        {(status === 'error' || copy.cta) && (
+        {(copy.retry || copy.cta) && (
           <div className="flex flex-wrap items-center justify-center gap-2.5">
-            {status === 'error' && (
+            {copy.retry && (
               <Button onClick={handleRetry} variant="outline">
                 Try again
               </Button>
