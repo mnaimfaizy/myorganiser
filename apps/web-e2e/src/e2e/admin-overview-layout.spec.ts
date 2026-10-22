@@ -174,7 +174,7 @@ test.describe('Admin Overview layout (E2E)', () => {
       await expect(activity).toContainText('Promote');
       await expect(activity).toContainText('Grant YouTube Access');
       await expect(
-        activity.getByRole('link', { name: 'u-1', exact: true }),
+        activity.getByRole('link', { name: 'User One', exact: true }),
       ).toHaveAttribute('href', '/admin/users/u-1');
       await expect(
         activity.getByRole('link', { name: 'Audit log', exact: true }),

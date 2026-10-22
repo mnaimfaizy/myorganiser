@@ -245,4 +245,31 @@ test.describe('Platform Admin console', () => {
     ).toHaveCount(0, { timeout: 60000 });
     expect(requests.at(-1)).toMatchObject({ q: 'Ada', page: '1' });
   });
+
+  test('the Audit log nav link opens the audit page', async ({ page }) => {
+    test.setTimeout(60000);
+
+    await seedSession(page, PLATFORM_ADMIN);
+    await stubAuthRefresh(page, PLATFORM_ADMIN);
+    await stubAdminOverview(page);
+    await stubAdminAuditLogs(page);
+
+    await gotoStable(page, '/admin');
+
+    await expect(
+      page.getByRole('heading', { name: 'Platform overview', level: 1 }),
+    ).toBeVisible({ timeout: 60000 });
+
+    await page
+      .getByRole('navigation', { name: 'Admin sections' })
+      .getByRole('link', { name: 'Audit log', exact: true })
+      .click();
+
+    await expect(page).toHaveURL(/\/admin\/audit-logs\/?(\?.*)?$/, {
+      timeout: 60000,
+    });
+    await expect(
+      page.getByRole('heading', { name: 'Audit log', level: 1 }),
+    ).toBeVisible({ timeout: 60000 });
+  });
 });
