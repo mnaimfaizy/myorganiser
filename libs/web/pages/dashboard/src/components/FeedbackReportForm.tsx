@@ -1,20 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
-import { z } from 'zod';
 import { isAxiosError } from 'axios';
+import { TriangleAlert } from 'lucide-react';
 
-import { FeedbackReportKind } from '@myorganiser/app-api-client';
 import {
-  FEEDBACK_REPORT_TITLE_MAX_LENGTH,
-  FEEDBACK_REPORT_TEXT_MAX_LENGTH,
-  FEEDBACK_REPORT_CAP_MESSAGES,
-  FEEDBACK_REPORT_REQUIRED_MESSAGES,
-} from '@myorganiser/core';
-import {
+  BottomSheetDescription,
+  BottomSheetTitle,
   Button,
   Checkbox,
   DialogFooter,
@@ -23,74 +18,22 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
-  Input,
-  Textarea,
+  Illustration,
+  cn,
   useToast,
 } from '@myorganiser/web-ui';
 
 import { readReportContext, type ReportContext } from '../utils/reportContext';
 import { createFeedbackApi } from '../lib/apiClient';
-
-interface FeedbackKindChoice {
-  label: string;
-  hint: string;
-  descriptionLabel: string;
-  asksExpectedOutcome: boolean;
-}
-
-/**
- * The one table this form fans out over the report kind with (ADR 0053):
- * the choice labels, and the fact that only a Bug Report asks what the sender
- * expected to happen. A third kind fails to compile here until it has a home.
- */
-const FEEDBACK_KIND_CHOICES = {
-  bug_report: {
-    label: 'Bug report',
-    hint: "Something isn't working as it should.",
-    descriptionLabel: 'What happened?',
-    asksExpectedOutcome: true,
-  },
-  suggestion: {
-    label: 'Suggestion',
-    hint: 'An improvement or a new feature.',
-    descriptionLabel: 'What would you like to see?',
-    asksExpectedOutcome: false,
-  },
-} as const satisfies Record<FeedbackReportKind, FeedbackKindChoice>;
-
-// Derive enum values from the pinned table (ADR 0053 — do not re-enumerate).
-const FEEDBACK_KIND_VALUES = Object.keys(FEEDBACK_KIND_CHOICES) as [
-  FeedbackReportKind,
-  ...FeedbackReportKind[],
-];
-
-const feedbackFormSchema = z.object({
-  kind: z.enum(FEEDBACK_KIND_VALUES),
-  title: z
-    .string()
-    .trim()
-    .min(1, FEEDBACK_REPORT_REQUIRED_MESSAGES.title)
-    .max(FEEDBACK_REPORT_TITLE_MAX_LENGTH, FEEDBACK_REPORT_CAP_MESSAGES.title),
-  description: z
-    .string()
-    .trim()
-    .min(1, FEEDBACK_REPORT_REQUIRED_MESSAGES.description)
-    .max(
-      FEEDBACK_REPORT_TEXT_MAX_LENGTH,
-      FEEDBACK_REPORT_CAP_MESSAGES.description,
-    ),
-  expectedOutcome: z
-    .string()
-    .trim()
-    .max(
-      FEEDBACK_REPORT_TEXT_MAX_LENGTH,
-      FEEDBACK_REPORT_CAP_MESSAGES.expectedOutcome,
-    ),
-  fixNoticeOptIn: z.boolean(),
-});
-
-type FeedbackFormValues = z.infer<typeof feedbackFormSchema>;
+import {
+  FEEDBACK_DIALOG_DESCRIPTION,
+  FEEDBACK_KIND_CHOICES,
+  feedbackFormSchema,
+  type FeedbackFormValues,
+  type FeedbackReportFormVariant,
+} from '../schemas/feedback-report';
+import { FeedbackKindField } from './FeedbackKindField';
+import { FeedbackDetailsFields } from './FeedbackDetailsFields';
 
 interface ReportContextRowProps {
   label: string;
@@ -102,58 +45,12 @@ interface ReportContextRowProps {
  */
 function ReportContextRow({ label, value }: ReportContextRowProps) {
   return (
-    <div className="flex gap-2">
-      <span className="font-medium text-muted-foreground min-w-fit">
+    <div className="flex gap-1.5 text-caption text-foreground-supporting">
+      <span className="w-32 shrink-0 font-semibold text-foreground-secondary">
         {label}:
       </span>
-      <span className="break-all">{value}</span>
+      <span className="min-w-0 break-all">{value}</span>
     </div>
-  );
-}
-
-interface KindChoiceFieldsetProps {
-  kind: FeedbackReportKind;
-  onKindChange: (kind: FeedbackReportKind) => void;
-}
-
-/**
- * Render the kind choice as a native radio group.
- */
-function KindChoiceFieldset({ kind, onKindChange }: KindChoiceFieldsetProps) {
-  const handleChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      onKindChange(event.target.value as FeedbackReportKind);
-    },
-    [onKindChange],
-  );
-
-  return (
-    <fieldset className="space-y-3">
-      <legend className="text-sm font-medium">
-        What kind of feedback is this?
-      </legend>
-      <div className="space-y-2">
-        {Object.entries(FEEDBACK_KIND_CHOICES).map(([kindValue, choice]) => (
-          <label
-            key={kindValue}
-            className="flex items-start gap-3 rounded-md border border-input px-3 py-2 hover:bg-muted/50 cursor-pointer"
-          >
-            <input
-              type="radio"
-              name="kind"
-              value={kindValue}
-              checked={kind === kindValue}
-              onChange={handleChange}
-              className="mt-1"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{choice.label}</div>
-              <div className="text-xs text-muted-foreground">{choice.hint}</div>
-            </div>
-          </label>
-        ))}
-      </div>
-    </fieldset>
   );
 }
 
@@ -165,40 +62,48 @@ interface ReportContextPreviewProps {
  * Render the report context preview.
  */
 function ReportContextPreview({ context }: ReportContextPreviewProps) {
+  const headingId = useId();
+
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium">Sent with your report</div>
-      <div className="rounded-md bg-muted p-3 text-xs space-y-1">
-        <ReportContextRow
-          label="App"
-          value={`MyOrganiser ${context.platform} ${context.appVersion}`}
-        />
-        <ReportContextRow label="Browser" value={context.browser} />
-        <ReportContextRow
-          label="Operating system"
-          value={context.operatingSystem}
-        />
-        <ReportContextRow label="Page" value={context.path} />
-        <ReportContextRow
-          label="Time"
-          value={new Date(context.sentAt).toLocaleString()}
-        />
-      </div>
-      <div className="text-xs text-muted-foreground">
+    <section
+      aria-labelledby={headingId}
+      className="flex flex-col gap-1.5 rounded-panel border border-border bg-subtle p-4"
+    >
+      <h3 id={headingId} className="m-0 text-field font-semibold">
+        Sent with your report
+      </h3>
+      <ReportContextRow
+        label="App"
+        value={`MyOrganiser ${context.platform} ${context.appVersion}`}
+      />
+      <ReportContextRow label="Browser" value={context.browser} />
+      <ReportContextRow
+        label="Operating system"
+        value={context.operatingSystem}
+      />
+      <ReportContextRow label="Page" value={context.path} />
+      <ReportContextRow
+        label="Time"
+        value={new Date(context.sentAt).toLocaleString()}
+      />
+      <p className="m-0 mt-1 text-caption text-muted-foreground">
         No screenshots, logs, or vault contents are attached.
-      </div>
-    </div>
+      </p>
+    </section>
   );
 }
 
 export interface FeedbackReportFormProps {
   onSent: () => void;
   onCancel: () => void;
+  /** Internal layout switch set by FeedbackDialog. Defaults to desktop. */
+  variant?: FeedbackReportFormVariant;
 }
 
 export function FeedbackReportForm({
   onSent,
   onCancel,
+  variant = 'desktop',
 }: FeedbackReportFormProps) {
   const pathname = usePathname();
   const { toast } = useToast();
@@ -221,6 +126,8 @@ export function FeedbackReportForm({
   const kind = useWatch({ control: form.control, name: 'kind' });
   const kindChoice = FEEDBACK_KIND_CHOICES[kind];
   const { isSubmitting } = form.formState;
+  const isPhone = variant === 'phone';
+  const sendLabel = isSubmitting ? 'Sending...' : 'Send report';
 
   const handleCancel = useCallback(() => {
     onCancel();
@@ -291,136 +198,126 @@ export function FeedbackReportForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Kind choice as native radio group */}
-        <FormField
-          control={form.control}
-          name="kind"
-          render={({ field }) => (
-            <FormItem>
-              <KindChoiceFieldset
-                kind={field.value}
-                onKindChange={field.onChange}
-              />
-            </FormItem>
-          )}
-        />
-
-        {/* Title field */}
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Title</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Brief summary of your feedback"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Description field */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{kindChoice.descriptionLabel}</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Please provide details..."
-                  rows={4}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Expected outcome field — only for bug reports */}
-        {kindChoice.asksExpectedOutcome && (
-          <FormField
-            control={form.control}
-            name="expectedOutcome"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  What did you expect to happen?{' '}
-                  <span className="text-xs text-muted-foreground font-normal">
-                    (optional)
-                  </span>
-                </FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Describe what should have happened instead..."
-                    rows={3}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        {/* Not-encrypted warning */}
-        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-          This report is not encrypted. Do not include passwords, passphrases,
-          or anything from your vault.
-        </div>
-
-        {/* Report Context preview */}
-        <ReportContextPreview context={reportContext} />
-
-        {/* Fix Notice opt-in */}
-        <FormField
-          control={form.control}
-          name="fixNoticeOptIn"
-          render={({ field }) => (
-            <FormItem className="flex items-center gap-2 space-y-0">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <FormLabel className="font-normal cursor-pointer">
-                Email me when this is fixed
-              </FormLabel>
-            </FormItem>
-          )}
-        />
-
-        {/* Server error message */}
-        {serverError && (
-          <div
-            role="alert"
-            className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
-          >
-            {serverError}
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className={cn('flex flex-col', isPhone && 'min-h-0 flex-1')}
+      >
+        {/* Phone: the header bar carries Cancel and Send report, so the submit lives inside the form. */}
+        {isPhone && (
+          <div className="grid h-14 grid-cols-[72px_1fr_72px] items-center border-b border-border px-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="h-11 justify-self-start px-2"
+            >
+              Cancel
+            </Button>
+            <BottomSheetTitle className="text-center text-body font-semibold">
+              Send feedback
+            </BottomSheetTitle>
+            <Button
+              type="submit"
+              variant="link"
+              disabled={isSubmitting}
+              className="h-11 justify-self-end px-2 font-bold"
+            >
+              {sendLabel}
+            </Button>
           </div>
         )}
 
-        {/* Footer buttons */}
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleCancel}
-            disabled={isSubmitting}
+        <div
+          className={cn(
+            'flex flex-col gap-4',
+            isPhone
+              ? 'min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8'
+              : 'px-6 py-5',
+          )}
+        >
+          {/* Phone: the illustration sits beside the intro line. */}
+          {isPhone && (
+            <div className="flex items-center gap-3">
+              <Illustration kind="feedback" size={48} />
+              <BottomSheetDescription className="m-0 text-body-sm text-foreground-supporting">
+                {FEEDBACK_DIALOG_DESCRIPTION}
+              </BottomSheetDescription>
+            </div>
+          )}
+
+          <FeedbackKindField control={form.control} variant={variant} />
+
+          <FeedbackDetailsFields
+            control={form.control}
+            kind={kind}
+            variant={variant}
+          />
+
+          {/* Not-encrypted warning */}
+          <div
+            role="note"
+            className="flex items-start gap-2.5 rounded-control border border-destructive-edge bg-destructive-faint p-3 text-body-sm text-destructive-text"
           >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Sending...' : 'Send report'}
-          </Button>
-        </DialogFooter>
+            <TriangleAlert
+              aria-hidden="true"
+              className="mt-0.5 size-5 shrink-0 text-destructive"
+            />
+            <span>
+              This report is not encrypted. Do not include passwords,
+              passphrases, or anything from your vault.
+            </span>
+          </div>
+
+          {/* Report Context preview */}
+          <ReportContextPreview context={reportContext} />
+
+          {/* Fix Notice opt-in */}
+          <FormField
+            control={form.control}
+            name="fixNoticeOptIn"
+            render={({ field }) => (
+              <FormItem className="flex min-h-11 items-center gap-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormLabel className="cursor-pointer font-normal text-body">
+                  Email me when this is fixed
+                </FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Server error message */}
+          {serverError && (
+            <div
+              role="alert"
+              className="rounded-control border border-destructive-edge bg-destructive-faint p-3 text-body-sm text-destructive-text"
+            >
+              {serverError}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop footer buttons */}
+        {!isPhone && (
+          <DialogFooter className="border-t border-border px-6 py-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="brand" disabled={isSubmitting}>
+              {sendLabel}
+            </Button>
+          </DialogFooter>
+        )}
       </form>
     </Form>
   );

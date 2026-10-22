@@ -14,6 +14,7 @@ import {
 } from '@myorganiser/core';
 import {
   Button,
+  cn,
   Form,
   FormControl,
   FormField,
@@ -24,6 +25,7 @@ import {
   useToast,
 } from '@myorganiser/web-ui';
 
+import type { AccountVariant } from '../account-view';
 import { createFeedbackApi } from '../lib/apiClient';
 
 const followUpFormSchema = z.object({
@@ -42,9 +44,14 @@ type FollowUpFormValues = z.infer<typeof followUpFormSchema>;
 export interface FollowUpFormProps {
   reportId: string;
   onSent: (updated: FeedbackReportListItemDto) => void;
+  variant?: AccountVariant;
 }
 
-export function FollowUpForm({ reportId, onSent }: FollowUpFormProps) {
+export function FollowUpForm({
+  reportId,
+  onSent,
+  variant = 'desktop',
+}: FollowUpFormProps) {
   const { toast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -107,7 +114,9 @@ export function FollowUpForm({ reportId, onSent }: FollowUpFormProps) {
           name="followUp"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Follow-up</FormLabel>
+              <FormLabel className="text-body-sm font-semibold">
+                Follow-up
+              </FormLabel>
               <FormControl>
                 <Textarea placeholder="Add more detail…" rows={3} {...field} />
               </FormControl>
@@ -127,7 +136,12 @@ export function FollowUpForm({ reportId, onSent }: FollowUpFormProps) {
         )}
 
         {/* Submit button */}
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          variant="default"
+          className={cn(variant === 'phone' ? 'w-full' : 'self-start md:h-10')}
+        >
           {isSubmitting ? 'Sending...' : 'Send follow-up'}
         </Button>
       </form>
