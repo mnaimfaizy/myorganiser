@@ -419,6 +419,79 @@ describe('FeedbackService', () => {
     });
   });
 
+  describe('report context platform', () => {
+    function contextWithPlatform(platform: string) {
+      return {
+        platform,
+        appVersion: '1.0.0',
+        browser: 'Chrome',
+        operatingSystem: 'macOS',
+        path: '/dashboard',
+        sentAt: new Date().toISOString(),
+      };
+    }
+
+    test('refuses a platform outside web, ios and android with 400, before the rate count or create', async () => {
+      const result = await service.createReport(
+        'user-1',
+        makeValidInput({ context: contextWithPlatform('mobile') }),
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      expect(result.body).toEqual({
+        message: 'The report context platform must be web, ios or android.',
+      });
+      expect(prisma.feedbackReport.count).not.toHaveBeenCalled();
+      expect(prisma.feedbackReport.create).not.toHaveBeenCalled();
+    });
+
+    test.each(['ios', 'android'])(
+      'accepts %s and stores it as context_platform',
+      async (platform) => {
+        prisma.feedbackReport.count.mockResolvedValue(0);
+        prisma.feedbackReport.create.mockResolvedValue(makeRow());
+
+        const result = await service.createReport(
+          'user-1',
+          makeValidInput({ context: contextWithPlatform(platform) }),
+        );
+
+        expect(result.ok).toBe(true);
+        expect(result.status).toBe(201);
+        expect(prisma.feedbackReport.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ context_platform: platform }),
+        });
+      },
+    );
+
+    test('trims the platform before the membership check and stores the trimmed value', async () => {
+      prisma.feedbackReport.count.mockResolvedValue(0);
+      prisma.feedbackReport.create.mockResolvedValue(makeRow());
+
+      const result = await service.createReport(
+        'user-1',
+        makeValidInput({ context: contextWithPlatform('  ios  ') }),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(prisma.feedbackReport.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ context_platform: 'ios' }),
+      });
+    });
+
+    test('refuses an upper-case platform, since the match is case-sensitive', async () => {
+      const result = await service.createReport(
+        'user-1',
+        makeValidInput({ context: contextWithPlatform('WEB') }),
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(400);
+      expect(prisma.feedbackReport.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('string trimming', () => {
     test('trims title', async () => {
       prisma.feedbackReport.count.mockResolvedValue(0);

@@ -93,7 +93,6 @@ import {
 import bodyParser from 'body-parser';
 import express from 'express';
 import request from 'supertest';
-import { ValidateError } from 'tsoa';
 
 jest.setTimeout(120_000);
 
@@ -101,6 +100,10 @@ function makeApp() {
   jest.resetModules();
 
   const { RegisterRoutes } = require('../routes/routes');
+  // Load tsoa after resetModules so instanceof matches the ValidateError the
+  // freshly required routes throw; otherwise validation failures fall through
+  // to the generic status handler and surface as 400 instead of 422.
+  const { ValidateError } = require('tsoa');
 
   const app = express();
   app.use(bodyParser.json({ limit: '2mb' }));
@@ -115,7 +118,7 @@ function makeApp() {
     if (err instanceof ValidateError) {
       return res.status(422).json({
         message: 'Validation Failed',
-        details: err?.fields,
+        details: (err as { fields?: unknown }).fields,
       });
     }
     const anyErr = err as any;
@@ -538,6 +541,71 @@ describe('FeedbackController (HTTP integration)', () => {
 
       expect(res.status).toBe(200);
       expect(svc.markReportsSeen).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('context platform (HTTP integration)', () => {
+    test.each(['ios', 'android'])(
+      'a %s report reaches the service with that platform',
+      async (platform) => {
+        const svc = require('../services/FeedbackService').default;
+        svc.createReport.mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          body: {
+            id: 'report-5',
+            kind: 'bug_report',
+            status: 'received',
+            title: 'App Crashes When Viewing Tasks',
+            createdAt: new Date().toISOString(),
+          },
+        });
+
+        const body = makeValidBody();
+        const res = await request(app)
+          .post('/feedback/reports')
+          .set('Authorization', 'Bearer user-1')
+          .send({ ...body, context: { ...body.context, platform } });
+
+        expect(res.status).toBe(201);
+        expect(svc.createReport).toHaveBeenCalledWith(
+          'user-1',
+          expect.objectContaining({
+            context: expect.objectContaining({ platform }),
+          }),
+        );
+      },
+    );
+
+    test('context.platform mobile is rejected with 422 before the service is called', async () => {
+      const svc = require('../services/FeedbackService').default;
+
+      const body = makeValidBody();
+      const res = await request(app)
+        .post('/feedback/reports')
+        .set('Authorization', 'Bearer user-1')
+        .send({ ...body, context: { ...body.context, platform: 'mobile' } });
+
+      expect(res.status).toBe(422);
+      expect(res.body.message).toBe('Validation Failed');
+      expect(svc.createReport).not.toHaveBeenCalled();
+    });
+
+    test('a missing context.platform is rejected with 422 before the service is called', async () => {
+      const svc = require('../services/FeedbackService').default;
+
+      const body = makeValidBody();
+      const context: Record<string, unknown> = { ...body.context };
+      delete context.platform;
+
+      const res = await request(app)
+        .post('/feedback/reports')
+        .set('Authorization', 'Bearer user-1')
+        .send({ ...body, context });
+
+      expect(res.status).toBe(422);
+      expect(res.body.message).toBe('Validation Failed');
+      expect(svc.createReport).not.toHaveBeenCalled();
     });
   });
 });

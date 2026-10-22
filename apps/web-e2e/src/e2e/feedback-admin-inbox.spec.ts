@@ -101,6 +101,9 @@ async function stubAdminFeedbackReports(page: Page) {
               createdAt: new Date().toISOString(),
             },
           ],
+          total: 1,
+          page: 1,
+          pageSize: 100,
         }),
       });
       return;

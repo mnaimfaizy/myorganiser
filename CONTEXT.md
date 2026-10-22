@@ -163,7 +163,7 @@ Something a signed-in User sends MyOrganiser about the product itself — a Bug 
 _Avoid_: ticket, issue, support request, feedback item
 
 **Report Context**:
-The details attached to a Feedback Report besides what its sender typed — which app and version sent it, the browser and operating system, the page path without its query or fragment, and the time. It is shown to the sender before they send, and it never includes screenshots, logs, or anything read from the Vault.
+The details attached to a Feedback Report besides what its sender typed — which app sent it (its platform: web, ios or android) and that app's version, the browser and operating system, the page path without its query or fragment, and the time. It is shown to the sender before they send, and it never includes screenshots, logs, or anything read from the Vault.
 _Avoid_: diagnostics, telemetry, metadata, device info
 
 **Bug Report**:

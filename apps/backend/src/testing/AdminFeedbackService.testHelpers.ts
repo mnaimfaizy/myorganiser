@@ -14,6 +14,7 @@ export type MockPrisma = {
   feedbackReport: {
     findUnique: jest.Mock<any>;
     findMany?: jest.Mock<any>;
+    count?: jest.Mock<any>;
     update?: jest.Mock<any>;
   };
   $transaction: jest.Mock<any>;
@@ -28,6 +29,7 @@ export function makePrisma(): MockPrisma {
     feedbackReport: {
       findUnique: jest.fn() as jest.Mock<any>,
       findMany: jest.fn() as jest.Mock<any>,
+      count: jest.fn() as jest.Mock<any>,
       update: jest.fn() as jest.Mock<any>,
     },
     $transaction: jest.fn() as jest.Mock<any>,

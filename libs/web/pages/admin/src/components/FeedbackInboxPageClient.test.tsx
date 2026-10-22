@@ -28,6 +28,20 @@ import { FeedbackInboxPageClient } from './FeedbackInboxPageClient';
 
 const mockListFeedbackReports = jest.fn();
 
+// Mirrors the component's stopgap page size (#1269 replaces it with paging).
+const INBOX_PAGE_SIZE = 100;
+
+function responseFor(items: AdminFeedbackReportListItemDto[]) {
+  return {
+    data: {
+      items,
+      total: items.length,
+      page: 1,
+      pageSize: INBOX_PAGE_SIZE,
+    },
+  };
+}
+
 const sampleReports: AdminFeedbackReportListItemDto[] = [
   {
     id: 'report-1',
@@ -46,7 +60,7 @@ const sampleReports: AdminFeedbackReportListItemDto[] = [
     title: 'Add dark mode',
     kind: 'suggestion',
     status: 'under_review',
-    platform: 'mobile',
+    platform: 'android',
     trackingIssueNumber: 42,
     reporterUserId: 'user-456',
     reporter: { id: 'user-456', name: null, email: 'another@example.com' },
@@ -73,16 +87,16 @@ describe('FeedbackInboxPageClient', () => {
     (createPlatformAdminApi as jest.Mock).mockReturnValue({
       listFeedbackReports: mockListFeedbackReports,
     });
-    mockListFeedbackReports.mockResolvedValue({
-      data: { items: sampleReports },
-    });
+    mockListFeedbackReports.mockResolvedValue(responseFor(sampleReports));
   });
 
-  it('calls listFeedbackReports with no filter keys on mount', async () => {
+  it('calls listFeedbackReports with only pageSize on mount', async () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
   });
 
@@ -107,7 +121,9 @@ describe('FeedbackInboxPageClient', () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     const statusTrigger = screen.getByRole('combobox', { name: 'Status' });
@@ -121,6 +137,7 @@ describe('FeedbackInboxPageClient', () => {
     await waitFor(() => {
       expect(mockListFeedbackReports).toHaveBeenCalledWith({
         status: 'planned',
+        pageSize: INBOX_PAGE_SIZE,
       });
     });
   });
@@ -129,7 +146,9 @@ describe('FeedbackInboxPageClient', () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     const kindTrigger = screen.getByRole('combobox', { name: 'Kind' });
@@ -143,6 +162,7 @@ describe('FeedbackInboxPageClient', () => {
     await waitFor(() => {
       expect(mockListFeedbackReports).toHaveBeenCalledWith({
         kind: 'bug_report',
+        pageSize: INBOX_PAGE_SIZE,
       });
     });
   });
@@ -151,7 +171,9 @@ describe('FeedbackInboxPageClient', () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     // First select a status
@@ -165,6 +187,7 @@ describe('FeedbackInboxPageClient', () => {
     await waitFor(() => {
       expect(mockListFeedbackReports).toHaveBeenCalledWith({
         status: 'planned',
+        pageSize: INBOX_PAGE_SIZE,
       });
     });
 
@@ -177,7 +200,9 @@ describe('FeedbackInboxPageClient', () => {
     fireEvent.click(allOption);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
   });
 
@@ -185,7 +210,9 @@ describe('FeedbackInboxPageClient', () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     const platformInput = screen.getByPlaceholderText(
@@ -194,15 +221,94 @@ describe('FeedbackInboxPageClient', () => {
     fireEvent.change(platformInput, { target: { value: 'web' } });
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({ platform: 'web' });
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        platform: 'web',
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
+  });
+
+  it('trims a known platform before sending it to the API', async () => {
+    render(<FeedbackInboxPageClient />);
+
+    await waitFor(() => {
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
+    });
+
+    const platformInput = screen.getByPlaceholderText(
+      'Any platform',
+    ) as HTMLInputElement;
+    fireEvent.change(platformInput, { target: { value: '  ios  ' } });
+
+    await waitFor(() => {
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        platform: 'ios',
+        pageSize: INBOX_PAGE_SIZE,
+      });
+    });
+  });
+
+  it('shows the empty state without calling the API for an unknown platform', async () => {
+    render(<FeedbackInboxPageClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
+    });
+    const callsBeforeInput = mockListFeedbackReports.mock.calls.length;
+
+    const platformInput = screen.getByPlaceholderText(
+      'Any platform',
+    ) as HTMLInputElement;
+    fireEvent.change(platformInput, { target: { value: 'mobile' } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No feedback reports match these filters.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(mockListFeedbackReports).toHaveBeenCalledTimes(callsBeforeInput);
+    expect(mockListFeedbackReports).not.toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'mobile' }),
+    );
+  });
+
+  it('treats a platform with the wrong case as unknown and does not call the API for it', async () => {
+    render(<FeedbackInboxPageClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('App crashes on login')).toBeInTheDocument();
+    });
+    const callsBeforeInput = mockListFeedbackReports.mock.calls.length;
+
+    const platformInput = screen.getByPlaceholderText(
+      'Any platform',
+    ) as HTMLInputElement;
+    fireEvent.change(platformInput, { target: { value: 'Web' } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No feedback reports match these filters.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(mockListFeedbackReports).toHaveBeenCalledTimes(callsBeforeInput);
+    expect(mockListFeedbackReports).not.toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'Web' }),
+    );
   });
 
   it('refetches with trackingIssueNumber as a number when valid issue number is entered', async () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     const issueInput = screen.getByPlaceholderText(
@@ -213,18 +319,21 @@ describe('FeedbackInboxPageClient', () => {
     await waitFor(() => {
       expect(mockListFeedbackReports).toHaveBeenCalledWith({
         trackingIssueNumber: 42,
+        pageSize: INBOX_PAGE_SIZE,
       });
     });
   });
 
   it('excludes trackingIssueNumber from request when issue field has invalid value', async () => {
     mockListFeedbackReports.mockClear();
-    mockListFeedbackReports.mockResolvedValue({ data: { items: [] } });
+    mockListFeedbackReports.mockResolvedValue(responseFor([]));
 
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
     const issueInput = screen.getByPlaceholderText(
@@ -245,18 +354,21 @@ describe('FeedbackInboxPageClient', () => {
     render(<FeedbackInboxPageClient />);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
 
-    // Set a platform filter
+    // Set a known platform filter
     const platformFilterInput = screen.getByPlaceholderText(
       'Any platform',
     ) as HTMLInputElement;
-    fireEvent.change(platformFilterInput, { target: { value: 'mobile' } });
+    fireEvent.change(platformFilterInput, { target: { value: 'android' } });
 
     await waitFor(() => {
       expect(mockListFeedbackReports).toHaveBeenCalledWith({
-        platform: 'mobile',
+        platform: 'android',
+        pageSize: INBOX_PAGE_SIZE,
       });
     });
 
@@ -265,7 +377,9 @@ describe('FeedbackInboxPageClient', () => {
     fireEvent.click(clearButton);
 
     await waitFor(() => {
-      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({});
+      expect(mockListFeedbackReports).toHaveBeenLastCalledWith({
+        pageSize: INBOX_PAGE_SIZE,
+      });
     });
   });
 
@@ -324,7 +438,7 @@ describe('FeedbackInboxPageClient', () => {
   });
 
   it('shows empty state when API returns no reports', async () => {
-    mockListFeedbackReports.mockResolvedValue({ data: { items: [] } });
+    mockListFeedbackReports.mockResolvedValue(responseFor([]));
 
     render(<FeedbackInboxPageClient />);
 
