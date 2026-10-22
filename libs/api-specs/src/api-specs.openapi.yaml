@@ -1401,8 +1401,8 @@ components:
             Users whose account was created in the last 7 days (created_at >=
             now − 7 days).
 
-            Users created before User.created_at existed carry the migration's
-            timestamp, not their real sign-up time.
+            Users created before User.created_at existed were backfilled from
+            the creation time in their cuid id.
         platformAdmins:
           type: number
           format: double
@@ -1421,8 +1421,8 @@ components:
             (email_verification_timestamp is null AND created_at < now − 7
             days).
 
-            Users created before User.created_at existed carry the migration's
-            timestamp, not their real sign-up time.
+            Users created before User.created_at existed were backfilled from
+            the creation time in their cuid id.
         disabled:
           type: number
           format: double

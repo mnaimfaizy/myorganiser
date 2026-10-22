@@ -13,7 +13,7 @@ export interface AdminOverviewResponse {
   users: number;
   /**
    * Users whose account was created in the last 7 days (created_at >= now − 7 days).
-   * Users created before User.created_at existed carry the migration's timestamp, not their real sign-up time.
+   * Users created before User.created_at existed were backfilled from the creation time in their cuid id.
    */
   usersJoinedLast7Days: number;
   /** Users whose role is platform_admin. */
@@ -23,7 +23,7 @@ export interface AdminOverviewResponse {
   /**
    * Users who have not verified their email and whose account was created more than 7 days ago
    * (email_verification_timestamp is null AND created_at < now − 7 days).
-   * Users created before User.created_at existed carry the migration's timestamp, not their real sign-up time.
+   * Users created before User.created_at existed were backfilled from the creation time in their cuid id.
    */
   unverifiedOverAWeek: number;
   /** Users who are disabled. */
