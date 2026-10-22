@@ -3,7 +3,7 @@
 > **Single source of truth** for installed package versions and canonical technology choices.
 > All agent instruction files and documentation must reference this file rather than declaring versions inline.
 > Owned and kept current by the **DepSync** agent/skill — do not edit versions manually.
-> Last synced from `package.json` on 2026-10-21.
+> Last synced from `package.json` on 2026-10-22.
 
 > **Reading this file as an agent:** it is a lookup table, not a briefing. Read
 > the one section you need. Component work needs
@@ -276,16 +276,16 @@
 
 | Package                         | Version | Purpose                                                                                                           |
 | ------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `storybook`                     | 8.6.17  | UI component development environment                                                                              |
-| `@storybook/react`              | 8.6.17  | React renderer for Storybook                                                                                      |
-| `@storybook/react-vite`         | 8.6.17  | Vite-based bundler for Storybook                                                                                  |
-| `@storybook/addon-essentials`   | 8.6.17  | Storybook core addon bundle (docs, controls, actions, viewport, backgrounds) — registered in `.storybook/main.ts` |
-| `@storybook/addon-interactions` | 8.6.17  | Interactions panel for `play` function tests — registered in `.storybook/main.ts`                                 |
-| `@storybook/core-server`        | 8.6.17  | Storybook server core                                                                                             |
-| `@storybook/test`               | 8.6.17  | Storybook testing utilities (interaction tests)                                                                   |
+| `storybook`                     | 8.6.19  | UI component development environment                                                                              |
+| `@storybook/react`              | 8.6.19  | React renderer for Storybook                                                                                      |
+| `@storybook/react-vite`         | 8.6.19  | Vite-based bundler for Storybook                                                                                  |
+| `@storybook/addon-essentials`   | 8.6.19  | Storybook core addon bundle (docs, controls, actions, viewport, backgrounds) — registered in `.storybook/main.ts` |
+| `@storybook/addon-interactions` | 8.6.19  | Interactions panel for `play` function tests — registered in `.storybook/main.ts`                                 |
+| `@storybook/core-server`        | 8.6.19  | Storybook server core                                                                                             |
+| `@storybook/test`               | 8.6.19  | Storybook testing utilities (interaction tests)                                                                   |
 | `@storybook/test-runner`        | 0.23.0  | Runs Storybook stories as tests via Playwright                                                                    |
 | `chromatic`                     | 13.3.5  | Visual regression testing and Storybook hosting                                                                   |
-| `vite`                          | 6.4.2   | Build tool — used by Storybook and mobile web                                                                     |
+| `vite`                          | 6.4.3   | Build tool — used by Storybook and mobile web                                                                     |
 
 ---
 
