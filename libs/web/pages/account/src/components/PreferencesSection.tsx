@@ -18,7 +18,10 @@ import {
 } from '@myorganiser/web-ui';
 import { useCallback, useId } from 'react';
 
-import type { AccountVariant } from '../account-view';
+import {
+  type AccountVariant,
+  PHONE_ROW_SELECT_TRIGGER_CLASS,
+} from '../account-view';
 
 interface PreferencesSectionProps {
   variant: AccountVariant;
@@ -63,7 +66,7 @@ export function PreferencesSection({
               <Select value={countryCode} onValueChange={onCountryCodeChange}>
                 <SelectTrigger
                   aria-labelledby={countryLabelId}
-                  className="h-auto w-auto shrink-0 border-transparent bg-transparent px-0 text-body text-muted-foreground [&>span]:overflow-visible [&>span]:whitespace-normal"
+                  className={PHONE_ROW_SELECT_TRIGGER_CLASS}
                 >
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
@@ -88,7 +91,7 @@ export function PreferencesSection({
               >
                 <SelectTrigger
                   aria-labelledby={currencyLabelId}
-                  className="h-auto w-auto shrink-0 border-transparent bg-transparent px-0 text-body text-muted-foreground [&>span]:overflow-visible [&>span]:whitespace-normal"
+                  className={PHONE_ROW_SELECT_TRIGGER_CLASS}
                 >
                   <SelectValue placeholder="Select currency">
                     {preferredCurrency}

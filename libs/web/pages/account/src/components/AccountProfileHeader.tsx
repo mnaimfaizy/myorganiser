@@ -56,6 +56,7 @@ export function AccountProfileHeader({
           <span className="text-body text-navy-muted-foreground">{email}</span>
         )}
       </div>
+      {/* Shown unconditionally: sign-in requires a verified email. */}
       <span className="inline-flex h-7 items-center rounded-full bg-trust-text px-3 text-label-caps text-trust-edge">
         EMAIL VERIFIED
       </span>

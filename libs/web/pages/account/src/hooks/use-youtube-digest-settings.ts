@@ -15,7 +15,7 @@ export interface YouTubeDigestSettings {
   setWeekday: Dispatch<SetStateAction<number>>;
   saving: boolean;
   /** PATCHes the digest settings. Nothing is sent until this runs. */
-  save: () => void;
+  save: () => Promise<void>;
   timeZone: string;
 }
 

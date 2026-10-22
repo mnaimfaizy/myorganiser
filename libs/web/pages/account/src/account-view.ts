@@ -6,6 +6,13 @@ import type { LatestBackupState } from './hooks/useLatestBackup';
 export type AccountVariant = 'desktop' | 'phone';
 
 /**
+ * A phone list row's Select trigger, styled as the row's value: sized to its
+ * content, never truncated, no field chrome.
+ */
+export const PHONE_ROW_SELECT_TRIGGER_CLASS =
+  'h-auto w-auto shrink-0 border-transparent bg-transparent px-0 text-body text-muted-foreground [&>span]:overflow-visible [&>span]:whitespace-normal';
+
+/**
  * The first letter of up to two words in a name, upper-cased, for an avatar.
  * Copy of the dashboard helper: a page may not import from another page.
  */

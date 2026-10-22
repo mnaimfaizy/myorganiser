@@ -29,10 +29,6 @@ export function DeleteAccountSection({
     setOpen(true);
   }, []);
 
-  const handleOpenChange = useCallback((next: boolean) => {
-    setOpen(next);
-  }, []);
-
   if (variant === 'phone') {
     return (
       <section aria-labelledby={headingId} className="flex flex-col gap-3">
@@ -65,7 +61,7 @@ export function DeleteAccountSection({
         <DeleteAccountDialog
           variant={variant}
           open={open}
-          onOpenChange={handleOpenChange}
+          onOpenChange={setOpen}
         />
       </section>
     );
@@ -98,7 +94,7 @@ export function DeleteAccountSection({
       <DeleteAccountDialog
         variant={variant}
         open={open}
-        onOpenChange={handleOpenChange}
+        onOpenChange={setOpen}
       />
     </section>
   );
