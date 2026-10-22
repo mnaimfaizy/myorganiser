@@ -494,4 +494,39 @@ describe('FeedbackReportForm', () => {
       });
     });
   });
+
+  describe('Desktop layout', () => {
+    it('should show the title counter at 0 / 120 and update it as the title is typed', () => {
+      renderForm();
+
+      expect(screen.getByText('0 / 120')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+        target: { value: 'Hello' },
+      });
+
+      expect(screen.getByText('5 / 120')).toBeInTheDocument();
+      expect(screen.queryByText('0 / 120')).not.toBeInTheDocument();
+    });
+
+    it('should name the Title textbox exactly "Title", without the counter', () => {
+      renderForm();
+
+      expect(
+        screen.getByRole('textbox', { name: 'Title' }),
+      ).toBeInTheDocument();
+    });
+
+    it('should render one Send report button in the same row as Cancel', () => {
+      renderForm();
+
+      const sendButtons = screen.getAllByRole('button', {
+        name: 'Send report',
+      });
+      expect(sendButtons).toHaveLength(1);
+
+      const cancelButton = screen.getByRole('button', { name: 'Cancel' });
+      expect(sendButtons[0].parentElement).toBe(cancelButton.parentElement);
+    });
+  });
 });

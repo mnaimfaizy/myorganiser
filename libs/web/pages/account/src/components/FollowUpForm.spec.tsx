@@ -221,7 +221,7 @@ describe('FollowUpForm', () => {
     expect(onSent).not.toHaveBeenCalled();
   });
 
-  it('should show generic error message for non-4xx errors', async () => {
+  it('should show generic error message for a non-axios error', async () => {
     const onSent = jest.fn();
     mockAddFollowUp.mockRejectedValue({
       response: {
@@ -245,5 +245,86 @@ describe('FollowUpForm', () => {
     });
 
     expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('should hide an axios 500 detail behind the generic error message', async () => {
+    const onSent = jest.fn();
+    mockAddFollowUp.mockRejectedValue({
+      isAxiosError: true,
+      config: {},
+      response: {
+        status: 500,
+        data: { message: 'internal detail' },
+      },
+    });
+
+    renderForm(onSent);
+
+    fireEvent.change(screen.getByLabelText(/Follow-up/), {
+      target: { value: 'More detail' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send follow-up/ }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Your follow-up could not be sent. Please try again.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('internal detail')).toBeNull();
+    expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('should show generic error message for a 4xx response without a string message', async () => {
+    const onSent = jest.fn();
+    mockAddFollowUp.mockRejectedValue({
+      isAxiosError: true,
+      config: {},
+      response: {
+        status: 400,
+        data: { error: 'bad request' },
+      },
+    });
+
+    renderForm(onSent);
+
+    fireEvent.change(screen.getByLabelText(/Follow-up/), {
+      target: { value: 'More detail' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send follow-up/ }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Your follow-up could not be sent. Please try again.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('should submit the follow-up from the phone variant with the same request', async () => {
+    const onSent = jest.fn();
+    mockAddFollowUp.mockResolvedValue({ data: { id: 'report-1' } });
+
+    render(
+      <FollowUpForm reportId="report-1" onSent={onSent} variant="phone" />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Follow-up/), {
+      target: { value: 'Phone detail' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send follow-up/ }));
+
+    await waitFor(() => {
+      expect(mockAddFollowUp).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockAddFollowUp).toHaveBeenCalledWith({
+      reportId: 'report-1',
+      addFollowUpRequest: { followUp: 'Phone detail' },
+    });
+    await waitFor(() => {
+      expect(onSent).toHaveBeenCalledTimes(1);
+    });
   });
 });
