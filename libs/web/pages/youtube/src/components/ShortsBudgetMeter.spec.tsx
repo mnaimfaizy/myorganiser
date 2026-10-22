@@ -49,14 +49,41 @@ describe('ShortsBudgetMeter', () => {
   });
 
   describe('readout and progress', () => {
-    it('shows spent and remaining time as M:SS with their labels', () => {
+    it('shows spent of limit in whole minutes with the figure in bold, and remaining minutes', () => {
       renderMeter();
 
-      // The spent figure is its own element, so match the whole phrase by its text content.
+      // The bold figure is its own element, so match the whole phrase by its text content.
       expect(
-        screen.getByText((_, el) => el?.textContent === '1:05 used today'),
+        screen.getByText(
+          (_, el) => el?.textContent === '1 of 60 min used today',
+        ),
       ).toBeInTheDocument();
-      expect(screen.getByText('58:55 remaining')).toBeInTheDocument();
+      expect(screen.getByText('1 of 60 min')).toHaveClass('font-semibold');
+      expect(screen.getByText('59 min left')).toBeInTheDocument();
+    });
+
+    it('rounds spent minutes down, so 59 seconds spent still reads 0 and 60 seconds reads 1', () => {
+      const { rerenderMeter } = renderMeter({ spentMs: 59_000 });
+      expect(screen.getByText('0 of 60 min')).toBeInTheDocument();
+
+      rerenderMeter({ spentMs: 60_000 });
+      expect(screen.getByText('1 of 60 min')).toBeInTheDocument();
+    });
+
+    it('rounds remaining minutes up, so 60 seconds left reads 1 and 61 seconds left reads 2', () => {
+      const { rerenderMeter } = renderMeter({ remainingMs: 60_000 });
+      expect(screen.getByText('1 min left')).toBeInTheDocument();
+
+      rerenderMeter({ remainingMs: 61_000 });
+      expect(screen.getByText('2 min left')).toBeInTheDocument();
+    });
+
+    it('hides the progress bar when showProgressBar is false, keeping the readout and percentage text', () => {
+      renderMeter({ showProgressBar: false, usedPercent: 2 });
+
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.getByText('1 of 60 min')).toBeInTheDocument();
+      expect(screen.getByText('2% used')).toBeInTheDocument();
     });
 
     it('shows the metering marker only while the budget is metering', () => {

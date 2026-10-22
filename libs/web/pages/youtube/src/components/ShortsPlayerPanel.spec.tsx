@@ -872,5 +872,102 @@ describe('ShortsPlayerPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Mark watched' }));
       expect(onWatchedToggle).toHaveBeenCalledTimes(1);
     });
+
+    it('shows the minutes left above the player, rounded up to whole minutes', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={baseShort}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={61_000}
+          variant="phone"
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      const countdown = screen.getByText('2 min left today');
+      const player = screen.getByTestId('player-dQw4w9WgXcQ');
+      expect(
+        countdown.compareDocumentPosition(player) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    });
+
+    it('draws the stage progress bar from usedPercent, labelled with the percentage used', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={baseShort}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={60000}
+          usedPercent={42}
+          variant="phone"
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      const bar = screen.getByRole('progressbar', {
+        name: '42% of daily Shorts budget used',
+      });
+      expect(bar).toHaveAttribute('aria-valuenow', '42');
+      expect(bar).toHaveAttribute('aria-valuemin', '0');
+      expect(bar).toHaveAttribute('aria-valuemax', '100');
+      expect(bar.firstElementChild).toHaveStyle({ width: '42%' });
+    });
+
+    it('caps the stage fill at 100% when usage exceeds the limit', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={baseShort}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={0}
+          usedPercent={120}
+          variant="phone"
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      const bar = screen.getByRole('progressbar', {
+        name: '120% of daily Shorts budget used',
+      });
+      expect(bar.firstElementChild).toHaveStyle({ width: '100%' });
+    });
+
+    it('starts the stage progress bar at 0 when usedPercent is not given', () => {
+      renderPhone();
+
+      expect(
+        screen.getByRole('progressbar', {
+          name: '0% of daily Shorts budget used',
+        }),
+      ).toHaveAttribute('aria-valuenow', '0');
+    });
+  });
+
+  describe('desktop budget readout', () => {
+    it('renders no stage countdown or progress bar on the desktop variant', () => {
+      render(
+        <ShortsPlayerPanel
+          activeShort={baseShort}
+          activeIndex={2}
+          shortsLength={5}
+          remainingMs={60000}
+          usedPercent={42}
+          onPrevious={jest.fn()}
+          onNext={jest.fn()}
+          onWatchedToggle={jest.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.queryByText(/min left today/)).not.toBeInTheDocument();
+    });
   });
 });

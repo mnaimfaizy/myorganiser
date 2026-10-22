@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import { formatRetryAt, isRetryCooldownActive } from '../hooks';
 import type { YouTubeSubscription } from '../types';
 import { ChannelsAside } from './ChannelsAside';
-import { ChannelsListCard, type ChannelFilter } from './ChannelsListCard';
+import {
+  CHANNEL_FILTERS,
+  ChannelsListCard,
+  type ChannelFilter,
+  countChannelFilters,
+} from './ChannelsListCard';
 
 interface SubscriptionManagerProps {
   subscriptions: YouTubeSubscription[];
@@ -43,17 +48,11 @@ export function SubscriptionManager({
       ? `Refresh channels disabled until ${retryLabel}`
       : undefined;
 
-  const enabledCount = subscriptions.filter((sub) => sub.enabled).length;
-  const counts = {
-    all: subscriptions.length,
-    on: enabledCount,
-    off: subscriptions.length - enabledCount,
-  };
+  const counts = countChannelFilters(subscriptions);
 
   const needle = filterText.trim().toLowerCase();
   const visibleChannels = subscriptions.filter((sub) => {
-    const matchesChip =
-      filter === 'all' || (filter === 'on' ? sub.enabled : !sub.enabled);
+    const matchesChip = CHANNEL_FILTERS[filter].matches(sub);
     const matchesText =
       needle === '' || sub.channelTitle.toLowerCase().includes(needle);
     return matchesChip && matchesText;

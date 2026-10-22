@@ -7,7 +7,7 @@ import {
   ChevronRight,
   ChevronUp,
 } from 'lucide-react';
-import type { YouTubeVideo } from '../types';
+import type { YouTubeLayoutVariant, YouTubeVideo } from '../types';
 import { formatRuntimeSeconds } from '../lib/formatRuntimeSeconds';
 import { formatPublishedAgo } from '../lib/formatPublishedAgo';
 import { YouTubeVideoPlayer } from './YouTubeVideoPlayer';
@@ -17,6 +17,8 @@ interface ShortsPlayerPanelProps {
   activeIndex: number;
   shortsLength: number;
   remainingMs: number;
+  /** Share of today's Shorts budget used, 0–100. Drives the phone stage's progress bar. */
+  usedPercent?: number;
   watched?: boolean;
   onNearEnd?: () => void;
   /** The User pressed Play. Fires from the click itself, not from the embed. */
@@ -33,7 +35,7 @@ interface ShortsPlayerPanelProps {
    * centred column with Previous and Next flanking the player. Defaults to
    * desktop, which is also what renders while the breakpoint is unknown.
    */
-  variant?: 'desktop' | 'phone';
+  variant?: YouTubeLayoutVariant;
 }
 
 /**
@@ -53,6 +55,7 @@ export function ShortsPlayerPanel({
   activeIndex,
   shortsLength,
   remainingMs,
+  usedPercent = 0,
   watched = false,
   onNearEnd,
   onPlaybackStart,
@@ -75,6 +78,8 @@ export function ShortsPlayerPanel({
       : null;
   const position = `${activeIndex >= 0 ? activeIndex + 1 : 0} of ${shortsLength}`;
   const publishedAgo = formatPublishedAgo(activeShort.publishedAt);
+  const remainingMin = Math.ceil(remainingMs / 60_000);
+  const barPercent = Math.min(Math.max(usedPercent, 0), 100);
   const watchedLabel = watched ? 'Mark as New' : 'Mark watched';
 
   const budgetWarning =
@@ -154,6 +159,24 @@ export function ShortsPlayerPanel({
   if (isPhone) {
     return (
       <div className="flex flex-col gap-3 rounded-panel bg-navy p-3 text-navy-foreground">
+        <div className="flex flex-col gap-2">
+          <p className="text-body-sm font-semibold text-warning-edge">
+            {remainingMin} min left today
+          </p>
+          <div
+            role="progressbar"
+            aria-valuenow={usedPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${usedPercent}% of daily Shorts budget used`}
+            className="h-1.5 overflow-hidden rounded-full bg-navy-raised"
+          >
+            <div
+              className="h-full rounded-full bg-warning-edge transition-all duration-300 motion-reduce:transition-none"
+              style={{ width: `${barPercent}%` }}
+            />
+          </div>
+        </div>
         {player}
         {details}
         {budgetWarningBlock}

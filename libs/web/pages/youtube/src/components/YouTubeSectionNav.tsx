@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { YouTubeLayoutVariant } from '../types';
 
 type YouTubeSectionId = 'videos' | 'shorts' | 'channels';
 
@@ -17,7 +18,7 @@ interface YouTubeSectionNavProps {
   current: YouTubeSectionId;
   /** Desktop only: shown as "Channels · N" when a number. Phone labels never carry counts. */
   channelCount?: number | null;
-  variant: 'desktop' | 'phone';
+  variant: YouTubeLayoutVariant;
 }
 
 /**
@@ -25,11 +26,11 @@ interface YouTubeSectionNavProps {
  * so it is a `nav` of links with `aria-current="page"` on the current one,
  * not a tablist.
  */
-const YouTubeSectionNav = ({
+export function YouTubeSectionNav({
   current,
   channelCount,
   variant,
-}: YouTubeSectionNavProps) => {
+}: YouTubeSectionNavProps) {
   const isPhone = variant === 'phone';
 
   const labelFor = (id: YouTubeSectionId): string => {
@@ -91,7 +92,6 @@ const YouTubeSectionNav = ({
       </ul>
     </nav>
   );
-};
+}
 
-export { YouTubeSectionNav };
 export type { YouTubeSectionId, YouTubeSectionNavProps };

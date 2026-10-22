@@ -54,6 +54,7 @@ jest.mock('./ShortsPlayerPanel', () => ({
   ShortsPlayerPanel: ({
     activeShort,
     variant,
+    usedPercent,
     onNearEnd,
     onWatchedToggle,
     onPlaybackStart,
@@ -64,6 +65,7 @@ jest.mock('./ShortsPlayerPanel', () => ({
       data-testid="player-panel"
       data-variant={variant}
       data-active-id={activeShort?.videoId}
+      data-used-percent={usedPercent}
     >
       {activeShort ? activeShort.title : 'No short'}
       <button data-testid="mock-near-end" onClick={() => onNearEnd?.()}>
@@ -125,8 +127,8 @@ jest.mock('./ShortsEntryWarning', () => ({
 }));
 
 jest.mock('./ShortsBudgetMeter', () => ({
-  ShortsBudgetMeter: ({ onLimitMinutesChange }: any) => (
-    <div data-testid="meter">
+  ShortsBudgetMeter: ({ onLimitMinutesChange, showProgressBar }: any) => (
+    <div data-testid="meter" data-show-progress-bar={String(showProgressBar)}>
       Meter
       <button
         data-testid="set-limit"
@@ -857,6 +859,59 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
       fireEvent.click(screen.getByTestId('set-limit'));
 
       expect(setLimitMinutes).toHaveBeenCalledWith(15);
+    });
+
+    describe('meter placement and progress bar ownership', () => {
+      /** True when `second` comes after `first` in document order. */
+      const followsInDom = (first: HTMLElement, second: HTMLElement) =>
+        (first.compareDocumentPosition(second) &
+          Node.DOCUMENT_POSITION_FOLLOWING) !==
+        0;
+
+      it('keeps the meter before the player on desktop, and passes showProgressBar=true to it', () => {
+        renderShorts();
+
+        const meter = screen.getByTestId('meter');
+        expect(followsInDom(meter, screen.getByTestId('player-panel'))).toBe(
+          true,
+        );
+        expect(meter).toHaveAttribute('data-show-progress-bar', 'true');
+      });
+
+      it('moves the meter after the player and Up next on phone, and passes showProgressBar=false while the stage shows', () => {
+        renderShorts({ phone: true });
+
+        const meter = screen.getByTestId('meter');
+        expect(followsInDom(screen.getByTestId('player-panel'), meter)).toBe(
+          true,
+        );
+        expect(followsInDom(screen.getByTestId('shorts-list'), meter)).toBe(
+          true,
+        );
+        expect(meter).toHaveAttribute('data-show-progress-bar', 'false');
+      });
+
+      it('keeps the meter after the Hard Stop on phone when locked, and passes showProgressBar=true to it', () => {
+        renderShorts({ phone: true, locked: true });
+
+        const meter = screen.getByTestId('meter');
+        expect(
+          followsInDom(
+            screen.getByRole('status', { name: /exhausted/i }),
+            meter,
+          ),
+        ).toBe(true);
+        expect(meter).toHaveAttribute('data-show-progress-bar', 'true');
+      });
+
+      it('passes the budget usedPercent to the phone player panel', () => {
+        renderShorts({ phone: true, budget: { usedPercent: 42 } });
+
+        expect(screen.getByTestId('player-panel')).toHaveAttribute(
+          'data-used-percent',
+          '42',
+        );
+      });
     });
   });
 });

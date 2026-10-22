@@ -10,10 +10,29 @@ import type { YouTubeSubscription } from '../types';
 
 export type ChannelFilter = 'all' | 'on' | 'off';
 
-interface ChannelsListCardCounts {
-  all: number;
-  on: number;
-  off: number;
+/** One table for the sync-state chips: label and predicate. Fans out over the filter ids. */
+export const CHANNEL_FILTERS = {
+  all: { label: 'All', matches: () => true },
+  on: { label: 'On', matches: (sub: YouTubeSubscription) => sub.enabled },
+  off: { label: 'Off', matches: (sub: YouTubeSubscription) => !sub.enabled },
+} as const satisfies Record<
+  ChannelFilter,
+  { label: string; matches: (sub: YouTubeSubscription) => boolean }
+>;
+
+export const CHANNEL_FILTER_IDS = Object.keys(
+  CHANNEL_FILTERS,
+) as ChannelFilter[];
+
+/** Count of channels each chip would show, derived from the table. */
+export function countChannelFilters(
+  subscriptions: YouTubeSubscription[],
+): Record<ChannelFilter, number> {
+  const counts = {} as Record<ChannelFilter, number>;
+  for (const id of CHANNEL_FILTER_IDS) {
+    counts[id] = subscriptions.filter(CHANNEL_FILTERS[id].matches).length;
+  }
+  return counts;
 }
 
 interface ChannelsListCardProps {
@@ -21,7 +40,7 @@ interface ChannelsListCardProps {
   channels: YouTubeSubscription[];
   /** Every subscription before filtering. Zero means none have been imported. */
   totalCount: number;
-  counts: ChannelsListCardCounts;
+  counts: Record<ChannelFilter, number>;
   filterText: string;
   onFilterTextChange: (value: string) => void;
   filter: ChannelFilter;
@@ -165,24 +184,15 @@ export function ChannelsListCard({
           aria-label="Filter channels by sync state"
           className="flex flex-wrap items-center gap-2.5"
         >
-          <ChoiceChip
-            pressed={filter === 'all'}
-            onPressedChange={() => onFilterChange('all')}
-          >
-            {`All · ${counts.all}`}
-          </ChoiceChip>
-          <ChoiceChip
-            pressed={filter === 'on'}
-            onPressedChange={() => onFilterChange('on')}
-          >
-            {`On · ${counts.on}`}
-          </ChoiceChip>
-          <ChoiceChip
-            pressed={filter === 'off'}
-            onPressedChange={() => onFilterChange('off')}
-          >
-            {`Off · ${counts.off}`}
-          </ChoiceChip>
+          {CHANNEL_FILTER_IDS.map((id) => (
+            <ChoiceChip
+              key={id}
+              pressed={filter === id}
+              onPressedChange={() => onFilterChange(id)}
+            >
+              {`${CHANNEL_FILTERS[id].label} · ${counts[id]}`}
+            </ChoiceChip>
+          ))}
         </div>
         <Button
           variant="outline"

@@ -17,6 +17,7 @@ import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 import { ShortsList } from './ShortsList';
 import { ShortsPlayerPanel } from './ShortsPlayerPanel';
+import type { YouTubeLayoutVariant } from '../types';
 
 /** The page gutter: the shell provides none inside its content area. */
 const SHORTS_PAGE_CLASS =
@@ -62,7 +63,7 @@ export function ShortsPageClient() {
 
 function ShortsWatchExperience() {
   const isPhone = useIsMobileState() === true;
-  const variant: 'desktop' | 'phone' = isPhone ? 'phone' : 'desktop';
+  const variant: YouTubeLayoutVariant = isPhone ? 'phone' : 'desktop';
   const { connected, status } = useYouTubeStatus();
   const {
     shorts,
@@ -266,6 +267,10 @@ function ShortsWatchExperience() {
     );
   }
 
+  // The phone stage carries its own progress bar, so the meter card drops its
+  // bar while the stage is on screen: one progressbar role per state.
+  const phoneStageShown = isPhone && !budget.locked && activeShort !== null;
+
   // Render budget meter in both active and locked states
   const meterSection = (
     <ShortsBudgetMeter
@@ -276,6 +281,7 @@ function ShortsWatchExperience() {
       locked={budget.locked}
       metering={budget.metering}
       onLimitMinutesChange={budget.setLimitMinutes}
+      showProgressBar={!phoneStageShown}
     />
   );
 
@@ -284,10 +290,11 @@ function ShortsWatchExperience() {
     return (
       <div className={SHORTS_PAGE_CLASS}>
         {header}
-        {meterSection}
+        {!isPhone && meterSection}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
           <ShortsHardStop limitMs={budget.limitMs} />
         </div>
+        {isPhone && meterSection}
       </div>
     );
   }
@@ -296,7 +303,7 @@ function ShortsWatchExperience() {
   return (
     <div className={SHORTS_PAGE_CLASS}>
       {header}
-      {meterSection}
+      {!isPhone && meterSection}
 
       {/* Loading state */}
       {loading && !shorts.length ? (
@@ -333,6 +340,7 @@ function ShortsWatchExperience() {
             activeIndex={activeIndex}
             shortsLength={shorts.length}
             remainingMs={budget.remainingMs}
+            usedPercent={budget.usedPercent}
             watched={activeShort?.watched ?? false}
             onNearEnd={handleNearEnd}
             onPlaybackStart={handlePlaybackStart}
@@ -351,6 +359,8 @@ function ShortsWatchExperience() {
           />
         </div>
       )}
+
+      {isPhone && meterSection}
     </div>
   );
 }

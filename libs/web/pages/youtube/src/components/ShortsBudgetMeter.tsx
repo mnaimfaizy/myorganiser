@@ -2,11 +2,7 @@
 
 import { Button, Input, Label } from '@myorganiser/web-ui';
 import { useCallback, useState } from 'react';
-import {
-  formatShortsDuration,
-  MAX_SHORTS_LIMIT_MINUTES,
-  MIN_SHORTS_LIMIT_MINUTES,
-} from '../hooks';
+import { MAX_SHORTS_LIMIT_MINUTES, MIN_SHORTS_LIMIT_MINUTES } from '../hooks';
 
 interface ShortsBudgetMeterProps {
   spentMs: number;
@@ -16,9 +12,18 @@ interface ShortsBudgetMeterProps {
   locked: boolean;
   metering: boolean;
   onLimitMinutesChange: (minutes: number) => void;
+  /**
+   * The phone stage draws its own progress bar, so the page passes `false`
+   * there to keep one progressbar role on screen. Defaults to `true`.
+   */
+  showProgressBar?: boolean;
 }
 
-/** One stepper press moves the daily limit by this many minutes. */
+/**
+ * One stepper press moves the daily limit by this many minutes. The stepper's
+ * aria-labels ("Five minutes less" / "Five minutes more") are literal text and
+ * must change with this constant.
+ */
 const LIMIT_STEP_MINUTES = 5;
 
 /**
@@ -43,6 +48,7 @@ export function ShortsBudgetMeter({
   locked,
   metering,
   onLimitMinutesChange,
+  showProgressBar = true,
 }: ShortsBudgetMeterProps) {
   const [inputValue, setInputValue] = useState<string>(() =>
     String(Math.round(limitMs / 60_000)),
@@ -55,6 +61,10 @@ export function ShortsBudgetMeter({
     setInputValue(String(Math.round(limitMs / 60_000)));
   }
 
+  // Whole minutes for the visible budget line. Spent rounds down and remaining
+  // rounds up, so the two always add up to the limit.
+  const spentMin = Math.floor(spentMs / 60_000);
+  const limitMin = Math.round(limitMs / 60_000);
   // Coarsened to whole minutes so the polite region announces on a meaningful
   // step rather than on every one-second metering tick.
   const remainingMinutes = Math.ceil(remainingMs / 60_000);
@@ -127,13 +137,13 @@ export function ShortsBudgetMeter({
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-body-sm">
           <span className="text-foreground-secondary">
             <span className="font-semibold tabular-nums text-foreground">
-              {formatShortsDuration(spentMs)}
+              {spentMin} of {limitMin} min
             </span>{' '}
             used today
           </span>
           <span className="flex items-baseline gap-2">
             <span className="font-semibold text-warning-text">
-              {formatShortsDuration(remainingMs)} remaining
+              {remainingMinutes} min left
             </span>
             {metering && (
               <span className="text-caption text-muted-foreground">
@@ -148,22 +158,24 @@ export function ShortsBudgetMeter({
         </p>
 
         {/* Progress bar: shows usage with text label, not color alone */}
-        <div
-          role="progressbar"
-          aria-valuenow={usedPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`${usedPercent}% of daily Shorts budget used`}
-          className="h-2 overflow-hidden rounded-full bg-muted"
-        >
+        {showProgressBar && (
           <div
-            // Reduced motion is honoured in CSS rather than sniffed in JS —
-            // the variant tracks the OS preference live, with no effect,
-            // no state, and nothing to go stale.
-            className="h-full rounded-full bg-warning transition-all duration-300 motion-reduce:transition-none"
-            style={{ width: `${Math.min(usedPercent, 100)}%` }}
-          />
-        </div>
+            role="progressbar"
+            aria-valuenow={usedPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${usedPercent}% of daily Shorts budget used`}
+            className="h-2 overflow-hidden rounded-full bg-muted"
+          >
+            <div
+              // Reduced motion is honoured in CSS rather than sniffed in JS —
+              // the variant tracks the OS preference live, with no effect,
+              // no state, and nothing to go stale.
+              className="h-full rounded-full bg-warning transition-all duration-300 motion-reduce:transition-none"
+              style={{ width: `${Math.min(usedPercent, 100)}%` }}
+            />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-caption text-muted-foreground">
           <span>Resets at midnight. Long videos have no limit.</span>

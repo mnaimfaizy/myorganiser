@@ -1,5 +1,6 @@
 import { Illustration } from '@myorganiser/web-ui';
 import type { ReactNode } from 'react';
+import type { YouTubeLayoutVariant } from '../types';
 
 interface YouTubePageHeaderProps {
   title: string;
@@ -8,19 +9,19 @@ interface YouTubePageHeaderProps {
   /** Right-hand controls, e.g. the Sync uploads button. */
   actions?: ReactNode;
   /** Desktop shows the illustration and visible title; phone hides the title (the shell draws it). */
-  variant: 'desktop' | 'phone';
+  variant: YouTubeLayoutVariant;
 }
 
 /**
  * The YouTube page heading. On phone the app shell already draws the pushed
  * title, so the h1 is visually hidden and only the subtitle and actions show.
  */
-const YouTubePageHeader = ({
+export function YouTubePageHeader({
   title,
   subtitle,
   actions,
   variant,
-}: YouTubePageHeaderProps) => {
+}: YouTubePageHeaderProps) {
   if (variant === 'phone') {
     return (
       <div className="flex items-start gap-3">
@@ -56,7 +57,6 @@ const YouTubePageHeader = ({
       ) : null}
     </div>
   );
-};
+}
 
-export { YouTubePageHeader };
 export type { YouTubePageHeaderProps };
