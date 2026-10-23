@@ -109,11 +109,24 @@ export async function submitLoginForm(
  * so any part of the dashboard shell being on screen proves the shell mounted
  * and the route's own content is rendering — which is what the callers were
  * reaching for when they waited for network quiet after landing on
- * `/dashboard`. The layout renders two sidebar toggles, hence `.first()`.
+ * `/dashboard`. The header's sidebar toggle names itself by what it will do.
  */
 export async function waitForDashboardReady(page: Page): Promise<void> {
+  // Below md the desktop header (and its sidebar toggle) is display:none and
+  // the phone shell's tab bar takes its place. A page with no viewport set
+  // (`null`) runs at desktop width, so it keeps the sidebar-toggle wait.
+  // A reload of a pushed phone screen has no tab bar; callers that reload
+  // there should not rely on this helper.
+  const viewport = page.viewportSize();
+  if (viewport !== null && viewport.width < 768) {
+    await expect(
+      page.getByRole('navigation', { name: 'App sections' }),
+    ).toBeVisible({ timeout: 60000 });
+    return;
+  }
+
   await expect(
-    page.getByRole('button', { name: 'Toggle Sidebar' }).first(),
+    page.getByRole('button', { name: /^(Collapse|Expand|Open) sidebar$/ }),
   ).toBeVisible({ timeout: 60000 });
 }
 

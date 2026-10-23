@@ -1,186 +1,35 @@
 'use client';
 
-import { MobileNumberRecord } from '@myorganiser/vault-core';
-import { ConfirmDeleteDialog, useToast } from '@myorganiser/web-ui';
-import {
-  normalizeMobileNumbers,
-  saveVaultRecords,
-  type VaultHandle,
-} from '@myorganiser/web-vault';
-import { useLocalVaultRevision, VaultGate } from '@myorganiser/web-vault-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useIsMobileState } from '@myorganiser/web-ui';
+import type { VaultHandle } from '@myorganiser/web-vault';
+import { VaultGate } from '@myorganiser/web-vault-ui';
 
-import { type AddMobileNumberFormValues } from '../schemas/mobileNumber';
-import { mobileNumberFormValuesToRecordFields } from '../schemas/mobileNumber';
-import { randomId } from '../utils/randomId';
-import { AddMobileNumberDialog } from './AddMobileNumberDialog';
-import { MobileNumberListCard } from './MobileNumberListCard';
+import { useMobileNumbersPage } from '../hooks/use-mobile-numbers-page';
+import { MobileNumbersBoard } from './mobile-numbers-board';
 
 interface MobileNumbersInnerProps {
   handle: VaultHandle;
 }
 
-function describeMobileNumberDeletion(
-  mobileNumber: MobileNumberRecord | null,
-): string {
-  if (!mobileNumber) return '';
-  const count = mobileNumber.usageLocations.length;
-  if (count === 0) {
-    return 'This action cannot be undone. The mobile number will be permanently removed.';
-  } else if (count === 1) {
-    return 'This action cannot be undone. The mobile number and its 1 usage location will be permanently removed.';
-  } else {
-    return `This action cannot be undone. The mobile number and its ${count} usage locations will be permanently removed.`;
+function MobileNumbersInner({ handle }: MobileNumbersInnerProps) {
+  const page = useMobileNumbersPage(handle);
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop list on the first frame.
+  const isPhone = useIsMobileState();
+
+  if (isPhone === undefined) {
+    return null;
   }
-}
-
-function MobileNumbersInner(props: MobileNumbersInnerProps) {
-  const { toast } = useToast();
-
-  const [items, setItems] = useState<MobileNumberRecord[]>([]);
-  const [isAddMobileNumberOpen, setIsAddMobileNumberOpen] = useState(false);
-  const [deletingMobileNumber, setDeletingMobileNumber] =
-    useState<MobileNumberRecord | null>(null);
-
-  // Convergence replaces the Local Vault without passing through this
-  // component, so the revision is the only thing that says the Ciphertext
-  // behind `items` moved. Every mutation below saves the whole list, so a
-  // stale `items` is not merely out of date on screen — it is what gets
-  // written back over the record that arrived (#587).
-  const revision = useLocalVaultRevision();
-
-  useEffect(() => {
-    // Cancellation matters now that this effect re-fires on every convergence:
-    // without it, an earlier read resolving late can put stale records back
-    // over the ones a later read just applied.
-    let isActive = true;
-
-    props.handle
-      .loadDecryptedData<unknown>({
-        type: 'mobileNumbers',
-        defaultValue: [],
-      })
-      .then(async (raw) => {
-        const normalized = normalizeMobileNumbers(raw);
-        if (isActive) setItems(normalized.value);
-        if (normalized.changed) {
-          await saveVaultRecords(
-            props.handle,
-            'mobileNumbers',
-            normalized.value,
-          );
-        }
-      })
-      .catch(() => {
-        if (!isActive) return;
-        toast({
-          title: 'Failed to load mobile numbers',
-          description: 'Could not decrypt saved data.',
-          variant: 'destructive',
-        });
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [props.handle, toast, revision]);
-
-  const persist = useCallback(
-    async (next: MobileNumberRecord[], deletedId?: string) => {
-      setItems(next);
-      try {
-        await saveVaultRecords(
-          props.handle,
-          'mobileNumbers',
-          next,
-          deletedId === undefined ? undefined : { deletedId },
-        );
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        toast({
-          title: 'Failed to save',
-          description: message,
-          variant: 'destructive',
-        });
-        throw e;
-      }
-    },
-    [props.handle, toast],
-  );
-
-  const handleAddMobileNumber = useCallback(
-    async (values: AddMobileNumberFormValues): Promise<void> => {
-      const nextItem: MobileNumberRecord = {
-        id: randomId(),
-        ...mobileNumberFormValuesToRecordFields(values),
-        usageLocations: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      await persist([nextItem, ...items]);
-      toast({
-        title: 'Saved',
-        description: 'Mobile number saved (encrypted).',
-      });
-    },
-    [items, persist, toast],
-  );
-
-  const handleRequestDelete = useCallback((item: MobileNumberRecord) => {
-    setDeletingMobileNumber(item);
-  }, []);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deletingMobileNumber) return;
-    try {
-      await persist(
-        items.filter((x) => x.id !== deletingMobileNumber.id),
-        deletingMobileNumber.id,
-      );
-      toast({ title: 'Deleted', description: 'Mobile number removed.' });
-      setDeletingMobileNumber(null);
-    } catch {
-      // persist() already toasted the failure; leave the dialog open for retry
-    }
-  }, [deletingMobileNumber, items, persist, toast]);
-
-  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setDeletingMobileNumber(null);
-    }
-  }, []);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <AddMobileNumberDialog
-        open={isAddMobileNumberOpen}
-        onOpenChange={setIsAddMobileNumberOpen}
-        onAdd={handleAddMobileNumber}
-      />
-
-      <MobileNumberListCard
-        items={items}
-        onAddMobileNumber={() => setIsAddMobileNumberOpen(true)}
-        onRequestDelete={handleRequestDelete}
-      />
-
-      <ConfirmDeleteDialog
-        open={deletingMobileNumber !== null}
-        onOpenChange={handleDeleteDialogOpenChange}
-        title={
-          deletingMobileNumber ? `Delete "${deletingMobileNumber.label}"?` : ''
-        }
-        description={describeMobileNumberDeletion(deletingMobileNumber)}
-        onConfirm={handleConfirmDelete}
-      />
-    </div>
+    <MobileNumbersBoard page={page} variant={isPhone ? 'phone' : 'desktop'} />
   );
 }
 
 export function MobileNumbersPageClient() {
   return (
     <VaultGate title="Mobile Numbers">
-      {({ handle }) => <MobileNumbersInner handle={handle!} />}
+      {({ handle }) => (handle ? <MobileNumbersInner handle={handle} /> : null)}
     </VaultGate>
   );
 }

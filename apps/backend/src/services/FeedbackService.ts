@@ -17,6 +17,7 @@ import {
   FeedbackReportStatus,
   INITIAL_FEEDBACK_REPORT_STATUS,
   isFeedbackReportKind,
+  isFeedbackReportPlatform,
 } from './feedbackReportConstants';
 
 /**
@@ -163,6 +164,12 @@ function validateReportContext(
     FEEDBACK_REPORT_CONTEXT_FIELD_MAX_LENGTH,
   );
   if (typeof platform !== 'string') return platform;
+  if (!isFeedbackReportPlatform(platform)) {
+    return {
+      ok: false,
+      message: 'The report context platform must be web, ios or android.',
+    };
+  }
 
   const appVersion = readContextField(
     context.appVersion,

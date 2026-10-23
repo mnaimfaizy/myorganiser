@@ -6,6 +6,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 jest.mock('@myorganiser/auth', () => ({
+  // isPlatformAdmin is pure, so the real one is used rather than a copy.
+  ...jest.requireActual('@myorganiser/auth'),
   authSession: {},
   getCurrentUser: jest.fn(),
   resolveOutboundGuard: jest.fn(),

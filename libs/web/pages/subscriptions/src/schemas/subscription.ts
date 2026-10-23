@@ -26,7 +26,10 @@ export const subscriptionFormSchema = z.object({
     SubscriptionBillingCycleEnum.TwoYears,
     SubscriptionBillingCycleEnum.ThreeYears,
   ]),
-  amount: z.number().finite().min(0, 'Amount must be >= 0'),
+  amount: z
+    .number({ error: 'Enter an amount.' })
+    .finite()
+    .min(0, 'Use 0 or more.'),
   currency: z.custom<CurrencyCode>(
     (v) => typeof v === 'string' && v.length > 0,
   ),
@@ -50,7 +53,12 @@ export const subscriptionFormSchema = z.object({
   startDate: z.string().trim().min(1, 'Start date is required'),
   endDate: z.string().trim().optional(),
   nextBillingDate: z.string().trim().optional(),
-  link: z.string().trim().url().optional().or(z.literal('')),
+  link: z
+    .string()
+    .trim()
+    .url({ error: 'Enter a full web address, starting with https://' })
+    .optional()
+    .or(z.literal('')),
 });
 
 export type SubscriptionFormValues = z.infer<typeof subscriptionFormSchema>;

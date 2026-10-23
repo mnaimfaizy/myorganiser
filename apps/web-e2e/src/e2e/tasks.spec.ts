@@ -284,6 +284,10 @@ test.describe('Tasks (E2E)', () => {
   test('should create a task, reload page, and verify task persists', async ({
     page,
   }) => {
+    const taskTitle = 'Buy groceries for E2E test';
+    // The task's row: the element whose direct child is its Done checkbox.
+    const rowSelector = `div:has(> [role="checkbox"][aria-label="Done: ${taskTitle}"])`;
+
     // Setup mock routes for vault
     await setupRoutes(page);
 
@@ -300,49 +304,41 @@ test.describe('Tasks (E2E)', () => {
     // Step 4: Unlock vault with the passphrase
     await unlockWithPassphrase(page, E2E_VAULT_PHRASE);
 
-    // Step 5: Open the add-task dialog, then wait for its form.
-    // The form used to render inline on the page; it now lives behind the
-    // "Add Task" button in TaskAddDialog (issue #506).
-    await page.getByRole('button', { name: 'Add Task' }).first().click();
+    // Step 5: Open the add-task dialog. The header and the all-clear card both
+    // carry an "Add task" button, so the trigger is the first match; the
+    // dialog's own submit button is scoped to the dialog below.
+    await page
+      .getByRole('button', { name: 'Add task', exact: true })
+      .first()
+      .click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByLabel('Title')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByLabel('Title', { exact: true })).toBeVisible({
+      timeout: 30000,
+    });
 
     // Step 6: Fill task title
-    await page.getByLabel('Title').fill('Buy groceries for E2E test');
+    await page.getByLabel('Title', { exact: true }).fill(taskTitle);
 
     // Priority is already 'medium' by default (no need to change)
 
-    // Step 7: Submit the form. Scoped to the dialog: the page's own
-    // "Add Task" trigger shares the submit button's accessible name.
+    // Step 7: Submit the form. Scoped to the dialog so the header trigger is
+    // not matched.
     const submitButton = page
       .getByRole('dialog')
-      .getByRole('button', { name: 'Add Task' });
+      .getByRole('button', { name: 'Add task', exact: true });
     await expect(submitButton).toBeVisible();
     await submitButton.click();
 
-    // Step 8: Wait for task to appear in the task list
-    await page.waitForFunction(
-      () => {
-        const h3Elements = Array.from(document.querySelectorAll('h3'));
-        return h3Elements.some((el) =>
-          el.textContent?.includes('Buy groceries for E2E test'),
-        );
-      },
-      { timeout: 30000 },
-    );
+    // Step 8: Wait for the task's row to appear in the board.
+    await expect(
+      page.getByRole('checkbox', { name: `Done: ${taskTitle}`, exact: true }),
+    ).toBeVisible({ timeout: 30000 });
 
-    // Step 9: Verify task is visible with priority
-    const taskTitle = page.locator('h3', {
-      hasText: 'Buy groceries for E2E test',
-    });
-    await expect(taskTitle).toBeVisible();
-
-    // Verify priority 'medium' is displayed
-    // The badge sits in a sibling row of the title's own flex row, so the
-    // shared ancestor is two levels up from the heading.
-    const taskItem = taskTitle.locator('..').locator('..');
-    const priorityBadge = taskItem.locator('span', { hasText: 'medium' });
-    await expect(priorityBadge).toBeVisible();
+    // Step 9: Verify priority 'Med' (medium) is shown on that task's row. The
+    // row is the element whose direct child is the task's checkbox.
+    await expect(
+      page.locator(rowSelector).getByText('Med', { exact: true }),
+    ).toBeVisible();
 
     // Step 10: Reload the page
     await page.reload();
@@ -350,28 +346,14 @@ test.describe('Tasks (E2E)', () => {
     // Step 11: After reload, vault is locked again - unlock it
     await unlockWithPassphrase(page, E2E_VAULT_PHRASE);
 
-    // Step 12: Wait for task list to appear after unlock
-    await page.waitForFunction(
-      () => {
-        const h3Elements = Array.from(document.querySelectorAll('h3'));
-        return h3Elements.some((el) =>
-          el.textContent?.includes('Buy groceries for E2E test'),
-        );
-      },
-      { timeout: 30000 },
-    );
+    // Step 12: Wait for the task's row after unlock
+    await expect(
+      page.getByRole('checkbox', { name: `Done: ${taskTitle}`, exact: true }),
+    ).toBeVisible({ timeout: 30000 });
 
-    // Step 13: Assert task title is visible after reload
-    const reloadedTaskTitle = page.locator('h3', {
-      hasText: 'Buy groceries for E2E test',
-    });
-    await expect(reloadedTaskTitle).toBeVisible();
-
-    // Step 14: Verify priority 'medium' is still displayed after reload
-    const reloadedTaskItem = reloadedTaskTitle.locator('..').locator('..');
-    const reloadedPriorityBadge = reloadedTaskItem.locator('span', {
-      hasText: 'medium',
-    });
-    await expect(reloadedPriorityBadge).toBeVisible();
+    // Step 13: Priority 'Med' is still on the row after reload
+    await expect(
+      page.locator(rowSelector).getByText('Med', { exact: true }),
+    ).toBeVisible();
   });
 });

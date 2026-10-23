@@ -24,6 +24,8 @@ import { AdminYouTubeAccessController } from './../controllers/AdminYouTubeAcces
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminUsersController } from './../controllers/AdminUsersController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { AdminOverviewController } from './../controllers/AdminOverviewController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminFeedbackController } from './../controllers/AdminFeedbackController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AdminAuditLogController } from './../controllers/AdminAuditLogController';
@@ -561,10 +563,15 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"union","subSchemas":[{"ref":"FeedbackReportDto"},{"ref":"ErrorResponse"}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "FeedbackReportPlatform": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["web"]},{"dataType":"enum","enums":["ios"]},{"dataType":"enum","enums":["android"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ReportContextRequest": {
         "dataType": "refObject",
         "properties": {
-            "platform": {"dataType":"string","required":true},
+            "platform": {"ref":"FeedbackReportPlatform","required":true},
             "appVersion": {"dataType":"string","required":true},
             "browser": {"dataType":"string","required":true},
             "operatingSystem": {"dataType":"string","required":true},
@@ -734,8 +741,30 @@ const models: TsoaRoute.Models = {
             "disabled": {"dataType":"boolean","required":true},
             "emailVerified": {"dataType":"boolean","required":true},
             "youtubeAccess": {"dataType":"boolean","required":true},
+            "createdAt": {"dataType":"datetime","required":true},
         },
         "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserListResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "users": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminUserIdentity"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserStatusFilter": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["active"]},{"dataType":"enum","enums":["unverified"]},{"dataType":"enum","enums":["disabled"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminUserSort": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["newest"]},{"dataType":"enum","enums":["name"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "YouTubeDisconnectOutcome": {
@@ -746,6 +775,23 @@ const models: TsoaRoute.Models = {
     "WithdrawYouTubeAccessResponse": {
         "dataType": "refAlias",
         "type": {"dataType":"intersection","subSchemas":[{"ref":"AdminUserIdentity"},{"dataType":"nestedObjectLiteral","nestedProperties":{"youtubeDisconnect":{"ref":"YouTubeDisconnectOutcome","required":true}}}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminOverviewResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "users": {"dataType":"double","required":true},
+            "usersJoinedLast7Days": {"dataType":"double","required":true},
+            "platformAdmins": {"dataType":"double","required":true},
+            "unverified": {"dataType":"double","required":true},
+            "unverifiedOverAWeek": {"dataType":"double","required":true},
+            "disabled": {"dataType":"double","required":true},
+            "youtubeAccessPlacesUsed": {"dataType":"double","required":true},
+            "youtubeAccessPlacesLeft": {"dataType":"double","required":true},
+            "youtubeAccessCeiling": {"dataType":"double","required":true},
+            "feedbackReportsReceived": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "AdminFeedbackReporterDto": {
@@ -775,10 +821,13 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "ListAdminFeedbackReportsResponse": {
+    "AdminFeedbackReportListResponse": {
         "dataType": "refObject",
         "properties": {
             "items": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminFeedbackReportListItemDto"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -864,8 +913,23 @@ const models: TsoaRoute.Models = {
             "id": {"dataType":"string","required":true},
             "actorUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
             "targetUserId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "actorName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "targetName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "actorDeleted": {"dataType":"boolean","required":true},
+            "targetDeleted": {"dataType":"boolean","required":true},
             "action": {"ref":"AdminAuditAction","required":true},
             "createdAt": {"dataType":"datetime","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AdminAuditLogListResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "entries": {"dataType":"array","array":{"dataType":"refObject","ref":"AdminAuditLogEntry"},"required":true},
+            "total": {"dataType":"double","required":true},
+            "page": {"dataType":"double","required":true},
+            "pageSize": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -2409,6 +2473,11 @@ export function RegisterRoutes(app: Router) {
         const argsAdminUsersController_listUsers: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
                 q: {"in":"query","name":"q","dataType":"string"},
+                status: {"in":"query","name":"status","ref":"AdminUserStatusFilter"},
+                role: {"in":"query","name":"role","ref":"UserRole"},
+                sort: {"in":"query","name":"sort","ref":"AdminUserSort"},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/users',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),
@@ -2739,13 +2808,45 @@ export function RegisterRoutes(app: Router) {
             }
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsAdminOverviewController_getAdminOverview: Record<string, TsoaRoute.ParameterSchema> = {
+                req: {"in":"request","name":"req","required":true,"dataType":"object"},
+        };
+        app.get('/admin/overview',
+            authenticateMiddleware([{"jwt":["platform_admin"]}]),
+            ...(fetchMiddlewares<RequestHandler>(AdminOverviewController)),
+            ...(fetchMiddlewares<RequestHandler>(AdminOverviewController.prototype.getAdminOverview)),
+
+            async function AdminOverviewController_getAdminOverview(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsAdminOverviewController_getAdminOverview, request, response });
+
+                const controller = new AdminOverviewController();
+
+              await templateService.apiHandler({
+                methodName: 'getAdminOverview',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAdminFeedbackController_listFeedbackReports: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
                 status: {"in":"query","name":"status","ref":"FeedbackReportStatus"},
                 kind: {"in":"query","name":"kind","ref":"FeedbackReportKind"},
-                platform: {"in":"query","name":"platform","dataType":"string"},
-                trackingIssueNumber: {"in":"query","name":"trackingIssueNumber","dataType":"double"},
-                limit: {"in":"query","name":"limit","dataType":"double"},
+                platform: {"in":"query","name":"platform","ref":"FeedbackReportPlatform"},
+                trackingIssueNumber: {"in":"query","name":"trackingIssueNumber","dataType":"integer","validators":{"isInt":{"errorMsg":"trackingIssueNumber"},"minimum":{"value":1}}},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/feedback/reports',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),
@@ -2973,7 +3074,10 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsAdminAuditLogController_listAuditLogs: Record<string, TsoaRoute.ParameterSchema> = {
                 req: {"in":"request","name":"req","required":true,"dataType":"object"},
-                limit: {"in":"query","name":"limit","dataType":"double"},
+                userId: {"in":"query","name":"userId","dataType":"string"},
+                action: {"in":"query","name":"action","dataType":"array","array":{"dataType":"refAlias","ref":"AdminAuditAction"}},
+                page: {"in":"query","name":"page","dataType":"integer","validators":{"isInt":{"errorMsg":"page"},"minimum":{"value":1}}},
+                pageSize: {"in":"query","name":"pageSize","dataType":"integer","validators":{"isInt":{"errorMsg":"pageSize"},"minimum":{"value":1},"maximum":{"value":100}}},
         };
         app.get('/admin/audit-logs',
             authenticateMiddleware([{"jwt":["platform_admin"]}]),

@@ -327,23 +327,32 @@ test.describe('Tasks Vault Sync Convergence (E2E)', () => {
     const uniqueTitle = `Task ${Date.now()}`;
     const initialTasksEtag = serverBlobEtags.tasks;
 
-    await page1.getByRole('button', { name: 'Add Task' }).first().click();
+    // The header and all-clear card both carry "Add task", so the trigger is the first.
+    await page1
+      .getByRole('button', { name: 'Add task', exact: true })
+      .first()
+      .click();
     await expect(page1.getByRole('dialog')).toBeVisible({ timeout: 30000 });
-    await expect(page1.getByLabel('Title')).toBeVisible({ timeout: 30000 });
+    await expect(page1.getByLabel('Title', { exact: true })).toBeVisible({
+      timeout: 30000,
+    });
 
-    await page1.getByLabel('Title').fill(uniqueTitle);
+    await page1.getByLabel('Title', { exact: true }).fill(uniqueTitle);
 
     // Submit button is scoped to the dialog to avoid collision with page trigger.
     const submitButton = page1
       .getByRole('dialog')
-      .getByRole('button', { name: 'Add Task' });
+      .getByRole('button', { name: 'Add task', exact: true });
     await expect(submitButton).toBeVisible();
     await submitButton.click();
 
     // Wait for task to appear in ctx1's DOM (local save)
-    await expect(page1.locator('h3', { hasText: uniqueTitle })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(
+      page1.getByRole('checkbox', {
+        name: `Done: ${uniqueTitle}`,
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30000 });
 
     // Step 11: Poll for push — tasks blob etag should change
     // Push drains after VAULT_SYNC_DRAIN_DELAY_MS = 1000ms
@@ -385,9 +394,12 @@ test.describe('Tasks Vault Sync Convergence (E2E)', () => {
     await unlockWithPassphrase(page2, passphrase);
 
     // Step 18: Assert task is visible in ctx2 after re-navigation and unlock
-    await expect(page2.locator('h3', { hasText: uniqueTitle })).toBeVisible({
-      timeout: 60000,
-    });
+    await expect(
+      page2.getByRole('checkbox', {
+        name: `Done: ${uniqueTitle}`,
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 60000 });
 
     // Step 19: Final assertion — no whole-Vault prompt anywhere
     await expect(page1.getByTestId('vault-standoff-dialog')).toHaveCount(0);

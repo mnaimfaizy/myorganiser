@@ -1,5 +1,9 @@
 export { default as AdminGuard } from './components/AdminGuard';
+export { AdminHeader } from './components/AdminHeader';
+export { AdminPhoneBar } from './components/AdminPhoneBar';
 export { AdminSidebar } from './components/AdminSidebar';
+export { AdminTabBar } from './components/AdminTabBar';
+export { AdminOverviewProvider } from './hooks/use-admin-overview';
 export { default as AdminAuditLogPage } from './pages/AdminAuditLogPage';
 export { default as AdminFeedbackPage } from './pages/AdminFeedbackPage';
 export { default as AdminFeedbackReportPage } from './pages/AdminFeedbackReportPage';

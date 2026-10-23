@@ -75,6 +75,7 @@ export async function addTaskToWorkflow(
       status: 'pending',
       context: formData.context,
       dueDate: formData.dueDate,
+      estimatedMinutes: formData.estimatedMinutes,
       archived: false,
       createdAt: now,
     },

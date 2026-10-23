@@ -3,16 +3,24 @@ export const neutral0 = "#ffffff";
 export const neutral0Var = 'var(--neutral-0)';
 export const neutral50 = "#f8fafc";
 export const neutral50Var = 'var(--neutral-50)';
+export const neutral100 = "#f1f5f9";
+export const neutral100Var = 'var(--neutral-100)';
 export const neutral150 = "#eceef0";
 export const neutral150Var = 'var(--neutral-150)';
 export const neutral200 = "#e2e8f0";
 export const neutral200Var = 'var(--neutral-200)';
+export const neutral300 = "#cbd5e1";
+export const neutral300Var = 'var(--neutral-300)';
 export const neutral400 = "#94a3b8";
 export const neutral400Var = 'var(--neutral-400)';
 export const neutral450 = "#7f8ea3";
 export const neutral450Var = 'var(--neutral-450)';
 export const neutral500 = "#64748b";
 export const neutral500Var = 'var(--neutral-500)';
+export const neutral600 = "#475569";
+export const neutral600Var = 'var(--neutral-600)';
+export const neutral700 = "#334155";
+export const neutral700Var = 'var(--neutral-700)';
 export const neutral800 = "#1d283a";
 export const neutral800Var = 'var(--neutral-800)';
 export const neutral850 = "#0f172a";
@@ -21,6 +29,70 @@ export const neutral900 = "#030711";
 export const neutral900Var = 'var(--neutral-900)';
 export const neutral950 = "#020205";
 export const neutral950Var = 'var(--neutral-950)';
+export const violet100 = "#ede9fe";
+export const violet100Var = 'var(--violet-100)';
+export const violet300 = "#c4b5fd";
+export const violet300Var = 'var(--violet-300)';
+export const violet600 = "#7c3aed";
+export const violet600Var = 'var(--violet-600)';
+export const violet700 = "#6d28d9";
+export const violet700Var = 'var(--violet-700)';
+export const violet800 = "#5b21b6";
+export const violet800Var = 'var(--violet-800)';
+export const violet900 = "#4c1d95";
+export const violet900Var = 'var(--violet-900)';
+export const teal50 = "#f0fdfa";
+export const teal50Var = 'var(--teal-50)';
+export const teal100 = "#ccfbf1";
+export const teal100Var = 'var(--teal-100)';
+export const teal200 = "#99f6e4";
+export const teal200Var = 'var(--teal-200)';
+export const teal400 = "#2dd4bf";
+export const teal400Var = 'var(--teal-400)';
+export const teal700 = "#0f766e";
+export const teal700Var = 'var(--teal-700)';
+export const teal800 = "#115e59";
+export const teal800Var = 'var(--teal-800)';
+export const red50 = "#fef2f2";
+export const red50Var = 'var(--red-50)';
+export const red100 = "#fee2e2";
+export const red100Var = 'var(--red-100)';
+export const red300 = "#fca5a5";
+export const red300Var = 'var(--red-300)';
+export const red600 = "#dc2626";
+export const red600Var = 'var(--red-600)';
+export const red700 = "#b91c1c";
+export const red700Var = 'var(--red-700)';
+export const red800 = "#991b1b";
+export const red800Var = 'var(--red-800)';
+export const amber50 = "#fffbeb";
+export const amber50Var = 'var(--amber-50)';
+export const amber100 = "#fef3c7";
+export const amber100Var = 'var(--amber-100)';
+export const amber300 = "#fcd34d";
+export const amber300Var = 'var(--amber-300)';
+export const amber700 = "#b45309";
+export const amber700Var = 'var(--amber-700)';
+export const amber800 = "#92400e";
+export const amber800Var = 'var(--amber-800)';
+export const green50 = "#f0fdf4";
+export const green50Var = 'var(--green-50)';
+export const green100 = "#dcfce7";
+export const green100Var = 'var(--green-100)';
+export const green300 = "#86efac";
+export const green300Var = 'var(--green-300)';
+export const green700 = "#15803d";
+export const green700Var = 'var(--green-700)';
+export const green800 = "#166534";
+export const green800Var = 'var(--green-800)';
+export const cyan400 = "#22d3ee";
+export const cyan400Var = 'var(--cyan-400)';
+export const cyan500 = "#06b6d4";
+export const cyan500Var = 'var(--cyan-500)';
+export const cyan700 = "#0e7490";
+export const cyan700Var = 'var(--cyan-700)';
+export const orange700 = "#c2410c";
+export const orange700Var = 'var(--orange-700)';
 /** Deep slate navy. Branding, primary text, grounding elements. */
 export const colorPrimary = "#0f172a";
 export const colorPrimaryVar = 'var(--color-primary)';
@@ -91,6 +163,16 @@ export const fontDisplayVar = 'var(--font-display)';
 /** Body copy and UI labels. */
 export const fontBody = "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
 export const fontBodyVar = 'var(--font-body)';
+export const fontWeightRegular = "400";
+export const fontWeightRegularVar = 'var(--font-weight-regular)';
+export const fontWeightMedium = "500";
+export const fontWeightMediumVar = 'var(--font-weight-medium)';
+export const fontWeightSemibold = "600";
+export const fontWeightSemiboldVar = 'var(--font-weight-semibold)';
+export const fontWeightBold = "700";
+export const fontWeightBoldVar = 'var(--font-weight-bold)';
+export const fontWeightExtrabold = "800";
+export const fontWeightExtraboldVar = 'var(--font-weight-extrabold)';
 export const typeDisplaySize = "34px";
 export const typeDisplaySizeVar = 'var(--type-display-size)';
 export const typeDisplayLineHeight = "40px";
@@ -147,6 +229,38 @@ export const typeCaptionWeight = "400";
 export const typeCaptionWeightVar = 'var(--type-caption-weight)';
 export const typeCaptionTracking = "0em";
 export const typeCaptionTrackingVar = 'var(--type-caption-tracking)';
+export const typeLabelSmSize = "11px";
+export const typeLabelSmSizeVar = 'var(--type-label-sm-size)';
+export const typeLabelSmLineHeight = "14px";
+export const typeLabelSmLineHeightVar = 'var(--type-label-sm-line-height)';
+export const typeLabelSmWeight = "600";
+export const typeLabelSmWeightVar = 'var(--type-label-sm-weight)';
+export const typeLabelSmTracking = "0em";
+export const typeLabelSmTrackingVar = 'var(--type-label-sm-tracking)';
+export const typeControlSmSize = "14px";
+export const typeControlSmSizeVar = 'var(--type-control-sm-size)';
+export const typeControlSmLineHeight = "20px";
+export const typeControlSmLineHeightVar = 'var(--type-control-sm-line-height)';
+export const typeControlSmWeight = "600";
+export const typeControlSmWeightVar = 'var(--type-control-sm-weight)';
+export const typeControlSmTracking = "0em";
+export const typeControlSmTrackingVar = 'var(--type-control-sm-tracking)';
+export const typeInputSize = "16px";
+export const typeInputSizeVar = 'var(--type-input-size)';
+export const typeInputLineHeight = "24px";
+export const typeInputLineHeightVar = 'var(--type-input-line-height)';
+export const typeInputWeight = "400";
+export const typeInputWeightVar = 'var(--type-input-weight)';
+export const typeInputTracking = "0em";
+export const typeInputTrackingVar = 'var(--type-input-tracking)';
+export const typeValueSize = "18px";
+export const typeValueSizeVar = 'var(--type-value-size)';
+export const typeValueLineHeight = "26px";
+export const typeValueLineHeightVar = 'var(--type-value-line-height)';
+export const typeValueWeight = "500";
+export const typeValueWeightVar = 'var(--type-value-weight)';
+export const typeValueTracking = "0em";
+export const typeValueTrackingVar = 'var(--type-value-tracking)';
 export const radiusSm = "0.25rem";
 export const radiusSmVar = 'var(--radius-sm)';
 export const radiusMd = "0.5rem";
@@ -159,6 +273,21 @@ export const radius2xl = "1.5rem";
 export const radius2xlVar = 'var(--radius-2xl)';
 export const radiusFull = "9999px";
 export const radiusFullVar = 'var(--radius-full)';
+/** 9px. An item inside a menu, listbox or segmented control — its container radius less the container padding. */
+export const radiusItem = "0.5625rem";
+export const radiusItemVar = 'var(--radius-item)';
+/** 10px. A 36px control: small button, filter chip, banner action, 40px icon button, avatar tile. */
+export const radiusControlSm = "0.625rem";
+export const radiusControlSmVar = 'var(--radius-control-sm)';
+/** 14px. A menu or listbox surface. */
+export const radiusMenu = "0.875rem";
+export const radiusMenuVar = 'var(--radius-menu)';
+/** 18px. The 56px Quick add button. */
+export const radiusFab = "1.125rem";
+export const radiusFabVar = 'var(--radius-fab)';
+/** 20px. A dashboard card, data-table card, section card or dialog. */
+export const radiusPanel = "1.25rem";
+export const radiusPanelVar = 'var(--radius-panel)';
 export const spaceXs = "4px";
 export const spaceXsVar = 'var(--space-xs)';
 export const spaceSm = "8px";
@@ -169,30 +298,96 @@ export const spaceLg = "24px";
 export const spaceLgVar = 'var(--space-lg)';
 export const spaceXl = "32px";
 export const spaceXlVar = 'var(--space-xl)';
+export const space2xl = "48px";
+export const space2xlVar = 'var(--space-2xl)';
 export const spaceGutter = "16px";
 export const spaceGutterVar = 'var(--space-gutter)';
 export const spaceMarginMobile = "16px";
 export const spaceMarginMobileVar = 'var(--space-margin-mobile)';
 export const spaceMarginDesktop = "24px";
 export const spaceMarginDesktopVar = 'var(--space-margin-desktop)';
+/** 18px. Horizontal padding of a 44px or 48px button; off the 4px grid, as the Buttons sheet draws it. */
+export const spaceControlX = "18px";
+export const spaceControlXVar = 'var(--space-control-x)';
+/** An icon inside a button, an icon button or a field. */
+export const sizeIcon = "18px";
+export const sizeIconVar = 'var(--size-icon)';
+/** The icon in the 56px floating action button. */
+export const sizeIconFab = "22px";
+export const sizeIconFabVar = 'var(--size-icon-fab)';
+/** The width of a switch track; its height is 32px, spacing step 8. */
+export const sizeSwitchWidth = "52px";
+export const sizeSwitchWidthVar = 'var(--size-switch-width)';
+/** The switch thumb, inset 3px inside the 32px track. */
+export const sizeSwitchThumb = "26px";
+export const sizeSwitchThumbVar = 'var(--size-switch-thumb)';
 /** Ambient card shadow per Secure Modernism spec. */
 export const shadowCard = "0px 1px 3px rgba(15, 23, 42, 0.05)";
 export const shadowCardVar = 'var(--shadow-card)';
+/** Menus, listboxes, sheets and the light (error) toast. */
 export const shadowPopover = "0 12px 24px rgba(15, 23, 42, 0.08)";
 export const shadowPopoverVar = 'var(--shadow-popover)';
+/** A dialog or alert dialog. */
+export const shadowDialog = "0 24px 48px rgba(15, 23, 42, 0.14)";
+export const shadowDialogVar = 'var(--shadow-dialog)';
+/** A navy toast. Deeper than popover because a dark surface over a light page needs more separation. */
+export const shadowToast = "0 12px 24px rgba(15, 23, 42, 0.16)";
+export const shadowToastVar = 'var(--shadow-toast)';
+/** The selected segment of a segmented control. */
+export const shadowSegment = "0 1px 3px rgba(15, 23, 42, 0.12)";
+export const shadowSegmentVar = 'var(--shadow-segment)';
+/** The Quick add button: brand violet at 35%, the one coloured shadow. */
+export const shadowBrand = "0 10px 24px rgba(124, 58, 237, 0.35)";
+export const shadowBrandVar = 'var(--shadow-brand)';
 
 export const tokens = {
   'neutral-0': { value: "#ffffff", cssVar: 'var(--neutral-0)' },
   'neutral-50': { value: "#f8fafc", cssVar: 'var(--neutral-50)' },
+  'neutral-100': { value: "#f1f5f9", cssVar: 'var(--neutral-100)' },
   'neutral-150': { value: "#eceef0", cssVar: 'var(--neutral-150)' },
   'neutral-200': { value: "#e2e8f0", cssVar: 'var(--neutral-200)' },
+  'neutral-300': { value: "#cbd5e1", cssVar: 'var(--neutral-300)' },
   'neutral-400': { value: "#94a3b8", cssVar: 'var(--neutral-400)' },
   'neutral-450': { value: "#7f8ea3", cssVar: 'var(--neutral-450)' },
   'neutral-500': { value: "#64748b", cssVar: 'var(--neutral-500)' },
+  'neutral-600': { value: "#475569", cssVar: 'var(--neutral-600)' },
+  'neutral-700': { value: "#334155", cssVar: 'var(--neutral-700)' },
   'neutral-800': { value: "#1d283a", cssVar: 'var(--neutral-800)' },
   'neutral-850': { value: "#0f172a", cssVar: 'var(--neutral-850)' },
   'neutral-900': { value: "#030711", cssVar: 'var(--neutral-900)' },
   'neutral-950': { value: "#020205", cssVar: 'var(--neutral-950)' },
+  'violet-100': { value: "#ede9fe", cssVar: 'var(--violet-100)' },
+  'violet-300': { value: "#c4b5fd", cssVar: 'var(--violet-300)' },
+  'violet-600': { value: "#7c3aed", cssVar: 'var(--violet-600)' },
+  'violet-700': { value: "#6d28d9", cssVar: 'var(--violet-700)' },
+  'violet-800': { value: "#5b21b6", cssVar: 'var(--violet-800)' },
+  'violet-900': { value: "#4c1d95", cssVar: 'var(--violet-900)' },
+  'teal-50': { value: "#f0fdfa", cssVar: 'var(--teal-50)' },
+  'teal-100': { value: "#ccfbf1", cssVar: 'var(--teal-100)' },
+  'teal-200': { value: "#99f6e4", cssVar: 'var(--teal-200)' },
+  'teal-400': { value: "#2dd4bf", cssVar: 'var(--teal-400)' },
+  'teal-700': { value: "#0f766e", cssVar: 'var(--teal-700)' },
+  'teal-800': { value: "#115e59", cssVar: 'var(--teal-800)' },
+  'red-50': { value: "#fef2f2", cssVar: 'var(--red-50)' },
+  'red-100': { value: "#fee2e2", cssVar: 'var(--red-100)' },
+  'red-300': { value: "#fca5a5", cssVar: 'var(--red-300)' },
+  'red-600': { value: "#dc2626", cssVar: 'var(--red-600)' },
+  'red-700': { value: "#b91c1c", cssVar: 'var(--red-700)' },
+  'red-800': { value: "#991b1b", cssVar: 'var(--red-800)' },
+  'amber-50': { value: "#fffbeb", cssVar: 'var(--amber-50)' },
+  'amber-100': { value: "#fef3c7", cssVar: 'var(--amber-100)' },
+  'amber-300': { value: "#fcd34d", cssVar: 'var(--amber-300)' },
+  'amber-700': { value: "#b45309", cssVar: 'var(--amber-700)' },
+  'amber-800': { value: "#92400e", cssVar: 'var(--amber-800)' },
+  'green-50': { value: "#f0fdf4", cssVar: 'var(--green-50)' },
+  'green-100': { value: "#dcfce7", cssVar: 'var(--green-100)' },
+  'green-300': { value: "#86efac", cssVar: 'var(--green-300)' },
+  'green-700': { value: "#15803d", cssVar: 'var(--green-700)' },
+  'green-800': { value: "#166534", cssVar: 'var(--green-800)' },
+  'cyan-400': { value: "#22d3ee", cssVar: 'var(--cyan-400)' },
+  'cyan-500': { value: "#06b6d4", cssVar: 'var(--cyan-500)' },
+  'cyan-700': { value: "#0e7490", cssVar: 'var(--cyan-700)' },
+  'orange-700': { value: "#c2410c", cssVar: 'var(--orange-700)' },
   'color-primary': { value: "#0f172a", cssVar: 'var(--color-primary)' },
   'color-secondary': { value: "#7c3aed", cssVar: 'var(--color-secondary)' },
   'color-tertiary': { value: "#0f766e", cssVar: 'var(--color-tertiary)' },
@@ -217,6 +412,11 @@ export const tokens = {
   'color-success-on-dark': { value: "#4ade80", cssVar: 'var(--color-success-on-dark)' },
   'font-display': { value: "'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif", cssVar: 'var(--font-display)' },
   'font-body': { value: "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif", cssVar: 'var(--font-body)' },
+  'font-weight-regular': { value: "400", cssVar: 'var(--font-weight-regular)' },
+  'font-weight-medium': { value: "500", cssVar: 'var(--font-weight-medium)' },
+  'font-weight-semibold': { value: "600", cssVar: 'var(--font-weight-semibold)' },
+  'font-weight-bold': { value: "700", cssVar: 'var(--font-weight-bold)' },
+  'font-weight-extrabold': { value: "800", cssVar: 'var(--font-weight-extrabold)' },
   'type-display-size': { value: "34px", cssVar: 'var(--type-display-size)' },
   'type-display-line-height': { value: "40px", cssVar: 'var(--type-display-line-height)' },
   'type-display-weight': { value: "800", cssVar: 'var(--type-display-weight)' },
@@ -245,22 +445,53 @@ export const tokens = {
   'type-caption-line-height': { value: "18px", cssVar: 'var(--type-caption-line-height)' },
   'type-caption-weight': { value: "400", cssVar: 'var(--type-caption-weight)' },
   'type-caption-tracking': { value: "0em", cssVar: 'var(--type-caption-tracking)' },
+  'type-label-sm-size': { value: "11px", cssVar: 'var(--type-label-sm-size)' },
+  'type-label-sm-line-height': { value: "14px", cssVar: 'var(--type-label-sm-line-height)' },
+  'type-label-sm-weight': { value: "600", cssVar: 'var(--type-label-sm-weight)' },
+  'type-label-sm-tracking': { value: "0em", cssVar: 'var(--type-label-sm-tracking)' },
+  'type-control-sm-size': { value: "14px", cssVar: 'var(--type-control-sm-size)' },
+  'type-control-sm-line-height': { value: "20px", cssVar: 'var(--type-control-sm-line-height)' },
+  'type-control-sm-weight': { value: "600", cssVar: 'var(--type-control-sm-weight)' },
+  'type-control-sm-tracking': { value: "0em", cssVar: 'var(--type-control-sm-tracking)' },
+  'type-input-size': { value: "16px", cssVar: 'var(--type-input-size)' },
+  'type-input-line-height': { value: "24px", cssVar: 'var(--type-input-line-height)' },
+  'type-input-weight': { value: "400", cssVar: 'var(--type-input-weight)' },
+  'type-input-tracking': { value: "0em", cssVar: 'var(--type-input-tracking)' },
+  'type-value-size': { value: "18px", cssVar: 'var(--type-value-size)' },
+  'type-value-line-height': { value: "26px", cssVar: 'var(--type-value-line-height)' },
+  'type-value-weight': { value: "500", cssVar: 'var(--type-value-weight)' },
+  'type-value-tracking': { value: "0em", cssVar: 'var(--type-value-tracking)' },
   'radius-sm': { value: "0.25rem", cssVar: 'var(--radius-sm)' },
   'radius-md': { value: "0.5rem", cssVar: 'var(--radius-md)' },
   'radius-lg': { value: "0.75rem", cssVar: 'var(--radius-lg)' },
   'radius-xl': { value: "1rem", cssVar: 'var(--radius-xl)' },
   'radius-2xl': { value: "1.5rem", cssVar: 'var(--radius-2xl)' },
   'radius-full': { value: "9999px", cssVar: 'var(--radius-full)' },
+  'radius-item': { value: "0.5625rem", cssVar: 'var(--radius-item)' },
+  'radius-control-sm': { value: "0.625rem", cssVar: 'var(--radius-control-sm)' },
+  'radius-menu': { value: "0.875rem", cssVar: 'var(--radius-menu)' },
+  'radius-fab': { value: "1.125rem", cssVar: 'var(--radius-fab)' },
+  'radius-panel': { value: "1.25rem", cssVar: 'var(--radius-panel)' },
   'space-xs': { value: "4px", cssVar: 'var(--space-xs)' },
   'space-sm': { value: "8px", cssVar: 'var(--space-sm)' },
   'space-md': { value: "16px", cssVar: 'var(--space-md)' },
   'space-lg': { value: "24px", cssVar: 'var(--space-lg)' },
   'space-xl': { value: "32px", cssVar: 'var(--space-xl)' },
+  'space-2xl': { value: "48px", cssVar: 'var(--space-2xl)' },
   'space-gutter': { value: "16px", cssVar: 'var(--space-gutter)' },
   'space-margin-mobile': { value: "16px", cssVar: 'var(--space-margin-mobile)' },
   'space-margin-desktop': { value: "24px", cssVar: 'var(--space-margin-desktop)' },
+  'space-control-x': { value: "18px", cssVar: 'var(--space-control-x)' },
+  'size-icon': { value: "18px", cssVar: 'var(--size-icon)' },
+  'size-icon-fab': { value: "22px", cssVar: 'var(--size-icon-fab)' },
+  'size-switch-width': { value: "52px", cssVar: 'var(--size-switch-width)' },
+  'size-switch-thumb': { value: "26px", cssVar: 'var(--size-switch-thumb)' },
   'shadow-card': { value: "0px 1px 3px rgba(15, 23, 42, 0.05)", cssVar: 'var(--shadow-card)' },
-  'shadow-popover': { value: "0 12px 24px rgba(15, 23, 42, 0.08)", cssVar: 'var(--shadow-popover)' }
+  'shadow-popover': { value: "0 12px 24px rgba(15, 23, 42, 0.08)", cssVar: 'var(--shadow-popover)' },
+  'shadow-dialog': { value: "0 24px 48px rgba(15, 23, 42, 0.14)", cssVar: 'var(--shadow-dialog)' },
+  'shadow-toast': { value: "0 12px 24px rgba(15, 23, 42, 0.16)", cssVar: 'var(--shadow-toast)' },
+  'shadow-segment': { value: "0 1px 3px rgba(15, 23, 42, 0.12)", cssVar: 'var(--shadow-segment)' },
+  'shadow-brand': { value: "0 10px 24px rgba(124, 58, 237, 0.35)", cssVar: 'var(--shadow-brand)' }
 } as const;
 
 export type TokenName = keyof typeof tokens;

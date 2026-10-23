@@ -12,14 +12,14 @@ import {
 } from './helpers';
 
 /**
- * E2E tests for addresses management (create / add usage location / delete / detail navigation).
+ * E2E tests for addresses management (create / add place / delete / detail navigation).
  * Uses the vault mocking patterns from `vault.spec.ts` and an in-memory blob store
  * per-test to ensure isolation.
  *
  * Single continuous test covering:
  * - Step A: Empty list, add an Address via the sheet
  * - Step B: Follow the post-save step to the detail page
- * - Step C: Add a Usage Location through its dialog
+ * - Step C: Add a place (Usage Location) through its dialog
  * - Step D: Delete it, refused until confirmed, cancel destroys nothing
  * - Step E: Prove the detail route resolves from a direct navigation
  */
@@ -283,14 +283,15 @@ async function setupRoutes(page: import('@playwright/test').Page) {
 }
 
 /**
- * Assert the ConfirmDeleteDialog for a usage location is open with the
+ * Assert the delete-place ConfirmDialog (role alertdialog) is open with the
  * expected interpolated title, and return it scoped for further assertions.
  */
 async function expectDeleteConfirmDialogVisible(
   page: import('@playwright/test').Page,
   organisationName: string,
 ) {
-  const dialog = page.getByRole('dialog');
+  // ConfirmDeleteDialog wraps ConfirmDialog, which is an alertdialog.
+  const dialog = page.getByRole('alertdialog');
   await expect(
     dialog.getByText(new RegExp(`Delete "${organisationName}"\\?`)),
   ).toBeVisible({ timeout: 10000 });
@@ -341,8 +342,8 @@ test.describe('Addresses (E2E)', () => {
     await sheet.getByLabel('Label').fill('E2E Home Address');
     await sheet.getByLabel('Street').fill('Baker Street');
     await sheet.getByLabel('Suburb or city').fill('London');
-    await sheet.getByLabel('State or province').fill('Greater London');
-    await sheet.getByLabel('Zip or postal code').fill('NW1 6XE');
+    await sheet.getByLabel('State', { exact: true }).fill('Greater London');
+    await sheet.getByLabel('Postcode', { exact: true }).fill('NW1 6XE');
 
     // Step A8: Submit the form
     const saveButton = sheet.getByRole('button', { name: 'Save address' });
@@ -369,47 +370,66 @@ test.describe('Addresses (E2E)', () => {
     const addressId = urlMatch ? urlMatch[1] : null;
     expect(addressId).toBeTruthy();
 
-    // Step B3: Assert the Usage Locations table is empty on arrival, no dialog opened
+    // Step B3: Assert the places checklist is empty on arrival, no dialog opened
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByText('No usage locations yet')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Usage Locations', exact: true }),
+      page.getByText('No places yet', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        level: 2,
+        name: 'Places to update',
+        exact: true,
+      }),
     ).toBeVisible();
 
-    // Step C1: Click "Add Location" button to open the dialog (use .first() to avoid selector collision)
-    const addLocationButton = page
-      .getByRole('button', { name: 'Add Location' })
+    // Step C1: Click "Add place" to open the dialog (the card header and the
+    // empty state both carry it while the list is empty, so take the first)
+    const addPlaceButton = page
+      .getByRole('button', { name: 'Add place', exact: true })
       .first();
-    await expect(addLocationButton).toBeVisible();
-    await addLocationButton.click();
+    await expect(addPlaceButton).toBeVisible();
+    await addPlaceButton.click();
 
-    // Step C2: Assert the UsageLocationDialog opened
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Add usage location')).toBeVisible({
-      timeout: 10000,
+    // Step C2: Assert the Add place dialog opened
+    const dialog = page.getByRole('dialog', { name: 'Add place', exact: true });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    // Step C3: Fill the Organisation field
+    await dialog.getByLabel('Organisation', { exact: true }).fill('ATO');
+
+    // Step C4: Submit the dialog (the submit is "Add place" too, scoped to the dialog)
+    const addPlaceSubmitButton = dialog.getByRole('button', {
+      name: 'Add place',
+      exact: true,
     });
-
-    // Step C3: Fill Organisation Name field
-    await dialog.getByLabel('Organisation Name').fill('ATO');
-
-    // Step C4: Submit the dialog (click "Add location" button scoped to dialog)
-    const addLocationSubmitButton = dialog.getByRole('button', {
-      name: 'Add location',
-    });
-    await expect(addLocationSubmitButton).toBeEnabled({ timeout: 10000 });
-    await addLocationSubmitButton.click();
+    await expect(addPlaceSubmitButton).toBeEnabled({ timeout: 10000 });
+    await addPlaceSubmitButton.click();
 
     // Step C5: Assert the dialog closed
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    // Step C6: Assert the table now shows the new usage location
-    const row = page.getByRole('row', { name: /ATO/ });
+    // Step C6: Assert the checklist now shows the new place, as its ticked row
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('checkbox', {
+        name: 'Updated at ATO',
+        exact: true,
+      }),
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('No usage locations yet')).not.toBeVisible();
+    await expect(
+      page.getByText('No places yet', { exact: true }),
+    ).not.toBeVisible();
 
-    // Step D1: Click the delete button on the row
-    const deleteButton = row.getByRole('button', { name: 'Delete' });
-    await deleteButton.click();
+    // Step D1: Open the row's "More for ATO" menu and choose "Delete place…"
+    const moreButton = row.getByRole('button', {
+      name: 'More for ATO',
+      exact: true,
+    });
+    await moreButton.click();
+    await page
+      .getByRole('menuitem', { name: 'Delete place…', exact: true })
+      .click();
 
     // Step D2: Assert the confirm dialog opened
     const confirmDialog = await expectDeleteConfirmDialogVisible(page, 'ATO');
@@ -420,15 +440,21 @@ test.describe('Addresses (E2E)', () => {
     ).toBeVisible();
 
     // Step D3: Cancel the deletion - nothing should be deleted
-    const cancelButton = confirmDialog.getByRole('button', { name: 'Cancel' });
+    const cancelButton = confirmDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
     await cancelButton.click();
 
     // Assert the dialog closed and the row is still present
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(row).toBeVisible();
 
-    // Step D4: Delete for real - click delete button again, then confirm
-    await deleteButton.click();
+    // Step D4: Delete for real - reopen the menu, choose "Delete place…", then confirm
+    await moreButton.click();
+    await page
+      .getByRole('menuitem', { name: 'Delete place…', exact: true })
+      .click();
 
     // Assert confirm dialog opened again (reopened after the cancelled attempt)
     const reopenedConfirmDialog = await expectDeleteConfirmDialogVisible(
@@ -436,16 +462,17 @@ test.describe('Addresses (E2E)', () => {
       'ATO',
     );
 
-    // Click the destructive Delete button
+    // Click the confirm button, which is named "Delete place" (not the menu item)
     const confirmDeleteButton = reopenedConfirmDialog.getByRole('button', {
-      name: /^Delete$/,
+      name: 'Delete place',
+      exact: true,
     });
     await confirmDeleteButton.click();
 
     // Step D5: Assert the dialog closed and the row is gone
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(row).not.toBeVisible();
-    await expect(page.getByText('No usage locations yet')).toBeVisible({
+    await expect(row).toHaveCount(0);
+    await expect(page.getByText('No places yet', { exact: true })).toBeVisible({
       timeout: 10000,
     });
 
@@ -455,14 +482,24 @@ test.describe('Addresses (E2E)', () => {
     // Step E2: Re-unlock vault after the full page navigation
     await unlockWithPassphrase(page, E2E_VAULT_PHRASE);
 
-    // Step E3: Assert the page renders the same address
-    await expect(page.getByText('E2E Home Address')).toBeVisible({
+    // Step E3: Assert the page renders the same address (its h1 is the label)
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: 'E2E Home Address',
+        exact: true,
+      }),
+    ).toBeVisible({
       timeout: 30000,
     });
     await expect(
-      page.getByRole('heading', { name: 'Usage Locations', exact: true }),
+      page.getByRole('heading', {
+        level: 2,
+        name: 'Places to update',
+        exact: true,
+      }),
     ).toBeVisible();
-    await expect(page.getByText('No usage locations yet')).toBeVisible({
+    await expect(page.getByText('No places yet', { exact: true })).toBeVisible({
       timeout: 10000,
     });
   });

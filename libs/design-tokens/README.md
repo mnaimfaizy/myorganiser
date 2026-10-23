@@ -1,7 +1,7 @@
 # `@myorganiser/design-tokens`
 
 Single source of truth for the MyOrganiser design system (colors, spacing,
-typography, radius, shadow). Based on the **Secure Modernism** spec in
+sizes, typography, radius, shadow). Based on the **Secure Modernism** spec in
 [DESIGN.md](DESIGN.md).
 
 ## Files
@@ -38,6 +38,20 @@ typography, radius, shadow). Based on the **Secure Modernism** spec in
 The **Mobile App theme reads roles, not primitives** (`roleLight` / `roleDark`).
 A primitive has one value and a themed app needs the pair, so a theme built out
 of primitives can only ever be light.
+
+The **tonal ramps** (`violet`, `teal`, `red`, `amber`, `green`, `cyan`,
+`orange`) are the hue equivalent of the Neutral Ramp: data the roles alias, and
+the Brand Primitives such as `color.secondary` are aliases of one rung. The one
+primitive-only use is a categorical colour with no meaning, such as an admin
+avatar ground, which a component reads as a TS constant.
+
+Both Tailwind configs spread one shared theme,
+[`tailwind-theme.cjs`](tailwind-theme.cjs), so a role is wired once. It exposes
+every role, the type scale (`text-body-sm`), the 12px control radius
+(`rounded-control`) and the off-scale radii (`rounded-panel`), the named sizes
+(`size-icon`, `px-control-x`), every shadow (`shadow-dialog`) and the two font
+stacks (`font-display`) by token name. The `input` type step is `text-field`,
+because `text-input` is the colour of the `input` role.
 
 The Neutral Ramp is deliberately **not** exposed as Tailwind utilities. Dark mode
 cannot be expressed without an ordered greyscale, but a second elevation vocabulary

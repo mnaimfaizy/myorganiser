@@ -106,6 +106,14 @@ const meta: Meta<typeof ConfirmDeleteDialogTriggerExample> = {
   component: ConfirmDeleteDialogTriggerExample,
   title: 'Components/ConfirmDeleteDialog',
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '**Deprecated.** Use `ConfirmDialog` with `tone="destructive"` and a confirm label that names the action and the object, for example "Delete list". This wrapper keeps the bare "Delete" default for existing callers and forwards everything to `ConfirmDialog`.',
+      },
+    },
+  },
 };
 
 export default meta;

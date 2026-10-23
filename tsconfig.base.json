@@ -39,13 +39,13 @@
       "@myorganiser/web-pages/dashboard": [
         "libs/web/pages/dashboard/src/index.ts"
       ],
+      "@myorganiser/web-pages/download": [
+        "libs/web/pages/download/src/index.ts"
+      ],
       "@myorganiser/web-pages/groceries": [
         "libs/web/pages/groceries/src/index.ts"
       ],
       "@myorganiser/web-pages/home": ["libs/web/pages/home/src/index.ts"],
-      "@myorganiser/web-pages/download": [
-        "libs/web/pages/download/src/index.ts"
-      ],
       "@myorganiser/web-pages/legal": ["libs/web/pages/legal/src/index.ts"],
       "@myorganiser/web-pages/mobile-numbers": [
         "libs/web/pages/mobile-numbers/src/index.ts"
@@ -58,6 +58,9 @@
       "@myorganiser/web-pages/vault": ["libs/web/pages/vault/src/index.ts"],
       "@myorganiser/web-pages/youtube": ["libs/web/pages/youtube/src/index.ts"],
       "@myorganiser/web-ui": ["libs/web/ui/src/index.ts"],
+      "@myorganiser/web-usage-locations": [
+        "libs/web/usage-locations/src/index.ts"
+      ],
       "@myorganiser/web-vault": ["libs/web/vault/src/index.ts"],
       "@myorganiser/web-vault-ui": ["libs/web/vault-ui/src/index.ts"],
       "@myorganiser/web-youtube": ["./libs/web/youtube/src/index.ts"]

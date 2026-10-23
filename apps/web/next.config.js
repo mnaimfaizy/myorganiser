@@ -38,6 +38,16 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: workspaceVersion,
   },
   poweredByHeader: false,
+  // `next dev` refuses its dev resources (HMR) to any hostname but localhost
+  // and the one it started on. Opening the dev server from a phone on the LAN
+  // needs that machine's address listed. It differs per developer and per
+  // network, so it comes from the environment, comma-separated hostnames with
+  // no scheme or port (e.g. `192.168.1.7`). Unset means Next.js's default.
+  // Ignored by `next build` and `next start`.
+  allowedDevOrigins: (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   async headers() {
     return [
       {

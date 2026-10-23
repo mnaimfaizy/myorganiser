@@ -43,6 +43,16 @@ describe('FixNoticeUnsubscribeClient', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('should link the MyOrganiser logo to the home page when no token is present', () => {
+    mockSearchParams.value = new URLSearchParams();
+
+    render(<FixNoticeUnsubscribeClient />);
+
+    expect(
+      screen.getByRole('link', { name: 'MyOrganiser home' }),
+    ).toHaveAttribute('href', '/');
+  });
+
   it('should show invalid-link state when token is only whitespace', () => {
     mockSearchParams.value = new URLSearchParams('token=   ');
 
@@ -202,5 +212,26 @@ describe('FixNoticeUnsubscribeClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     });
+  });
+
+  it('should offer Try again and a link to your reports in the error state', async () => {
+    mockSearchParams.value = new URLSearchParams('token=valid-token');
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    } as Response);
+
+    render(<FixNoticeUnsubscribeClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole('button', { name: /Try again/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Go to your reports/ }),
+    ).toHaveAttribute('href', '/dashboard/account/reports');
   });
 });

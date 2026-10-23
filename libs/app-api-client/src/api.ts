@@ -84,7 +84,7 @@ export type AdminAuditAction = typeof AdminAuditAction[keyof typeof AdminAuditAc
 
 
 /**
- * Platform Admin Audit Log entry returned by list APIs.
+ * Platform Admin Audit Log entry returned by list APIs. Every action targets a User (admin actions the acted-on User, feedback actions the reporter) and the actor is always set at write time, so a null id only arises from User Deletion\'s `onDelete: SetNull`. That is what `actorDeleted` and `targetDeleted` report; the matching name is null once the User is gone.
  */
 export interface AdminAuditLogEntry {
     'id': string;
@@ -96,11 +96,45 @@ export interface AdminAuditLogEntry {
      * Null once the affected User has been removed by User Deletion.
      */
     'targetUserId': string | null;
+    /**
+     * Display name of the acting User, or null once they are deleted.
+     */
+    'actorName': string | null;
+    /**
+     * Display name of the affected User, or null once they are deleted.
+     */
+    'targetName': string | null;
+    /**
+     * True when `actorUserId` is null (User Deletion removed the actor).
+     */
+    'actorDeleted': boolean;
+    /**
+     * True when `targetUserId` is null (User Deletion removed the target).
+     */
+    'targetDeleted': boolean;
     'action': AdminAuditAction;
     'createdAt': string;
 }
 
 
+/**
+ * One page of the Platform Admin Audit Log.
+ */
+export interface AdminAuditLogListResponse {
+    'entries': Array<AdminAuditLogEntry>;
+    /**
+     * Count matching the userId + action filters, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
 /**
  * Admin Feedback Report Context details.
  */
@@ -172,12 +206,75 @@ export interface AdminFeedbackReportListItemDto {
 
 
 /**
+ * Response body for the admin feedback report list: one page of reports, and the total that matches the filters ignoring paging.
+ */
+export interface AdminFeedbackReportListResponse {
+    'items': Array<AdminFeedbackReportListItemDto>;
+    /**
+     * Count matching the filters, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
+/**
  * Admin Feedback Reporter identity.
  */
 export interface AdminFeedbackReporterDto {
     'id': string;
     'name': string | null;
     'email': string;
+}
+/**
+ * Platform counts for the admin Overview page. Platform Admin only.
+ */
+export interface AdminOverviewResponse {
+    /**
+     * Total number of Users.
+     */
+    'users': number;
+    /**
+     * Users whose account was created in the last 7 days (created_at >= now − 7 days). Users created before User.created_at existed were backfilled from the creation time in their cuid id.
+     */
+    'usersJoinedLast7Days': number;
+    /**
+     * Users whose role is platform_admin.
+     */
+    'platformAdmins': number;
+    /**
+     * Users who have not verified their email.
+     */
+    'unverified': number;
+    /**
+     * Users who have not verified their email and whose account was created more than 7 days ago (email_verification_timestamp is null AND created_at < now − 7 days). Users created before User.created_at existed were backfilled from the creation time in their cuid id.
+     */
+    'unverifiedOverAWeek': number;
+    /**
+     * Users who are disabled.
+     */
+    'disabled': number;
+    /**
+     * Users ever granted YouTube Access (lifetime, ADR 0129).
+     */
+    'youtubeAccessPlacesUsed': number;
+    /**
+     * YouTube Access places still available under the ceiling, never negative.
+     */
+    'youtubeAccessPlacesLeft': number;
+    /**
+     * The configured lifetime YouTube Access ceiling.
+     */
+    'youtubeAccessCeiling': number;
+    /**
+     * Feedback Reports in the received status.
+     */
+    'feedbackReportsReceived': number;
 }
 /**
  * Identity-only User projection for Platform Admin directory APIs.
@@ -196,7 +293,54 @@ export interface AdminUserIdentity {
      * Whether a Platform Admin currently grants this User YouTube Access (ADR 0129).
      */
     'youtubeAccess': boolean;
+    /**
+     * When the User joined (`User.created_at`).
+     */
+    'createdAt': string;
 }
+
+
+/**
+ * One page of the Platform Admin users list.
+ */
+export interface AdminUserListResponse {
+    'users': Array<AdminUserIdentity>;
+    /**
+     * Count matching q + status + role, ignoring paging.
+     */
+    'total': number;
+    /**
+     * Echoed effective 1-based page.
+     */
+    'page': number;
+    /**
+     * Echoed effective page size.
+     */
+    'pageSize': number;
+}
+/**
+ * Sort order for the Platform Admin users list.
+ */
+
+export const AdminUserSort = {
+    Newest: 'newest',
+    Name: 'name',
+} as const;
+
+export type AdminUserSort = typeof AdminUserSort[keyof typeof AdminUserSort];
+
+
+/**
+ * User state filter for the Platform Admin users list. `disabled` is a Disabled User; `unverified` is an Unverified User who is not disabled; `active` is neither a Disabled User nor an Unverified User.
+ */
+
+export const AdminUserStatusFilter = {
+    Active: 'active',
+    Unverified: 'unverified',
+    Disabled: 'disabled',
+} as const;
+
+export type AdminUserStatusFilter = typeof AdminUserStatusFilter[keyof typeof AdminUserStatusFilter];
 
 
 export interface AuthUrlResponse {
@@ -407,6 +551,19 @@ export interface FeedbackReportListItemDto {
 
 
 /**
+ * Which app sent a Feedback Report, as the Report Context platform: `web` for the dashboard, `ios` and `android` for the mobile app. The database column stays a plain string, so rows stored before this type are still readable.
+ */
+
+export const FeedbackReportPlatform = {
+    Web: 'web',
+    Ios: 'ios',
+    Android: 'android',
+} as const;
+
+export type FeedbackReportPlatform = typeof FeedbackReportPlatform[keyof typeof FeedbackReportPlatform];
+
+
+/**
  * Where a Feedback Report stands as its reporter sees it. There is no Duplicate status.
  */
 
@@ -588,12 +745,6 @@ export interface LinkFeedbackReportTrackingIssueRequest {
      */
     'trackingIssueNumber': number;
 }
-/**
- * Response body for list feedback reports endpoint.
- */
-export interface ListAdminFeedbackReportsResponse {
-    'items': Array<AdminFeedbackReportListItemDto>;
-}
 export interface ListFeedbackReportsResponse {
     'items': Array<FeedbackReportListItemDto>;
     'hasChangedSinceLastSeen': boolean;
@@ -772,10 +923,7 @@ export interface ReopenFeedbackReportRequest {
  * The Report Context the sender saw before sending. It never carries screenshots, logs, or anything read from the Vault, and `path` is the page path alone — no query string and no fragment.
  */
 export interface ReportContextRequest {
-    /**
-     * Which app sent the report — `web` for the dashboard.
-     */
-    'platform': string;
+    'platform': FeedbackReportPlatform;
     'appVersion': string;
     'browser': string;
     'operatingSystem': string;
@@ -785,6 +933,8 @@ export interface ReportContextRequest {
      */
     'sentAt': string;
 }
+
+
 export interface ResendVerificationEmailByEmailRequest {
     'email': string;
 }
@@ -1122,6 +1272,10 @@ export interface WithdrawYouTubeAccessResponse {
      * Whether a Platform Admin currently grants this User YouTube Access (ADR 0129).
      */
     'youtubeAccess': boolean;
+    /**
+     * When the User joined (`User.created_at`).
+     */
+    'createdAt': string;
     'youtubeDisconnect': YouTubeDisconnectOutcome;
 }
 
@@ -2513,6 +2667,39 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminOverview: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/admin/overview`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication jwt required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
          * @param {string} reportId 
          * @param {*} [options] Override http request option.
@@ -2699,12 +2886,15 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
-         * @param {number} [limit] 
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
+         * @param {string} [userId] Entries where this User is the actor OR the target.
+         * @param {Array<AdminAuditAction>} [action] Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Entries per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listAuditLogs: async (limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listAuditLogs: async (userId?: string, action?: Array<AdminAuditAction>, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/audit-logs`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2721,8 +2911,20 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
-            if (limit !== undefined) {
-                localVarQueryParameter['limit'] = limit;
+            if (userId !== undefined) {
+                localVarQueryParameter['userId'] = userId;
+            }
+
+            if (action) {
+                localVarQueryParameter['action'] = action;
+            }
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -2737,16 +2939,17 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
-         * @param {FeedbackReportStatus} [status] 
-         * @param {FeedbackReportKind} [kind] 
-         * @param {string} [platform] 
-         * @param {number} [trackingIssueNumber] 
-         * @param {number} [limit] 
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] Reports in this Report Status.
+         * @param {FeedbackReportKind} [kind] Reports of this kind.
+         * @param {FeedbackReportPlatform} [platform] Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+         * @param {number} [trackingIssueNumber] Reports linked to this GitHub issue number.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Reports per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listFeedbackReports: async (status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listFeedbackReports: async (status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: FeedbackReportPlatform, trackingIssueNumber?: number, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/feedback/reports`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2779,8 +2982,12 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
                 localVarQueryParameter['trackingIssueNumber'] = trackingIssueNumber;
             }
 
-            if (limit !== undefined) {
-                localVarQueryParameter['limit'] = limit;
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -2795,12 +3002,17 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
-         * @param {string} [q] 
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
+         * @param {string} [q] Matches email, name, first name or last name (case-insensitive).
+         * @param {AdminUserStatusFilter} [status] &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+         * @param {UserRole} [role] &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+         * @param {AdminUserSort} [sort] &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Users per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listUsers: async (q?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        listUsers: async (q?: string, status?: AdminUserStatusFilter, role?: UserRole, sort?: AdminUserSort, page?: number, pageSize?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/admin/users`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2819,6 +3031,26 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
 
             if (q !== undefined) {
                 localVarQueryParameter['q'] = q;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['status'] = status;
+            }
+
+            if (role !== undefined) {
+                localVarQueryParameter['role'] = role;
+            }
+
+            if (sort !== undefined) {
+                localVarQueryParameter['sort'] = sort;
+            }
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['pageSize'] = pageSize;
             }
 
             localVarHeaderParameter['Accept'] = 'application/json';
@@ -3135,6 +3367,17 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getAdminOverview(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminOverviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getAdminOverview(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.getAdminOverview']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
          * @param {string} reportId 
          * @param {*} [options] Override http request option.
@@ -3195,41 +3438,50 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
-         * @param {number} [limit] 
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
+         * @param {string} [userId] Entries where this User is the actor OR the target.
+         * @param {Array<AdminAuditAction>} [action] Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Entries per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listAuditLogs(limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AdminAuditLogEntry>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listAuditLogs(limit, options);
+        async listAuditLogs(userId?: string, action?: Array<AdminAuditAction>, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminAuditLogListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listAuditLogs(userId, action, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listAuditLogs']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
-         * @param {FeedbackReportStatus} [status] 
-         * @param {FeedbackReportKind} [kind] 
-         * @param {string} [platform] 
-         * @param {number} [trackingIssueNumber] 
-         * @param {number} [limit] 
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
+         * @param {FeedbackReportStatus} [status] Reports in this Report Status.
+         * @param {FeedbackReportKind} [kind] Reports of this kind.
+         * @param {FeedbackReportPlatform} [platform] Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+         * @param {number} [trackingIssueNumber] Reports linked to this GitHub issue number.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Reports per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listFeedbackReports(status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: string, trackingIssueNumber?: number, limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ListAdminFeedbackReportsResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listFeedbackReports(status, kind, platform, trackingIssueNumber, limit, options);
+        async listFeedbackReports(status?: FeedbackReportStatus, kind?: FeedbackReportKind, platform?: FeedbackReportPlatform, trackingIssueNumber?: number, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminFeedbackReportListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listFeedbackReports(status, kind, platform, trackingIssueNumber, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listFeedbackReports']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
-         * @param {string} [q] 
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
+         * @param {string} [q] Matches email, name, first name or last name (case-insensitive).
+         * @param {AdminUserStatusFilter} [status] &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+         * @param {UserRole} [role] &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+         * @param {AdminUserSort} [sort] &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+         * @param {number} [page] 1-based page number. Defaults to 1.
+         * @param {number} [pageSize] Users per page, 1 to 100. Defaults to 25.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async listUsers(q?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AdminUserIdentity>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listUsers(q, options);
+        async listUsers(q?: string, status?: AdminUserStatusFilter, role?: UserRole, sort?: AdminUserSort, page?: number, pageSize?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AdminUserListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listUsers(q, status, role, sort, page, pageSize, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PlatformAdminApi.listUsers']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -3363,6 +3615,14 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.forceLogoutUser(requestParameters.userId, options).then((request) => request(axios, basePath));
         },
         /**
+         * Platform counts for the admin Overview page. Platform Admin only.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminOverview(options?: RawAxiosRequestConfig): AxiosPromise<AdminOverviewResponse> {
+            return localVarFp.getAdminOverview(options).then((request) => request(axios, basePath));
+        },
+        /**
          * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
          * @param {PlatformAdminApiGetFeedbackReportRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -3407,31 +3667,31 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.linkFeedbackReportTrackingIssue(requestParameters.reportId, requestParameters.linkFeedbackReportTrackingIssueRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * List recent Admin Audit Log entries (newest first). Platform Admin only.
+         * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
          * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<Array<AdminAuditLogEntry>> {
-            return localVarFp.listAuditLogs(requestParameters.limit, options).then((request) => request(axios, basePath));
+        listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminAuditLogListResponse> {
+            return localVarFp.listAuditLogs(requestParameters.userId, requestParameters.action, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
-         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+         * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
          * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ListAdminFeedbackReportsResponse> {
-            return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(axios, basePath));
+        listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminFeedbackReportListResponse> {
+            return localVarFp.listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
-         * List/search Users (identity fields only). Platform Admin only.
+         * List/search Users (identity fields only), one page at a time. Platform Admin only.
          * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<Array<AdminUserIdentity>> {
-            return localVarFp.listUsers(requestParameters.q, options).then((request) => request(axios, basePath));
+        listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AdminUserListResponse> {
+            return localVarFp.listUsers(requestParameters.q, requestParameters.status, requestParameters.role, requestParameters.sort, requestParameters.page, requestParameters.pageSize, options).then((request) => request(axios, basePath));
         },
         /**
          * Mark a Feedback Report as delivered (Fixed for Bug Reports, Shipped for Suggestions) by naming the Release. Platform Admin only.
@@ -3561,29 +3821,95 @@ export interface PlatformAdminApiLinkFeedbackReportTrackingIssueRequest {
  * Request parameters for listAuditLogs operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListAuditLogsRequest {
-    readonly limit?: number
+    /**
+     * Entries where this User is the actor OR the target.
+     */
+    readonly userId?: string
+
+    /**
+     * Entries whose action is in this list. Repeat the parameter for several actions (&#x60;?action&#x3D;disable&amp;action&#x3D;enable&#x60;).
+     */
+    readonly action?: Array<AdminAuditAction>
+
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Entries per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
  * Request parameters for listFeedbackReports operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListFeedbackReportsRequest {
+    /**
+     * Reports in this Report Status.
+     */
     readonly status?: FeedbackReportStatus
 
+    /**
+     * Reports of this kind.
+     */
     readonly kind?: FeedbackReportKind
 
-    readonly platform?: string
+    /**
+     * Reports sent from this app: &#x60;web&#x60;, &#x60;ios&#x60; or &#x60;android&#x60;.
+     */
+    readonly platform?: FeedbackReportPlatform
 
+    /**
+     * Reports linked to this GitHub issue number.
+     */
     readonly trackingIssueNumber?: number
 
-    readonly limit?: number
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Reports per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
  * Request parameters for listUsers operation in PlatformAdminApi.
  */
 export interface PlatformAdminApiListUsersRequest {
+    /**
+     * Matches email, name, first name or last name (case-insensitive).
+     */
     readonly q?: string
+
+    /**
+     * &#x60;disabled&#x60;: Disabled Users. &#x60;unverified&#x60;: Unverified Users who are not disabled. &#x60;active&#x60;: neither disabled nor unverified.
+     */
+    readonly status?: AdminUserStatusFilter
+
+    /**
+     * &#x60;platform_admin&#x60; or &#x60;user&#x60;.
+     */
+    readonly role?: UserRole
+
+    /**
+     * &#x60;newest&#x60; (joined, newest first; the default) or &#x60;name&#x60;.
+     */
+    readonly sort?: AdminUserSort
+
+    /**
+     * 1-based page number. Defaults to 1.
+     */
+    readonly page?: number
+
+    /**
+     * Users per page, 1 to 100. Defaults to 25.
+     */
+    readonly pageSize?: number
 }
 
 /**
@@ -3687,6 +4013,15 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
+     * Platform counts for the admin Overview page. Platform Admin only.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getAdminOverview(options?: RawAxiosRequestConfig) {
+        return PlatformAdminApiFp(this.configuration).getAdminOverview(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
      * Get a single Feedback Report by id with full details and reporter info. Platform Admin only.
      * @param {PlatformAdminApiGetFeedbackReportRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
@@ -3736,33 +4071,33 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
-     * List recent Admin Audit Log entries (newest first). Platform Admin only.
+     * List Admin Audit Log entries (newest first), one page at a time. Platform Admin only. Each entry carries the actor and target display names; a deleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted` true, and a null name. Every action targets a User, and the actor is always set at write time, so a null id only comes from User Deletion.
      * @param {PlatformAdminApiListAuditLogsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listAuditLogs(requestParameters: PlatformAdminApiListAuditLogsRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listAuditLogs(requestParameters.limit, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listAuditLogs(requestParameters.userId, requestParameters.action, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber, limit). Newest first. Platform Admin only.
+     * List Feedback Reports with optional filters (status, kind, platform, trackingIssueNumber), newest first, one page at a time. Platform Admin only.
      * @param {PlatformAdminApiListFeedbackReportsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listFeedbackReports(requestParameters: PlatformAdminApiListFeedbackReportsRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.limit, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listFeedbackReports(requestParameters.status, requestParameters.kind, requestParameters.platform, requestParameters.trackingIssueNumber, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
-     * List/search Users (identity fields only). Platform Admin only.
+     * List/search Users (identity fields only), one page at a time. Platform Admin only.
      * @param {PlatformAdminApiListUsersRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     public listUsers(requestParameters: PlatformAdminApiListUsersRequest = {}, options?: RawAxiosRequestConfig) {
-        return PlatformAdminApiFp(this.configuration).listUsers(requestParameters.q, options).then((request) => request(this.axios, this.basePath));
+        return PlatformAdminApiFp(this.configuration).listUsers(requestParameters.q, requestParameters.status, requestParameters.role, requestParameters.sort, requestParameters.page, requestParameters.pageSize, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

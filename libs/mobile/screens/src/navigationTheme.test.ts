@@ -1,3 +1,4 @@
+import { roleDark, roleLight } from '@myorganiser/design-tokens';
 import type { Theme, ThemeColors } from '@myorganiser/mobile/ui';
 import { navigationTheme } from './navigationTheme';
 
@@ -15,7 +16,10 @@ import { navigationTheme } from './navigationTheme';
  * silently disagreeing with the family it is paired with.
  */
 function buildFixtureTheme(mode: 'light' | 'dark'): Theme {
+  // Start from the real roles so every Semantic Role has a value, then
+  // overwrite the ones the mapping reads with distinct sentinels.
   const colors: ThemeColors = {
+    ...(mode === 'light' ? roleLight : roleDark),
     background: '#bg0000',
     foreground: '#fg0000',
     card: '#card000', // distinct from raisedSurface to catch mapping errors

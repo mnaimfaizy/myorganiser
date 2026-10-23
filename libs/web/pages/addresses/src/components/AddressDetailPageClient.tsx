@@ -1,373 +1,321 @@
 'use client';
 
 import {
-  AddressRecord,
-  OrganisationTypeEnum,
-  PriorityEnum,
-  UpdateMethodEnum,
-  UsageLocationRecord,
+  AddressStatusEnum,
+  type AddressStatus,
+  type UsageLocationRecord,
 } from '@myorganiser/vault-core';
-import { Button, ConfirmDeleteDialog, useToast } from '@myorganiser/web-ui';
+import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
 import {
-  normalizeAddresses,
-  saveVaultRecords,
-  type VaultHandle,
-} from '@myorganiser/web-vault';
-import { useLocalVaultRevision, VaultGate } from '@myorganiser/web-vault-ui';
-import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+  PlaceDialog,
+  PlaceSheet,
+  type PlaceFormValues,
+  useExpiringCopy,
+} from '@myorganiser/web-usage-locations';
+import type { VaultHandle } from '@myorganiser/web-vault';
+import { VaultGate } from '@myorganiser/web-vault-ui';
+import { useRouter } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 
-import { type AddAddressFormValues } from '../schemas/address';
-import { addressFormValuesToRecordFields } from '../utils/addressForm';
+import { useAddressesPage } from '../hooks/use-addresses-page';
+import type { AddAddressFormValues } from '../schemas/address';
 import {
-  type UsageLocationFormValues,
-  usageLocationFormValuesToRecordFields,
-} from '../schemas/usageLocation';
-import { parseEnumValue } from '../utils/enumUtils';
-import { randomId } from '../utils/randomId';
+  describeAddressDeletion,
+  formatAddressForCopy,
+} from '../utils/address-summary';
+import { AddressDetail } from './address-detail';
+import { AddressDetailScreen } from './address-detail-screen';
 import { AddressDetailLoading } from './AddressDetailLoading';
 import { AddressDetailNotFound } from './AddressDetailNotFound';
-import { BackToAddressesLink } from './BackToAddressesLink';
-import { AddressDetailsCard } from './AddressDetailsCard';
-import { AddressEditDialog } from './AddressEditDialog';
-import { UsageLocationDialog } from './UsageLocationDialog';
-import { UsageLocationsTable } from './UsageLocationsTable';
+import { AddressFormSheet } from './address-form-sheet';
 
-interface AddressDetailsInnerProps {
+const ADDRESSES_HREF = '/dashboard/addresses';
+
+/** The label of the status button: it offers the status the Address is not in. */
+const STATUS_ACTION_LABEL = {
+  [AddressStatusEnum.Current]: 'Mark as old',
+  [AddressStatusEnum.Old]: 'Mark as current',
+} as const satisfies Record<AddressStatus, string>;
+
+const NEXT_STATUS = {
+  [AddressStatusEnum.Current]: AddressStatusEnum.Old,
+  [AddressStatusEnum.Old]: AddressStatusEnum.Current,
+} as const satisfies Record<AddressStatus, AddressStatus>;
+
+export interface AddressDetailPageClientProps {
+  params: { id: string };
+}
+
+interface AddressDetailInnerProps {
   handle: VaultHandle;
   addressId: string;
 }
 
-function AddressDetailsInner(props: AddressDetailsInnerProps) {
-  const { toast } = useToast();
+interface PlaceDialogState {
+  open: boolean;
+  /** null means add; a record means edit with that record loaded. */
+  location: UsageLocationRecord | null;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [addresses, setAddresses] = useState<AddressRecord[]>([]);
-  const [editingAddress, setEditingAddress] = useState(false);
-  const [usageLocationDialog, setUsageLocationDialog] = useState<{
-    open: boolean;
-    location: UsageLocationRecord | null;
-  }>({ open: false, location: null });
-  const [deletingLocation, setDeletingLocation] =
+/**
+ * The Address detail route. The page owns every dialog, sheet and confirm,
+ * and the vault writes come from `useAddressesPage`, so the desktop and the
+ * phone detail share one set of behaviours.
+ */
+function AddressDetailInner({ handle, addressId }: AddressDetailInnerProps) {
+  const router = useRouter();
+  const page = useAddressesPage(handle);
+  const { copy, message: copyMessage } = useExpiringCopy();
+  // Render nothing until the breakpoint is decided, so a phone never paints
+  // the desktop detail on the first frame.
+  const isPhone = useIsMobileState();
+
+  const {
+    items,
+    loading,
+    updateAddress,
+    setAddressStatus,
+    deleteAddress,
+    saveLocation,
+    setLocationChanged,
+    deleteLocation,
+  } = page;
+  const address = items.find((x) => x.id === addressId);
+  const today = new Date();
+
+  const [editing, setEditing] = useState(false);
+  const [placeDialog, setPlaceDialog] = useState<PlaceDialogState>({
+    open: false,
+    location: null,
+  });
+  const [deletingPlace, setDeletingPlace] =
     useState<UsageLocationRecord | null>(null);
+  const [deletingAddress, setDeletingAddress] = useState(false);
+  const [pendingPlaceIds, setPendingPlaceIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // Set while the Address is being deleted, so the not-found state does not
+  // flash in the moment before the explicit navigation back to the list.
+  const leavingRef = useRef(false);
 
-  const addressRecord = addresses.find((x) => x.id === props.addressId) ?? null;
-  const usageLocations = useMemo(
-    () => addressRecord?.usageLocations ?? [],
-    [addressRecord],
+  const handleRequestEdit = useCallback(() => {
+    setEditing(true);
+  }, []);
+
+  const handleEditOpenChange = useCallback((open: boolean) => {
+    setEditing(open);
+  }, []);
+
+  const handleSubmitEdit = useCallback(
+    (values: AddAddressFormValues) => updateAddress(addressId, values),
+    [addressId, updateAddress],
   );
 
-  const persist = useCallback(
-    async (next: AddressRecord[]) => {
+  const handleToggleStatus = useCallback(() => {
+    if (!address) return;
+    void setAddressStatus(addressId, NEXT_STATUS[address.status]);
+  }, [address, addressId, setAddressStatus]);
+
+  const handleCopyField = useCallback(
+    (label: string, value: string) => {
+      void copy(label, value);
+    },
+    [copy],
+  );
+
+  const handleCopyAll = useCallback(() => {
+    if (!address) return;
+    void copy('Address', formatAddressForCopy(address));
+  }, [address, copy]);
+
+  const handleAddPlace = useCallback(() => {
+    setPlaceDialog({ open: true, location: null });
+  }, []);
+
+  const handleEditPlace = useCallback((location: UsageLocationRecord) => {
+    setPlaceDialog({ open: true, location });
+  }, []);
+
+  const handlePlaceOpenChange = useCallback((open: boolean) => {
+    // The location is kept so the dialog does not change its title while it closes.
+    setPlaceDialog((state) => ({ ...state, open }));
+  }, []);
+
+  const handleSubmitPlace = useCallback(
+    async (values: PlaceFormValues, editingId: string | null) => {
+      // A rejection keeps the dialog open for a retry.
+      await saveLocation(addressId, values, editingId);
+      setPlaceDialog((state) => ({ ...state, open: false }));
+    },
+    [addressId, saveLocation],
+  );
+
+  const handleSetPlaceChanged = useCallback(
+    async (locationId: string, changed: boolean) => {
+      setPendingPlaceIds((prev) => new Set(prev).add(locationId));
       try {
-        await saveVaultRecords(props.handle, 'addresses', next);
-        setAddresses(next);
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        toast({
-          title: 'Failed to save',
-          description: message,
-          variant: 'destructive',
+        await setLocationChanged(addressId, locationId, changed);
+      } finally {
+        setPendingPlaceIds((prev) => {
+          const next = new Set(prev);
+          next.delete(locationId);
+          return next;
         });
-        throw e;
       }
     },
-    [props.handle, toast],
+    [addressId, setLocationChanged],
   );
 
-  const persistUsageLocations = useCallback(
-    async (next: UsageLocationRecord[]) => {
-      const nextAddresses = addresses.map((x) =>
-        x.id === props.addressId
-          ? { ...x, usageLocations: next, updatedAt: new Date().toISOString() }
-          : x,
-      );
-      return persist(nextAddresses);
-    },
-    [addresses, props.addressId, persist],
-  );
-
-  // Which record the loading view has already been shown for. A reload is
-  // not a first load, and only a first load may blank the page.
-  const loadedKeyRef = useRef<string | null>(null);
-  const loadKey = props.addressId;
-
-  // Convergence replaces the Local Vault without passing through this
-  // component, so the revision is the only thing that says the Ciphertext
-  // behind this record moved. Saving here rewrites the whole list, so a stale
-  // read is what gets written back over the record that arrived (#587).
-  const revision = useLocalVaultRevision();
-
-  useEffect(() => {
-    let isActive = true;
-
-    // A reload triggered by convergence must not put the page back into its
-    // loading state. The render returns the loading view while `loading` is
-    // true, which unmounts every open dialog — edit, usage location, confirm
-    // delete — and throws away whatever the User was typing in it. Only a
-    // first load, or a move to a different record, earns that.
-    const isFirstLoad = loadedKeyRef.current !== loadKey;
-    loadedKeyRef.current = loadKey;
-
-    if (isFirstLoad) {
-      queueMicrotask(() => {
-        if (!isActive) return;
-        setLoading(true);
-        setNotFound(false);
-      });
-    }
-
-    props.handle
-      .loadDecryptedData<unknown>({
-        type: 'addresses',
-        defaultValue: [],
-      })
-      .then(async (raw) => {
-        if (!isActive) return;
-        const normalized = normalizeAddresses(raw);
-        const found = normalized.value.find((x) => x.id === props.addressId);
-        if (!found) {
-          if (isActive) setNotFound(true);
-          return;
-        }
-        // Recomputed on every read rather than only cleared up front, because
-        // a reload no longer resets it — a record that convergence brought
-        // back must stop reading as not found.
-        if (isActive) setNotFound(false);
-
-        if (isActive) {
-          setAddresses(normalized.value);
-        }
-
-        if (normalized.changed) {
-          await saveVaultRecords(props.handle, 'addresses', normalized.value);
-        }
-      })
-      .catch(() => {
-        if (!isActive) return;
-        toast({
-          title: 'Failed to load address',
-          description: 'Could not decrypt saved data.',
-          variant: 'destructive',
-        });
-      })
-      .finally(() => {
-        if (isActive) setLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [props.addressId, props.handle, toast, revision]);
-
-  const handleEditAddress = useCallback(() => {
-    setEditingAddress(true);
-  }, []);
-
-  const handleSaveEditAddress = useCallback(
-    async (id: string, values: AddAddressFormValues) => {
-      const next = addresses.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              ...addressFormValuesToRecordFields(values),
-              updatedAt: new Date().toISOString(),
-            }
-          : x,
-      );
-
-      await persist(next);
-      toast({
-        title: 'Saved',
-        description: 'Address updated (encrypted).',
-      });
-    },
-    [addresses, persist, toast],
-  );
-
-  const handleAddLocation = useCallback(() => {
-    setUsageLocationDialog({ open: true, location: null });
-  }, []);
-
-  const handleEditLocation = useCallback((location: UsageLocationRecord) => {
-    setUsageLocationDialog({ open: true, location });
-  }, []);
-
-  const handleSubmitUsageLocation = useCallback(
-    async (values: UsageLocationFormValues, editingId: string | null) => {
-      const now = new Date().toISOString();
-      const baseFields = usageLocationFormValuesToRecordFields(values);
-
-      let updatedLocations: UsageLocationRecord[];
-
-      if (editingId) {
-        // Edit existing location
-        updatedLocations = usageLocations.map((loc) =>
-          loc.id === editingId
-            ? {
-                ...loc,
-                ...baseFields,
-                organisationType: parseEnumValue(
-                  OrganisationTypeEnum,
-                  baseFields.orgType,
-                  OrganisationTypeEnum.Other,
-                ),
-                updateMethod: parseEnumValue(
-                  UpdateMethodEnum,
-                  baseFields.updateMethod,
-                  UpdateMethodEnum.Online,
-                ),
-                priority: parseEnumValue(
-                  PriorityEnum,
-                  baseFields.priority,
-                  PriorityEnum.Normal,
-                ),
-                changedAt: values.changed && !loc.changed ? now : loc.changedAt,
-              }
-            : loc,
-        );
-      } else {
-        // Add new location
-        const next: UsageLocationRecord = {
-          id: randomId(),
-          ...baseFields,
-          organisationType: parseEnumValue(
-            OrganisationTypeEnum,
-            baseFields.orgType,
-            OrganisationTypeEnum.Other,
-          ),
-          updateMethod: parseEnumValue(
-            UpdateMethodEnum,
-            baseFields.updateMethod,
-            UpdateMethodEnum.Online,
-          ),
-          priority: parseEnumValue(
-            PriorityEnum,
-            baseFields.priority,
-            PriorityEnum.Normal,
-          ),
-          createdAt: now,
-          changedAt: values.changed ? now : undefined,
-        };
-        updatedLocations = [next, ...usageLocations];
-      }
-
-      await persistUsageLocations(updatedLocations);
-      toast({
-        title: editingId ? 'Updated' : 'Saved',
-        description: editingId
-          ? 'Usage location updated successfully (encrypted).'
-          : 'Usage location saved (encrypted).',
-      });
-    },
-    [usageLocations, persistUsageLocations, toast],
-  );
-
-  const handleRequestDeleteLocation = useCallback(
+  const handleRequestDeletePlace = useCallback(
     (location: UsageLocationRecord) => {
-      setDeletingLocation(location);
+      setDeletingPlace(location);
     },
     [],
   );
 
-  const handleConfirmDeleteLocation = useCallback(async () => {
-    if (!deletingLocation) return;
-    try {
-      const updatedLocations = usageLocations.filter(
-        (l) => l.id !== deletingLocation.id,
-      );
-      await persistUsageLocations(updatedLocations);
-      toast({
-        title: 'Deleted',
-        description: 'Usage location deleted successfully.',
-      });
-      setDeletingLocation(null);
-    } catch {
-      // persist already toasted; leave dialog open for retry
-    }
-  }, [deletingLocation, usageLocations, persistUsageLocations, toast]);
-
-  const handleDeleteLocationDialogOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setDeletingLocation(null);
-    }
+  const handleDeletePlaceOpenChange = useCallback((open: boolean) => {
+    if (!open) setDeletingPlace(null);
   }, []);
 
-  const handleUsageLocationDialogOpenChange = useCallback((_open: boolean) => {
-    // Always close when called (Radix Dialog calls this with false on dismiss)
-    setUsageLocationDialog({ open: false, location: null });
+  const handleConfirmDeletePlace = useCallback(async () => {
+    if (!deletingPlace) return;
+    // On failure the dialog stays open so the User can retry.
+    const deleted = await deleteLocation(addressId, deletingPlace.id);
+    if (deleted) setDeletingPlace(null);
+  }, [addressId, deleteLocation, deletingPlace]);
+
+  const handleRequestDeleteAddress = useCallback(() => {
+    setDeletingAddress(true);
   }, []);
+
+  const handleDeleteAddressOpenChange = useCallback((open: boolean) => {
+    setDeletingAddress(open);
+  }, []);
+
+  const handleConfirmDeleteAddress = useCallback(async () => {
+    leavingRef.current = true;
+    const deleted = await deleteAddress(addressId);
+    if (deleted) {
+      setDeletingAddress(false);
+      router.push(ADDRESSES_HREF);
+    } else {
+      // Stay on the detail with the dialog open, so the User can retry.
+      leavingRef.current = false;
+    }
+  }, [addressId, deleteAddress, router]);
+
+  if (isPhone === undefined) {
+    return null;
+  }
 
   if (loading) {
     return <AddressDetailLoading />;
   }
 
-  if (notFound || !addressRecord) {
-    return <AddressDetailNotFound />;
+  if (!address) {
+    return leavingRef.current ? null : <AddressDetailNotFound />;
   }
 
+  const placeFormProps = {
+    open: placeDialog.open,
+    location: placeDialog.location,
+    existingLocations: address.usageLocations,
+    subject: address.label,
+    noun: 'address' as const,
+    onOpenChange: handlePlaceOpenChange,
+    onSubmit: handleSubmitPlace,
+  };
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <BackToAddressesLink />
+    <>
+      {isPhone ? (
+        <AddressDetailScreen
+          address={address}
+          copyMessage={copyMessage}
+          statusActionLabel={STATUS_ACTION_LABEL[address.status]}
+          pendingPlaceIds={pendingPlaceIds}
+          onEdit={handleRequestEdit}
+          onToggleStatus={handleToggleStatus}
+          onCopyField={handleCopyField}
+          onCopyAll={handleCopyAll}
+          onAddPlace={handleAddPlace}
+          onEditPlace={handleEditPlace}
+          onSetPlaceChanged={handleSetPlaceChanged}
+          onRequestDeletePlace={handleRequestDeletePlace}
+          onRequestDeleteAddress={handleRequestDeleteAddress}
+        />
+      ) : (
+        <AddressDetail
+          address={address}
+          today={today}
+          copyMessage={copyMessage}
+          statusActionLabel={STATUS_ACTION_LABEL[address.status]}
+          pendingPlaceIds={pendingPlaceIds}
+          onEdit={handleRequestEdit}
+          onToggleStatus={handleToggleStatus}
+          onCopyField={handleCopyField}
+          onCopyAll={handleCopyAll}
+          onAddPlace={handleAddPlace}
+          onEditPlace={handleEditPlace}
+          onSetPlaceChanged={handleSetPlaceChanged}
+          onRequestDeletePlace={handleRequestDeletePlace}
+          onRequestDeleteAddress={handleRequestDeleteAddress}
+        />
+      )}
 
-      <AddressDetailsCard
-        addressRecord={addressRecord}
-        onEdit={handleEditAddress}
+      <AddressFormSheet
+        open={editing}
+        onOpenChange={handleEditOpenChange}
+        mode="edit"
+        address={address}
+        items={items}
+        onSubmit={handleSubmitEdit}
+        variant={isPhone ? 'phone' : 'desktop'}
       />
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Usage Locations</h2>
-        <Button onClick={handleAddLocation} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Location
-        </Button>
-      </div>
+      {isPhone ? (
+        <PlaceSheet {...placeFormProps} />
+      ) : (
+        <PlaceDialog {...placeFormProps} />
+      )}
 
-      <UsageLocationsTable
-        usageLocations={usageLocations}
-        onEdit={handleEditLocation}
-        onRequestDelete={handleRequestDeleteLocation}
-        onAddLocation={handleAddLocation}
-      />
+      {deletingPlace ? (
+        <ConfirmDialog
+          open
+          onOpenChange={handleDeletePlaceOpenChange}
+          title={`Delete "${deletingPlace.organisationName}"?`}
+          description="This action cannot be undone. This usage location will be permanently removed from this address."
+          confirmLabel="Delete place"
+          tone="destructive"
+          onConfirm={handleConfirmDeletePlace}
+        />
+      ) : null}
 
-      <AddressEditDialog
-        open={editingAddress}
-        address={addressRecord}
-        items={addresses}
-        onOpenChange={setEditingAddress}
-        onSave={handleSaveEditAddress}
-      />
-
-      <UsageLocationDialog
-        open={usageLocationDialog.open}
-        location={usageLocationDialog.location}
-        existingLocations={usageLocations}
-        onOpenChange={handleUsageLocationDialogOpenChange}
-        onSubmit={handleSubmitUsageLocation}
-      />
-
-      <ConfirmDeleteDialog
-        open={deletingLocation !== null}
-        onOpenChange={handleDeleteLocationDialogOpenChange}
-        title={
-          deletingLocation
-            ? `Delete "${deletingLocation.organisationName}"?`
-            : ''
-        }
-        description="This action cannot be undone. This usage location will be permanently removed from this address."
-        onConfirm={handleConfirmDeleteLocation}
-      />
-    </div>
+      {deletingAddress ? (
+        <ConfirmDialog
+          open
+          onOpenChange={handleDeleteAddressOpenChange}
+          title={`Delete "${address.label}"?`}
+          description={describeAddressDeletion(address)}
+          confirmLabel="Delete address"
+          tone="destructive"
+          onConfirm={handleConfirmDeleteAddress}
+        />
+      ) : null}
+    </>
   );
 }
 
-export function AddressDetailPageClient(props: { params: { id: string } }) {
+export function AddressDetailPageClient({
+  params,
+}: AddressDetailPageClientProps) {
   return (
     <VaultGate title="Address">
-      {({ handle }) => (
-        <AddressDetailsInner handle={handle!} addressId={props.params.id} />
-      )}
+      {({ handle }) =>
+        handle ? (
+          <AddressDetailInner handle={handle} addressId={params.id} />
+        ) : null
+      }
     </VaultGate>
   );
 }

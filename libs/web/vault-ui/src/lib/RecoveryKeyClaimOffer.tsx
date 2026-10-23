@@ -105,6 +105,7 @@ export function RecoveryKeyClaimOffer(
       <Button
         type="button"
         variant="secondary"
+        className="h-auto w-full whitespace-normal py-3 md:h-auto"
         onClick={() => setIsExpanded(true)}
       >
         I have a recovery key for a vault on this device
@@ -131,7 +132,7 @@ export function RecoveryKeyClaimOffer(
         </p>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={isSubmitDisabled}>
           Claim this vault
         </Button>

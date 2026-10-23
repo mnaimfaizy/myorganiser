@@ -1,16 +1,20 @@
 'use client';
 
+import type { LegalVariant } from '../lib/legal-sections';
 import { useLegalOperator } from '../lib/legal-operator-context';
 import { OperatorContactView } from './OperatorContactView';
 
 export interface OperatorContactFromContextProps {
-  /** Heading level: h3 inside the Sign up legal dialog. */
-  headingLevel?: 'h2' | 'h3';
+  /** Where the section renders: the Sign up legal dialog passes 'dialog'. */
+  variant?: LegalVariant;
+  /** Page variant only: the section number shown in its badge. */
+  number?: string;
 }
 
 /** Client-side Operator & Contact section, fed by LegalOperatorProvider. */
 export function OperatorContactFromContext({
-  headingLevel,
+  variant,
+  number,
 }: OperatorContactFromContextProps) {
   const operator = useLegalOperator();
 
@@ -20,7 +24,8 @@ export function OperatorContactFromContext({
     <OperatorContactView
       name={operator.name}
       email={operator.email}
-      headingLevel={headingLevel}
+      variant={variant}
+      number={number}
     />
   );
 }

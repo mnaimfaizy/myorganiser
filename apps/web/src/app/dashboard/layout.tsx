@@ -1,28 +1,43 @@
-import {
-  Separator,
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  Toaster,
-} from '@myorganiser/web-ui';
+import type { Viewport } from 'next';
+
+import { SidebarInset, SidebarProvider, Toaster } from '@myorganiser/web-ui';
 
 import {
   DashboardGuard,
+  DashboardHeader,
   DashboardSidebar,
-  DynamicBreadcrumb,
   FeedbackDialog,
   OfflineNotice,
+  PhoneAppBar,
+  PhoneTabBar,
 } from '@myorganiser/web-pages/dashboard';
 
 import {
   PassphraseResetPrompt,
-  SyncStatusWidget,
   VaultMetaConvergeRunner,
   VaultMountSettleProvider,
   VaultPullRunner,
   VaultReconcileRunner,
   VaultSessionProvider,
 } from '@myorganiser/web-vault-ui';
+
+/*
+ * viewport-fit=cover lets env(safe-area-inset-*) report the notch and home
+ * indicator in the Installed Web App. Scoped to the dashboard on purpose:
+ * public pages have no safe-area handling.
+ */
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+};
+
+/*
+ * Desktop widths for the navy sidebar: the 272px expanded sidebar and the
+ * 76px icon rail. The provider's own default (16rem) is overridden here.
+ */
+const SIDEBAR_STYLE = {
+  '--sidebar-width': '17rem',
+  '--sidebar-width-icon': '4.75rem',
+} as React.CSSProperties;
 
 export default function DashboardLayout({
   children,
@@ -31,7 +46,14 @@ export default function DashboardLayout({
 }) {
   return (
     <DashboardGuard>
-      <SidebarProvider>
+      {/*
+       * On a phone the tab bar sits above the toasts: the Toast viewport reads
+       * --toast-offset from this ancestor, set only while the tab bar is mounted.
+       */}
+      <SidebarProvider
+        style={SIDEBAR_STYLE}
+        className="has-[[data-phone-tab-bar]]:[--toast-offset:calc(88px_+_env(safe-area-inset-bottom))]"
+      >
         <VaultSessionProvider>
           {/*
            * Watches VaultReconcileRunner, VaultMetaConvergeRunner, and
@@ -57,16 +79,8 @@ export default function DashboardLayout({
             <PassphraseResetPrompt />
             <DashboardSidebar />
             <SidebarInset>
-              <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                <div className="flex items-center gap-2 px-4">
-                  <SidebarTrigger className="-ml-1" />
-                  <Separator orientation="vertical" className="mr-2 h-4" />
-                  <DynamicBreadcrumb />
-                </div>
-                <div className="px-4">
-                  <SyncStatusWidget />
-                </div>
-              </header>
+              <DashboardHeader />
+              <PhoneAppBar />
               {/*
                * Explains why a save fails while the browser reports no
                * connection. It changes no save path and queues nothing, and
@@ -74,9 +88,10 @@ export default function DashboardLayout({
                */}
               <OfflineNotice />
               {children}
+              <PhoneTabBar />
             </SidebarInset>
             {/* Feedback Dialog is mounted once here because both the sidebar
-                footer and the user menu open it. */}
+                footer and the account menu in the header open it. */}
             <FeedbackDialog />
             <Toaster />
           </VaultMountSettleProvider>

@@ -56,15 +56,14 @@ test.describe('Vault Settings Unlock after Hard Navigation (E2E)', () => {
     await gotoStable(page, '/dashboard/vault');
     await waitForDashboardReady(page);
 
-    // 4. Assert locked state: VaultUnlockCard rendered, ChangePassphraseCard's input disabled
+    // 4. Assert locked state: VaultUnlockCard rendered, ChangePassphraseCard's
+    // opener disabled (its form only mounts inside the dialog it opens)
     await expect(
-      page.getByText('Unlock your vault', { exact: true }),
+      page.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
     ).toBeVisible({ timeout: 60000 });
 
-    const currentPassphraseInput = page.getByLabel('Current passphrase', {
-      exact: true,
-    });
-    await expect(currentPassphraseInput).toBeDisabled();
+    const changePassphraseOpen = page.getByTestId('change-passphrase-open');
+    await expect(changePassphraseOpen).toBeDisabled();
 
     // 5. Attempt unlock with WRONG passphrase
     const passphraseInput = page.getByLabel('Passphrase', { exact: true });
@@ -85,11 +84,11 @@ test.describe('Vault Settings Unlock after Hard Navigation (E2E)', () => {
 
     // Assert VaultUnlockCard is still rendered (not unmounted on error)
     await expect(
-      page.getByText('Unlock your vault', { exact: true }),
+      page.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
     ).toBeVisible({ timeout: 60000 });
 
-    // 6. Assert ChangePassphraseCard's input is STILL disabled after failed unlock attempt
-    await expect(currentPassphraseInput).toBeDisabled();
+    // 6. Assert ChangePassphraseCard's opener is STILL disabled after failed unlock attempt
+    await expect(changePassphraseOpen).toBeDisabled();
 
     // 7. Clear the wrong passphrase and fill the CORRECT one
     await passphraseInput.clear();
@@ -104,11 +103,24 @@ test.describe('Vault Settings Unlock after Hard Navigation (E2E)', () => {
       page.getByText('Vault unlocked for this session.', { exact: true }),
     ).toBeVisible({ timeout: 60000 });
 
-    // 8. Assert unlocked state: VaultUnlockCard unmounted, ChangePassphraseCard's input enabled
+    // 8. Assert unlocked state: VaultUnlockCard unmounted, ChangePassphraseCard's opener enabled
     await expect(
-      page.getByText('Unlock your vault', { exact: true }),
+      page.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
     ).toHaveCount(0, { timeout: 60000 });
 
-    await expect(currentPassphraseInput).toBeEnabled({ timeout: 60000 });
+    await expect(changePassphraseOpen).toBeEnabled({ timeout: 60000 });
+
+    // The opener mounts the change form in a dialog; its current-passphrase
+    // field is editable once the vault is unlocked. Close it without submitting.
+    await changePassphraseOpen.click();
+    const changeDialog = page.getByRole('dialog', {
+      name: 'Change passphrase',
+    });
+    await expect(changeDialog).toBeVisible();
+    await expect(
+      changeDialog.getByLabel('Current passphrase', { exact: true }),
+    ).toBeEditable();
+    await changeDialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(changeDialog).toHaveCount(0);
   });
 });

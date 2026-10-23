@@ -25,11 +25,7 @@ jest.mock('../utils/passport', () => ({
 
 jest.mock('../middleware/authentication', () => {
   return {
-    expressAuthentication: async (
-      req: any,
-      _securityName: string,
-      scopes?: string[],
-    ) => {
+    expressAuthentication: async (req: any, _securityName: string) => {
       const authHeader = req?.headers?.authorization;
       if (!authHeader) {
         const err = new Error('Unauthorized') as Error & { status?: number };
@@ -41,6 +37,9 @@ jest.mock('../middleware/authentication', () => {
         ? authHeader.slice('Bearer '.length)
         : authHeader;
 
+      // Stub-level rejection only: the authentication layer refuses a disabled
+      // bearer. The real disabled rule is covered in the authentication
+      // middleware tests, not here.
       if (token === 'disabled') {
         const err = new Error('Account disabled') as Error & {
           status?: number;
@@ -49,14 +48,9 @@ jest.mock('../middleware/authentication', () => {
         throw err;
       }
 
+      // Authenticated non-admin: the real PlatformAdminControllerBase guard
+      // (requirePlatformAdmin) produces the 403, not this stub.
       if (token === 'user') {
-        if (scopes?.includes('platform_admin')) {
-          const err = new Error('Platform Admin role required') as Error & {
-            status?: number;
-          };
-          err.status = 403;
-          throw err;
-        }
         req.user = { id: 'user-1', role: 'user', disabled: false };
         return req.user;
       }
@@ -126,10 +120,15 @@ function makeApp() {
     res: any,
     next: any,
   ) {
-    if (err instanceof ValidateError) {
+    // `makeApp` resets the module registry, so routes load a different `tsoa`
+    // instance than this file's import; match by name as well as by class.
+    if (
+      err instanceof ValidateError ||
+      (err as { name?: unknown } | null)?.name === 'ValidateError'
+    ) {
       return res.status(422).json({
         message: 'Validation Failed',
-        details: err?.fields,
+        details: (err as { fields?: unknown } | null)?.fields,
       });
     }
 
@@ -162,6 +161,7 @@ const identityRow = {
   role: 'user',
   disabled: false,
   email_verification_timestamp: new Date('2024-01-01'),
+  created_at: new Date('2024-01-01T00:00:00.000Z'),
   password: 'secret-hash',
   blacklisted_tokens: ['old-token'],
   reset_password_token: 'reset-token',
@@ -213,7 +213,7 @@ describe('AdminUsersController (HTTP integration)', () => {
       expect(userService.listIdentityUsers).not.toHaveBeenCalled();
     });
 
-    test('returns 401 when bearer account is disabled', async () => {
+    test('returns 401 when the authentication layer rejects a disabled User', async () => {
       const userService = require('../services/UserService').default;
 
       const res = await request(app)
@@ -225,61 +225,147 @@ describe('AdminUsersController (HTTP integration)', () => {
       expect(userService.listIdentityUsers).not.toHaveBeenCalled();
     });
 
-    test('returns 200 with identity DTOs for platform_admin', async () => {
+    test('applies defaults when no params are given and returns the page envelope', async () => {
       const userService = require('../services/UserService').default;
 
-      userService.listIdentityUsers.mockResolvedValueOnce([identityRow]);
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [identityRow],
+        total: 1,
+      });
 
       const res = await request(app)
         .get('/admin/users')
         .set('Authorization', 'Bearer admin');
 
       expect(res.status).toBe(200);
-      expect(userService.listIdentityUsers).toHaveBeenCalledWith(undefined);
-      expect(res.body).toEqual([
-        {
-          id: 'u1',
-          name: 'Alice Example',
-          email: 'alice@example.com',
-          firstName: 'Alice',
-          lastName: 'Example',
-          role: 'user',
-          disabled: false,
-          emailVerified: true,
-          youtubeAccess: false,
-        },
-      ]);
+      expect(userService.listIdentityUsers).toHaveBeenCalledWith({
+        q: undefined,
+        status: undefined,
+        role: undefined,
+        sort: 'newest',
+        page: 1,
+        pageSize: 25,
+      });
+      expect(res.body).toEqual({
+        users: [
+          {
+            id: 'u1',
+            name: 'Alice Example',
+            email: 'alice@example.com',
+            firstName: 'Alice',
+            lastName: 'Example',
+            role: 'user',
+            disabled: false,
+            emailVerified: true,
+            youtubeAccess: false,
+            createdAt: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+      });
     });
 
-    test('passes search query to listIdentityUsers', async () => {
+    test('forwards every query param to the service and echoes page, pageSize and the service total', async () => {
       const userService = require('../services/UserService').default;
 
-      userService.listIdentityUsers.mockResolvedValueOnce([]);
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [identityRow],
+        total: 14,
+      });
 
       const res = await request(app)
         .get('/admin/users')
-        .query({ q: 'alice' })
+        .query({
+          q: 'alice',
+          status: 'unverified',
+          role: 'platform_admin',
+          sort: 'name',
+          page: 3,
+          pageSize: 10,
+        })
         .set('Authorization', 'Bearer admin');
 
       expect(res.status).toBe(200);
-      expect(userService.listIdentityUsers).toHaveBeenCalledWith('alice');
+      expect(userService.listIdentityUsers).toHaveBeenCalledWith({
+        q: 'alice',
+        status: 'unverified',
+        role: 'platform_admin',
+        sort: 'name',
+        page: 3,
+        pageSize: 10,
+      });
+      expect(res.body.total).toBe(14);
+      expect(res.body.page).toBe(3);
+      expect(res.body.pageSize).toBe(10);
+      expect(res.body.users).toHaveLength(1);
+    });
+
+    test('returns an empty users page with the total when the requested page is past the end', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [],
+        total: 4,
+      });
+
+      const res = await request(app)
+        .get('/admin/users')
+        .query({ page: 9 })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(userService.listIdentityUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 9, pageSize: 25 }),
+      );
+      expect(res.body).toEqual({
+        users: [],
+        total: 4,
+        page: 9,
+        pageSize: 25,
+      });
+    });
+
+    test('accepts the boundary values page=1 and pageSize=100', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [],
+        total: 0,
+      });
+
+      const res = await request(app)
+        .get('/admin/users')
+        .query({ page: 1, pageSize: 100 })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(userService.listIdentityUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 100 }),
+      );
+      expect(res.body.pageSize).toBe(100);
     });
 
     test('returns identity-only fields without sensitive data', async () => {
       const userService = require('../services/UserService').default;
 
-      userService.listIdentityUsers.mockResolvedValueOnce([identityRow]);
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [identityRow],
+        total: 1,
+      });
 
       const res = await request(app)
         .get('/admin/users')
         .set('Authorization', 'Bearer admin');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
+      expect(res.body.users).toHaveLength(1);
 
-      const item = res.body[0];
+      const item = res.body.users[0];
       expect(Object.keys(item).sort()).toEqual(
         [
+          'createdAt',
           'disabled',
           'email',
           'emailVerified',
@@ -294,6 +380,28 @@ describe('AdminUsersController (HTTP integration)', () => {
       for (const field of sensitiveFields) {
         expect(item).not.toHaveProperty(field);
       }
+    });
+
+    test.each([
+      { label: 'status=archived', query: { status: 'archived' } },
+      { label: 'role=admin', query: { role: 'admin' } },
+      { label: 'sort=oldest', query: { sort: 'oldest' } },
+      { label: 'page=0', query: { page: 0 } },
+      { label: 'pageSize=0', query: { pageSize: 0 } },
+      { label: 'pageSize=101', query: { pageSize: 101 } },
+      { label: 'page=1.5', query: { page: 1.5 } },
+      { label: 'page=abc', query: { page: 'abc' } },
+    ])('returns 422 and skips the service for $label', async ({ query }) => {
+      const userService = require('../services/UserService').default;
+
+      const res = await request(app)
+        .get('/admin/users')
+        .query(query)
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(422);
+      expect(res.body).toHaveProperty('message', 'Validation Failed');
+      expect(userService.listIdentityUsers).not.toHaveBeenCalled();
     });
   });
 
@@ -341,6 +449,7 @@ describe('AdminUsersController (HTTP integration)', () => {
         disabled: false,
         emailVerified: true,
         youtubeAccess: false,
+        createdAt: '2024-01-01T00:00:00.000Z',
       });
       for (const field of sensitiveFields) {
         expect(res.body).not.toHaveProperty(field);

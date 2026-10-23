@@ -166,6 +166,38 @@ type SystemSetFeedbackReportStatus = {
 export const INITIAL_FEEDBACK_REPORT_STATUS: SystemSetFeedbackReportStatus =
   'received';
 
+/**
+ * Which app sent a Feedback Report, as the Report Context platform: `web` for
+ * the dashboard, `ios` and `android` for the mobile app. The database column
+ * stays a plain string, so rows stored before this type are still readable.
+ */
+export type FeedbackReportPlatform = 'web' | 'ios' | 'android';
+
+/**
+ * The one table every fan-out over the report platform reaches (ADR 0053).
+ * It is the only list of the platform members.
+ */
+export const FEEDBACK_REPORT_PLATFORM_RULES = {
+  web: { label: 'Web' },
+  ios: { label: 'iOS' },
+  android: { label: 'Android' },
+} as const satisfies Record<FeedbackReportPlatform, { label: string }>;
+
+/** Derived from the platform table, so the members are never listed twice. */
+export const FEEDBACK_REPORT_PLATFORMS = Object.keys(
+  FEEDBACK_REPORT_PLATFORM_RULES,
+) as FeedbackReportPlatform[];
+
+/** Membership test against the platform table — the only list of the members. */
+export function isFeedbackReportPlatform(
+  value: unknown,
+): value is FeedbackReportPlatform {
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(FEEDBACK_REPORT_PLATFORM_RULES, value)
+  );
+}
+
 /** Membership test against the kind table — the only list of the members. */
 export function isFeedbackReportKind(
   value: unknown,
@@ -201,6 +233,10 @@ export const FEEDBACK_REPORTS_PER_DAY_LIMIT =
   CORE_FEEDBACK_REPORTS_PER_DAY_LIMIT;
 export const FEEDBACK_REPORT_RATE_WINDOW_MS =
   CORE_FEEDBACK_REPORT_RATE_WINDOW_MS;
+
+/** The admin list's page size when the caller names none, and its ceiling. */
+export const FEEDBACK_REPORT_LIST_DEFAULT_PAGE_SIZE = 25;
+export const FEEDBACK_REPORT_LIST_MAX_PAGE_SIZE = 100;
 
 /**
  * A Release tag (`v1.4.0`) or a Mobile Release tag (`mobile-v1.4.0`) — the

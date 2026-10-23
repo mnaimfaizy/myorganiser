@@ -13,6 +13,14 @@
  * Companion to check-test-hygiene.mjs; see docs/ui/GUIDELINES.md for the rules
  * this enforces and docs/adr/0014-component-pipeline-guardrails.md for why.
  *
+ * Scopes: UI Primitives (libs/web/ui/src/lib/components/), Feature Components
+ * (libs/web/pages/<route>/src/), Vault UI Components (libs/web/vault-ui/src/lib/),
+ * and Feature Library Components — `.tsx` under `libs/web/<lib>/src/lib/` of any
+ * other library tagged `type:feature` and `scope:web` in its project.json (for
+ * example libs/web/usage-locations). The tags are read rather than the library
+ * named, so the next shared feature library is checked on arrival instead of
+ * sitting behind a green checker until somebody remembers to add it.
+ *
  * Deliberately NOT checked here:
  *   - `any` usage — @typescript-eslint/no-explicit-any already owns it, honours
  *     inline disable comments, and this repo has four deliberate suppressions.
@@ -47,7 +55,7 @@
  * ran and passed, never that there were no checks to run.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -75,8 +83,9 @@ not a pass.
 
 Runs the mechanical (non-judgment) ComponentReviewer checklist items against
 React components in libs/web/ui/ (UI Primitives), libs/web/pages/ (Feature
-Components), and libs/web/vault-ui/ (Vault UI Components). Stories and test
-files are skipped. Judgment items — composition pattern, concern mixing,
+Components), libs/web/vault-ui/ (Vault UI Components), and every other
+libs/web/<lib>/ tagged type:feature + scope:web (Feature Library Components).
+Stories and test files are skipped. Judgment items — composition pattern, concern mixing,
 abstraction quality — stay with ComponentReviewer.
 `;
 
@@ -95,6 +104,28 @@ const SCOPE_BARRELS = {
     re: /libs\/web\/vault-ui\/src\/(lib\/[^/]+)\.tsx$/,
   },
 };
+
+/**
+ * A Feature Library publishes through its own `src/index.ts`, so its barrel
+ * depends on the file rather than the scope. Only a compound root is held to
+ * it — `lib/<Name>.tsx` or `lib/<Name>/<Name>.tsx` — because a part beside the
+ * root in its folder is the root's business, not the library's public surface.
+ */
+const FEATURE_LIBRARY_ROOT = /libs\/web\/([^/]+)\/src\/lib\/.+\.tsx$/;
+const FEATURE_LIBRARY_BARREL_RE =
+  /libs\/web\/[^/]+\/src\/(lib\/(?:([^/]+)\/\2|[^/]+))\.tsx$/;
+
+/** Libraries under libs/web/ that have a scope of their own. */
+const NAMED_WEB_LIBRARIES = new Set(['ui', 'vault-ui', 'pages']);
+
+function barrelSpecOf(file, scope) {
+  if (scope !== 'feature-library') return SCOPE_BARRELS[scope] ?? null;
+  const lib = posix(file).match(FEATURE_LIBRARY_ROOT)?.[1];
+  return {
+    barrel: `libs/web/${lib}/src/index.ts`,
+    re: FEATURE_LIBRARY_BARREL_RE,
+  };
+}
 
 const MAX_JSX_LINES = 150;
 
@@ -141,7 +172,57 @@ function scopeOf(file) {
   // component is the same kind of false clean this scope was added to remove.
   if (/libs\/web\/vault-ui\/src\/lib\/[^/]+\.tsx$/.test(p)) return 'vault-ui';
   if (/libs\/web\/pages\/[^/]+\/src\//.test(p)) return 'feature';
+  const lib = p.match(FEATURE_LIBRARY_ROOT)?.[1];
+  if (lib && isFeatureLibrary(lib)) return 'feature-library';
   return null;
+}
+
+const featureLibraryCache = new Map();
+
+/**
+ * True when `libs/web/<lib>/project.json` carries both `type:feature` and
+ * `scope:web`. Read relative to the working directory, like the barrels: every
+ * mode runs from the repo root (`--staged` changes to it). A library with no
+ * readable project.json is out of scope, which the "nothing was checked" exit
+ * then reports, rather than a guess about what it is.
+ *
+ * Shared feature libraries are a Feature Library scope, not Feature
+ * Components, for the reason Vault UI Components are not: they are reused
+ * across routes and publish through a barrel, so filing them under `feature`
+ * would drop the primitive half of the rules. `.tsx` only, for the same reason
+ * as vault-ui — the form schemas and label helpers beside the components are
+ * not components.
+ */
+function isFeatureLibrary(lib) {
+  if (NAMED_WEB_LIBRARIES.has(lib)) return false;
+  if (!featureLibraryCache.has(lib)) {
+    let tags = [];
+    try {
+      const project = JSON.parse(
+        readFileSync(`libs/web/${lib}/project.json`, 'utf8'),
+      );
+      tags = Array.isArray(project.tags) ? project.tags : [];
+    } catch {
+      tags = [];
+    }
+    featureLibraryCache.set(
+      lib,
+      tags.includes('type:feature') && tags.includes('scope:web'),
+    );
+  }
+  return featureLibraryCache.get(lib);
+}
+
+function featureLibraryRoots() {
+  let entries;
+  try {
+    entries = readdirSync('libs/web', { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && isFeatureLibrary(entry.name))
+    .map((entry) => `libs/web/${entry.name}/src/lib`);
 }
 
 // --- primitive checks --------------------------------------------------------
@@ -197,7 +278,7 @@ function checkClassNameMerge(_code, raw, findings) {
  * GUIDELINES §1 permits.
  */
 function checkBarrelExport(file, scope, barrels, findings) {
-  const spec = SCOPE_BARRELS[scope];
+  const spec = barrelSpecOf(file, scope);
   if (!spec) return;
   const barrelSource = barrels.get(spec.barrel);
   if (barrelSource == null) return;
@@ -665,12 +746,21 @@ function checkJsxSize(code, raw, findings) {
  *
  * Vault UI Components take both sets. They accept a `className` and merge it
  * like a primitive, they publish through a barrel like a primitive, and they
- * consume primitives through `@myorganiser/web-ui` like a feature.
+ * consume primitives through `@myorganiser/web-ui` like a feature. Feature
+ * Library Components take both sets for the same reasons.
  */
 const SCOPE_RULES = {
   primitive: ['displayName', 'classNameMerge', 'barrelExport'],
   feature: ['deepImport', 'handlerCallbacks', 'inlinePropsType'],
   'vault-ui': [
+    'displayName',
+    'classNameMerge',
+    'barrelExport',
+    'deepImport',
+    'handlerCallbacks',
+    'inlinePropsType',
+  ],
+  'feature-library': [
     'displayName',
     'classNameMerge',
     'barrelExport',
@@ -715,7 +805,7 @@ const RULES = {
  * file that reports PASS having been checked against nothing.
  */
 function assertScopesCovered() {
-  const scopes = ['primitive', 'feature', 'vault-ui'];
+  const scopes = ['primitive', 'feature', 'vault-ui', 'feature-library'];
   for (const scope of scopes) {
     if (!SCOPE_RULES[scope]) {
       throw new Error(
@@ -755,6 +845,7 @@ async function collectAll() {
     'libs/web/ui/src/lib/components',
     'libs/web/vault-ui/src/lib',
     'libs/web/pages',
+    ...featureLibraryRoots(),
   ];
   const out = [];
   const walk = async (dir) => {
@@ -873,7 +964,13 @@ async function main() {
   // Barrel unreadable (wrong cwd, partial checkout) — skip that rule rather
   // than accuse every component of being unexported.
   const barrels = new Map();
-  for (const { barrel } of Object.values(SCOPE_BARRELS)) {
+  const barrelPaths = files
+    .map((file) => {
+      const scope = scopeOf(file);
+      return scope ? barrelSpecOf(file, scope)?.barrel : undefined;
+    })
+    .filter(Boolean);
+  for (const barrel of barrelPaths) {
     if (barrels.has(barrel)) continue;
     try {
       barrels.set(barrel, await fs.readFile(barrel, 'utf8'));
@@ -894,7 +991,8 @@ async function main() {
       skipped += 1;
       results.push({
         file,
-        skipped: 'not a UI Primitive, Vault UI Component, or Feature Component',
+        skipped:
+          'not a UI Primitive, Vault UI Component, Feature Library Component, or Feature Component',
         findings: [],
       });
       continue;
@@ -953,7 +1051,9 @@ async function main() {
       `Component hygiene: nothing was checked — all ${skipped} file(s) were out of scope. ` +
         'This is not a pass. Point the checker at a UI Primitive ' +
         '(libs/web/ui/src/lib/components/), a Vault UI Component ' +
-        '(libs/web/vault-ui/src/lib/), or a Feature Component ' +
+        '(libs/web/vault-ui/src/lib/), a Feature Library Component ' +
+        '(libs/web/<lib>/src/lib/ of a library tagged type:feature + scope:web), ' +
+        'or a Feature Component ' +
         '(libs/web/pages/<route>/src/) — see docs/ui/GUIDELINES.md §1.\n',
     );
     process.exitCode = 1;

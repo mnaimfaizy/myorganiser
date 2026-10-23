@@ -28,7 +28,7 @@ describe('getBreadcrumbItems (pure resolver)', () => {
       ['/dashboard/addresses', 'Addresses', '/dashboard/addresses'],
       [
         '/dashboard/mobile-numbers',
-        'Mobile Numbers',
+        'Mobile numbers',
         '/dashboard/mobile-numbers',
       ],
       ['/dashboard/subscriptions', 'Subscriptions', '/dashboard/subscriptions'],
@@ -89,7 +89,7 @@ describe('getBreadcrumbItems (pure resolver)', () => {
       ['/dashboard/groceries/abc123', 'Groceries', 'Details'],
       ['/dashboard/addresses/42', 'Addresses', 'Details'],
       ['/dashboard/subscriptions/7', 'Subscriptions', 'Details'],
-      ['/dashboard/mobile-numbers/9', 'Mobile Numbers', 'Details'],
+      ['/dashboard/mobile-numbers/9', 'Mobile numbers', 'Details'],
     ])(
       'resolves %s to Dashboard / %s / %s',
       (pathname, parentLabel, detailsLabel) => {
@@ -178,7 +178,7 @@ describe('DynamicBreadcrumb (component)', () => {
       ['/dashboard/tasks', 'Tasks'],
       ['/dashboard/groceries', 'Groceries'],
       ['/dashboard/addresses', 'Addresses'],
-      ['/dashboard/mobile-numbers', 'Mobile Numbers'],
+      ['/dashboard/mobile-numbers', 'Mobile numbers'],
       ['/dashboard/subscriptions', 'Subscriptions'],
       ['/dashboard/youtube', 'YouTube'],
       ['/dashboard/vault', 'Vault'],
@@ -300,7 +300,7 @@ describe('DynamicBreadcrumb (component)', () => {
       ],
       [
         '/dashboard/mobile-numbers/9',
-        'Mobile Numbers',
+        'Mobile numbers',
         '/dashboard/mobile-numbers',
       ],
     ])(

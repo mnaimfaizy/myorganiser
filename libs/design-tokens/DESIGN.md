@@ -30,6 +30,38 @@ The color palette is architected to balance trust with interactive energy.
     points at the problem; the words stay readable, and colour is never the only cue.
   - **Caution Amber (#B45309)** marks a state the User should notice where nothing has failed and nothing is irreversible — a change that has not reached the server yet, or a condition worth seeing before an action rather than after it. It is the deliberate middle ground the palette previously lacked: Destructive overstates these, claiming a failure or a point of no return, and the muted neutral understates them into invisibility. Reach for Caution before an action, and Destructive only for one that cannot be undone.
 
+**Navy is a surface as well as a text colour.** The Web v2.0 sidebar, the
+Home hero and the toast are `navy`, with `navy-raised` for a card or divider
+on it. Text on navy takes `navy-foreground`, and meta on navy takes
+`navy-muted-foreground` (6.9:1). An accent on navy is not the light-surface
+accent: a progress fill or a toast action is `navy-accent` (the lighter cyan),
+and a trust mark is `navy-trust`. The `sidebar-*` roles are the navy sidebar:
+`sidebar-accent` is `navy-raised` (hover and the vault card), and the active
+pill is `sidebar-primary` violet as a border over a translucent tint of itself.
+
+**Brand violet has a text form and a soft form.** Filled violet (`brand`) is
+the one main create action on a screen and the active-tab underline. Violet as
+text — a link, a selected option's tick — is `brand-text`, a darker violet that
+reads at body size on white; `brand-text-strong` is its hover and a selected
+option's label. `brand-soft` is the tint behind an active pill, a selected
+option or a Brand pill.
+
+**Trust teal is a role on the web.** `trust` marks encrypted, synced and
+unlocked — the sync dot, the Vault-locked banner icon. Its soft, faint, edge and
+text forms build the Synced chip and the Trust pill and banner.
+
+**Every status tone is a family, not a value.** Success, warning, destructive
+and trust each carry a `-soft` ground for a pill or chip, a `-faint` ground and
+an `-edge` for a banner, and a `-text` ink that reads on both. The filled tone
+is a dot, an icon or a fill; the words always sit in `-text` on `-soft` or
+`-faint`, so a pill or banner never relies on its colour alone. A neutral pill
+is `subtle` with `subtle-foreground`.
+
+**Text has two steps between foreground and muted.** `foreground-secondary` is
+row text, icons and banner body copy; `foreground-supporting` is a description
+under a title, an empty-state sentence or a table header. `muted` stays the
+caption and metadata colour.
+
 **A caution colour is read against a surface, so it is a pair rather than a value.** #B45309 is the light-surface value, chosen at 5.0:1 on white so it passes AA as body text; the lighter amber it replaced did not. The dark-surface pairing is a _lighter_ amber, not this hue darkened, and lives with the other themed roles in the app stylesheet because this token layer has no dark variant to hold it.
 
 ## Typography
@@ -39,13 +71,19 @@ The typography strategy uses a dual-font approach to differentiate between "Disp
 - **Plus Jakarta Sans** is the headline font. Its modern, geometric shapes project a forward-thinking tech persona. It is used for all major section headers and display titles.
 - **Inter** is the workhorse font for body copy and UI labels. It was chosen for its exceptional legibility at small sizes, which is critical for viewing dense task lists and personal data.
 
-**The named type scale.** There are seven steps and no eighth — `display`,
-`title-lg`, `title`, `body`, `body-sm`, `label-caps`, `caption`. Each carries a
-size, a line height, a weight, and a letter-spacing, pinned in
-[`src/tokens.json`](src/tokens.json) under `type`, and each is used **whole**: a
-step assembled from three tokens and a fourth value chosen at the call site is
-not a scale, it is a suggestion. Plus Jakarta Sans sets `display` through
-`title`; Inter sets everything from `body` down.
+**The named type scale.** There are seven reading steps — `display`,
+`title-lg`, `title`, `body`, `body-sm`, `label-caps`, `caption` — and four
+control steps the Web v2.0 design adds: `label-sm` (a row pill), `control-sm`
+(a 36px control), `input` (text in a field, 16px so iOS does not zoom; its
+Tailwind utility is `text-field`, because `text-input` is the `input` colour)
+and `value` (a copyable field value). Each carries a size, a line height, a weight,
+and a letter-spacing, pinned in [`src/tokens.json`](src/tokens.json) under
+`type`, and each is used **whole**: a step assembled from three tokens and a
+fourth value chosen at the call site is not a scale, it is a suggestion. The one
+exception is weight: a label or emphasis may take a weight from `font-weight`
+(a field label is `body-sm` at semibold), never a size or line height of its
+own. Plus Jakarta Sans sets `display` through `title`; Inter sets everything
+from `body` down.
 
 **Hierarchy Rules:**
 
@@ -91,23 +129,26 @@ Visual hierarchy is primarily conveyed through **Tonal Layers** and **Low-Contra
 
 ## Shapes
 
-The shape language uses **Rounded (8px)** corners to soften the professional navy and teal palette, making the app feel user-friendly and modern.
+The shape language uses rounded corners to soften the professional navy and teal palette, making the app feel user-friendly and modern. The radius grows with the size of the thing it rounds.
 
-- **Standard Radius:** 0.5rem (8px) for buttons, cards, and input fields.
-- **Large Radius:** 1rem (16px) for major modal containers or onboarding cards.
+- **Control Radius:** `lg` for every 44px button and field; `control-sm` for a 36px control or chip; `fab` for the 56px Quick add button.
+- **Container Radius:** `xl` for a grouped list card; `panel` for a dashboard card, data-table card, section card or dialog; `menu` for a menu or listbox, whose items take `item`.
 - **Pill Shapes:** Reserved exclusively for status indicators (e.g., "Encrypted," "Syncing") to distinguish them from actionable buttons.
 
 ## Components
 
 ### Buttons
 
-- **Primary:** Solid `#0F172A` background with white text. 8px radius.
-- **Secure Action:** Solid `#7C3AED` (Electric Purple). Used for "Unlock Vault" or "Save Passphrase."
-- **Secondary:** Transparent with a **control edge** border. It is a control, so it takes the control edge rather than the structural hairline — see Focus & Controls above.
+- **Primary:** Solid `#0F172A` background with white text, for submit and confirm.
+- **Brand:** Solid `#7C3AED` (Electric Purple), for the one main create action on a screen and secure actions such as "Unlock Vault".
+- **Secondary:** The neutral `secondary` fill, for a second action.
+- **Outline:** White with a `border-strong` edge, for Cancel and neutral actions. Its label identifies the control, so its edge is the lighter `border-strong` rather than the control edge a field needs.
+- **Ghost** and **Link** are the low-emphasis forms; a Link is `brand-text`.
+- Every filled variant has its own `-hover` and `-pressed` role, so a state never comes from an opacity or a filter. Disabled is the variant at 45% opacity.
 
 ### Inputs & VaultGate
 
-- **Inputs:** Raised surface background, **control edge** border, 8px radius. On focus, the edge thickens to 2px of **focus** (the foreground colour). In error, it thickens to 2px of **error edge** and an alert icon joins the message, so colour is not the only cue.
+- **Inputs:** Raised surface background, **control edge** border, 12px radius. Disabled takes the `subtle` ground and a `border-strong` edge. On focus, the edge thickens to 2px of **focus** (the foreground colour). In error, it thickens to 2px of **error edge** and an alert icon joins the message, so colour is not the only cue.
 - **VaultGate:** When data is locked, use a semi-transparent blur overlay with a centered lock icon and a `#7C3AED` primary button to initiate the decryption flow.
 
 ### Cards
@@ -117,5 +158,5 @@ The shape language uses **Rounded (8px)** corners to soften the professional nav
 
 ### Navigation Sidebar
 
-- **Style:** Deep navy or light slate background. Active items use a high-contrast cyan indicator (`#06B6D4`) on the left edge or a soft background tint.
+- **Style:** Deep navy or light slate background. Active items use a high-contrast cyan indicator (`#06B6D4`) on the left edge or a soft background tint. The Web v2.0 sidebar is the navy one — see Navy under Colors.
 - **Typography:** Navigation links use `Inter` Medium 14px for maximum space efficiency.

@@ -332,11 +332,12 @@ const MyForm = ({ onSubmit }: { onSubmit: (name: string) => void }) => {
 
 ### 5.3 Zod schema placement
 
-| Scenario                          | Where the schema lives                                                 |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| One form only, not reused         | Inline in the component file, above the component                      |
-| Shared between add and edit forms | `libs/web/pages/<route>/src/schemas/<feature>.ts`                      |
-| Shared across routes              | `libs/core/src/` or `libs/app-api-client/` (discuss before doing this) |
+| Scenario                                | Where the schema lives                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| One form only, not reused               | Inline in the component file, above the component                                            |
+| Shared between add and edit forms       | `libs/web/pages/<route>/src/schemas/<feature>.ts`                                            |
+| Shared across routes                    | `libs/core/src/` or `libs/app-api-client/` (discuss before doing this)                       |
+| Shared with the feature UI it validates | The feature library that holds that UI, e.g. `libs/web/usage-locations/src/lib/placeForm.ts` |
 
 ### 5.4 Props interface
 
@@ -439,11 +440,11 @@ This document is the source of truth. The agents do not paraphrase it into their
 
 Enforcement is split three ways by what each layer can actually decide:
 
-| Layer                         | Owns                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check-component-hygiene.mjs` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX, export/basename match (Feature: one exported component named after the file; primitive/vault-ui: basename matches the compound root). Deterministic — a script counts where a model estimates. |
-| `tsc --noEmit` + `eslint`     | Type correctness, importer compatibility, `any`, unused vars, hook dependency arrays.                                                                                                                                                                                                                                                                                                  |
-| ComponentReviewer             | Judgment: is the composition pattern right, is the component in the right scope, is it mixing too many concerns, is the client boundary correct, should this be Radix, accessibility beyond the shape rules.                                                                                                                                                                           |
+| Layer                         | Owns                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-component-hygiene.mjs` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX, export/basename match (Feature: one exported component named after the file; primitive/vault-ui/Feature Library (any other `libs/web/<lib>` tagged `type:feature` + `scope:web`): basename matches the compound root). Deterministic — a script counts where a model estimates. |
+| `tsc --noEmit` + `eslint`     | Type correctness, importer compatibility, `any`, unused vars, hook dependency arrays.                                                                                                                                                                                                                                                                                                                                                                                   |
+| ComponentReviewer             | Judgment: is the composition pattern right, is the component in the right scope, is it mixing too many concerns, is the client boundary correct, should this be Radix, accessibility beyond the shape rules.                                                                                                                                                                                                                                                            |
 
 Run the shape rules yourself at any time:
 

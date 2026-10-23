@@ -47,3 +47,72 @@ export async function routeApi(
     await handler(route);
   });
 }
+
+function corsHeaders(origin: string) {
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'access-control-allow-headers': 'content-type,authorization',
+  } as const;
+}
+
+/**
+ * Answer GET with a fixed JSON body and OPTIONS with a CORS preflight. Any
+ * other method is handed to the network. Use it for reads a shell makes on
+ * mount, where the body only has to be the generated client's response shape.
+ */
+export async function stubJsonGet(page: Page, url: RegExp, body: unknown) {
+  await routeApi(page, url, async (route) => {
+    const origin = new URL(page.url() || 'http://localhost:4200').origin;
+    const headers = corsHeaders(origin);
+    const request = route.request();
+
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+}
+
+/**
+ * Answer POST with a fixed JSON body and OPTIONS with a CORS preflight. Any
+ * other method is handed to the network. Use it for writes a page makes on
+ * mount whose response the page ignores, such as a fire-and-forget mark.
+ */
+export async function stubJsonPost(page: Page, url: RegExp, body: unknown) {
+  await routeApi(page, url, async (route) => {
+    const origin = new URL(page.url() || 'http://localhost:4200').origin;
+    const headers = corsHeaders(origin);
+    const request = route.request();
+
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+
+    if (request.method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+}

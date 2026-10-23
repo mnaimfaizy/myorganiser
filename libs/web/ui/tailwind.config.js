@@ -1,69 +1,37 @@
+const { join } = require('node:path');
+
+// The shared theme lives in libs/design-tokens and is required by a path built
+// at runtime: a relative import specifier across projects is what
+// `@nx/enforce-module-boundaries` refuses (the same reason apps/web/next.config.js
+// reads the workspace package.json by path).
+const theme = require(
+  join(__dirname, '..', '..', 'design-tokens', 'tailwind-theme.cjs'),
+);
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // Every source the Storybook in .storybook/main.ts loads stories from. A
+  // class used only in a vault-ui, usage-locations or page-library story
+  // generates no CSS otherwise, and the story renders unstyled.
   content: [
     './src/**/*.{ts,tsx,js,jsx,html}',
     './.storybook/**/*.{ts,tsx,js,jsx,html}',
+    '../vault-ui/src/**/*.{ts,tsx,js,jsx,html}',
+    '../usage-locations/src/**/*.{ts,tsx,js,jsx,html}',
+    '../pages/*/src/**/*.{ts,tsx,js,jsx,html}',
   ],
   theme: {
     extend: {
+      ...theme,
       fontFamily: {
         sans: ['system-ui', 'sans-serif'],
-      },
-      colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        brand: {
-          DEFAULT: 'hsl(var(--brand))',
-          foreground: 'hsl(var(--brand-foreground))',
-        },
-        cyan: {
-          DEFAULT: 'hsl(var(--cyan))',
-          foreground: 'hsl(var(--cyan-foreground))',
-        },
-        warning: {
-          DEFAULT: 'hsl(var(--warning))',
-          foreground: 'hsl(var(--warning-foreground))',
-        },
-        success: {
-          DEFAULT: 'hsl(var(--success))',
-          foreground: 'hsl(var(--success-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
-        },
+        ...theme.fontFamily,
       },
       borderRadius: {
         lg: `var(--radius)`,
         md: `calc(var(--radius) - 2px)`,
         sm: 'calc(var(--radius) - 4px)',
+        ...theme.borderRadius,
       },
     },
   },

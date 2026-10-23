@@ -25,6 +25,7 @@ export interface TaskFormInput {
   status: Task['status'];
   context?: Task['context'];
   dueDate?: string;
+  estimatedMinutes?: number;
 }
 
 export interface TaskUpdateInput {
@@ -34,4 +35,5 @@ export interface TaskUpdateInput {
   status: Task['status'];
   context?: Task['context'];
   dueDate?: string;
+  estimatedMinutes?: number;
 }

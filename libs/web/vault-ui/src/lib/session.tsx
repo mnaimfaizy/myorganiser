@@ -45,7 +45,7 @@ export type VaultUnlockSecret = 'passphrase' | 'recovery-key';
  */
 type PassphraseResetPromptAnswer = 'skipped' | 'completed';
 
-type VaultSessionContextValue = {
+export type VaultSessionContextValue = {
   masterKeyBytes: Uint8Array | null;
   /**
    * Null while locked. Set with the Master Key when unlocking, and cleared
@@ -119,9 +119,13 @@ type VaultSessionContextValue = {
   absentEvidence: VaultAbsentEvidenceState;
 };
 
-const VaultSessionContext = createContext<VaultSessionContextValue | null>(
-  null,
-);
+/**
+ * Exported so a story can mount a chosen session value — locked, unlocked, or
+ * a given sync reading — without the IndexedDB-backed provider. App code
+ * mounts `VaultSessionProvider`, never this context directly.
+ */
+export const VaultSessionContext =
+  createContext<VaultSessionContextValue | null>(null);
 
 export interface VaultSessionProviderProps {
   children: React.ReactNode;
@@ -332,4 +336,17 @@ export function useVaultSession(): VaultSessionContextValue {
 
 export function useOptionalVaultSession(): VaultSessionContextValue | null {
   return useContext(VaultSessionContext);
+}
+
+/**
+ * The lock state a shell reads for chrome: `no-session` when no Vault Session
+ * is mounted (not locked, and not unlockable), otherwise `locked` or
+ * `unlocked` from the Master Key.
+ */
+export type VaultLockState = 'no-session' | 'locked' | 'unlocked';
+
+export function useVaultLockState(): VaultLockState {
+  const session = useOptionalVaultSession();
+  if (session === null) return 'no-session';
+  return session.masterKeyBytes === null ? 'locked' : 'unlocked';
 }

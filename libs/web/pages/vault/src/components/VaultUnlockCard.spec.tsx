@@ -36,24 +36,8 @@ jest.mock('@myorganiser/web-ui', () => {
     );
   }
 
-  function Card({ children }: any) {
-    return <div data-testid="card">{children}</div>;
-  }
-
-  function CardHeader({ children }: any) {
-    return <div>{children}</div>;
-  }
-
-  function CardTitle({ children }: any) {
-    return <h2>{children}</h2>;
-  }
-
-  function CardDescription({ children }: any) {
-    return <p>{children}</p>;
-  }
-
-  function CardContent({ children }: any) {
-    return <div>{children}</div>;
+  function Illustration({ size }: any) {
+    return <svg data-testid="illustration" data-size={size} />;
   }
 
   function Form({ children, ...props }: any) {
@@ -90,11 +74,6 @@ jest.mock('@myorganiser/web-ui', () => {
 
   return {
     Button,
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
     Form,
     FormField,
     FormItem,
@@ -102,13 +81,16 @@ jest.mock('@myorganiser/web-ui', () => {
     FormControl,
     FormDescription,
     FormMessage,
+    Illustration,
     Input,
+    useIsMobile: jest.fn(),
     useToast: jest.fn(),
   };
 });
 
 import { VaultUnlockCard } from './VaultUnlockCard';
 import { useVaultUnlock, useVaultDisabledState } from '../hooks';
+import { useIsMobile } from '@myorganiser/web-ui';
 
 // === Mock helpers ===
 
@@ -121,6 +103,7 @@ describe('VaultUnlockCard', () => {
     jest.clearAllMocks();
 
     // Default mocks
+    (useIsMobile as jest.Mock).mockReturnValue(false);
     (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
     (useVaultUnlock as jest.Mock).mockReturnValue({
       unlocking: false,
@@ -139,7 +122,9 @@ describe('VaultUnlockCard', () => {
       const { container } = render(<VaultUnlockCard />);
 
       expect(screen.queryByText('Unlock your vault')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('card')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1 }),
+      ).not.toBeInTheDocument();
       expect(container.firstChild).toBeNull();
     });
 
@@ -149,7 +134,9 @@ describe('VaultUnlockCard', () => {
       const { container } = render(<VaultUnlockCard />);
 
       expect(screen.queryByText('Unlock your vault')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('card')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1 }),
+      ).not.toBeInTheDocument();
       expect(container.firstChild).toBeNull();
     });
 
@@ -159,22 +146,30 @@ describe('VaultUnlockCard', () => {
       const { container } = render(<VaultUnlockCard />);
 
       expect(screen.queryByText('Unlock your vault')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('card')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1 }),
+      ).not.toBeInTheDocument();
       expect(container.firstChild).toBeNull();
     });
   });
 
   describe('Rendering when vault is locked', () => {
-    test('4: renders Card with title, description, password input, and Unlock button', () => {
+    test('4: renders the locked hero with h1 title, description, password input, and Unlock button', () => {
       (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
 
       render(<VaultUnlockCard />);
 
-      // Assert Card is rendered
-      expect(screen.getByTestId('card')).toBeInTheDocument();
+      // Assert the hero's h1 title
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
 
-      // Assert title
-      expect(screen.getByText('Unlock your vault')).toBeInTheDocument();
+      // Assert the passphrase label and the desktop illustration size
+      expect(screen.getByText('Passphrase')).toBeInTheDocument();
+      expect(screen.getByTestId('illustration')).toHaveAttribute(
+        'data-size',
+        '112',
+      );
 
       // Assert description
       expect(
@@ -195,6 +190,19 @@ describe('VaultUnlockCard', () => {
       const submitButton = screen.getByTestId('vault-unlock-submit');
       expect(submitButton).toHaveTextContent('Unlock');
       expect(submitButton).not.toBeDisabled();
+    });
+  });
+
+  describe('Mobile layout', () => {
+    test('5a: uses the compact illustration below md', () => {
+      (useIsMobile as jest.Mock).mockReturnValue(true);
+
+      render(<VaultUnlockCard />);
+
+      expect(screen.getByTestId('illustration')).toHaveAttribute(
+        'data-size',
+        '48',
+      );
     });
   });
 

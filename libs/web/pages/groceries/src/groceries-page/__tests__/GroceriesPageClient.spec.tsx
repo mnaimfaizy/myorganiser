@@ -1,1401 +1,641 @@
-/*
-  Tests for GroceriesPageClient component.
-  - Covers GroceriesPage (VaultGate wrapper) and GroceriesInner (main logic)
-  - Tests loading, empty, and loaded states
-  - Tests error handling and dialog orchestration
-  - Covers create, rename, and delete list flows with vault mutation tracking
-  - Mocks useGroceriesVault hook, VaultGate, child components, and web-ui
-*/
+// Mocks sit above every import, so the module graph sees them first.
+const mockToast = jest.fn();
 
-/** Mocking rule: place jest.mock calls before any imports */
+jest.mock('@myorganiser/web-vault-ui', () => ({
+  VaultGate: ({
+    children,
+  }: {
+    children: (props: { handle: unknown }) => unknown;
+  }) => children({ handle: { isUnlocked: true } }),
+}));
 
 jest.mock('../../shared/hooks', () => ({
   useGroceriesVault: jest.fn(),
+  useGroceriesErrorToast: jest.requireActual(
+    '../../shared/hooks/useGroceriesErrorToast',
+  ).useGroceriesErrorToast,
 }));
 
-jest.mock('@myorganiser/web-vault-ui', () => ({
-  // Constant: these suites never converge, so the revision never moves.
-  // Reloading on a moved revision is covered where it is the subject.
-  useLocalVaultRevision: () => 0,
-  VaultGate: ({ children, title }: any) => {
-    const ctx = { handle: { isUnlocked: true } };
-    return (
-      <div data-testid="vault-gate" data-title={title}>
-        {children(ctx)}
-      </div>
-    );
-  },
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
+  useIsMobileState: jest.fn(),
+  useToast: jest.fn(),
 }));
 
-jest.mock('@myorganiser/web-ui', () => {
-  const React = require('react');
+import type {
+  CatalogItem,
+  GroceryList,
+  ListLine,
+} from '@myorganiser/vault-core';
+import { useIsMobileState, useToast } from '@myorganiser/web-ui';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { useGroceriesVault } from '../../shared/hooks';
+import { GroceriesPageClient } from '../GroceriesPageClient';
 
-  function Button({
-    children,
-    onClick,
-    disabled = false,
-    size = 'md',
-    className = '',
-  }: any) {
-    return (
-      <button
-        data-testid="button"
-        onClick={onClick}
-        disabled={disabled}
-        data-size={size}
-        className={className}
-      >
-        {children}
-      </button>
-    );
-  }
-
-  function Skeleton({ className = '' }: any) {
-    return <div data-testid="skeleton" className={className} />;
-  }
-
-  return { Button, Skeleton };
-});
-
-jest.mock('lucide-react', () => ({
-  Plus: ({ className }: any) => (
-    <svg data-testid="plus-icon" className={className} viewBox="0 0 24 24" />
-  ),
-  LayoutGrid: ({ className }: any) => (
-    <svg
-      data-testid="layout-grid-icon"
-      className={className}
-      viewBox="0 0 24 24"
-    />
-  ),
+// Radix menus and dialogs need a ResizeObserver in jsdom.
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
 }));
 
-jest.mock('../components', () => {
-  const React = require('react');
+const TIMESTAMP = '2026-10-01T09:00:00.000Z';
 
-  function TripBoardIndex({
+function catalogItem(
+  id: string,
+  name: string,
+  category: CatalogItem['category'],
+  extras: Partial<CatalogItem> = {},
+): CatalogItem {
+  return {
+    id,
+    name,
+    category,
+    createdAt: TIMESTAMP,
+    updatedAt: TIMESTAMP,
+    ...extras,
+  };
+}
+
+function listLine(
+  id: string,
+  catalogItemId: string,
+  checked = false,
+): ListLine {
+  return {
+    id,
+    catalogItemId,
+    checked,
+    createdAt: TIMESTAMP,
+    updatedAt: TIMESTAMP,
+  };
+}
+
+function groceryList(
+  id: string,
+  name: string,
+  lines: ListLine[] = [],
+): GroceryList {
+  return { id, name, lines, createdAt: TIMESTAMP, updatedAt: TIMESTAMP };
+}
+
+const CATALOG = {
+  milk: catalogItem('cat-milk', 'Milk', 'dairy', { price: 2.5 }),
+  bread: catalogItem('cat-bread', 'Bread', 'bakery', { price: 4 }),
+  eggs: catalogItem('cat-eggs', 'Eggs', 'dairy'),
+  apples: catalogItem('cat-apples', 'Apples', 'produce', { price: 3 }),
+  butter: catalogItem('cat-butter', 'Butter', 'dairy', { price: 3.5 }),
+  rice: catalogItem('cat-rice', 'Rice', 'other', { price: 2 }),
+};
+
+const ALL_CATALOG = Object.values(CATALOG);
+
+interface VaultFixture {
+  lists?: GroceryList[];
+  catalog?: CatalogItem[];
+  loading?: boolean;
+  error?: string | null;
+}
+
+/** A controllable stand-in for useGroceriesVault; mutators resolve by default. */
+function makeVault({
+  lists = [],
+  catalog = ALL_CATALOG,
+  loading = false,
+  error = null,
+}: VaultFixture = {}) {
+  return {
     lists,
     catalog,
-    onRenameList,
-    onDeleteList,
-    onAddExistingItem,
-    isLoading,
-  }: any) {
-    return (
-      <div data-testid="trip-board-index">
-        <div data-testid="lists-count">{lists.length}</div>
-        <div data-testid="catalog-count">{catalog?.length ?? 0}</div>
-        <button
-          data-testid="selector-rename-button"
-          onClick={() => onRenameList('list1')}
-        >
-          Rename
-        </button>
-        <button
-          data-testid="selector-delete-button"
-          onClick={() => onDeleteList('list1')}
-        >
-          Delete
-        </button>
-        <button
-          data-testid="selector-add-existing-button"
-          onClick={() => onAddExistingItem('cat-1', ['list1'])}
-        >
-          Add existing
-        </button>
-        <div data-testid="selector-loading">
-          {isLoading ? 'loading' : 'ready'}
-        </div>
-      </div>
-    );
-  }
-
-  function CreateListDialog({ isOpen, onClose, onSubmit, isLoading }: any) {
-    return (
-      <div
-        data-testid="create-list-dialog"
-        data-open={isOpen}
-        data-loading={isLoading}
-      >
-        {isOpen && (
-          <>
-            <button
-              data-testid="dialog-create-submit"
-              onClick={() => onSubmit('New List')}
-            >
-              Submit
-            </button>
-            <button data-testid="dialog-create-close" onClick={onClose}>
-              Close
-            </button>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  function RenameListDialog({
-    isOpen,
-    currentName,
-    onClose,
-    onSubmit,
-    isLoading,
-  }: any) {
-    return isOpen ? (
-      <div
-        data-testid="rename-list-dialog"
-        data-open={isOpen}
-        data-current-name={currentName}
-        data-loading={isLoading}
-      >
-        <button
-          data-testid="dialog-rename-submit"
-          onClick={() => onSubmit('Renamed List')}
-        >
-          Submit
-        </button>
-        <button data-testid="dialog-rename-close" onClick={onClose}>
-          Close
-        </button>
-      </div>
-    ) : null;
-  }
-
-  function DeleteListConfirmDialog({
-    isOpen,
-    listName,
-    itemCount,
-    onClose,
-    onConfirm,
-    isLoading,
-  }: any) {
-    return isOpen ? (
-      <div
-        data-testid="delete-list-dialog"
-        data-open={isOpen}
-        data-list-name={listName}
-        data-item-count={itemCount}
-        data-loading={isLoading}
-      >
-        <button data-testid="dialog-delete-confirm" onClick={() => onConfirm()}>
-          Confirm
-        </button>
-        <button data-testid="dialog-delete-close" onClick={onClose}>
-          Close
-        </button>
-      </div>
-    ) : null;
-  }
-
-  return {
-    TripBoardIndex,
-    CreateListDialog,
-    RenameListDialog,
-    DeleteListConfirmDialog,
+    loading,
+    error,
+    setError: jest.fn(),
+    createList: jest.fn().mockResolvedValue(undefined),
+    renameList: jest.fn().mockResolvedValue(undefined),
+    deleteList: jest.fn().mockResolvedValue(undefined),
+    uncheckAllLines: jest.fn().mockResolvedValue(undefined),
+    addItemToLists: jest.fn().mockResolvedValue(undefined),
+    addExistingCatalogItemToLists: jest.fn().mockResolvedValue([]),
+    updateCatalogItem: jest.fn().mockResolvedValue(undefined),
+    deleteCatalogItem: jest.fn().mockResolvedValue(undefined),
   };
-});
+}
 
-import type { CatalogItem, GroceryList } from '@myorganiser/vault-core';
-import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { GroceriesPageClient as GroceriesPage } from '../GroceriesPageClient';
-import { useGroceriesVault } from '../../shared/hooks';
+function renderPage(fixture: VaultFixture = {}) {
+  const vault = makeVault(fixture);
+  (useGroceriesVault as jest.Mock).mockReturnValue(vault);
+  render(<GroceriesPageClient />);
+  return vault;
+}
 
-const mockUseGroceriesVault = useGroceriesVault as jest.Mock;
+/** Radix opens a dropdown on Enter keydown on its trigger. */
+function openCardMenu(listName: string) {
+  fireEvent.keyDown(
+    screen.getByRole('button', { name: `Actions for ${listName}` }),
+    { key: 'Enter' },
+  );
+}
 
 describe('GroceriesPageClient', () => {
-  /* ============================================
-     Test Helpers
-     ============================================ */
-
-  interface VaultState {
-    lists: GroceryList[];
-    catalog: CatalogItem[];
-    loading: boolean;
-    error: string | null;
-    selectedListIds: string[];
-    setSelectedListIds: jest.Mock;
-    setError: jest.Mock;
-    createList: jest.Mock;
-    renameList: jest.Mock;
-    deleteList: jest.Mock;
-    addExistingCatalogItemToLists: jest.Mock;
-  }
-
-  function makeVaultState(overrides?: Partial<VaultState>): VaultState {
-    return {
-      lists: [],
-      catalog: [],
-      loading: false,
-      error: null,
-      selectedListIds: [],
-      setSelectedListIds: jest.fn(),
-      setError: jest.fn(),
-      createList: jest.fn(),
-      renameList: jest.fn(),
-      deleteList: jest.fn(),
-      addExistingCatalogItemToLists: jest.fn(),
-      ...overrides,
-    };
-  }
-
-  function makeGroceryList(
-    id: string,
-    name: string,
-    itemCount = 0,
-  ): GroceryList {
-    return {
-      id,
-      name,
-      lines: Array.from({ length: itemCount }, (_, i) => ({
-        id: `line-${i}`,
-        catalogItemId: `catalog-item-${i}`,
-        checked: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  }
-
   beforeEach(() => {
-    jest.clearAllMocks();
+    (useGroceriesVault as jest.Mock).mockReset();
+    (useIsMobileState as jest.Mock).mockReset();
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    (useToast as jest.Mock).mockReset();
+    (useToast as jest.Mock).mockReturnValue({
+      toast: mockToast,
+      toasts: [],
+      dismiss: jest.fn(),
+    });
+    mockToast.mockReset();
   });
 
-  /* ============================================
-     Loading State Tests
-     ============================================ */
+  describe('before the breakpoint is decided', () => {
+    it('renders nothing, so neither the phone nor the desktop layout paints first', () => {
+      (useIsMobileState as jest.Mock).mockReturnValue(undefined);
+      (useGroceriesVault as jest.Mock).mockReturnValue(makeVault());
 
-  describe('Loading State', () => {
-    it('should display loading skeletons when vault.loading=true', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
+      const { container } = render(<GroceriesPageClient />);
 
-      render(<GroceriesPage />);
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
 
-      const skeletons = screen.getAllByTestId('skeleton');
-      expect(skeletons).toHaveLength(5); // 1 header + 1 subtitle + 3 list cards
+  describe('loading', () => {
+    it('shows a busy placeholder while the vault loads', () => {
+      renderPage({ loading: true });
+
+      const placeholder = screen.getByLabelText('Loading groceries list');
+      expect(placeholder).toHaveAttribute('aria-busy', 'true');
+      expect(
+        screen.queryByRole('heading', { level: 1, name: 'Groceries' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('desktop Lists tab', () => {
+    const weeklyShop = groceryList('list-weekly', 'Weekly shop', [
+      listLine('line-1', 'cat-milk'),
+      listLine('line-2', 'cat-eggs'),
+    ]);
+    const party = groceryList('list-party', 'Party', [
+      listLine('line-3', 'cat-bread', true),
+    ]);
+
+    it('renders one page heading and a summary that names the unpriced items', () => {
+      renderPage({ lists: [weeklyShop, party] });
+
+      const headings = screen.getAllByRole('heading', { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveTextContent('Groceries');
+      expect(
+        screen.getByText('2 lists · $6.50 known spend · 1 item unpriced'),
+      ).toBeInTheDocument();
     });
 
-    it('should show header skeleton with correct dimensions', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
+    it('omits the unpriced segment from the summary when every line is priced', () => {
+      renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+          ]),
+          party,
+        ],
+      });
 
-      render(<GroceriesPage />);
-
-      const skeletons = screen.getAllByTestId('skeleton');
-      expect(skeletons[0]).toHaveClass('h-8', 'w-48');
-      expect(skeletons[1]).toHaveClass('h-4', 'w-64');
+      expect(
+        screen.getByText('2 lists · $6.50 known spend'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
     });
 
-    it('should show three list card skeletons with correct dimensions', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
+    it('opens Create List from the header and calls createList with the typed name', async () => {
+      const vault = renderPage({ lists: [weeklyShop] });
 
-      render(<GroceriesPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'New list' }));
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Create New List',
+      });
+      fireEvent.change(within(dialog).getByRole('textbox'), {
+        target: { value: 'Camping' },
+      });
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Create List' }),
+        );
+      });
 
-      const skeletons = screen.getAllByTestId('skeleton');
-      for (let i = 2; i < 5; i++) {
-        expect(skeletons[i]).toHaveClass('h-24', 'w-full');
+      await waitFor(() => {
+        expect(vault.createList).toHaveBeenCalledWith('Camping');
+      });
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('dialog', { name: 'Create New List' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('selects Lists by default and shows the Catalog summary after clicking Catalog', async () => {
+      renderPage({ lists: [weeklyShop, party] });
+
+      expect(screen.getByRole('tab', { name: 'Lists · 2' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(
+        screen.getByRole('button', { name: 'New list' }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Catalog · 6' }));
+
+      expect(screen.getByRole('tab', { name: 'Catalog · 6' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(
+        screen.getByText(
+          'Your Catalog keeps names, prices and notes so every list can reuse them.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'New Catalog Item' }),
+      ).toBeInTheDocument();
+    });
+
+    it('moves the selected tab with ArrowRight on the tablist', () => {
+      renderPage({ lists: [weeklyShop, party] });
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Lists · 2' }), {
+        key: 'ArrowRight',
+      });
+
+      expect(screen.getByRole('tab', { name: 'Catalog · 6' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(screen.getByRole('tab', { name: 'Lists · 2' })).toHaveAttribute(
+        'aria-selected',
+        'false',
+      );
+    });
+
+    it('wraps ArrowLeft from Lists to Catalog, and Home and End jump to the ends', () => {
+      renderPage({ lists: [weeklyShop, party] });
+      const tablist = screen.getByRole('tablist', { name: 'Groceries' });
+
+      fireEvent.keyDown(tablist, { key: 'ArrowLeft' });
+      expect(screen.getByRole('tab', { name: 'Catalog · 6' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+
+      fireEvent.keyDown(tablist, { key: 'Home' });
+      expect(screen.getByRole('tab', { name: 'Lists · 2' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+
+      fireEvent.keyDown(tablist, { key: 'End' });
+      expect(screen.getByRole('tab', { name: 'Catalog · 6' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('leaves the selected tab unchanged for keys the tablist does not handle', () => {
+      renderPage({ lists: [weeklyShop, party] });
+
+      fireEvent.keyDown(screen.getByRole('tablist', { name: 'Groceries' }), {
+        key: 'ArrowDown',
+      });
+
+      expect(screen.getByRole('tab', { name: 'Lists · 2' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(screen.getByRole('tab', { name: 'Catalog · 6' })).toHaveAttribute(
+        'aria-selected',
+        'false',
+      );
+    });
+  });
+
+  describe('list cards', () => {
+    it('shows the list link, known spend, unpriced count, progress and checked counts', () => {
+      renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+            listLine('line-2', 'cat-eggs'),
+            listLine('line-3', 'cat-bread', true),
+          ]),
+        ],
+      });
+
+      const card = screen.getByRole('article');
+      expect(
+        within(card).getByRole('link', { name: 'Weekly shop' }),
+      ).toHaveAttribute('href', '/dashboard/groceries/list-weekly');
+      expect(within(card).getByText('$6.50')).toBeInTheDocument();
+      expect(within(card).getByText('1 unpriced')).toBeInTheDocument();
+      expect(
+        within(card).getByRole('progressbar', {
+          name: 'Weekly shop progress',
+        }),
+      ).toHaveAttribute('aria-valuenow', '1');
+      expect(
+        within(card).getByText('1 of 3 checked · 2 left'),
+      ).toBeInTheDocument();
+    });
+
+    it('names the first four open items in STILL TO BUY and counts the rest', () => {
+      renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+            listLine('line-2', 'cat-bread'),
+            listLine('line-3', 'cat-apples'),
+            listLine('line-4', 'cat-butter'),
+            listLine('line-5', 'cat-rice'),
+            listLine('line-6', 'cat-eggs'),
+          ]),
+        ],
+      });
+
+      const card = screen.getByRole('article');
+      expect(within(card).getByText('STILL TO BUY')).toBeInTheDocument();
+      for (const name of ['Milk', 'Bread', 'Apples', 'Butter']) {
+        expect(within(card).getByText(name)).toBeInTheDocument();
+      }
+      expect(within(card).queryByText('Rice')).not.toBeInTheDocument();
+      expect(within(card).getByText('+2 more')).toBeInTheDocument();
+    });
+
+    it('shows the all-bought callout and calls uncheckAllLines from Uncheck All', async () => {
+      const vault = renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk', true),
+            listLine('line-2', 'cat-bread', true),
+          ]),
+        ],
+      });
+
+      const card = screen.getByRole('article');
+      expect(
+        within(card).getByText('All bought. Uncheck All to use it again.'),
+      ).toBeInTheDocument();
+      expect(within(card).queryByText('STILL TO BUY')).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(
+          within(card).getByRole('button', { name: 'Uncheck All' }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(vault.uncheckAllLines).toHaveBeenCalledWith('list-weekly');
+      });
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it('shows the Error toast when uncheckAllLines rejects', async () => {
+      const consoleError = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      try {
+        const vault = renderPage({
+          lists: [
+            groceryList('list-weekly', 'Weekly shop', [
+              listLine('line-1', 'cat-milk', true),
+            ]),
+          ],
+        });
+        const failure = new Error('vault write failed');
+        vault.uncheckAllLines.mockRejectedValue(failure);
+
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Uncheck All' }));
+        });
+
+        await waitFor(() => {
+          expect(mockToast).toHaveBeenCalledWith({
+            title: 'Error',
+            description: 'Failed to save your changes. Please try again.',
+            variant: 'destructive',
+          });
+        });
+        expect(consoleError).toHaveBeenCalledWith(
+          'Failed to uncheck all lines:',
+          failure,
+        );
+      } finally {
+        consoleError.mockRestore();
       }
     });
 
-    it('should not display dialogs during loading', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
-
-      render(<GroceriesPage />);
-
-      const dialogs = screen.queryAllByTestId(/dialog/);
-      dialogs.forEach((dialog) => {
-        expect(dialog).toHaveAttribute('data-open', 'false');
+    it('shows the empty copy and an Add items link for a list with no lines', () => {
+      renderPage({
+        lists: [groceryList('list-empty', 'Camping', [])],
       });
-    });
 
-    it('should not display TripBoardIndex during loading', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
-
-      render(<GroceriesPage />);
-
-      expect(screen.queryByTestId('trip-board-index')).not.toBeInTheDocument();
-    });
-
-    it('should not display empty state during loading', () => {
-      mockUseGroceriesVault.mockReturnValue(makeVaultState({ loading: true }));
-
-      render(<GroceriesPage />);
-
+      const card = screen.getByRole('article');
       expect(
-        screen.queryByText('No grocery lists yet'),
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Empty State Tests
-     ============================================ */
-
-  describe('Empty State', () => {
-    it('should display empty state when vault.lists is empty and not loading', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('No grocery lists yet')).toBeInTheDocument();
-    });
-
-    it('should show empty state heading and description', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('No grocery lists yet')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Create your first list to get started organizing your shopping.',
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it('should show Create Your First List button in empty state', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const createFirstListBtn = buttons.find(
-        (btn) => btn.textContent === 'Create Your First List',
-      );
-      expect(createFirstListBtn).toBeInTheDocument();
-    });
-
-    it('should open CreateListDialog when Create Your First List button clicked', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const createFirstListBtn = buttons.find(
-        (btn) => btn.textContent === 'Create Your First List',
-      );
-      fireEvent.click(createFirstListBtn!);
-
-      const dialog = screen.getByTestId('create-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should not display TripBoardIndex when lists empty', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.queryByTestId('trip-board-index')).not.toBeInTheDocument();
-    });
-
-    it('should display header with trip board copy even in empty state', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('Trip board')).toBeInTheDocument();
-      expect(
-        screen.getByRole('heading', { name: 'Active trips' }),
+        within(card).getByText('Nothing on this list yet'),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
-          (_, element) => element?.textContent === '$0.00 known spend',
-        ),
-      ).toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Loaded State Tests
-     ============================================ */
-
-  describe('Loaded State - List Display', () => {
-    it('should display TripBoardIndex when vault.lists has items', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 5)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
+        within(card).getByRole('link', { name: 'Add items' }),
+      ).toHaveAttribute('href', '/dashboard/groceries/list-empty');
     });
 
-    it('should pass correct lists array to TripBoardIndex', () => {
-      const lists = [
-        makeGroceryList('list1', 'Groceries', 3),
-        makeGroceryList('list2', 'Farmers Market', 2),
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByTestId('lists-count')).toHaveTextContent('2');
-    });
-
-    it('should pass vault.catalog through to TripBoardIndex', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 1)];
-      const catalog: CatalogItem[] = [
-        {
-          id: 'catalog-item-0',
-          name: 'Milk',
-          category: 'dairy',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, catalog, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByTestId('catalog-count')).toHaveTextContent('1');
-    });
-
-    it('should pass loading state to TripBoardIndex', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByTestId('selector-loading')).toHaveTextContent('ready');
-    });
-
-    it('should display header with trip board title and portfolio subline', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 1)];
-      const catalog: CatalogItem[] = [
-        {
-          id: 'catalog-item-0',
-          name: 'Milk',
-          category: 'dairy',
-          price: 3.5,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, catalog, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('Trip board')).toBeInTheDocument();
-      expect(
-        screen.getByRole('heading', { name: 'Active trips' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          (_, element) => element?.textContent === '$3.50 known spend',
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it('should append unpriced count to the portfolio subline when present', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 2)];
-      const catalog: CatalogItem[] = [
-        {
-          id: 'catalog-item-0',
-          name: 'Milk',
-          category: 'dairy',
-          price: 2,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'catalog-item-1',
-          name: 'Bread',
-          category: 'bakery',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, catalog, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(
-        screen.getByText(
-          (_, element) =>
-            element?.textContent === '$2.00 known spend · 1 unpriced',
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it('should show New trip button in header', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      expect(newListBtn).toBeInTheDocument();
-    });
-
-    it('should enable New trip button when not loading', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      expect(newListBtn).not.toBeDisabled();
-    });
-
-    it('should pass callback functions to TripBoardIndex', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Verify the component renders TripBoardIndex
-      expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-
-      // Verify callback buttons are present and functional
-      expect(screen.getByTestId('selector-rename-button')).toBeInTheDocument();
-      expect(screen.getByTestId('selector-delete-button')).toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Error Handling Tests
-     ============================================ */
-
-  describe('Error Handling', () => {
-    it('should display error banner when vault.error is set', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: 'Failed to load lists',
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('Failed to load lists')).toBeInTheDocument();
-    });
-
-    it('should show error banner with dismiss button', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: 'Failed to load lists',
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.getByText('Dismiss')).toBeInTheDocument();
-    });
-
-    it('should call vault.setError(null) when dismiss button clicked', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockSetError = jest.fn();
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: 'Failed to load lists',
-          setError: mockSetError,
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByText('Dismiss'));
-      expect(mockSetError).toHaveBeenCalledWith(null);
-    });
-
-    it('should not display error banner when vault.error is null', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: null,
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      expect(screen.queryByText('Dismiss')).not.toBeInTheDocument();
-    });
-
-    it('should display error banner above list content', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: 'Network error occurred',
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      const errorText = screen.getByText('Network error occurred');
-      const selector = screen.getByTestId('trip-board-index');
-
-      // Both should be in document, error appears first in DOM
-      expect(errorText).toBeInTheDocument();
-      expect(selector).toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Create List Flow Tests
-     ============================================ */
-
-  describe('Create List Flow', () => {
-    it('should open CreateListDialog when New trip button clicked', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      const dialog = screen.getByTestId('create-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should open CreateListDialog from empty state button', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const createFirstBtn = buttons.find(
-        (btn) => btn.textContent === 'Create Your First List',
-      );
-      fireEvent.click(createFirstBtn!);
-
-      const dialog = screen.getByTestId('create-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should call vault.createList with entered name on dialog submit', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockCreateList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, createList: mockCreateList }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      const submitBtn = screen.getByTestId('dialog-create-submit');
-      fireEvent.click(submitBtn);
-
-      await waitFor(() => {
-        expect(mockCreateList).toHaveBeenCalledWith('New List');
-      });
-    });
-
-    it('should close CreateListDialog after successful submission', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockCreateList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, createList: mockCreateList }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      const submitBtn = screen.getByTestId('dialog-create-submit');
-      fireEvent.click(submitBtn);
-
-      await waitFor(() => {
-        const dialog = screen.getByTestId('create-list-dialog');
-        expect(dialog).toHaveAttribute('data-open', 'false');
-      });
-    });
-
-    it('should close CreateListDialog when close button clicked', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      const closeBtn = screen.getByTestId('dialog-create-close');
-      fireEvent.click(closeBtn);
-
-      const dialog = screen.getByTestId('create-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'false');
-    });
-
-    it('should render CreateListDialog when not loading', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // CreateListDialog should be rendered when not loading
-      expect(screen.getByTestId('create-list-dialog')).toBeInTheDocument();
-    });
-  });
-
-  /* ============================================
-     Rename List Flow Tests
-     ============================================ */
-
-  describe('Rename List Flow', () => {
-    it('should open RenameListDialog when onRenameList called on selector', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      const dialog = screen.getByTestId('rename-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should populate RenameListDialog with current list name', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      const dialog = screen.getByTestId('rename-list-dialog');
-      expect(dialog).toHaveAttribute('data-current-name', 'Groceries');
-    });
-
-    it('should call vault.renameList with listId and new name on submit', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockRenameList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, renameList: mockRenameList }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-      fireEvent.click(screen.getByTestId('dialog-rename-submit'));
-
-      await waitFor(() => {
-        expect(mockRenameList).toHaveBeenCalledWith('list1', 'Renamed List');
-      });
-    });
-
-    it('should close RenameListDialog after successful submission', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockRenameList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, renameList: mockRenameList }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-      fireEvent.click(screen.getByTestId('dialog-rename-submit'));
-
-      await waitFor(() => {
-        const dialog = screen.queryByTestId('rename-list-dialog');
-        expect(dialog).not.toBeInTheDocument();
-      });
-    });
-
-    it('should close RenameListDialog when close button clicked', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-      fireEvent.click(screen.getByTestId('dialog-rename-close'));
-
-      const dialog = screen.queryByTestId('rename-list-dialog');
-      expect(dialog).not.toBeInTheDocument();
-    });
-
-    it('should pass isLoading state to RenameListDialog', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      // Dialog receives loading state from vault
-      const dialog = screen.getByTestId('rename-list-dialog');
-      expect(dialog).toHaveAttribute('data-loading', 'false');
-    });
-
-    it('should find correct list by listId for rename dialog', () => {
-      const lists = [
-        makeGroceryList('list1', 'Groceries', 3),
-        makeGroceryList('list2', 'Farmers Market', 2),
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      // Selector always renames list1
-      const dialog = screen.getByTestId('rename-list-dialog');
-      expect(dialog).toHaveAttribute('data-current-name', 'Groceries');
-    });
-  });
-
-  /* ============================================
-     Delete List Flow Tests
-     ============================================ */
-
-  describe('Delete List Flow', () => {
-    it('should open DeleteListConfirmDialog when onDeleteList called on selector', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should populate DeleteListConfirmDialog with list name', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-list-name', 'Groceries');
-    });
-
-    it('should populate DeleteListConfirmDialog with item count', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 5)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-item-count', '5');
-    });
-
-    it('should call vault.deleteList with listId on confirm', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockDeleteList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, deleteList: mockDeleteList }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-      fireEvent.click(screen.getByTestId('dialog-delete-confirm'));
-
-      await waitFor(() => {
-        expect(mockDeleteList).toHaveBeenCalledWith('list1');
-      });
-    });
-
-    it('should close DeleteListConfirmDialog after successful deletion', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockDeleteList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, deleteList: mockDeleteList }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-      fireEvent.click(screen.getByTestId('dialog-delete-confirm'));
-
-      await waitFor(() => {
-        const dialog = screen.queryByTestId('delete-list-dialog');
-        expect(dialog).not.toBeInTheDocument();
-      });
-    });
-
-    it('should close DeleteListConfirmDialog when close button clicked', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-      fireEvent.click(screen.getByTestId('dialog-delete-close'));
-
-      const dialog = screen.queryByTestId('delete-list-dialog');
-      expect(dialog).not.toBeInTheDocument();
-    });
-
-    it('should pass isLoading state to DeleteListConfirmDialog', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      // When not loading, dialog shows with data-loading="false"
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-loading', 'false');
-    });
-
-    it('should handle delete list with zero items', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 0)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-item-count', '0');
-    });
-
-    it('should handle delete list with many items', () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 50)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-item-count', '50');
-    });
-  });
-
-  /* ============================================
-     Dialog State Management Tests
-     ============================================ */
-
-  describe('Dialog State Management', () => {
-    it('should only show one dialog at a time', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
+    it('renames a list through the card menu and calls renameList with the new name', async () => {
+      const vault = renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+          ]),
+        ],
       });
 
-      // Open create dialog
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      const createDialog = screen.getByTestId('create-list-dialog');
-      expect(createDialog).toHaveAttribute('data-open', 'true');
-
-      // Rename and delete dialogs should not be in DOM
-      const renameDialog = screen.queryByTestId('rename-list-dialog');
-      const deleteDialog = screen.queryByTestId('delete-list-dialog');
-      expect(renameDialog).not.toBeInTheDocument();
-      expect(deleteDialog).not.toBeInTheDocument();
-    });
-
-    it('should transition between different dialogs', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
+      openCardMenu('Weekly shop');
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Rename list' }),
       );
 
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
+      const dialog = await screen.findByRole('dialog', { name: 'Rename List' });
+      const input = within(dialog).getByRole('textbox');
+      expect(input).toHaveValue('Weekly shop');
+      fireEvent.change(input, { target: { value: 'Party shop' } });
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Rename List' }),
+        );
       });
 
-      // Open create dialog
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      let createDialog = screen.getByTestId('create-list-dialog');
-      expect(createDialog).toHaveAttribute('data-open', 'true');
-
-      // Close create dialog
-      fireEvent.click(screen.getByTestId('dialog-create-close'));
-
-      createDialog = screen.getByTestId('create-list-dialog');
-      expect(createDialog).toHaveAttribute('data-open', 'false');
-
-      // Open rename dialog
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      const renameDialog = screen.getByTestId('rename-list-dialog');
-      expect(renameDialog).toHaveAttribute('data-open', 'true');
-    });
-
-    it('should clear dialog state when dialog closes', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
       await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
+        expect(vault.renameList).toHaveBeenCalledWith(
+          'list-weekly',
+          'Party shop',
+        );
       });
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      const renameDialog = screen.getByTestId('rename-list-dialog');
-      expect(renameDialog).toHaveAttribute('data-open', 'true');
-
-      fireEvent.click(screen.getByTestId('dialog-rename-close'));
-
-      expect(
-        screen.queryByTestId('rename-list-dialog'),
-      ).not.toBeInTheDocument();
-    });
-
-    it('should persist dialog state across renders', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockRenameList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, renameList: mockRenameList }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      const renameDialog = screen.getByTestId('rename-list-dialog');
-      expect(renameDialog).toHaveAttribute('data-open', 'true');
-      expect(renameDialog).toHaveAttribute('data-current-name', 'Groceries');
-    });
-  });
-
-  /* ============================================
-     VaultGate Integration Tests
-     ============================================ */
-
-  describe('VaultGate Integration', () => {
-    it('should render GroceriesPage wrapped with VaultGate', () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      const vaultGate = screen.getByTestId('vault-gate');
-      expect(vaultGate).toBeInTheDocument();
-      expect(vaultGate).toHaveAttribute('data-title', 'Groceries');
-    });
-
-    it('should call useGroceriesVault with the handle from VaultGate', async () => {
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists: [], loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for component to initialize and call the hook
-      await waitFor(() => {
-        expect(mockUseGroceriesVault).toHaveBeenCalledWith({
-          handle: expect.objectContaining({ isUnlocked: true }),
-        });
-      });
-    });
-
-    it('should render GroceriesInner as child of VaultGate', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        const vaultGate = screen.getByTestId('vault-gate');
-        expect(
-          vaultGate.querySelector('[data-testid="trip-board-index"]'),
-        ).toBeInTheDocument();
-      });
-    });
-  });
-
-  /* ============================================
-     Integration Tests
-     ============================================ */
-
-  describe('Integration', () => {
-    it('should handle complete create list flow', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockCreateList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, createList: mockCreateList }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
-
-      // Click New trip
-      const buttons = screen.getAllByTestId('button');
-      const newListBtn = buttons.find((btn) =>
-        btn.textContent.includes('New trip'),
-      );
-      fireEvent.click(newListBtn!);
-
-      // Dialog opens
-      let dialog = screen.getByTestId('create-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-
-      // Submit form
-      fireEvent.click(screen.getByTestId('dialog-create-submit'));
-
-      // Dialog closes after submission
-      await waitFor(() => {
-        dialog = screen.getByTestId('create-list-dialog');
-        expect(dialog).toHaveAttribute('data-open', 'false');
-      });
-
-      // vault.createList was called
-      expect(mockCreateList).toHaveBeenCalledWith('New List');
-    });
-
-    it('should handle complete rename list flow', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockRenameList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, renameList: mockRenameList }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
-
-      // Click Rename on selector
-      fireEvent.click(screen.getByTestId('selector-rename-button'));
-
-      // Dialog opens with correct name
-      const dialog = screen.getByTestId('rename-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-      expect(dialog).toHaveAttribute('data-current-name', 'Groceries');
-
-      // Submit form
-      fireEvent.click(screen.getByTestId('dialog-rename-submit'));
-
-      // Dialog closes after submission
       await waitFor(() => {
         expect(
-          screen.queryByTestId('rename-list-dialog'),
+          screen.queryByRole('dialog', { name: 'Rename List' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('deletes a list through the card menu and calls deleteList once confirmed', async () => {
+      const vault = renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+          ]),
+        ],
+      });
+
+      openCardMenu('Weekly shop');
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Delete Grocery List…' }),
+      );
+
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Delete "Weekly shop"?',
+      });
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Delete List' }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(vault.deleteList).toHaveBeenCalledWith('list-weekly');
+      });
+    });
+
+    it('shows the New list tile with zero lists and opens Create List from it', async () => {
+      renderPage({ lists: [] });
+
+      const tile = screen.getByRole('button', {
+        name: /For the next shop or an occasion/,
+      });
+      fireEvent.click(tile);
+
+      expect(
+        await screen.findByRole('dialog', { name: 'Create New List' }),
+      ).toBeInTheDocument();
+    });
+
+    it('calls setError(null) when Dismiss is clicked on the vault error banner', () => {
+      const vault = renderPage({
+        lists: [],
+        error: 'Failed to save your changes. Please try again.',
+      });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(
+        'Failed to save your changes. Please try again.',
+      );
+      fireEvent.click(within(alert).getByRole('button', { name: 'Dismiss' }));
+
+      expect(vault.setError).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('phone', () => {
+    beforeEach(() => {
+      (useIsMobileState as jest.Mock).mockReturnValue(true);
+    });
+
+    it('keeps one visually hidden page heading and a phone summary without the unpriced segment', () => {
+      renderPage({
+        lists: [
+          groceryList('list-weekly', 'Weekly shop', [
+            listLine('line-1', 'cat-milk'),
+          ]),
+          groceryList('list-party', 'Party', [
+            listLine('line-2', 'cat-bread', true),
+          ]),
+        ],
+      });
+
+      const headings = screen.getAllByRole('heading', { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveTextContent('Groceries');
+      expect(headings[0]).toHaveClass('sr-only');
+      expect(screen.getByText('2 lists · $6.50 known')).toBeInTheDocument();
+    });
+
+    it('shows the phone sub-line for each list state', () => {
+      renderPage({
+        lists: [
+          groceryList('list-empty', 'Camping', []),
+          groceryList('list-done', 'Done list', [
+            listLine('line-1', 'cat-bread', true),
+          ]),
+          groceryList('list-mixed', 'Mixed list', [
+            listLine('line-2', 'cat-milk', true),
+            listLine('line-3', 'cat-eggs'),
+          ]),
+          groceryList('list-open', 'Open list', [
+            listLine('line-4', 'cat-apples'),
+          ]),
+        ],
+      });
+
+      expect(screen.getByText('Nothing on it yet')).toBeInTheDocument();
+      expect(
+        screen.getByText('All bought · Uncheck All to reuse'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('1 of 2 · 1 unpriced')).toBeInTheDocument();
+      expect(screen.getByText('0 of 1 checked')).toBeInTheDocument();
+    });
+
+    it('opens Create List from the Lists FAB and the add dialog from the Catalog FAB', async () => {
+      renderPage({ lists: [] });
+
+      fireEvent.click(screen.getByRole('button', { name: 'New list' }));
+      expect(
+        await screen.findByRole('dialog', { name: 'Create New List' }),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('dialog', { name: 'Create New List' }),
         ).not.toBeInTheDocument();
       });
 
-      // vault.renameList was called with correct args
-      expect(mockRenameList).toHaveBeenCalledWith('list1', 'Renamed List');
+      fireEvent.click(screen.getByRole('tab', { name: 'Catalog · 6' }));
+      fireEvent.click(screen.getByRole('button', { name: 'New Catalog Item' }));
+      expect(
+        await screen.findByRole('dialog', { name: 'New Catalog Item' }),
+      ).toBeInTheDocument();
     });
 
-    it('should handle complete delete list flow', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 5)];
-      const mockDeleteList = jest.fn().mockResolvedValue(undefined);
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false, deleteList: mockDeleteList }),
-      );
+    it('shows the empty copy and the New list FAB on the Lists tab, then New Catalog Item on Catalog', () => {
+      renderPage({ lists: [] });
 
-      render(<GroceriesPage />);
+      expect(screen.getByText('No grocery lists yet')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'New list' }),
+      ).toBeInTheDocument();
 
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
+      fireEvent.click(screen.getByRole('tab', { name: 'Catalog · 6' }));
 
-      // Click Delete on selector
-      fireEvent.click(screen.getByTestId('selector-delete-button'));
-
-      // Dialog opens with correct info
-      const dialog = screen.getByTestId('delete-list-dialog');
-      expect(dialog).toHaveAttribute('data-open', 'true');
-      expect(dialog).toHaveAttribute('data-list-name', 'Groceries');
-      expect(dialog).toHaveAttribute('data-item-count', '5');
-
-      // Confirm deletion
-      fireEvent.click(screen.getByTestId('dialog-delete-confirm'));
-
-      // Dialog closes after deletion
-      await waitFor(() => {
-        expect(
-          screen.queryByTestId('delete-list-dialog'),
-        ).not.toBeInTheDocument();
-      });
-
-      // vault.deleteList was called
-      expect(mockDeleteList).toHaveBeenCalledWith('list1');
-    });
-
-    it('should maintain state through multiple list operations', async () => {
-      const lists = [
-        makeGroceryList('list1', 'Groceries', 3),
-        makeGroceryList('list2', 'Farmers Market', 2),
-      ];
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({ lists, loading: false }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
-
-      // Verify selector has correct list count
-      expect(screen.getByTestId('lists-count')).toHaveTextContent('2');
-
-      // Both callback functions are present and work
-      expect(screen.getByTestId('selector-rename-button')).toBeInTheDocument();
-      expect(screen.getByTestId('selector-delete-button')).toBeInTheDocument();
-    });
-
-    it('should show error and allow list operations simultaneously', async () => {
-      const lists = [makeGroceryList('list1', 'Groceries', 3)];
-      const mockSetError = jest.fn();
-      mockUseGroceriesVault.mockReturnValue(
-        makeVaultState({
-          lists,
-          loading: false,
-          error: 'Some warning',
-          setError: mockSetError,
-        }),
-      );
-
-      render(<GroceriesPage />);
-
-      // Wait for selector to be visible (error and selector render together)
-      await waitFor(() => {
-        expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      });
-
-      // Error banner visible
-      expect(screen.getByText('Some warning')).toBeInTheDocument();
-
-      // Lists still visible and operable
-      expect(screen.getByTestId('trip-board-index')).toBeInTheDocument();
-      expect(screen.getByTestId('selector-rename-button')).toBeInTheDocument();
-
-      // Can dismiss error
-      fireEvent.click(screen.getByText('Dismiss'));
-      expect(mockSetError).toHaveBeenCalledWith(null);
+      expect(
+        screen.getByRole('button', { name: 'New Catalog Item' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'New list' }),
+      ).not.toBeInTheDocument();
     });
   });
 });

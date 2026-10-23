@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, CardTitle } from '@myorganiser/web-ui';
-import Link from 'next/link';
+import { useIsMobileState } from '@myorganiser/web-ui';
 import { useCallback, useState } from 'react';
 import {
   useYouTubeAvailability,
@@ -16,15 +15,20 @@ import { isRunLive } from '../lib/syncProgress';
 import { DisconnectYouTubeDialog } from './DisconnectYouTubeDialog';
 import { SubscriptionManager } from './SubscriptionManager';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
+import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 
 export function YouTubeChannelsPageClient() {
-  const { available } = useYouTubeAvailability();
+  const { available, error: availabilityError } = useYouTubeAvailability();
 
   // Availability gate — fail closed. The connection and data hooks live below
   // it, so a User without YouTube Access makes no YouTube request at all.
   if (available !== true) {
-    return <YouTubeUnavailableNotice />;
+    return (
+      <YouTubeUnavailableNotice
+        reason={availabilityError ? 'unreachable' : 'unavailable'}
+      />
+    );
   }
 
   return <YouTubeChannelsConnectionState />;
@@ -40,13 +44,16 @@ function YouTubeChannelsConnectionState() {
 
   const disconnectNoticeBanner =
     disconnectNotice === null ? null : (
-      <div role="status" className="mx-4 mt-4 text-sm text-muted-foreground">
+      <div
+        role="status"
+        className="mx-4 mt-4 rounded-panel border border-border bg-raised-surface p-4 text-body-sm text-foreground-supporting"
+      >
         {disconnectNotice.message}{' '}
         <a
           href={disconnectNotice.googlePermissionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline"
+          className="font-semibold text-brand-text underline"
         >
           Manage Google permissions
         </a>
@@ -102,6 +109,7 @@ function ConnectedChannelsDashboard({
   const { disconnect } = useYouTubeConnect();
   const subs = useYouTubeSubscriptions();
   const syncStatus = useYouTubeSyncStatus();
+  const isMobile = useIsMobileState();
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
@@ -175,13 +183,13 @@ function ConnectedChannelsDashboard({
   }, [disconnect, onDisconnectNotice, refreshStatus]);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="flex items-center gap-4">
-        <CardTitle>Channels</CardTitle>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/youtube">Videos</Link>
-        </Button>
-      </div>
+    <div className="mx-auto flex w-full max-w-[1240px] flex-1 flex-col gap-5 px-4 pb-8 pt-4 md:p-8">
+      <h1 className="sr-only">Channels</h1>
+      <YouTubeSectionNav
+        current="channels"
+        channelCount={subs.loading ? null : subs.subscriptions.length}
+        variant={isMobile === true ? 'phone' : 'desktop'}
+      />
 
       <SubscriptionManager
         subscriptions={subs.subscriptions}

@@ -7,6 +7,8 @@ jest.mock('@myorganiser/web-ui', () => ({
     </button>
   ),
   Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  // Plain concatenation: the real cn also runs tailwind-merge, which these tests do not exercise.
+  cn: (...inputs: unknown[]) => inputs.filter(Boolean).join(' '),
   CardContent: ({ children, ...props }: any) => (
     <div {...props}>{children}</div>
   ),
@@ -175,6 +177,18 @@ describe('CloudBackupCard', () => {
         'Google Drive refused access',
       );
       expect(badgeNoReason.textContent).not.toContain('(undefined)');
+    });
+  });
+
+  describe('structure', () => {
+    test('titles the card with a level 3 heading', () => {
+      renderCard({ connection: { status: 'linked' } });
+      expect(
+        screen.getByRole('heading', {
+          level: 3,
+          name: 'Encrypted Escape Copy',
+        }),
+      ).toBeInTheDocument();
     });
   });
 

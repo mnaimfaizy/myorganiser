@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '../../utils';
+import { fieldBaseClassName } from '../../field-classes';
 
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
@@ -7,7 +8,8 @@ const Textarea = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <textarea
     className={cn(
-      'w-full rounded-md border border-input bg-background px-3 py-2 min-h-24 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+      fieldBaseClassName,
+      'min-h-24 resize-y py-3 text-body md:text-field',
       className,
     )}
     ref={ref}

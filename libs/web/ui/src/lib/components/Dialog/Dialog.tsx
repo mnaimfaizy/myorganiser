@@ -5,6 +5,17 @@ import { X } from 'lucide-react';
 import * as React from 'react';
 
 import { cn } from '../../utils';
+import { IconButton } from '../IconButton/IconButton';
+
+/**
+ * A modal dialog built on Radix Dialog, which traps focus, closes on Escape
+ * and restores focus to the trigger.
+ *
+ * Accessibility contract: every DialogContent needs a DialogTitle and a
+ * DialogDescription. If a dialog has no description, pass
+ * `aria-describedby={undefined}` to DialogContent deliberately, so the omission
+ * is visible at the call site rather than silent.
+ */
 
 const Dialog = DialogPrimitive.Root;
 
@@ -21,7 +32,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/80 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
+      'fixed inset-0 z-50 bg-scrim motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in-0',
       className,
     )}
     {...props}
@@ -44,16 +55,20 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+        'fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-panel border border-border bg-card p-6 shadow-dialog motion-safe:duration-200 motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:zoom-out-95 motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in-0 motion-safe:data-[state=open]:zoom-in-95',
         className,
       )}
       {...props}
     >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+        <DialogPrimitive.Close asChild>
+          <IconButton
+            label="Close"
+            variant="ghost"
+            icon={<X />}
+            className="absolute right-2 top-2"
+          />
         </DialogPrimitive.Close>
       )}
     </DialogPrimitive.Content>
@@ -61,32 +76,34 @@ const DialogContent = React.forwardRef<
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
-const DialogHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+const DialogHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
   <div
-    className={cn(
-      'flex flex-col space-y-1.5 text-center sm:text-left',
-      className,
-    )}
+    ref={ref}
+    className={cn('flex flex-col gap-1 pr-10 text-left', className)}
     {...props}
   />
-);
+));
 DialogHeader.displayName = 'DialogHeader';
 
-const DialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+/*
+ * Footer buttons sit right-aligned in a row at every width. The stacked,
+ * full-width layout is reserved for the phone confirm sheet (ConfirmDialog),
+ * where the destructive action is the thumb target; a generic dialog with two
+ * or three buttons reads better as a right-aligned row.
+ */
+const DialogFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
   <div
-    className={cn(
-      'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
-      className,
-    )}
+    ref={ref}
+    className={cn('flex justify-end gap-2.5', className)}
     {...props}
   />
-);
+));
 DialogFooter.displayName = 'DialogFooter';
 
 const DialogTitle = React.forwardRef<
@@ -95,10 +112,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      'text-lg font-semibold leading-none tracking-tight',
-      className,
-    )}
+    className={cn('font-display text-title text-foreground', className)}
     {...props}
   />
 ));
@@ -110,7 +124,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-muted-foreground', className)}
+    className={cn('text-body-sm text-foreground-supporting', className)}
     {...props}
   />
 ));

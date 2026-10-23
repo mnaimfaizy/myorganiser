@@ -1,96 +1,138 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 
-import { GoogleDriveCloudBackupProvider } from '@myorganiser/web-vault';
-import { useOptionalVaultSession } from '@myorganiser/web-vault-ui';
+import { useIsMobile } from '@myorganiser/web-ui';
 
-import {
-  useGoogleIdentityScript,
-  useVaultOperationAvailability,
-} from '../hooks';
-import { VAULT_OPERATIONS } from '../policy';
+import { useVaultDisabledState } from '../hooks';
+import type { VaultDisabledState } from '../policy';
 import { ChangePassphraseCard } from './ChangePassphraseCard';
-import { CloudBackupLiveCard } from './CloudBackupLiveCard';
-import { CloudBackupUnavailableCard } from './CloudBackupUnavailableCard';
+import type { CloudBackupSummary } from './CloudBackupLiveCard';
 import { EscapeCopyReaderCard } from './EscapeCopyReaderCard';
 import { ExportVaultCard } from './ExportVaultCard';
 import { ImportVaultCard } from './ImportVaultCard';
 import { RecoveryKeyRotationCard } from './RecoveryKeyRotationCard';
 import { RemoveVaultCard } from './RemoveVaultCard';
+import { VaultEscapeCopySection } from './VaultEscapeCopySection';
+import { VaultPhoneSections } from './VaultPhoneSections';
+import { VaultStatusHero } from './VaultStatusHero';
 import { VaultUnlockCard } from './VaultUnlockCard';
 
+const SECTION_GRID_CLASS =
+  'grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]';
+
+const renderVaultHeading = () => <h1 className="sr-only">Vault</h1>;
+
+/** The hero for each disabled state. Enabled takes the Escape Copy summary; the rest ignore it. */
+const HERO_FOR_DISABLED_STATE = {
+  enabled: (escapeCopy: CloudBackupSummary | undefined): ReactNode => (
+    <VaultStatusHero escapeCopy={escapeCopy} />
+  ),
+  locked: (): ReactNode => <VaultUnlockCard />,
+  'no-local-vault': renderVaultHeading,
+  'signed-out': renderVaultHeading,
+} as const satisfies Record<
+  VaultDisabledState,
+  (escapeCopy: CloudBackupSummary | undefined) => ReactNode
+>;
+
+/**
+ * The Vault page. One layout renders, chosen by `useIsMobile`: the phone
+ * ListGroups below md, the sectioned desktop page at md and up. Rendering both
+ * would duplicate every test id on the page.
+ */
 export function VaultPageClient() {
+  const isMobile = useIsMobile();
+  const disabledState = useVaultDisabledState();
   const [justMadeACopy, setJustMadeACopy] = useState(false);
+  const [escapeCopySummary, setEscapeCopySummary] = useState<
+    CloudBackupSummary | undefined
+  >(undefined);
 
   const handleEscapeCopyMade = useCallback(() => {
     setJustMadeACopy(true);
   }, []);
 
-  const gisStatus = useGoogleIdentityScript();
-  const vaultSession = useOptionalVaultSession();
-  const handle = vaultSession?.handle ?? null;
-  const cloudBackup = useVaultOperationAvailability(
-    VAULT_OPERATIONS.CloudBackup,
-  );
-  const clientId =
-    // Production and staging bake NEXT_PUBLIC_GOOGLE_CLIENT_ID in at
-    // build time. window.__MYORG_GOOGLE_CLIENT_ID__ is an E2E/dev fallback
-    // only — not a hosted configuration path (issue #751).
-    typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-      ? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-      : typeof window !== 'undefined'
-        ? ((window as { __MYORG_GOOGLE_CLIENT_ID__?: string })
-            .__MYORG_GOOGLE_CLIENT_ID__ ?? '')
-        : '';
+  const handleSummaryChange = useCallback((summary: CloudBackupSummary) => {
+    setEscapeCopySummary(summary);
+  }, []);
 
-  const provider = useMemo(() => {
-    if (!clientId || gisStatus !== 'ready') return null;
-    return new GoogleDriveCloudBackupProvider({ clientId });
-  }, [clientId, gisStatus]);
+  const hero = HERO_FOR_DISABLED_STATE[disabledState](escapeCopySummary);
 
-  function renderCloudBackupCard() {
-    // The policy answers first: with no Local Vault to back up, how Google Drive
-    // is configured is not the reason the card is unavailable.
-    if (cloudBackup.unavailableReason !== null) {
-      return (
-        <CloudBackupUnavailableCard reason={cloudBackup.unavailableReason} />
-      );
-    }
-    if (!clientId) {
-      return (
-        <CloudBackupUnavailableCard reason="Cloud backup is not configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google Drive backup." />
-      );
-    }
-    if (gisStatus === 'error') {
-      return (
-        <CloudBackupUnavailableCard reason="Google Identity Services failed to load. Check your network and try again." />
-      );
-    }
-    if (!provider || !handle) {
-      return (
-        <CloudBackupUnavailableCard reason="Loading Google Drive integration…" />
-      );
-    }
+  if (isMobile) {
     return (
-      <CloudBackupLiveCard
-        provider={provider}
-        handle={handle}
-        onEscapeCopyMade={handleEscapeCopyMade}
-      />
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        {hero}
+        <VaultPhoneSections />
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <VaultUnlockCard />
-      <ChangePassphraseCard />
-      <RecoveryKeyRotationCard />
-      {renderCloudBackupCard()}
-      <ExportVaultCard onEscapeCopyMade={handleEscapeCopyMade} />
-      <EscapeCopyReaderCard justMadeACopy={justMadeACopy} />
-      <RemoveVaultCard />
-      <ImportVaultCard />
+    <div className="flex flex-1 flex-col gap-4 p-4 md:pt-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+        {hero}
+
+        <section
+          aria-labelledby="vault-access-heading"
+          className="flex flex-col gap-3"
+        >
+          <div className="flex flex-col gap-1">
+            <h2
+              id="vault-access-heading"
+              className="font-display text-title-lg"
+            >
+              Access
+            </h2>
+            <p className="text-body text-foreground-supporting">
+              What opens your vault. Both open a dialog with the full steps.
+            </p>
+          </div>
+          <div className={SECTION_GRID_CLASS}>
+            <ChangePassphraseCard />
+            <RecoveryKeyRotationCard />
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="vault-backups-heading"
+          className="flex flex-col gap-3"
+        >
+          <div className="flex flex-col gap-1">
+            <h2
+              id="vault-backups-heading"
+              className="font-display text-title-lg"
+            >
+              Backups and moving your vault
+            </h2>
+            <p className="text-body text-foreground-supporting">
+              Every copy is ciphertext. Plaintext never leaves this device.
+            </p>
+          </div>
+          <VaultEscapeCopySection
+            onEscapeCopyMade={handleEscapeCopyMade}
+            onSummaryChange={handleSummaryChange}
+          />
+          <div className={SECTION_GRID_CLASS}>
+            <ExportVaultCard onEscapeCopyMade={handleEscapeCopyMade} />
+            <ImportVaultCard />
+          </div>
+          <EscapeCopyReaderCard justMadeACopy={justMadeACopy} />
+        </section>
+
+        <section
+          aria-labelledby="vault-danger-heading"
+          className="flex flex-col gap-3"
+        >
+          <h2
+            id="vault-danger-heading"
+            className="font-display text-title-lg text-destructive-text"
+          >
+            Danger zone
+          </h2>
+          <RemoveVaultCard />
+        </section>
+      </div>
     </div>
   );
 }

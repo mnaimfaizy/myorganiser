@@ -8,18 +8,15 @@ import { z } from 'zod';
 
 import {
   Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  Illustration,
   Input,
+  useIsMobile,
 } from '@myorganiser/web-ui';
 import { currentPassphraseSchema } from '@myorganiser/web-vault';
 
@@ -31,9 +28,11 @@ const vaultUnlockSchema = z.object({
 
 type VaultUnlockInput = z.infer<typeof vaultUnlockSchema>;
 
+/** The locked hero: the one place the vault is unlocked, shown above the Access cards. */
 export function VaultUnlockCard() {
   const { unlocking, unlock } = useVaultUnlock();
   const disabledState = useVaultDisabledState();
+  const isMobile = useIsMobile();
 
   const form = useForm<VaultUnlockInput>({
     resolver: zodResolver(vaultUnlockSchema),
@@ -63,47 +62,57 @@ export function VaultUnlockCard() {
     return null;
   }
 
+  // Below md the illustration and heading share a row; the body and form span both
+  // columns. At md the column wrapper becomes a flex column again (display: contents
+  // below md).
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Unlock your vault</CardTitle>
-        <CardDescription>
+    <section className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-3 rounded-2xl bg-navy p-6 text-navy-foreground md:flex md:flex-wrap md:gap-8 md:p-8">
+      <Illustration kind="vault" size={isMobile ? 48 : 112} />
+      <div className="contents md:flex md:min-w-0 md:flex-1 md:basis-80 md:flex-col md:gap-3">
+        <h1 className="font-display text-title md:text-display">
+          Unlock your vault
+        </h1>
+        <p className="col-span-2 text-body text-navy-muted-foreground">
           Enter your passphrase to unlock your vault on this device for this
           session.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+        </p>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-3"
+            className="col-span-2 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start"
           >
             <FormField
               control={form.control}
               name="passphrase"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Passphrase</FormLabel>
+                <FormItem className="md:min-w-72 md:flex-1">
+                  <FormLabel className="text-navy-foreground">
+                    Passphrase
+                  </FormLabel>
                   <FormControl>
-                    <Input {...field} type="password" />
+                    <Input
+                      {...field}
+                      type="password"
+                      className="border-2 border-navy-accent bg-navy-raised text-navy-foreground aria-[invalid=true]:border-error-edge"
+                    />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-navy-foreground" />
                 </FormItem>
               )}
             />
 
-            <div className="flex gap-2">
-              <Button
-                type="submit"
-                data-testid="vault-unlock-submit"
-                disabled={unlocking}
-              >
-                {unlocking ? 'Unlocking…' : 'Unlock'}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              variant="brand"
+              data-testid="vault-unlock-submit"
+              disabled={unlocking}
+              className="w-full md:mt-6 md:w-auto"
+            >
+              {unlocking ? 'Unlocking…' : 'Unlock'}
+            </Button>
           </form>
         </Form>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 
+const ROW_MENU_TRIGGER_LABEL = 'Actions for Weekly groceries';
+
 function DropdownMenuExample() {
   return (
     <DropdownMenu>
@@ -68,7 +70,7 @@ function DropdownMenuIconTriggerExample() {
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" aria-label="Open task actions">
-          <MoreVertical aria-hidden="true" className="h-4 w-4" />
+          <MoreVertical aria-hidden="true" className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
@@ -76,6 +78,54 @@ function DropdownMenuIconTriggerExample() {
         <DropdownMenuSeparator />
         <DropdownMenuItem>Mark complete</DropdownMenuItem>
         <DropdownMenuItem>Assign collaborator</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/*
+ * The row menu's items, shared by the open and closed wrappers so the two
+ * stories cannot drift apart. The destructive item sits last, after a
+ * separator, as in the Data row menu.
+ */
+function RowMenuItems() {
+  return (
+    <>
+      <DropdownMenuItem>Rename list</DropdownMenuItem>
+      <DropdownMenuItem>Uncheck All</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive">
+        Delete Grocery List…
+      </DropdownMenuItem>
+    </>
+  );
+}
+
+function DropdownMenuRowOpenExample() {
+  return (
+    <DropdownMenu defaultOpen>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={ROW_MENU_TRIGGER_LABEL}>
+          <MoreVertical aria-hidden="true" className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end">
+        <RowMenuItems />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DropdownMenuRowClosedExample() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={ROW_MENU_TRIGGER_LABEL}>
+          <MoreVertical aria-hidden="true" className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end">
+        <RowMenuItems />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -110,12 +160,38 @@ export const IconTrigger: Story = {
   },
 };
 
+export const RowMenuOpen: Story = {
+  render: function Render() {
+    return <DropdownMenuRowOpenExample />;
+  },
+};
+
 export const OpensOnClick: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Task actions' }));
     await waitFor(() => {
       expect(within(document.body).getByText('Mark complete')).toBeVisible();
+    });
+  },
+};
+
+export const OpensRowMenu: Story = {
+  render: function Render() {
+    return <DropdownMenuRowClosedExample />;
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: ROW_MENU_TRIGGER_LABEL }),
+    );
+    // The menu portals to document.body, so query there rather than the canvas.
+    await waitFor(() => {
+      expect(
+        within(document.body).getByRole('menuitem', {
+          name: 'Delete Grocery List…',
+        }),
+      ).toBeVisible();
     });
   },
 };

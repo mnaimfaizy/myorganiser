@@ -4,3 +4,4 @@ export type {
   UpdateCatalogItemInput,
   UpdateListLineInput,
 } from './useGroceriesVault';
+export { useGroceriesErrorToast } from './useGroceriesErrorToast';

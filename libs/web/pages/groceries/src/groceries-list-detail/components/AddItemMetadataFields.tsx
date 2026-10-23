@@ -10,95 +10,64 @@ import {
   Input,
   cn,
 } from '@myorganiser/web-ui';
-import type { Control } from 'react-hook-form';
 import { useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
-import {
-  CATEGORY_EMOJIS,
-  CATEGORY_LABELS,
-  CATEGORY_ORDER,
-} from '../../shared/constants/categories';
+import type { Control } from 'react-hook-form';
+import { getCategoryLabel } from '../../shared/constants/categories';
+import { formatMoney } from '../../shared/utils';
 import type { AddItemFormValues } from '../schemas';
+import { CategoryPicker } from './CategoryPicker';
+
+export const ADD_ITEM_LISTBOX_ID = 'add-item-name-suggestions';
+export const ADD_ITEM_NEW_OPTION_ID = 'add-item-new-option';
 
 interface AddItemMetadataFieldsProps {
   control: Control<AddItemFormValues>;
   matchingCatalogItems: CatalogItem[];
   activeSuggestion: number;
-  selectedCategory: AddItemFormValues['category'];
+  showListbox: boolean;
+  typedName: string;
   onNameChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onNameKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSelectCatalogItem: (item: CatalogItem) => void;
+  onKeepTypedName: () => void;
   isLoading: boolean;
 }
 
-interface CategoryButtonsProps {
-  onChange: (value: AddItemFormValues['category']) => void;
-  selectedCategory: AddItemFormValues['category'];
-  isLoading: boolean;
-}
-
-function CategoryButtons({
-  onChange,
-  selectedCategory,
-  isLoading,
-}: CategoryButtonsProps) {
-  const handleCategoryClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      const category = event.currentTarget.dataset.category;
-      if (category) {
-        onChange(category as AddItemFormValues['category']);
-      }
-    },
-    [onChange],
-  );
-
+/** The name in bold where it matches the typed text; the rest plain. */
+function renderMatch(name: string, query: string) {
+  const index = query ? name.toLowerCase().indexOf(query.toLowerCase()) : -1;
+  if (index === -1) return name;
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {CATEGORY_ORDER.map((cat) => (
-        <button
-          key={cat}
-          type="button"
-          role="radio"
-          aria-checked={selectedCategory === cat}
-          data-category={cat}
-          onClick={handleCategoryClick}
-          disabled={isLoading}
-          className={cn(
-            'flex flex-col items-center justify-center rounded-lg p-2 text-center transition-all',
-            selectedCategory === cat
-              ? 'border-2 border-brand bg-brand/10'
-              : 'border border-border bg-card hover:border-brand',
-          )}
-        >
-          <span className="mb-0.5 text-lg" aria-hidden="true">
-            {CATEGORY_EMOJIS[cat]}
-          </span>
-          <span
-            className={cn(
-              'text-[10px] font-medium leading-tight',
-              selectedCategory === cat
-                ? 'font-bold text-brand'
-                : 'text-muted-foreground',
-            )}
-          >
-            {CATEGORY_LABELS[cat]}
-          </span>
-        </button>
-      ))}
-    </div>
+    <>
+      {name.slice(0, index)}
+      <b className="font-semibold">{name.slice(index, index + query.length)}</b>
+      {name.slice(index + query.length)}
+    </>
   );
 }
 
+/** The item name (a Catalog combobox) and the category, the two fields that identify an item. */
 export function AddItemMetadataFields({
   control,
   matchingCatalogItems,
   activeSuggestion,
-  selectedCategory,
+  showListbox,
+  typedName,
   onNameChange,
   onNameKeyDown,
   onSelectCatalogItem,
+  onKeepTypedName,
   isLoading,
 }: AddItemMetadataFieldsProps) {
+  const trimmedName = typedName.trim();
+  const activeId =
+    showListbox && activeSuggestion < matchingCatalogItems.length
+      ? `catalog-suggestion-${matchingCatalogItems[activeSuggestion]?.id}`
+      : showListbox
+        ? ADD_ITEM_NEW_OPTION_ID
+        : undefined;
+
   const handleSuggestionMouseDown = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
@@ -125,9 +94,9 @@ export function AddItemMetadataFields({
         control={control}
         name="name"
         render={({ field }) => (
-          <FormItem>
-            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Item Name <span className="text-destructive">*</span>
+          <FormItem className="gap-1.5">
+            <FormLabel className="text-body font-semibold text-foreground">
+              Item
             </FormLabel>
             <FormControl>
               <Input
@@ -135,53 +104,80 @@ export function AddItemMetadataFields({
                 placeholder="e.g. Organic Almond Milk"
                 role="combobox"
                 aria-autocomplete="list"
-                aria-controls="add-item-name-suggestions"
-                aria-expanded={matchingCatalogItems.length > 0}
-                aria-activedescendant={
-                  matchingCatalogItems[activeSuggestion]
-                    ? `catalog-suggestion-${matchingCatalogItems[activeSuggestion].id}`
-                    : undefined
-                }
+                aria-controls={showListbox ? ADD_ITEM_LISTBOX_ID : undefined}
+                aria-expanded={showListbox}
+                aria-activedescendant={activeId}
                 autoComplete="off"
                 onChange={onNameChange}
                 onKeyDown={onNameKeyDown}
                 disabled={isLoading}
                 maxLength={200}
                 autoFocus
-                className="text-base md:text-sm"
+                className="h-11 text-body"
               />
             </FormControl>
-            {matchingCatalogItems.length > 0 && (
-              <div
-                id="add-item-name-suggestions"
-                role="listbox"
-                aria-label="Existing catalog items"
-                className="rounded-lg border border-border bg-card"
-              >
-                {matchingCatalogItems.map((item, index) => (
+            {showListbox ? (
+              <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-card p-1.5 shadow-card">
+                <span
+                  aria-hidden="true"
+                  className="px-2.5 py-1.5 text-label-caps text-muted-foreground"
+                >
+                  FROM YOUR CATALOG
+                </span>
+                <div
+                  id={ADD_ITEM_LISTBOX_ID}
+                  role="listbox"
+                  aria-label="From your Catalog"
+                  className="flex flex-col gap-0.5"
+                >
+                  {matchingCatalogItems.map((item, index) => (
+                    <button
+                      key={item.id}
+                      id={`catalog-suggestion-${item.id}`}
+                      type="button"
+                      role="option"
+                      aria-selected={index === activeSuggestion}
+                      data-catalog-item-id={item.id}
+                      onMouseDown={handleSuggestionMouseDown}
+                      onClick={handleSuggestionClick}
+                      disabled={isLoading}
+                      className={cn(
+                        'flex min-h-11 items-center justify-between gap-3 rounded-item px-2.5 text-left text-foreground',
+                        index === activeSuggestion && 'bg-brand-soft',
+                      )}
+                    >
+                      <span className="min-w-0 text-body">
+                        {renderMatch(item.name, trimmedName)}
+                        {` · ${getCategoryLabel(item.category)}`}
+                      </span>
+                      {typeof item.price === 'number' ? (
+                        <span className="shrink-0 text-body-sm text-foreground-secondary tabular-nums">
+                          {formatMoney(item.price)}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
                   <button
-                    key={item.id}
-                    id={`catalog-suggestion-${item.id}`}
+                    id={ADD_ITEM_NEW_OPTION_ID}
                     type="button"
                     role="option"
-                    aria-selected={index === activeSuggestion}
-                    data-catalog-item-id={item.id}
+                    aria-selected={
+                      activeSuggestion === matchingCatalogItems.length
+                    }
                     onMouseDown={handleSuggestionMouseDown}
-                    onClick={handleSuggestionClick}
+                    onClick={onKeepTypedName}
                     disabled={isLoading}
                     className={cn(
-                      'block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted',
-                      index === activeSuggestion && 'bg-muted',
+                      'flex min-h-11 items-center rounded-item px-2.5 text-left text-body font-semibold text-brand-text',
+                      activeSuggestion === matchingCatalogItems.length &&
+                        'bg-brand-soft',
                     )}
                   >
-                    <span className="font-medium">{item.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {CATEGORY_LABELS[item.category]}
-                    </span>
+                    {`Add “${trimmedName}” as a new Catalog Item`}
                   </button>
-                ))}
+                </div>
               </div>
-            )}
+            ) : null}
             <FormMessage />
           </FormItem>
         )}
@@ -192,19 +188,11 @@ export function AddItemMetadataFields({
         name="category"
         render={({ field }) => (
           <FormItem>
-            <FormLabel
-              id="add-item-category-label"
-              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              Category
-            </FormLabel>
-            <div role="radiogroup" aria-labelledby="add-item-category-label">
-              <CategoryButtons
-                onChange={field.onChange}
-                selectedCategory={selectedCategory}
-                isLoading={isLoading}
-              />
-            </div>
+            <CategoryPicker
+              value={field.value}
+              onChange={field.onChange}
+              disabled={isLoading}
+            />
             <FormMessage />
           </FormItem>
         )}

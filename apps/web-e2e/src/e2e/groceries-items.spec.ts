@@ -235,7 +235,7 @@ async function gotoGroceriesAndUnlock(
   const unlockButton = page.getByRole('button', { name: 'Use passphrase' });
   await expect(
     unlockButton
-      .or(page.getByRole('heading', { name: 'Active trips' }))
+      .or(page.getByRole('heading', { level: 1, name: 'Groceries' }))
       .first(),
   ).toBeVisible({ timeout: 30000 });
 
@@ -245,30 +245,22 @@ async function gotoGroceriesAndUnlock(
 
   if (isLocked) await unlockWithPassphrase(page, passphrase);
 
-  await expect(page.getByRole('heading', { name: 'Active trips' })).toBeVisible(
-    { timeout: 30000 },
-  );
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Groceries' }),
+  ).toBeVisible({ timeout: 30000 });
 
   // The heading renders before the decrypted trips do; the board's primary
   // action is what depends on that list having resolved.
   await expect(
-    page
-      .getByRole('button', { name: 'New trip' })
-      .or(page.getByRole('button', { name: 'Create Your First List' }))
-      .first(),
+    page.getByRole('button', { name: 'New list', exact: true }).first(),
   ).toBeVisible({ timeout: 30000 });
 }
 
-async function clickNewTrip(page: import('@playwright/test').Page) {
-  const newTrip = page.getByRole('button', { name: 'New trip' });
-  const createFirst = page.getByRole('button', {
-    name: 'Create Your First List',
-  });
-  if (await newTrip.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await newTrip.click();
-  } else {
-    await createFirst.click();
-  }
+async function clickNewList(page: import('@playwright/test').Page) {
+  await page
+    .getByRole('button', { name: 'New list', exact: true })
+    .first()
+    .click();
 }
 
 function tripCard(page: import('@playwright/test').Page, tripName: string) {
@@ -281,7 +273,7 @@ async function createListViaUI(
   page: import('@playwright/test').Page,
   name: string,
 ) {
-  await clickNewTrip(page);
+  await clickNewList(page);
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -352,21 +344,23 @@ async function addItemViaDialog(
   page: import('@playwright/test').Page,
   name: string,
 ) {
-  await page.getByRole('button', { name: 'Add Item' }).click();
+  await page.getByRole('button', { name: 'Add item', exact: true }).click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 30000 });
 
-  const nameInput = page.getByRole('combobox', { name: /Item Name/ });
+  const nameInput = page.getByRole('combobox', { name: 'Item', exact: true });
   await expect(nameInput).toBeVisible({ timeout: 10000 });
   await nameInput.fill(name);
 
-  const addBtn = dialog.getByRole('button', { name: 'Add to List' });
+  const addBtn = dialog.getByRole('button', { name: 'Add to list' });
   await expect(addBtn).toBeEnabled({ timeout: 10000 });
   await addBtn.click();
 
   await expect(dialog).toHaveCount(0, { timeout: 30000 });
-  await expect(page.getByText(name, { exact: true })).toBeVisible({
+  await expect(
+    page.getByRole('checkbox', { name: `Bought ${name}`, exact: true }),
+  ).toBeVisible({
     timeout: 30000,
   });
 }
@@ -375,9 +369,7 @@ async function openRowActionsMenu(
   page: import('@playwright/test').Page,
   itemName: string,
 ) {
-  await page
-    .getByRole('button', { name: `More actions for ${itemName}` })
-    .click();
+  await page.getByRole('button', { name: `More for ${itemName}` }).click();
 }
 
 async function editCatalogItemViaMenu(
@@ -419,7 +411,7 @@ async function editListLineViaPencil(
   updates: { amount?: string },
 ) {
   await page
-    .getByRole('button', { name: `Edit List Line for ${itemName}` })
+    .getByRole('button', { name: `Edit amount for ${itemName}` })
     .click();
 
   const dialog = page.getByRole('dialog');
@@ -443,6 +435,19 @@ async function removeLineViaMenu(
 }
 
 /**
+ * Expand the collapsed "Checked · n" section so a checked line is back in the
+ * DOM. A line moves there the moment it is checked.
+ */
+async function expandCheckedSection(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('button', { name: /^Checked · / });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false', {
+    timeout: 30000,
+  });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+/**
  * The list row for `itemName`. Item names and prices also appear in the catalog
  * chips and the trip summary, so assertions about a line must be scoped here or
  * they match several elements at once (issue #506).
@@ -458,7 +463,7 @@ async function assertItemRowVisible(
   itemName: string,
 ) {
   await expect(
-    page.getByRole('checkbox', { name: new RegExp(`Toggle ${itemName}`) }),
+    page.getByRole('checkbox', { name: `Bought ${itemName}`, exact: true }),
   ).toBeVisible({ timeout: 30000 });
 }
 
@@ -509,9 +514,10 @@ test.describe('Groceries Items (E2E)', () => {
     });
 
     await assertItemRowVisible(page, 'Organic Bananas - Ripe');
-    await expect(
-      listLine(page, 'Organic Bananas - Ripe').getByText('$3.50'),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(listLine(page, 'Organic Bananas - Ripe')).toContainText(
+      '$3.50',
+      { timeout: 30000 },
+    );
   });
 
   test('2 — Add Multiple Items and persist', async ({ page }) => {
@@ -565,9 +571,10 @@ test.describe('Groceries Items (E2E)', () => {
     });
 
     await assertItemRowVisible(page, 'Cherry Tomatoes - Sweet');
-    await expect(
-      listLine(page, 'Cherry Tomatoes - Sweet').getByText('$2.99'),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(listLine(page, 'Cherry Tomatoes - Sweet')).toContainText(
+      '$2.99',
+      { timeout: 30000 },
+    );
   });
 
   test('5 — Mark as Done visual change', async ({ page }) => {
@@ -587,18 +594,25 @@ test.describe('Groceries Items (E2E)', () => {
     await addItemViaDialog(page, 'Cucumber');
 
     // Find and check the checkbox by aria-label
-    const checkbox = page.getByRole('checkbox', { name: /Toggle Cucumber/ });
+    const checkbox = page.getByRole('checkbox', {
+      name: 'Bought Cucumber',
+      exact: true,
+    });
     await expect(checkbox).toBeVisible({ timeout: 30000 });
-    // Use click + expect instead of check() because GroceryListView.handleToggleChecked
-    // is async and must persist through the vault before `checked` re-renders.
+    // Use click + expect instead of check() because the toggle is async and
+    // must persist through the vault before `checked` re-renders.
     // Playwright's check() does not retry its state verification (issue #557).
     await checkbox.click();
+    // A checked line moves into the collapsed "Checked · n" section.
+    await expandCheckedSection(page);
     await expect(checkbox).toBeChecked({ timeout: 30000 });
 
     // Visual change: name should have line-through class.
     // The line-through is applied to the span containing the item name, and
     // `toHaveClass` retries until React has re-rendered it (issue #524).
-    const nameElement = page.getByText('Cucumber', { exact: true });
+    const nameElement = listLine(page, 'Cucumber').getByText('Cucumber', {
+      exact: true,
+    });
     await expect(nameElement).toHaveClass(/line-through/, { timeout: 30000 });
   });
 
@@ -619,7 +633,9 @@ test.describe('Groceries Items (E2E)', () => {
     await addItemViaDialog(page, 'Chips');
     await removeLineViaMenu(page, 'Chips');
 
-    await expect(page.getByText('Chips', { exact: true })).toHaveCount(0, {
+    await expect(
+      page.getByRole('checkbox', { name: 'Bought Chips', exact: true }),
+    ).toHaveCount(0, {
       timeout: 30000,
     });
   });
@@ -645,16 +661,21 @@ test.describe('Groceries Items (E2E)', () => {
     });
     await assertItemRowVisible(page, 'Alpha v2');
 
-    const chk = page.getByRole('checkbox', { name: /Toggle Alpha v2/ });
+    const chk = page.getByRole('checkbox', {
+      name: 'Bought Alpha v2',
+      exact: true,
+    });
     await expect(chk).toBeVisible({ timeout: 30000 });
     await chk.click();
+    await expandCheckedSection(page);
     await expect(chk).toBeChecked({ timeout: 30000 });
+    // Unchecking moves the line back to the open list.
     await chk.click();
     await expect(chk).not.toBeChecked({ timeout: 30000 });
 
     await removeLineViaMenu(page, 'Alpha v2');
     await expect(
-      page.getByRole('checkbox', { name: /Toggle Alpha v2/ }),
+      page.getByRole('checkbox', { name: 'Bought Alpha v2', exact: true }),
     ).toHaveCount(0, { timeout: 30000 });
   });
 

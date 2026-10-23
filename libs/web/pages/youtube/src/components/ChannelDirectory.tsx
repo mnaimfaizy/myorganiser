@@ -2,6 +2,7 @@
 
 import { Button, Skeleton } from '@myorganiser/web-ui';
 import { ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
 import { updateVideoWatched } from '../hooks';
 import { useCachedUploadExpansion } from '../hooks/useCachedUploadExpansion';
@@ -13,7 +14,7 @@ import { UploadListItem } from './UploadListItem';
 
 export { CHANNEL_LIST_UPLOAD_CAP } from '../hooks/useCachedUploadExpansion';
 
-/** The single detail pane both channel tab lists swap. */
+/** The single detail pane the channel tab set swaps. */
 const CHANNEL_PANEL_ID = 'channel-directory-panel';
 
 interface ChannelDirectoryProps {
@@ -77,8 +78,7 @@ export function ChannelDirectory({
   const [pickedVideoId, setPickedVideoId] = useState<string | null>(null);
   const [focusedVideoIndex, setFocusedVideoIndex] = useState<number>(0);
 
-  const channelDesktopRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const channelMobileRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const channelRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const videoRowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const playerTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -113,26 +113,15 @@ export function ChannelDirectory({
   );
 
   const handleChannelKeyDown = useCallback(
-    (
-      e: React.KeyboardEvent<HTMLButtonElement>,
-      index: number,
-      layoutType: 'desktop' | 'mobile',
-    ) => {
+    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
       if (channels.length === 0) return;
 
-      // Each layout answers to its own axis, per the WAI-ARIA keyboard
-      // conventions: the desktop directory is a vertical list, the mobile
-      // chip row a horizontal one. Binding both axes in both layouts would
-      // mean swallowing page scroll on the chip row to no purpose, and
-      // leaving a vertical list that only answers Left/Right — which is what
-      // this did before — is simply the wrong axis for the shape on screen.
-      const nextKey = layoutType === 'desktop' ? 'ArrowDown' : 'ArrowRight';
-      const previousKey = layoutType === 'desktop' ? 'ArrowUp' : 'ArrowLeft';
-
+      // The channel tab set is one horizontal chip row, so it answers to the
+      // horizontal axis only, per the WAI-ARIA tabs keyboard convention.
       let targetIndex: number | null = null;
-      if (e.key === nextKey) {
+      if (e.key === 'ArrowRight') {
         targetIndex = Math.min(index + 1, channels.length - 1);
-      } else if (e.key === previousKey) {
+      } else if (e.key === 'ArrowLeft') {
         targetIndex = Math.max(index - 1, 0);
       } else if (e.key === 'Home') {
         targetIndex = 0;
@@ -143,11 +132,7 @@ export function ChannelDirectory({
       if (targetIndex === null) return;
 
       e.preventDefault();
-      const refs =
-        layoutType === 'desktop'
-          ? channelDesktopRefs.current
-          : channelMobileRefs.current;
-      refs[targetIndex]?.focus();
+      channelRefs.current[targetIndex]?.focus();
       selectChannel(channels[targetIndex].channelId);
       setPickedVideoId(null);
       setFocusedVideoIndex(0);
@@ -225,17 +210,18 @@ export function ChannelDirectory({
       <div
         role="alert"
         aria-live="assertive"
-        className="rounded-lg border border-destructive bg-destructive/10 p-4"
+        className="flex flex-col items-start gap-3 rounded-panel border border-destructive-edge bg-destructive-faint p-4"
       >
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-body-sm text-destructive-text">{error}</p>
         {onRetry && (
-          <button
-            onClick={handleRetryClick}
-            className="mt-3 inline-flex items-center rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive active:bg-destructive"
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRetryClick}
           >
             Retry
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -243,54 +229,44 @@ export function ChannelDirectory({
 
   if (loading && channels.length === 0) {
     return (
-      <div role="status" aria-live="polite" className="space-y-6">
-        <div className="hidden lg:flex gap-4">
-          <div className="w-48 space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full rounded" />
-            ))}
-          </div>
-          <div className="flex-1 space-y-4">
-            <Skeleton className="h-6 w-48 rounded" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded" />
-            ))}
-          </div>
-        </div>
-        <div className="lg:hidden space-y-4">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-24 rounded-full shrink-0" />
-            ))}
-          </div>
-          <Skeleton className="h-6 w-48 rounded" />
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded" />
+      <div role="status" aria-live="polite" className="flex flex-col gap-4">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-24 shrink-0 rounded-control" />
           ))}
         </div>
+        <Skeleton className="h-6 w-48 rounded" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[84px] w-full rounded-panel" />
+        ))}
       </div>
     );
   }
 
   if (channels.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-muted p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No Enabled Channels yet. Enable a channel from the list above to get
-          started.
+      <div className="rounded-panel border border-border bg-muted p-6 text-center">
+        <p className="text-body-sm text-muted-foreground">
+          No Enabled Channels yet. Turn on a channel in{' '}
+          <Link
+            href="/dashboard/youtube/channels"
+            className="font-semibold text-brand-text underline"
+          >
+            Channels
+          </Link>{' '}
+          to get started.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
+    <div className="flex min-w-0 flex-col gap-4">
       <ChannelList
         channels={channels}
         selectedChannelId={effectiveSelectedChannelId}
         panelId={CHANNEL_PANEL_ID}
-        desktopRefs={channelDesktopRefs}
-        mobileRefs={channelMobileRefs}
+        channelRefs={channelRefs}
         onSelect={handleChannelSelect}
         onKeyDown={handleChannelKeyDown}
       />
@@ -300,18 +276,13 @@ export function ChannelDirectory({
         <div
           id={CHANNEL_PANEL_ID}
           role="tabpanel"
-          // Two tab lists (desktop and mobile) point at this one panel, so it
-          // cannot be labelled by a single tab element. The channel name is the
-          // same name those tabs carry, so it is stated directly instead.
+          // Every channel tab points at this one panel, so it cannot be
+          // labelled by a single tab element. The channel name is the same
+          // name those tabs carry, so it is stated directly instead.
           aria-label={selectedChannel.channelTitle}
-          className="flex-1 min-w-0 flex flex-col gap-4"
+          className="flex min-w-0 flex-col gap-4"
         >
-          {/* Channel title */}
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              {selectedChannel.channelTitle}
-            </h2>
-          </div>
+          <h2 className="sr-only">{selectedChannel.channelTitle}</h2>
 
           {/* Active player */}
           {activeVideoId && (
@@ -320,6 +291,7 @@ export function ChannelDirectory({
               video={selectedChannel.videos.find(
                 (v) => v.videoId === activeVideoId,
               )}
+              channelTitle={selectedChannel.channelTitle}
               onClose={handleClosePlayer}
               onNearEnd={handleVideoNearEnd}
             />
@@ -327,50 +299,49 @@ export function ChannelDirectory({
 
           {/* Uploads list */}
           {selectedChannel.videos.length === 0 ? (
-            <div className="rounded-lg border border-border bg-muted p-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="rounded-panel border border-border bg-raised-surface p-4">
+              <p className="text-body-sm text-muted-foreground">
                 No uploads for this channel.
               </p>
               <a
                 href={`https://www.youtube.com/channel/${encodeURIComponent(selectedChannel.channelId)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand hover:text-brand"
+                className="mt-2 inline-flex items-center gap-1 text-body-sm font-semibold text-brand-text hover:text-brand-text-strong"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="size-icon" aria-hidden="true" />
                 Open channel on YouTube
               </a>
             </div>
           ) : (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Cached Uploads
-              </h3>
-              {selectedChannel.videos.map((video, index) => (
-                <UploadListItem
-                  key={video.id}
-                  video={video}
-                  index={index}
-                  isFocused={focusedVideoIndex === index}
-                  ref={(el) => {
-                    videoRowRefs.current[index] = el;
-                  }}
-                  tabIndex={focusedVideoIndex === index ? 0 : -1}
-                  onKeyDown={(e) =>
-                    handleVideoKeyDown(e, index, selectedChannel)
-                  }
-                  onPlay={(triggerEl) =>
-                    handlePlayVideo(video.videoId, triggerEl)
-                  }
-                  onWatchedToggle={onWatchedToggle}
-                  onAddToQueue={onAddToQueue}
-                  isQueued={isQueued?.(video.videoId) ?? false}
-                  queueFull={queueFull ?? false}
-                />
-              ))}
+            <>
+              <div className="flex min-w-0 flex-col overflow-hidden rounded-panel border border-border bg-raised-surface">
+                <h3 className="sr-only">Cached Uploads</h3>
+                {selectedChannel.videos.map((video, index) => (
+                  <UploadListItem
+                    key={video.id}
+                    video={video}
+                    index={index}
+                    ref={(el) => {
+                      videoRowRefs.current[index] = el;
+                    }}
+                    tabIndex={focusedVideoIndex === index ? 0 : -1}
+                    onKeyDown={(e) =>
+                      handleVideoKeyDown(e, index, selectedChannel)
+                    }
+                    onPlay={(triggerEl) =>
+                      handlePlayVideo(video.videoId, triggerEl)
+                    }
+                    onWatchedToggle={onWatchedToggle}
+                    onAddToQueue={onAddToQueue}
+                    isQueued={isQueued?.(video.videoId) ?? false}
+                    queueFull={queueFull ?? false}
+                  />
+                ))}
+              </div>
 
               {/* End-of-list disclosure */}
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-panel border border-border bg-raised-surface p-4">
                 {canLoadMoreUploads && (
                   <Button
                     type="button"
@@ -385,7 +356,7 @@ export function ChannelDirectory({
                       : 'Show older uploads'}
                   </Button>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   MyOrganiser stores only recent uploads from each channel.
                   Older uploads are not cached here.
                 </p>
@@ -393,13 +364,13 @@ export function ChannelDirectory({
                   href={`https://www.youtube.com/channel/${encodeURIComponent(selectedChannel.channelId)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand hover:text-brand"
+                  className="mt-3 inline-flex items-center gap-1 text-body-sm font-semibold text-brand-text hover:text-brand-text-strong"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="size-icon" aria-hidden="true" />
                   Open channel on YouTube
                 </a>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}

@@ -1,181 +1,49 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useCallback, useState } from 'react';
 
 import {
   Button,
   Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  Input,
-  useToast,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@myorganiser/web-ui';
-import {
-  currentPassphraseSchema,
-  mintRecoveryKey,
-  type MintedRecoveryKey,
-} from '@myorganiser/web-vault';
 
-import { downloadTextFile } from '../utils';
-import {
-  useRecoveryKeyRotation,
-  useVaultOperationAvailability,
-} from '../hooks';
+import { useVaultOperationAvailability } from '../hooks';
 import { VAULT_OPERATIONS } from '../policy';
-import { RecoveryKeyMintedSection } from './RecoveryKeyMintedSection';
+import { RecoveryKeyRotationForm } from './RecoveryKeyRotationForm';
 import { VaultUnavailableNotice } from './VaultUnavailableNotice';
 
-const rotationFormSchema = z.object({
-  currentPassphrase: currentPassphraseSchema,
-  confirmRecoveryKey: z.string(),
-});
-
-export type RotationFormInput = z.infer<typeof rotationFormSchema>;
+export const ROTATION_DESCRIPTION =
+  'Generate a new recovery key that can open your vault. Your old key stops working after you confirm the new one.';
 
 export function RecoveryKeyRotationCard() {
-  const { toast } = useToast();
-  const { rotating, rotateRecoveryKey } = useRecoveryKeyRotation();
   const { allowed, unavailableReason } = useVaultOperationAvailability(
     VAULT_OPERATIONS.RecoveryKeyRotation,
   );
+  const [open, setOpen] = useState(false);
 
-  const [mintedKey, setMintedKey] = useState<MintedRecoveryKey | null>(null);
-
-  const handlePreventSubmit = useCallback((event: React.FormEvent) => {
-    event.preventDefault();
+  const handleOpenChange = useCallback((next: boolean) => {
+    setOpen(next);
   }, []);
 
-  const form = useForm<RotationFormInput>({
-    resolver: zodResolver(rotationFormSchema),
-    defaultValues: {
-      currentPassphrase: '',
-      confirmRecoveryKey: '',
-    },
-  });
+  const handleOpen = useCallback(() => {
+    setOpen(true);
+  }, []);
 
-  const handleGenerateKey = useCallback(async () => {
-    const valid = await form.trigger('currentPassphrase');
-    if (!valid) return;
-    const newKey = mintRecoveryKey();
-    setMintedKey(newKey);
-  }, [form]);
-
-  const handleDownload = useCallback(() => {
-    if (!mintedKey) return;
-    downloadTextFile(
-      'myorganiser-recovery-key.txt',
-      `MyOrganiser Recovery Key\n\n${mintedKey}\n\nKeep this safe. Anyone with it can decrypt your vault.`,
-    );
-  }, [mintedKey]);
-
-  const handleCopy = useCallback(async () => {
-    if (!mintedKey) return;
-
-    if (!navigator.clipboard) {
-      toast({
-        title: 'Copy not available',
-        description:
-          'Your browser does not support copy to clipboard. Use the Download button or select the key manually.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(mintedKey);
-      toast({
-        title: 'Copied',
-        description: 'Recovery key copied to clipboard.',
-      });
-    } catch {
-      toast({
-        title: 'Copy failed',
-        description:
-          'Could not copy recovery key to clipboard. Use the Download button or select it manually.',
-        variant: 'destructive',
-      });
-    }
-  }, [mintedKey, toast]);
-
-  const handleCancel = useCallback(() => {
-    setMintedKey(null);
-    form.resetField('confirmRecoveryKey');
-  }, [form]);
-
-  const handleRotate = useCallback(async () => {
-    const valid = await form.trigger('currentPassphrase');
-    if (!valid) return;
-    const currentPassphrase = form.getValues('currentPassphrase');
-    if (!mintedKey) return;
-
-    const result = await rotateRecoveryKey({
-      currentPassphrase,
-      recoveryKey: mintedKey,
-    });
-
-    if (result === 'ok') {
-      form.reset();
-      setMintedKey(null);
-    } else if (result === 'wrong-passphrase') {
-      form.setError('currentPassphrase', {
-        message: 'That is not your current passphrase.',
-      });
-    }
-    // On 'error', the hook already toasted — leave everything as-is
-  }, [form, mintedKey, rotateRecoveryKey]);
-
-  const currentPassphrase = form.watch('currentPassphrase');
-  const confirmRecoveryKey = form.watch('confirmRecoveryKey');
-  const isPassphraseEmpty = !currentPassphrase?.trim();
-
-  // Only flag a mismatch once the User has entered at least as much as the
-  // minted key — otherwise every keystroke of a correct paste-in-progress
-  // would flash as an error before it's had a chance to match.
-  useEffect(() => {
-    if (
-      mintedKey &&
-      confirmRecoveryKey &&
-      confirmRecoveryKey.length >= mintedKey.length &&
-      confirmRecoveryKey !== mintedKey
-    ) {
-      form.setError('confirmRecoveryKey', {
-        message:
-          'Recovery key does not match. Check that you pasted it correctly.',
-      });
-    } else {
-      form.clearErrors('confirmRecoveryKey');
-    }
-  }, [confirmRecoveryKey, mintedKey, form]);
+  const handleClose = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Rotate recovery key</CardTitle>
-        <CardDescription>
-          Generate a new recovery key that can open your vault. Your old key
-          stops working after you confirm the new one.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">
-          Generating a new recovery key does not change anything by itself —
-          nothing is written until you confirm you have it.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          A Vault Export you saved before rotating still opens with your old
-          recovery key — see "Export encrypted vault" below.
+      <div className="flex flex-col gap-3 p-4 md:p-6">
+        <h3 className="font-display text-title">Rotate recovery key</h3>
+        <p className="text-body text-foreground-supporting">
+          {ROTATION_DESCRIPTION}
         </p>
 
         <VaultUnavailableNotice
@@ -183,46 +51,32 @@ export function RecoveryKeyRotationCard() {
           testId="recovery-key-rotation-unavailable"
         />
 
-        <Form {...form}>
-          <form onSubmit={handlePreventSubmit} className="flex flex-col gap-3">
-            <FormField
-              control={form.control}
-              name="currentPassphrase"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Passphrase to authorize this rotation</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="password" disabled={!allowed} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="recovery-key-rotation-open"
+            disabled={!allowed}
+            onClick={handleOpen}
+          >
+            Rotate recovery key…
+          </Button>
+        </div>
+      </div>
 
-            <Button
-              type="button"
-              data-testid="recovery-key-rotation-mint"
-              disabled={!allowed || isPassphraseEmpty || mintedKey !== null}
-              onClick={handleGenerateKey}
-            >
-              Generate recovery key
-            </Button>
-
-            {mintedKey !== null && (
-              <RecoveryKeyMintedSection
-                mintedKey={mintedKey}
-                form={form}
-                disabled={!allowed}
-                rotating={rotating}
-                onDownload={handleDownload}
-                onCopy={handleCopy}
-                onCancel={handleCancel}
-                onRotate={handleRotate}
-              />
-            )}
-          </form>
-        </Form>
-      </CardContent>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-h-[calc(100dvh-theme(spacing.8))] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Rotate recovery key</DialogTitle>
+            <DialogDescription>{ROTATION_DESCRIPTION}</DialogDescription>
+          </DialogHeader>
+          <RecoveryKeyRotationForm
+            layout="dialog"
+            onCancel={handleClose}
+            onDone={handleClose}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

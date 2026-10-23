@@ -1,95 +1,66 @@
 /* eslint-disable import/first */
+jest.mock('next/navigation', () => ({
+  usePathname: jest.fn(),
+}));
+
 jest.mock('../hooks/useYouTubeNavVisible', () => ({
   useYouTubeNavVisible: jest.fn(),
 }));
 
-jest.mock('@myorganiser/auth', () => ({
-  getCurrentUser: jest.fn(),
+jest.mock('../hooks/use-feedback-dialog', () => ({
+  openFeedbackDialog: jest.fn(),
+}));
+
+jest.mock('@myorganiser/web-vault-ui', () => ({
+  useVaultLockState: jest.fn(),
+}));
+
+jest.mock('./SidebarVaultCard', () => ({
+  SidebarVaultCard: () => <div data-testid="sidebar-vault-card" />,
 }));
 
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
   useSidebar: jest.fn(),
+  // The real root and rail read the module-local useSidebar, which a barrel
+  // mock cannot reach, so both are stubbed. Header, content and footer are
+  // plain containers and render for real.
   Sidebar: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="sidebar">{children}</div>
   ),
-  // Stubs forward props; the capture-phase drawer close sits on the content.
-  SidebarHeader: (props: React.ComponentProps<'div'>) => (
-    <div data-testid="sidebar-header" {...props} />
-  ),
-  SidebarContent: (props: React.ComponentProps<'div'>) => (
-    <div data-testid="sidebar-content" {...props} />
-  ),
   SidebarRail: () => <div data-testid="sidebar-rail" />,
-  AppLogo: () => <div data-testid="app-logo" />,
-  SidebarFooter: (props: React.ComponentProps<'div'>) => (
-    <div data-testid="sidebar-footer" {...props} />
-  ),
-  SidebarMenu: (props: React.ComponentProps<'ul'>) => (
-    <ul data-testid="sidebar-menu" {...props} />
-  ),
-  SidebarMenuItem: (props: React.ComponentProps<'li'>) => (
-    <li data-testid="sidebar-menu-item" {...props} />
-  ),
-  // The real button reads useSidebar() through its own module-local binding,
-  // which a barrel-level mock cannot reach, so it is stubbed here. The props
-  // it takes that a DOM button does not are swallowed rather than forwarded.
-  SidebarMenuButton: ({
-    asChild: _asChild,
-    isActive: _isActive,
-    tooltip: _tooltip,
-    variant: _variant,
-    size: _size,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    asChild?: boolean;
-    isActive?: boolean;
-    tooltip?: string;
-    variant?: string;
-    size?: string;
-  }) => <button type="button" data-testid="sidebar-menu-button" {...props} />,
 }));
 
-jest.mock('./nav-main', () => ({
-  NavMain: jest.fn(({ items }: { items: { title: string; url: string }[] }) => (
-    <div data-testid="nav-main" data-items={items.length}>
-      {items.map((item: { title: string; url: string }) => (
-        <a
-          key={item.title}
-          href={item.url}
-          data-testid={`nav-item-${item.title.toLowerCase()}`}
-        >
-          {item.title}
-        </a>
-      ))}
-    </div>
-  )),
-}));
-
-jest.mock('./nav-user', () => ({
-  NavUser: jest.fn(({ user }) => (
-    <button type="button" data-testid="nav-user">
-      {user.name}
-    </button>
-  )),
-}));
+// Spy on the real NavMain: the rendered tree is real, and its props are read
+// back for the counts contract (no nav item supplies a count yet).
+jest.mock('./nav-main', () => {
+  const actual = jest.requireActual('./nav-main');
+  return { ...actual, NavMain: jest.fn(actual.NavMain) };
+});
 
 import React from 'react';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { getCurrentUser } from '@myorganiser/auth';
-import { useSidebar } from '@myorganiser/web-ui';
+import { usePathname } from 'next/navigation';
+import { TooltipProvider, useSidebar } from '@myorganiser/web-ui';
+import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
-import { setFeedbackDialogOpen } from '../hooks/use-feedback-dialog';
-import * as feedbackDialogModule from '../hooks/use-feedback-dialog';
+import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { AppSidebar } from './app-sidebar';
 import { NavMain } from './nav-main';
-import { NavUser } from './nav-user';
 
-function stubSidebar(isMobile: boolean) {
+type SidebarState = 'expanded' | 'collapsed';
+
+function stubSidebar({
+  isMobile = false,
+  state = 'expanded',
+}: {
+  isMobile?: boolean;
+  state?: SidebarState;
+} = {}) {
   const sidebar = {
-    state: 'expanded',
-    open: true,
+    state,
+    open: state === 'expanded',
     isMobile,
     openMobile: false,
     setOpen: jest.fn(),
@@ -100,135 +71,144 @@ function stubSidebar(isMobile: boolean) {
   return sidebar;
 }
 
+function stubVaultLockState(state: 'locked' | 'unlocked' | 'no-session') {
+  (useVaultLockState as jest.Mock).mockReturnValue(state);
+}
+
+function lastNavMainProps(): { countsVisible: boolean } {
+  const calls = (NavMain as jest.Mock).mock.calls;
+  return calls[calls.length - 1][0];
+}
+
+function renderSidebar() {
+  return render(
+    <TooltipProvider>
+      <AppSidebar />
+    </TooltipProvider>,
+  );
+}
+
 describe('AppSidebar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useYouTubeNavVisible as jest.Mock).mockReturnValue(false);
-    (getCurrentUser as jest.Mock).mockReturnValue({
-      name: 'Test User',
-      email: 'test@example.com',
-    });
-    stubSidebar(false);
-    setFeedbackDialogOpen(false);
+    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+    (useYouTubeNavVisible as jest.Mock).mockReturnValue(true);
+    stubVaultLockState('no-session');
+    stubSidebar();
   });
 
-  describe('YouTube nav visibility', () => {
-    it('should show YouTube when useYouTubeNavVisible returns true', () => {
-      (useYouTubeNavVisible as jest.Mock).mockReturnValue(true);
+  describe('sections', () => {
+    it('renders the sections in artboard order with their hrefs', () => {
+      renderSidebar();
 
-      render(<AppSidebar />);
+      const nav = screen.getByRole('navigation', { name: 'Sections' });
+      const rendered = Array.from(nav.children).map((group) => ({
+        label: group.querySelector('span')?.textContent,
+        links: Array.from(group.querySelectorAll('a')).map((a) => [
+          a.textContent,
+          a.getAttribute('href'),
+        ]),
+      }));
 
-      const navMainCall = (NavMain as jest.Mock).mock.calls[0][0];
-      expect(navMainCall.items).toHaveLength(8);
-      const youtubeItem = navMainCall.items.find(
-        (item: { title: string }) => item.title === 'YouTube',
-      );
-      expect(youtubeItem).toBeDefined();
+      expect(rendered).toEqual([
+        { label: 'OVERVIEW', links: [['Home', '/dashboard']] },
+        {
+          label: 'ORGANISE',
+          links: [
+            ['Tasks', '/dashboard/tasks'],
+            ['Groceries', '/dashboard/groceries'],
+            ['Subscriptions', '/dashboard/subscriptions'],
+          ],
+        },
+        {
+          label: 'PEOPLE AND PLACES',
+          links: [
+            ['Addresses', '/dashboard/addresses'],
+            ['Mobile numbers', '/dashboard/mobile-numbers'],
+          ],
+        },
+        { label: 'MEDIA', links: [['YouTube', '/dashboard/youtube']] },
+        { label: 'SECURITY', links: [['Vault', '/dashboard/vault']] },
+      ]);
     });
 
-    it('should hide YouTube when useYouTubeNavVisible returns false', () => {
+    it('drops the MEDIA group with its only item when YouTube is hidden', () => {
       (useYouTubeNavVisible as jest.Mock).mockReturnValue(false);
 
-      render(<AppSidebar />);
+      renderSidebar();
 
-      const navMainCall = (NavMain as jest.Mock).mock.calls[0][0];
-      expect(navMainCall.items).toHaveLength(7);
-      const youtubeItem = navMainCall.items.find(
-        (item: { title: string }) => item.title === 'YouTube',
-      );
-      expect(youtubeItem).toBeUndefined();
+      expect(
+        screen.queryByRole('link', { name: 'YouTube' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('MEDIA')).not.toBeInTheDocument();
+      expect(screen.getByText('SECURITY')).toBeInTheDocument();
     });
   });
 
-  describe('permanent nav items', () => {
-    it.each([true, false])(
-      'should always show other nav items when youtubeNavVisible=%p',
-      (youtubeNavVisible) => {
-        (useYouTubeNavVisible as jest.Mock).mockReturnValue(youtubeNavVisible);
+  describe('feedback button', () => {
+    it('opens the feedback dialog from the Send feedback button', () => {
+      renderSidebar();
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
 
-        render(<AppSidebar />);
-
-        const navMainCall = (NavMain as jest.Mock).mock.calls[0][0];
-        const items = navMainCall.items;
-
-        const expectedItems = [
-          'Home',
-          'Tasks',
-          'Groceries',
-          'Addresses',
-          'Mobile Numbers',
-          'Subscriptions',
-          'Vault',
-        ];
-        expectedItems.forEach((title) => {
-          const item = items.find((i: { title: string }) => i.title === title);
-          expect(item).toBeDefined();
-          expect(item.title).toBe(title);
-        });
-      },
-    );
-  });
-
-  describe('user data', () => {
-    it('should pass correct user data to NavUser', () => {
-      (getCurrentUser as jest.Mock).mockReturnValue({
-        name: 'John Doe',
-        email: 'john@example.com',
-      });
-
-      render(<AppSidebar />);
-
-      const navUserCall = (NavUser as jest.Mock).mock.calls[0][0];
-      expect(navUserCall.user.name).toBe('John Doe');
-      expect(navUserCall.user.email).toBe('john@example.com');
-      expect(navUserCall.user.avatar).toBe('');
+      expect(openFeedbackDialog).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle missing user data', () => {
-      (getCurrentUser as jest.Mock).mockReturnValue(null);
+    it('closes the phone drawer when Send feedback is chosen', () => {
+      const sidebar = stubSidebar({ isMobile: true });
 
-      render(<AppSidebar />);
+      renderSidebar();
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
 
-      const navUserCall = (NavUser as jest.Mock).mock.calls[0][0];
-      expect(navUserCall.user.name).toBe('');
-      expect(navUserCall.user.email).toBe('');
+      expect(openFeedbackDialog).toHaveBeenCalledTimes(1);
+      expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
+    });
+
+    it('leaves drawer state alone on desktop when Send feedback is chosen', () => {
+      const sidebar = stubSidebar({ isMobile: false });
+
+      renderSidebar();
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+      expect(openFeedbackDialog).toHaveBeenCalledTimes(1);
+      expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     });
   });
 
   describe('drawer closes after navigation on phone width', () => {
-    it('should close the mobile drawer when a top-level nav link is chosen', () => {
-      const sidebar = stubSidebar(true);
+    it('closes the phone drawer when a nav link is chosen', () => {
+      const sidebar = stubSidebar({ isMobile: true });
 
-      render(<AppSidebar />);
+      renderSidebar();
       fireEvent.click(screen.getByRole('link', { name: 'Tasks' }));
 
       expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
       expect(sidebar.setOpen).not.toHaveBeenCalled();
     });
 
-    it('should close the mobile drawer for a link to the page already open', () => {
-      // AppSidebar reads no pathname, so closing cannot depend on a route change.
-      const sidebar = stubSidebar(true);
+    it('closes the phone drawer for a link to the page already open', () => {
+      // The pathname is /dashboard, so Home is the current page; closing must
+      // not depend on a route change.
+      const sidebar = stubSidebar({ isMobile: true });
 
-      render(<AppSidebar />);
+      renderSidebar();
       fireEvent.click(screen.getByRole('link', { name: 'Home' }));
 
       expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
     });
 
-    it('should leave the mobile drawer open when a non-link control is chosen', () => {
-      const sidebar = stubSidebar(true);
+    it('leaves the phone drawer open when a click is not on a link', () => {
+      const sidebar = stubSidebar({ isMobile: true });
 
-      render(<AppSidebar />);
-      fireEvent.click(screen.getByRole('button', { name: 'Test User' }));
+      renderSidebar();
+      fireEvent.click(screen.getByText('ORGANISE'));
 
       expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
     });
 
-    it('should not touch drawer state on desktop when a nav link is chosen', () => {
-      const sidebar = stubSidebar(false);
+    it('never touches drawer state on desktop when a nav link is chosen', () => {
+      const sidebar = stubSidebar({ isMobile: false });
 
-      render(<AppSidebar />);
+      renderSidebar();
       fireEvent.click(screen.getByRole('link', { name: 'Tasks' }));
 
       expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
@@ -236,36 +216,65 @@ describe('AppSidebar', () => {
     });
   });
 
-  describe('feedback button', () => {
-    it('should open the feedback dialog when the Send feedback button is clicked', () => {
-      const openFeedbackDialogSpy = jest.spyOn(
-        feedbackDialogModule,
-        'openFeedbackDialog',
-      );
+  describe('collapsed layout', () => {
+    it('hides the vault card, group labels and keeps Send feedback reachable by name on the desktop rail', () => {
+      stubSidebar({ isMobile: false, state: 'collapsed' });
+      stubVaultLockState('unlocked');
 
-      render(<AppSidebar />);
-      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      renderSidebar();
 
-      expect(openFeedbackDialogSpy).toHaveBeenCalled();
-      openFeedbackDialogSpy.mockRestore();
+      expect(
+        screen.queryByTestId('sidebar-vault-card'),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('ORGANISE')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Send feedback' }),
+      ).toBeInTheDocument();
     });
 
-    it('should close the mobile drawer when the Send feedback button is clicked', () => {
-      const sidebar = stubSidebar(true);
+    it('keeps the expanded layout at phone width even when the desktop state is collapsed', () => {
+      stubSidebar({ isMobile: true, state: 'collapsed' });
+      stubVaultLockState('unlocked');
 
-      render(<AppSidebar />);
-      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      renderSidebar();
 
-      expect(sidebar.setOpenMobile).toHaveBeenCalledWith(false);
+      expect(screen.getByText('ORGANISE')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-vault-card')).toBeInTheDocument();
+    });
+  });
+
+  describe('vault counts', () => {
+    it('hides counts while the Vault is locked', () => {
+      stubVaultLockState('locked');
+
+      renderSidebar();
+
+      expect(lastNavMainProps().countsVisible).toBe(false);
     });
 
-    it('should not close the drawer on desktop when the Send feedback button is clicked', () => {
-      const sidebar = stubSidebar(false);
+    it('shows counts while the Vault is unlocked', () => {
+      stubVaultLockState('unlocked');
 
-      render(<AppSidebar />);
-      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      renderSidebar();
 
-      expect(sidebar.setOpenMobile).not.toHaveBeenCalled();
+      expect(lastNavMainProps().countsVisible).toBe(true);
+    });
+
+    it('shows counts when there is no Vault Session', () => {
+      stubVaultLockState('no-session');
+
+      renderSidebar();
+
+      expect(lastNavMainProps().countsVisible).toBe(true);
+    });
+  });
+
+  describe('search', () => {
+    it('renders no search box in the sidebar', () => {
+      renderSidebar();
+
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     });
   });
 });

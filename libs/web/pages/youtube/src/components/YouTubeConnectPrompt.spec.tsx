@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { YOUTUBE_DATA_PRIVACY_BULLETS } from '../lib/dataPrivacyCopy';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
-
-const mockUseYouTubeAcknowledgement = jest.fn();
 
 jest.mock('../hooks', () => ({
   useYouTubeAcknowledgement: () => mockUseYouTubeAcknowledgement(),
@@ -42,6 +47,8 @@ jest.mock('next/link', () => {
   return ({ children, href }: any) => <a href={href}>{children}</a>;
 });
 
+const mockUseYouTubeAcknowledgement = jest.fn();
+
 interface AcknowledgementStub {
   acknowledged: boolean | null;
   loading: boolean;
@@ -59,6 +66,23 @@ function setAcknowledgement(overrides: Partial<AcknowledgementStub> = {}) {
   });
 }
 
+/** The navy hero, named by its h1. */
+function getHero() {
+  return screen.getByRole('region', { name: 'Connect Your YouTube Account' });
+}
+
+/** The "How we store your YouTube data" card. */
+function getStorageCard() {
+  return screen.getByRole('region', {
+    name: 'How we store your YouTube data',
+  });
+}
+
+/** The first-connect acknowledgement form, named by its h2. */
+function getAcknowledgementForm() {
+  return screen.getByRole('form', { name: 'Before you connect' });
+}
+
 describe('YouTubeConnectPrompt', () => {
   beforeEach(() => {
     mockUseYouTubeAcknowledgement.mockReset();
@@ -66,23 +90,34 @@ describe('YouTubeConnectPrompt', () => {
   });
 
   describe('static content', () => {
-    it('should render the main heading', () => {
+    it('should render the main heading as the page h1', () => {
       render(<YouTubeConnectPrompt />);
       expect(
         screen.getByRole('heading', {
           name: /Connect Your YouTube Account/i,
-          level: 2,
+          level: 1,
         }),
       ).toBeInTheDocument();
     });
 
-    it('should render read-only access sentence', () => {
+    it('should render read-only access sentence in the hero', () => {
       render(<YouTubeConnectPrompt />);
       expect(
-        screen.getByText(
+        within(getHero()).getByText(
           /Link your YouTube account to view and manage videos from your Enabled Channels.*read-only access/i,
         ),
       ).toBeInTheDocument();
+    });
+
+    it('should render the six storage bullets in the storage card', () => {
+      render(<YouTubeConnectPrompt />);
+      const items = within(getStorageCard()).getAllByRole('listitem');
+
+      expect(items).toHaveLength(6);
+      expect(items).toHaveLength(YOUTUBE_DATA_PRIVACY_BULLETS.length);
+      items.forEach((item, index) => {
+        expect(item).toHaveTextContent(YOUTUBE_DATA_PRIVACY_BULLETS[index]);
+      });
     });
 
     it('should render metadata and Watched sentence', () => {
@@ -95,17 +130,16 @@ describe('YouTubeConnectPrompt', () => {
       ).toBeInTheDocument();
     });
 
-    it('should render the disconnect bullet that deletes Watched marks and no 30-day Watched retention', () => {
+    it('should render the disconnect bullet that says Disconnect deletes Watched marks', () => {
       render(<YouTubeConnectPrompt />);
       expect(
         screen.getByText(/Disconnect deletes .*Watched marks/),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/kept for 30 days/)).not.toBeInTheDocument();
     });
 
-    it('should render the privacy data link', () => {
+    it('should render the privacy data link inside the storage card', () => {
       render(<YouTubeConnectPrompt />);
-      const privacyLink = screen.getByRole('link', {
+      const privacyLink = within(getStorageCard()).getByRole('link', {
         name: /How we store your YouTube data/i,
       });
       expect(privacyLink).toHaveAttribute('href', '/youtube/data-privacy');
@@ -113,11 +147,11 @@ describe('YouTubeConnectPrompt', () => {
   });
 
   describe('onConnect provided — Connect button rendered', () => {
-    it('should render "Connect YouTube" button when onConnect is provided', () => {
+    it('should render "Connect YouTube" button in the hero when onConnect is provided', () => {
       const mockOnConnect = jest.fn();
       render(<YouTubeConnectPrompt onConnect={mockOnConnect} />);
       expect(
-        screen.getByRole('button', { name: /Connect YouTube/i }),
+        within(getHero()).getByRole('button', { name: /Connect YouTube/i }),
       ).toBeInTheDocument();
     });
 
@@ -138,10 +172,10 @@ describe('YouTubeConnectPrompt', () => {
   });
 
   describe('onConnect NOT provided — Back link rendered', () => {
-    it('should render "Back to Videos" link when onConnect is not provided', () => {
+    it('should render "Back to Videos" link in the hero when onConnect is not provided', () => {
       render(<YouTubeConnectPrompt />);
       expect(
-        screen.getByRole('link', { name: /Back to Videos/i }),
+        within(getHero()).getByRole('link', { name: /Back to Videos/i }),
       ).toBeInTheDocument();
     });
 
@@ -166,16 +200,14 @@ describe('YouTubeConnectPrompt', () => {
   });
 
   describe('statusMessage', () => {
-    it('should render statusMessage when provided', () => {
+    it('should render statusMessage as a status region when provided', () => {
       render(<YouTubeConnectPrompt statusMessage="Account revoked" />);
-      expect(screen.getByText('Account revoked')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Account revoked');
     });
 
-    it('should not render statusMessage when not provided', () => {
-      const { container } = render(<YouTubeConnectPrompt />);
-      // No text that would only appear in statusMessage rendering
-      const yellowText = container.querySelector('.text-yellow-600');
-      expect(yellowText).not.toBeInTheDocument();
+    it('should not render a status region when statusMessage is not provided', () => {
+      render(<YouTubeConnectPrompt />);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
     it('should render statusMessage with onConnect present', () => {
@@ -186,7 +218,7 @@ describe('YouTubeConnectPrompt', () => {
           statusMessage="Token expired"
         />,
       );
-      expect(screen.getByText('Token expired')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Token expired');
     });
 
     it('should render complex ReactNode as statusMessage', () => {
@@ -211,7 +243,7 @@ describe('YouTubeConnectPrompt', () => {
       expect(
         screen.getByRole('button', { name: /Connect YouTube/i }),
       ).toBeInTheDocument();
-      expect(screen.getByText('Revoked')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Revoked');
       expect(
         screen.getByRole('link', { name: /How we store your YouTube data/i }),
       ).toBeInTheDocument();
@@ -241,7 +273,12 @@ describe('YouTubeConnectPrompt', () => {
       setAcknowledgement({ acknowledged: false });
       render(<YouTubeConnectPrompt onConnect={jest.fn()} />);
 
-      expect(screen.getByText('Before you connect')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Before you connect', level: 2 }),
+      ).toBeInTheDocument();
+      expect(
+        within(getAcknowledgementForm()).getAllByRole('listitem'),
+      ).toHaveLength(5);
       expect(
         screen.getByText(/MyOrganiser reads your YouTube subscriptions/),
       ).toBeInTheDocument();
@@ -305,6 +342,45 @@ describe('YouTubeConnectPrompt', () => {
       await waitFor(() => expect(connectButton).toBeEnabled());
     });
 
+    it('disables Connect again and neither stores nor connects when the box is unticked', async () => {
+      const accept = jest.fn().mockResolvedValue(undefined);
+      const onConnect = jest.fn();
+      setAcknowledgement({ acknowledged: false, accept });
+      render(<YouTubeConnectPrompt onConnect={onConnect} />);
+
+      const connectButton = screen.getByRole('button', {
+        name: /Connect YouTube/i,
+      });
+      const checkbox = screen.getByRole('checkbox');
+
+      fireEvent.click(checkbox);
+      await waitFor(() => expect(connectButton).toBeEnabled());
+
+      fireEvent.click(checkbox);
+      await waitFor(() => expect(connectButton).toBeDisabled());
+
+      fireEvent.click(connectButton);
+
+      expect(accept).not.toHaveBeenCalled();
+      expect(onConnect).not.toHaveBeenCalled();
+    });
+
+    it('shows the not-ticked error and neither stores nor connects when the form is submitted unticked', async () => {
+      const accept = jest.fn().mockResolvedValue(undefined);
+      const onConnect = jest.fn();
+      setAcknowledgement({ acknowledged: false, accept });
+      render(<YouTubeConnectPrompt onConnect={onConnect} />);
+
+      // Connect is disabled until ticked, so the form is submitted directly.
+      fireEvent.submit(getAcknowledgementForm());
+
+      expect(
+        await screen.findByText('Tick the box to agree before connecting'),
+      ).toBeInTheDocument();
+      expect(accept).not.toHaveBeenCalled();
+      expect(onConnect).not.toHaveBeenCalled();
+    });
+
     it('stores the acknowledgement before calling onConnect', async () => {
       const order: string[] = [];
       const accept = jest.fn(async () => {
@@ -356,15 +432,17 @@ describe('YouTubeConnectPrompt', () => {
       expect(onConnect).not.toHaveBeenCalled();
     });
 
-    it('disables Connect and hides the checkbox while the acknowledgement loads', () => {
+    it('disables Connect in the hero and hides the form while the acknowledgement loads', () => {
       setAcknowledgement({ acknowledged: null, loading: true });
       render(<YouTubeConnectPrompt onConnect={jest.fn()} />);
 
       expect(
-        screen.getByRole('button', { name: /Connect YouTube/i }),
+        within(getHero()).getByRole('button', { name: /Connect YouTube/i }),
       ).toBeDisabled();
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-      expect(screen.queryByText('Before you connect')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Before you connect' }),
+      ).not.toBeInTheDocument();
     });
 
     it('connects straight away without asking again once acknowledged', () => {
@@ -374,7 +452,10 @@ describe('YouTubeConnectPrompt', () => {
       render(<YouTubeConnectPrompt onConnect={onConnect} />);
 
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-      const connectButton = screen.getByRole('button', {
+      expect(
+        screen.queryByRole('heading', { name: 'Before you connect' }),
+      ).not.toBeInTheDocument();
+      const connectButton = within(getHero()).getByRole('button', {
         name: /Connect YouTube/i,
       });
       expect(connectButton).toBeEnabled();

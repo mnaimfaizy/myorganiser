@@ -20,15 +20,15 @@ const optionalTextField = (label: string, maxLength: number) =>
 
 export const addAddressSchema = z.object({
   label: textField('Label', 60),
-  propertyNumber: optionalTextField('Property number', 32),
+  propertyNumber: optionalTextField('Number', 32),
   street: textField('Street', 120),
   suburb: textField('Suburb or city', 80),
-  state: textField('State or province', 80),
+  state: textField('State', 80),
   zipCode: z
     .string()
     .trim()
-    .min(2, 'Zip or postal code must be at least 2 characters')
-    .max(16, 'Zip or postal code must be 16 characters or less')
+    .min(2, 'Postcode must be at least 2 characters')
+    .max(16, 'Postcode must be 16 characters or less')
     .regex(
       /^[A-Za-z0-9][A-Za-z0-9\s-]*$/,
       'Use letters, numbers, spaces, or hyphens',

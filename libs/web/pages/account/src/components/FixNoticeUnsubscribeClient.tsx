@@ -1,12 +1,53 @@
 'use client';
 
 import { getApiBaseUrl } from '@myorganiser/core';
-import { Button, Card, CardContent } from '@myorganiser/web-ui';
+import { AppLogo, Button, Illustration, cn } from '@myorganiser/web-ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Status = 'working' | 'done' | 'invalid-link' | 'error';
+
+interface StatusCopy {
+  heading: string;
+  text: string;
+  cta: { label: string; href: string } | null;
+  retry: boolean;
+  headingClassName?: string;
+}
+
+const REPORTS_CTA = {
+  label: 'Go to your reports',
+  href: '/dashboard/account/reports',
+} as const;
+
+const STATUS_COPY = {
+  working: {
+    heading: 'Updating your notification preferences…',
+    text: 'Please wait while we process your request.',
+    cta: null,
+    retry: false,
+  },
+  done: {
+    heading: 'Fix Notices turned off',
+    text: 'You will no longer receive an email when one of your Feedback Reports is fixed or shipped. You can still see the outcome any time on your reports page.',
+    cta: REPORTS_CTA,
+    retry: false,
+  },
+  'invalid-link': {
+    heading: 'Link no longer valid',
+    text: 'This unsubscribe link has expired or is no longer valid. You can manage your Feedback Report notifications from your account.',
+    cta: { label: 'Go to account settings', href: '/dashboard/account' },
+    retry: false,
+  },
+  error: {
+    heading: 'Something went wrong',
+    text: "We couldn't process your request. Please try again or visit your reports page.",
+    cta: REPORTS_CTA,
+    retry: true,
+    headingClassName: 'text-destructive-text',
+  },
+} as const satisfies Record<Status, StatusCopy>;
 
 export default function FixNoticeUnsubscribeClient() {
   const searchParams = useSearchParams();
@@ -67,90 +108,49 @@ export default function FixNoticeUnsubscribeClient() {
     void performUnsubscribe();
   }, [performUnsubscribe]);
 
+  const copy: StatusCopy = STATUS_COPY[status];
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <Card className="w-full max-w-md">
-        <CardContent className="pt-6">
-          {status === 'working' && (
-            <div
-              className="space-y-2 text-center"
-              role="status"
-              aria-live="polite"
-            >
-              <h1 className="text-lg font-semibold">
-                Updating your notification preferences…
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Please wait while we process your request.
-              </p>
-            </div>
-          )}
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4 py-14">
+      <Link
+        href="/"
+        aria-label="MyOrganiser home"
+        className="inline-flex items-center rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <AppLogo variant="full" height={34} aria-hidden />
+      </Link>
 
-          {status === 'done' && (
-            <div className="space-y-4" role="status" aria-live="polite">
-              <div className="text-center space-y-2">
-                <h1 className="text-lg font-semibold">
-                  Fix Notices turned off
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  You will no longer receive an email when one of your Feedback
-                  Reports is fixed or shipped. You can still see the outcome any
-                  time on your reports page.
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/account/reports">
-                    Go to your reports
-                  </Link>
-                </Button>
-              </div>
-            </div>
+      <div
+        className="flex w-full max-w-[460px] flex-col items-center gap-3.5 rounded-panel border border-border bg-card px-7 py-9 text-center shadow-card"
+        role="status"
+        aria-live="polite"
+      >
+        <Illustration kind="feedback" size={96} />
+        <h1
+          className={cn(
+            'font-display text-title-lg text-foreground',
+            copy.headingClassName,
           )}
+        >
+          {copy.heading}
+        </h1>
+        <p className="text-body-sm text-foreground-supporting">{copy.text}</p>
 
-          {status === 'invalid-link' && (
-            <div className="space-y-4" role="status" aria-live="polite">
-              <div className="text-center space-y-2">
-                <h1 className="text-lg font-semibold">Link no longer valid</h1>
-                <p className="text-sm text-muted-foreground">
-                  This unsubscribe link has expired or is no longer valid. You
-                  can manage your Feedback Report notifications from your
-                  account.
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/account">Go to account settings</Link>
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {status === 'error' && (
-            <div className="space-y-4" role="status" aria-live="polite">
-              <div className="text-center space-y-2">
-                <h1 className="text-lg font-semibold text-destructive">
-                  Something went wrong
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  We couldn't process your request. Please try again or visit
-                  your reports page.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button onClick={handleRetry} variant="default">
-                  Try again
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/account/reports">
-                    Go to your reports
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {(copy.retry || copy.cta) && (
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {copy.retry && (
+              <Button onClick={handleRetry} variant="outline">
+                Try again
+              </Button>
+            )}
+            {copy.cta && (
+              <Button asChild variant="default">
+                <Link href={copy.cta.href}>{copy.cta.label}</Link>
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

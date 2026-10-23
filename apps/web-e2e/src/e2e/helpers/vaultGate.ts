@@ -49,10 +49,22 @@ export async function createOwnedVault(
  * Same as {@link createOwnedVault}, but returns the recovery key shown on the
  * acknowledgment step. Reads `#acknowledgment-recovery-key` before clicking
  * "I saved it".
+ *
+ * `onRecoveryKeyScreen`, when given, runs once the acknowledgment step is
+ * showing its key and before "I saved it" is clicked, so a spec can inspect
+ * that screen (for example its layout) while it is on screen.
  */
 export async function createOwnedVaultWithRecoveryKey(
   page: Page,
-  { passphrase, owner = E2E_USER_ID }: { passphrase: string; owner?: string },
+  {
+    passphrase,
+    owner = E2E_USER_ID,
+    onRecoveryKeyScreen,
+  }: {
+    passphrase: string;
+    owner?: string;
+    onRecoveryKeyScreen?: () => Promise<void>;
+  },
 ): Promise<string> {
   const setupPassphrase = page.locator('#setup-passphrase');
   await expect(setupPassphrase).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
@@ -73,6 +85,8 @@ export async function createOwnedVaultWithRecoveryKey(
   await expect(recoveryKeyInput).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
   const recoveryKey = await recoveryKeyInput.inputValue();
   expect(recoveryKey).toBeTruthy();
+
+  await onRecoveryKeyScreen?.();
 
   await savedRecoveryKey.click();
 

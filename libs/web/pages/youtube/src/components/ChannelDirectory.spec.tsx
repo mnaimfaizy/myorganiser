@@ -15,6 +15,7 @@ jest.mock('@myorganiser/web-ui', () => ({
   Skeleton: ({ className }: { className?: string }) => (
     <div className={className} data-testid="skeleton" />
   ),
+  useIsMobileState: () => mockUseIsMobileState(),
 }));
 
 jest.mock('lucide-react', () => ({
@@ -33,11 +34,22 @@ jest.mock('lucide-react', () => ({
   X: ({ className }: { className?: string }) => (
     <span className={className} aria-hidden="true" />
   ),
+  Play: ({ className }: { className?: string }) => (
+    <span className={className} aria-hidden="true" />
+  ),
+  Check: ({ className }: { className?: string }) => (
+    <span className={className} aria-hidden="true" />
+  ),
+  Plus: ({ className }: { className?: string }) => (
+    <span className={className} aria-hidden="true" />
+  ),
 }));
 
 jest.mock('../hooks', () => ({
   updateVideoWatched: jest.fn(),
 }));
+
+const mockUseIsMobileState = jest.fn();
 
 let capturedPlayerOnNearEnd: (() => void) | undefined;
 jest.mock('./YouTubeVideoPlayer', () => ({
@@ -94,10 +106,27 @@ const makeChannel = (
   videos,
 });
 
+/** The one horizontal channel tab set. */
+const getChannelTabs = () =>
+  within(
+    screen.getByRole('tablist', { name: 'Enabled channels' }),
+  ).getAllByRole('tab');
+
+/** Each upload row is the element carrying the tabindex above its title. */
+const getUploadRows = () =>
+  screen
+    .getAllByRole('heading', { level: 4 })
+    .map((heading) => heading.closest('[tabindex]') as HTMLElement);
+
+/** The heading naming the Selected channel inside the detail pane. */
+const getPaneHeadingText = () =>
+  screen.getByRole('heading', { level: 2 }).textContent;
+
 describe('ChannelDirectory', () => {
   beforeEach(() => {
     capturedPlayerOnNearEnd = undefined;
     jest.clearAllMocks();
+    mockUseIsMobileState.mockReturnValue(false);
   });
 
   describe('Error state', () => {
@@ -180,32 +209,21 @@ describe('ChannelDirectory', () => {
   });
 
   describe('Empty state', () => {
-    it('shows "No Enabled Channels yet" message when channels is empty and not loading', () => {
+    it('shows the "No Enabled Channels yet" copy with a link to Channels when channels is empty and not loading', () => {
       render(<ChannelDirectory channels={[]} loading={false} error={null} />);
 
-      expect(screen.getByText(/No Enabled Channels yet/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/No Enabled Channels yet\. Turn on a channel in/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Channels' })).toHaveAttribute(
+        'href',
+        '/dashboard/youtube/channels',
+      );
     });
   });
 
   describe('Channel list rendering and default selection', () => {
-    it('selects the first channel by default with no user interaction', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-      ];
-
-      const { container } = render(
-        <ChannelDirectory channels={channels} loading={false} error={null} />,
-      );
-
-      // Detail pane should show first channel's title in h2
-      const heading = container.querySelector('div.flex-1 h2');
-      expect(heading).toBeTruthy();
-      expect(heading?.textContent).toBe('Channel 1');
-    });
-
-    it('marks the selected channel tab with aria-selected="true"', () => {
+    it('selects the first channel by default and names the detail pane after it', () => {
       const videos = [makeVideo('1', 'Video 1')];
       const channels = [
         makeChannel('ch-1', 'Channel 1', videos),
@@ -216,267 +234,141 @@ describe('ChannelDirectory', () => {
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const tabs = screen.getAllByRole('tab');
-      // Desktop and mobile tab lists are both mounted, so both report a
-      // selection; every tab must state its selected state either way.
-      expect(tabs.length).toBeGreaterThan(0);
-      tabs.forEach((tab) => {
-        expect(tab).toHaveAttribute('aria-selected');
-      });
-      expect(
-        tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')
-          .length,
-      ).toBeGreaterThan(0);
+      expect(screen.getByRole('tabpanel')).toHaveAttribute(
+        'aria-label',
+        'Channel 1',
+      );
+      expect(getPaneHeadingText()).toBe('Channel 1');
     });
 
-    it('shows upload count and new badge on channel buttons', () => {
+    it('marks the selected channel tab with aria-selected="true" and the others "false"', () => {
+      const videos = [makeVideo('1', 'Video 1')];
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', videos),
+        makeChannel('ch-2', 'Channel 2', videos),
+      ];
+
+      render(
+        <ChannelDirectory channels={channels} loading={false} error={null} />,
+      );
+
+      const [first, second] = getChannelTabs();
+      expect(first).toHaveAttribute('aria-selected', 'true');
+      expect(second).toHaveAttribute('aria-selected', 'false');
+    });
+
+    it('shows the unwatched count on the chip and states it in the accessible name', () => {
       const videos = [
         makeVideo('1', 'Video 1', false),
         makeVideo('2', 'Video 2', false),
         makeVideo('3', 'Video 3', true),
       ];
-      const channels = [makeChannel('ch-1', 'Channel 1', videos)];
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', videos),
+        makeChannel('ch-2', 'Channel 2', [makeVideo('4', 'Video 4', true)]),
+      ];
 
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      // Desktop aside should show "3 uploads" and "· 2 New"
-      const asideNav = container.querySelector('aside [role="tablist"]');
-      if (asideNav) {
-        const asideText = asideNav.textContent;
-        expect(asideText).toContain('3 upload');
-        expect(asideText).toContain('2 New');
-      }
-
-      // Mobile should show chip with badge
-      const mobileNav = container.querySelector(
-        'div.lg\\:hidden [role="tablist"]',
-      );
-      if (mobileNav) {
-        const badge = mobileNav.querySelector('[aria-label="2 new"]');
-        expect(badge).toBeInTheDocument();
-      }
+      const [withNew, allWatched] = getChannelTabs();
+      expect(withNew).toHaveAccessibleName('Channel 1, 2 new');
+      expect(withNew).toHaveTextContent('Channel 1');
+      expect(withNew).toHaveTextContent('· 2');
+      expect(allWatched).toHaveAccessibleName('Channel 2');
+      expect(allWatched).not.toHaveTextContent('·');
     });
   });
 
-  describe('Keyboard navigation — channel list (desktop)', () => {
-    it('ArrowDown moves focus and selection to next desktop channel button', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-        makeChannel('ch-3', 'Channel 3', videos),
-      ];
+  describe('Channel tab set (horizontal model)', () => {
+    const channels = [
+      makeChannel('ch-1', 'Channel 1', [makeVideo('1', 'Video 1')]),
+      makeChannel('ch-2', 'Channel 2', [makeVideo('2', 'Video 2')]),
+      makeChannel('ch-3', 'Channel 3', [makeVideo('3', 'Video 3')]),
+    ];
 
-      const { container } = render(
+    it('moves focus and selection to the next channel tab on ArrowRight', () => {
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      // Find the desktop aside channel buttons
-      const aside = container.querySelector('aside');
-      expect(aside).toBeInTheDocument();
-      const desktopNav = aside?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
-      expect(desktopButtons.length).toBe(3);
+      const tabs = getChannelTabs();
+      expect(tabs).toHaveLength(3);
 
-      // Focus on first button and press ArrowDown
-      desktopButtons[0].focus();
-      fireEvent.keyDown(desktopButtons[0], { key: 'ArrowDown' });
+      tabs[0].focus();
+      fireEvent.keyDown(tabs[0], { key: 'ArrowRight' });
 
-      // Focus should move to second button
-      expect(desktopButtons[1]).toHaveFocus();
-
-      // Second channel should be selected (verify via detail pane h2)
-      const detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 2');
+      expect(tabs[1]).toHaveFocus();
+      expect(screen.getByRole('tabpanel')).toHaveAttribute(
+        'aria-label',
+        'Channel 2',
+      );
+      expect(getPaneHeadingText()).toBe('Channel 2');
     });
 
-    it('ArrowUp moves focus and selection to previous desktop channel button', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-      ];
-
-      const { container } = render(
+    it('moves focus and selection to the previous channel tab on ArrowLeft', () => {
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const aside = container.querySelector('aside');
-      const desktopNav = aside?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
+      const tabs = getChannelTabs();
+      tabs[1].focus();
+      fireEvent.keyDown(tabs[1], { key: 'ArrowLeft' });
 
-      // Start on second button
-      desktopButtons[1].focus();
-      fireEvent.keyDown(desktopButtons[1], { key: 'ArrowUp' });
-
-      expect(desktopButtons[0]).toHaveFocus();
-      const detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 1');
+      expect(tabs[0]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 1');
     });
 
-    it('Home/End on desktop channel button jumps to first/last', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-        makeChannel('ch-3', 'Channel 3', videos),
-      ];
-
-      const { container } = render(
+    it('Home/End on a channel tab jumps to the first/last channel', () => {
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const aside = container.querySelector('aside');
-      const desktopNav = aside?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
+      const tabs = getChannelTabs();
+      tabs[1].focus();
+      fireEvent.keyDown(tabs[1], { key: 'Home' });
+      expect(tabs[0]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 1');
 
-      // Press Home on any button
-      desktopButtons[1].focus();
-      fireEvent.keyDown(desktopButtons[1], { key: 'Home' });
-      expect(desktopButtons[0]).toHaveFocus();
-      let detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 1');
-
-      // Press End
-      fireEvent.keyDown(desktopButtons[0], { key: 'End' });
-      expect(desktopButtons[2]).toHaveFocus();
-      detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 3');
+      fireEvent.keyDown(tabs[0], { key: 'End' });
+      expect(tabs[2]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 3');
     });
 
-    it('ignores the horizontal axis, because the desktop list is vertical', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-      ];
-
-      const { container } = render(
+    it('ignores the vertical axis, leaving the channel selection and page scroll alone', () => {
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const desktopNav = container
-        .querySelector('aside')
-        ?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
+      const tabs = getChannelTabs();
+      tabs[0].focus();
 
-      desktopButtons[0].focus();
-      fireEvent.keyDown(desktopButtons[0], { key: 'ArrowRight' });
-      expect(desktopButtons[0]).toHaveFocus();
+      const downEvent = fireEvent.keyDown(tabs[0], { key: 'ArrowDown' });
+      expect(tabs[0]).toHaveFocus();
+      // Not handled here, so the browser keeps its default scroll behaviour.
+      expect(downEvent).toBe(true);
 
-      fireEvent.keyDown(desktopButtons[0], { key: 'ArrowLeft' });
-      expect(desktopButtons[0]).toHaveFocus();
-
-      const detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 1');
+      fireEvent.keyDown(tabs[0], { key: 'ArrowUp' });
+      expect(tabs[0]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 1');
     });
 
     it('stops at the ends rather than wrapping', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-      ];
-
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const desktopNav = container
-        .querySelector('aside')
-        ?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
+      const tabs = getChannelTabs();
+      tabs[0].focus();
+      fireEvent.keyDown(tabs[0], { key: 'ArrowLeft' });
+      expect(tabs[0]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 1');
 
-      desktopButtons[0].focus();
-      fireEvent.keyDown(desktopButtons[0], { key: 'ArrowUp' });
-      expect(desktopButtons[0]).toHaveFocus();
-
-      desktopButtons[1].focus();
-      fireEvent.keyDown(desktopButtons[1], { key: 'ArrowDown' });
-      expect(desktopButtons[1]).toHaveFocus();
-    });
-  });
-
-  describe('Keyboard navigation — channel list (mobile)', () => {
-    it('Arrow/Home/End on mobile channel button targets mobile buttons independently', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-        makeChannel('ch-3', 'Channel 3', videos),
-      ];
-
-      const { container } = render(
-        <ChannelDirectory channels={channels} loading={false} error={null} />,
-      );
-
-      // Get mobile channel list - find div with lg:hidden that contains nav
-      const mobileDiv = Array.from(container.querySelectorAll('div')).find(
-        (div) =>
-          div.classList.contains('lg:hidden') &&
-          div.querySelector('[role="tablist"][aria-label="Enabled channels"]'),
-      );
-
-      expect(mobileDiv).toBeInTheDocument();
-      const mobileNav =
-        mobileDiv?.querySelector<HTMLElement>('[role="tablist"]');
-      const mobileButtons = mobileNav
-        ? within(mobileNav).getAllByRole('tab')
-        : [];
-      expect(mobileButtons.length).toBe(3);
-
-      // Focus first mobile button and press ArrowRight
-      mobileButtons[0].focus();
-      fireEvent.keyDown(mobileButtons[0], { key: 'ArrowRight' });
-
-      // Verify focus is on second mobile button (not desktop)
-      expect(mobileButtons[1]).toHaveFocus();
-      const detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 2');
-    });
-
-    it('ignores the vertical axis, leaving page scroll alone on the chip row', () => {
-      const videos = [makeVideo('1', 'Video 1')];
-      const channels = [
-        makeChannel('ch-1', 'Channel 1', videos),
-        makeChannel('ch-2', 'Channel 2', videos),
-      ];
-
-      const { container } = render(
-        <ChannelDirectory channels={channels} loading={false} error={null} />,
-      );
-
-      const mobileDiv = Array.from(container.querySelectorAll('div')).find(
-        (div) =>
-          div.classList.contains('lg:hidden') &&
-          div.querySelector('[role="tablist"][aria-label="Enabled channels"]'),
-      );
-      const mobileNav =
-        mobileDiv?.querySelector<HTMLElement>('[role="tablist"]');
-      const mobileButtons = mobileNav
-        ? within(mobileNav).getAllByRole('tab')
-        : [];
-
-      mobileButtons[0].focus();
-      const scrollEvent = fireEvent.keyDown(mobileButtons[0], {
-        key: 'ArrowDown',
-      });
-
-      expect(mobileButtons[0]).toHaveFocus();
-      // Not handled here, so the browser keeps its default scroll behaviour.
-      expect(scrollEvent).toBe(true);
+      tabs[2].focus();
+      fireEvent.keyDown(tabs[2], { key: 'ArrowRight' });
+      expect(tabs[2]).toHaveFocus();
+      expect(getPaneHeadingText()).toBe('Channel 3');
     });
   });
 
@@ -501,7 +393,7 @@ describe('ChannelDirectory', () => {
       );
     });
 
-    it('renders one row per video with title, date, and status', () => {
+    it('renders one row per video with a watch link and its NEW or WATCHED state', () => {
       const videos = [
         makeVideo('1', 'Video 1', false),
         makeVideo('2', 'Video 2', true),
@@ -512,7 +404,8 @@ describe('ChannelDirectory', () => {
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      // Check video titles are links
+      expect(getUploadRows()).toHaveLength(2);
+
       const videoLinks = screen.getAllByRole('link');
       const watchLinks = videoLinks.filter(
         (link) =>
@@ -520,7 +413,6 @@ describe('ChannelDirectory', () => {
       );
       expect(watchLinks.length).toBe(2);
 
-      // Check status text
       expect(screen.getByText('New')).toBeInTheDocument(); // Video 1 is unwatched
       expect(screen.getByText('Watched')).toBeInTheDocument(); // Video 2 is watched
     });
@@ -553,30 +445,23 @@ describe('ChannelDirectory', () => {
       ];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
 
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      // The videos appear in a div.space-y-2 after the channel title
-      const videoContainer = container.querySelector('div.space-y-2');
-      expect(videoContainer).toBeTruthy();
+      const rows = getUploadRows();
+      expect(rows).toHaveLength(3);
 
-      // All divs with tabIndex in the video container should be our rows
-      if (videoContainer) {
-        const rows = videoContainer.querySelectorAll('div[tabindex]');
-        expect(rows.length).toBe(3);
+      // Focus on first row
+      rows[0].focus();
+      fireEvent.keyDown(rows[0], { key: 'ArrowDown' });
 
-        // Focus on first row
-        (rows[0] as HTMLElement).focus();
-        fireEvent.keyDown(rows[0], { key: 'ArrowDown' });
+      // Second row should have focus
+      expect(rows[1]).toHaveFocus();
 
-        // Second row should have focus
-        expect(rows[1]).toHaveFocus();
-
-        // ArrowUp should go back
-        fireEvent.keyDown(rows[1], { key: 'ArrowUp' });
-        expect(rows[0]).toHaveFocus();
-      }
+      // ArrowUp should go back
+      fireEvent.keyDown(rows[1], { key: 'ArrowUp' });
+      expect(rows[0]).toHaveFocus();
     });
 
     it('Home/End on video row jumps to first/last', () => {
@@ -587,28 +472,25 @@ describe('ChannelDirectory', () => {
       ];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
 
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
-      const videoContainer = container.querySelector('div.space-y-2');
-      if (videoContainer) {
-        const rows = videoContainer.querySelectorAll('div[tabindex]');
+      const rows = getUploadRows();
 
-        // Press Home from middle row
-        (rows[1] as HTMLElement).focus();
-        fireEvent.keyDown(rows[1], { key: 'Home' });
-        expect(rows[0]).toHaveFocus();
+      // Press Home from middle row
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: 'Home' });
+      expect(rows[0]).toHaveFocus();
 
-        // Press End
-        fireEvent.keyDown(rows[0], { key: 'End' });
-        expect(rows[2]).toHaveFocus();
-      }
+      // Press End
+      fireEvent.keyDown(rows[0], { key: 'End' });
+      expect(rows[2]).toHaveFocus();
     });
   });
 
   describe('In-app player (open/close/escape)', () => {
-    it('opens YouTubeVideoPlayer when "Play in app" button is clicked', () => {
+    it('opens the player in a section named for the channel when "Play in app" is clicked', () => {
       const videos = [makeVideo('1', 'Video 1')];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
 
@@ -622,6 +504,9 @@ describe('ChannelDirectory', () => {
       fireEvent.click(playButton);
 
       expect(screen.getByTestId('player-vid-1')).toBeInTheDocument();
+      expect(
+        screen.getByRole('region', { name: 'Playing from Channel 1' }),
+      ).toBeInTheDocument();
     });
 
     it('renders "Close player" button when player is open', () => {
@@ -667,7 +552,7 @@ describe('ChannelDirectory', () => {
       expect(playButton).toHaveFocus();
     });
 
-    it('closes player when onNearEnd callback is called for unwatched video and calls updateVideoWatched', async () => {
+    it('marks an unwatched video watched and reports it when the player reports near end', async () => {
       const onWatchedToggle = jest.fn();
       const videos = [makeVideo('1', 'Video 1', false)];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
@@ -734,7 +619,7 @@ describe('ChannelDirectory', () => {
       const videos = [makeVideo('1', 'Video 1'), makeVideo('2', 'Video 2')];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
 
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
@@ -745,14 +630,10 @@ describe('ChannelDirectory', () => {
 
       expect(screen.getByTestId('player-vid-1')).toBeInTheDocument();
 
-      // Get the first upload row and fire Escape on it
-      const videoContainer = container.querySelector('div.space-y-2');
-      const rows = videoContainer?.querySelectorAll('div[tabindex]');
-      expect(rows?.length).toBe(2);
+      const rows = getUploadRows();
+      expect(rows).toHaveLength(2);
 
-      if (rows && rows[0]) {
-        fireEvent.keyDown(rows[0] as HTMLElement, { key: 'Escape' });
-      }
+      fireEvent.keyDown(rows[0], { key: 'Escape' });
 
       expect(screen.queryByTestId('player-vid-1')).not.toBeInTheDocument();
       expect(playButton).toHaveFocus();
@@ -760,7 +641,7 @@ describe('ChannelDirectory', () => {
   });
 
   describe('Watched/unwatched toggle on upload row', () => {
-    it('calls updateVideoWatched and onWatchedToggle when "Mark as watched" is clicked', async () => {
+    it('calls updateVideoWatched and onWatchedToggle when the NEW pill is clicked, then offers to mark it new', async () => {
       const onWatchedToggle = jest.fn();
       const videos = [makeVideo('1', 'Video 1', false)];
       const channels = [makeChannel('ch-1', 'Channel 1', videos)];
@@ -917,7 +798,7 @@ describe('ChannelDirectory', () => {
         makeChannel('ch-2', 'Channel 2', videos),
       ];
 
-      const { container } = render(
+      render(
         <ChannelDirectory channels={channels} loading={false} error={null} />,
       );
 
@@ -928,20 +809,14 @@ describe('ChannelDirectory', () => {
       fireEvent.click(playButton);
       expect(screen.getByTestId('player-vid-1')).toBeInTheDocument();
 
-      // Switch to second channel via desktop buttons
-      const aside = container.querySelector('aside');
-      const desktopNav = aside?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
-      fireEvent.click(desktopButtons[1]);
+      // Switch to second channel via the channel tab set
+      fireEvent.click(getChannelTabs()[1]);
 
       // Player should close
       expect(screen.queryByTestId('player-vid-1')).not.toBeInTheDocument();
 
-      // Second channel should be displayed via detail pane h2
-      const detailH2 = container.querySelector('div.flex-1 h2');
-      expect(detailH2?.textContent).toBe('Channel 2');
+      // Second channel should be displayed via detail pane heading
+      expect(getPaneHeadingText()).toBe('Channel 2');
     });
   });
 
@@ -1032,7 +907,7 @@ describe('ChannelDirectory', () => {
     ];
 
     it('opens the channel named by the link', () => {
-      const { container } = render(
+      render(
         <ChannelDirectory
           channels={channels}
           loading={false}
@@ -1040,13 +915,11 @@ describe('ChannelDirectory', () => {
         />,
       );
 
-      expect(container.querySelector('div.flex-1 h2')?.textContent).toBe(
-        'Channel 2',
-      );
+      expect(getPaneHeadingText()).toBe('Channel 2');
     });
 
     it('falls back to the first channel when the link names a channel that is no longer enabled', () => {
-      const { container } = render(
+      render(
         <ChannelDirectory
           channels={channels}
           loading={false}
@@ -1054,13 +927,11 @@ describe('ChannelDirectory', () => {
         />,
       );
 
-      expect(container.querySelector('div.flex-1 h2')?.textContent).toBe(
-        'Channel 1',
-      );
+      expect(getPaneHeadingText()).toBe('Channel 1');
     });
 
     it('lets the User navigate away from the linked channel', () => {
-      const { container } = render(
+      render(
         <ChannelDirectory
           channels={channels}
           loading={false}
@@ -1068,17 +939,9 @@ describe('ChannelDirectory', () => {
         />,
       );
 
-      const desktopNav = container
-        .querySelector('aside')
-        ?.querySelector<HTMLElement>('[role="tablist"]');
-      const desktopButtons = desktopNav
-        ? within(desktopNav).getAllByRole('tab')
-        : [];
-      fireEvent.click(desktopButtons[0]);
+      fireEvent.click(getChannelTabs()[0]);
 
-      expect(container.querySelector('div.flex-1 h2')?.textContent).toBe(
-        'Channel 1',
-      );
+      expect(getPaneHeadingText()).toBe('Channel 1');
     });
   });
 
@@ -1193,6 +1056,7 @@ describe('ChannelDirectory', () => {
       ).toBeInTheDocument();
     });
   });
+
   describe('Channel selector tab semantics', () => {
     const renderTwoChannels = () =>
       render(
@@ -1206,67 +1070,177 @@ describe('ChannelDirectory', () => {
         />,
       );
 
-    it('exposes the channel selector as a tab set, not a nav landmark', () => {
+    it('exposes the channel selector as one horizontal tab set, not a nav landmark', () => {
       const { container } = renderTwoChannels();
 
       // The set carries a single tab stop and moves with arrow keys, which is
       // the tabs contract; announcing it as navigation contradicted that.
       expect(container.querySelector('nav')).toBeNull();
-      expect(screen.getAllByRole('tablist')).toHaveLength(2);
-      expect(screen.getAllByRole('tab').length).toBeGreaterThan(0);
+      const tablist = screen.getByRole('tablist', {
+        name: 'Enabled channels',
+      });
+      expect(tablist).toHaveAttribute('aria-orientation', 'horizontal');
+      expect(screen.getAllByRole('tablist')).toHaveLength(1);
+      expect(getChannelTabs()).toHaveLength(2);
     });
 
-    it('states the arrow-key axis each layout follows', () => {
-      const { container } = renderTwoChannels();
+    it('points every channel tab at the one detail pane it swaps', () => {
+      renderTwoChannels();
 
-      const [desktop, mobile] = Array.from(
-        container.querySelectorAll('[role="tablist"]'),
-      );
-
-      expect(desktop).toHaveAttribute('aria-orientation', 'vertical');
-      expect(mobile).toHaveAttribute('aria-orientation', 'horizontal');
-    });
-
-    it('points every tab at the detail pane it swaps', () => {
-      const { container } = renderTwoChannels();
-
-      const panel = container.querySelector('[role="tabpanel"]');
-      expect(panel).not.toBeNull();
+      const panel = screen.getByRole('tabpanel');
       expect(panel).toHaveAttribute('aria-label', 'Channel 1');
 
-      const panelId = panel?.getAttribute('id');
+      const panelId = panel.getAttribute('id');
       expect(panelId).toBeTruthy();
 
-      screen.getAllByRole('tab').forEach((tab) => {
+      getChannelTabs().forEach((tab) => {
         expect(tab).toHaveAttribute('aria-controls', panelId);
       });
     });
 
-    it('gives the desktop and mobile copies of a channel distinct tab ids', () => {
-      const { container } = renderTwoChannels();
+    it('gives each channel tab a unique id derived from its channel', () => {
+      renderTwoChannels();
 
-      const ids = Array.from(container.querySelectorAll('[role="tab"]')).map(
-        (tab) => tab.id,
-      );
-
-      expect(ids.every(Boolean)).toBe(true);
-      expect(new Set(ids).size).toBe(ids.length);
+      expect(getChannelTabs().map((tab) => tab.id)).toEqual([
+        'channel-tab-ch-1',
+        'channel-tab-ch-2',
+      ]);
     });
 
     it('moves aria-selected onto the newly chosen channel', () => {
-      const { container } = renderTwoChannels();
+      renderTwoChannels();
 
-      const desktopTabs = within(
-        container.querySelector('aside [role="tablist"]') as HTMLElement,
-      ).getAllByRole('tab');
+      const tabs = getChannelTabs();
 
-      expect(desktopTabs[0]).toHaveAttribute('aria-selected', 'true');
-      expect(desktopTabs[1]).toHaveAttribute('aria-selected', 'false');
+      expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+      expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
 
-      fireEvent.click(desktopTabs[1]);
+      fireEvent.click(tabs[1]);
 
-      expect(desktopTabs[0]).toHaveAttribute('aria-selected', 'false');
-      expect(desktopTabs[1]).toHaveAttribute('aria-selected', 'true');
+      expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
+      expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('Phone upload rows', () => {
+    beforeEach(() => {
+      mockUseIsMobileState.mockReturnValue(true);
+    });
+
+    it('makes the thumbnail the one Play control per row and it opens the player', () => {
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', [
+          makeVideo('1', 'Video 1'),
+          makeVideo('2', 'Video 2'),
+        ]),
+      ];
+
+      render(
+        <ChannelDirectory channels={channels} loading={false} error={null} />,
+      );
+
+      expect(screen.getAllByRole('button', { name: / in app$/ })).toHaveLength(
+        2,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Play Video 1 in app' }),
+      );
+
+      expect(screen.getByTestId('player-vid-1')).toBeInTheDocument();
+    });
+
+    it('toggles the watched pill from the phone row', async () => {
+      const onWatchedToggle = jest.fn();
+      (updateVideoWatched as jest.Mock).mockResolvedValue({ watched: true });
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', [makeVideo('1', 'Video 1')]),
+      ];
+
+      render(
+        <ChannelDirectory
+          channels={channels}
+          loading={false}
+          error={null}
+          onWatchedToggle={onWatchedToggle}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Mark Video 1 as watched' }),
+      );
+
+      await waitFor(() => {
+        expect(updateVideoWatched).toHaveBeenCalledWith('vid-1', true);
+      });
+      await waitFor(() => {
+        expect(onWatchedToggle).toHaveBeenCalledWith('vid-1', true);
+      });
+      expect(
+        screen.getByRole('button', { name: 'Mark Video 1 as new' }),
+      ).toBeInTheDocument();
+    });
+
+    it('calls onAddToQueue from the icon-only queue control', () => {
+      const onAddToQueue = jest.fn();
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', [makeVideo('1', 'Video 1')]),
+      ];
+
+      render(
+        <ChannelDirectory
+          channels={channels}
+          loading={false}
+          error={null}
+          onAddToQueue={onAddToQueue}
+        />,
+      );
+
+      const addButton = screen.getByRole('button', {
+        name: 'Add Video 1 to queue',
+      });
+      expect(addButton.textContent).toBe('');
+
+      fireEvent.click(addButton);
+
+      expect(onAddToQueue).toHaveBeenCalledWith('vid-1');
+    });
+
+    it('disables the icon-only queue control under its queued and full names', () => {
+      const channels = [
+        makeChannel('ch-1', 'Channel 1', [makeVideo('1', 'Video 1')]),
+      ];
+
+      const { unmount } = render(
+        <ChannelDirectory
+          channels={channels}
+          loading={false}
+          error={null}
+          onAddToQueue={jest.fn()}
+          isQueued={() => true}
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'Video 1 is already queued' }),
+      ).toBeDisabled();
+      unmount();
+
+      render(
+        <ChannelDirectory
+          channels={channels}
+          loading={false}
+          error={null}
+          onAddToQueue={jest.fn()}
+          queueFull
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', {
+          name: /Queue is full — remove an upload to add Video 1/,
+        }),
+      ).toBeDisabled();
     });
   });
 });

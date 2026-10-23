@@ -64,10 +64,22 @@ jest.mock('@myorganiser/web-vault-ui', () => {
     // no current test mounts RecoveryKeyMintedSection (which uses it), the stub
     // prevents a future author from accidentally triggering real jsdom probes
     // when they add a test that drives a successful key rotation.
+    // The hero reads the lock state from the real module, not from the session
+    // mock above. Set per test through setDisabledState, which derives it from
+    // the disabled state. A non-null session without masterKeyBytes is 'locked'.
+    useVaultLockState: jest.fn(),
     useServerReachability: () => ({
       reachability: 'reachable',
       recheck: jest.fn(),
     }),
+  };
+});
+
+jest.mock('@myorganiser/web-ui', () => {
+  const actual = jest.requireActual('@myorganiser/web-ui');
+  return {
+    ...actual,
+    useIsMobile: jest.fn(() => false),
   };
 });
 
@@ -77,8 +89,13 @@ jest.mock('./CloudBackupLiveCard', () => ({
   // is to raise the prompt when it does, and that is what this stands in for.
   CloudBackupLiveCard: ({
     onEscapeCopyMade,
+    onSummaryChange,
   }: {
     onEscapeCopyMade?: () => void;
+    onSummaryChange?: (summary: {
+      linked: boolean;
+      newestCopyCreatedAt: string | null | undefined;
+    }) => void;
   }) => (
     <div data-testid="cloud-backup-live-card">
       Encrypted cloud backup
@@ -89,13 +106,52 @@ jest.mock('./CloudBackupLiveCard', () => ({
       >
         backup succeeded
       </button>
+      <button
+        type="button"
+        data-testid="stub-summary-linked-dated"
+        onClick={() =>
+          onSummaryChange?.({
+            linked: true,
+            newestCopyCreatedAt: new Date(
+              Date.now() - 3 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+          })
+        }
+      >
+        report linked and dated
+      </button>
+      <button
+        type="button"
+        data-testid="stub-summary-unlinked-empty"
+        onClick={() =>
+          onSummaryChange?.({ linked: false, newestCopyCreatedAt: null })
+        }
+      >
+        report unlinked and empty
+      </button>
     </div>
   ),
 }));
 
 import { VaultPageClient } from './VaultPageClient';
+import { useIsMobile } from '@myorganiser/web-ui';
+import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useGoogleIdentityScript } from '../hooks';
 import { useVaultDisabledState } from '../hooks/useVaultDisabledState';
+
+/** The lock state each disabled state implies: a session that is null is 'no-session'. */
+const LOCK_STATE_FOR: Record<string, string> = {
+  enabled: 'unlocked',
+  locked: 'locked',
+  'no-local-vault': 'locked',
+  'signed-out': 'no-session',
+};
+
+/** Sets the disabled state and the lock state the hero reads, together. */
+function setDisabledState(state: string) {
+  (useVaultDisabledState as jest.Mock).mockReturnValue(state);
+  (useVaultLockState as jest.Mock).mockReturnValue(LOCK_STATE_FOR[state]);
+}
 
 describe('VaultPageClient', () => {
   const ORIGINAL_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -104,7 +160,8 @@ describe('VaultPageClient', () => {
     jest.clearAllMocks();
     delete process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     (useGoogleIdentityScript as jest.Mock).mockReturnValue('loading');
-    (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
+    setDisabledState('locked');
+    (useIsMobile as jest.Mock).mockReturnValue(false);
     mockExportVaultNow.mockResolvedValue(true);
   });
 
@@ -146,27 +203,32 @@ describe('VaultPageClient', () => {
     expect(screen.queryByTestId('last-backup-card')).not.toBeInTheDocument();
   });
 
-  test('positions the escape copy reader card and removal card in the correct order below export', () => {
+  test('positions the export and import cards, then the escape copy reader, then removal in the Danger zone', () => {
     render(<VaultPageClient />);
 
     const exportHeading = screen.getByText('Export encrypted vault');
+    const importHeading = screen.getByText('Import encrypted vault');
     const escapeCopyHeading = screen.getByText(
       'Open your Escape Copy without us',
     );
+    const dangerHeading = screen.getByRole('heading', { name: 'Danger zone' });
     const removeButton = screen.getByTestId('remove-vault-button');
-    const importHeading = screen.getByText('Import encrypted vault');
 
-    // Assert the order: Export → EscapeCopyReaderCard → RemoveVaultCard → ImportVaultCard
+    // Assert the order: ExportVaultCard + ImportVaultCard grid → EscapeCopyReaderCard → Danger zone → RemoveVaultCard
     expect(
-      exportHeading.compareDocumentPosition(escapeCopyHeading) &
+      exportHeading.compareDocumentPosition(importHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      escapeCopyHeading.compareDocumentPosition(removeButton) &
+      importHeading.compareDocumentPosition(escapeCopyHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      removeButton.compareDocumentPosition(importHeading) &
+      escapeCopyHeading.compareDocumentPosition(dangerHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      dangerHeading.compareDocumentPosition(removeButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
@@ -181,9 +243,7 @@ describe('VaultPageClient', () => {
 
   test('hides VaultUnlockCard when vault is unlocked', () => {
     // Override the default mock for this test to return 'enabled'
-    const mockUseVaultDisabledState = require('../hooks')
-      .useVaultDisabledState as jest.Mock;
-    mockUseVaultDisabledState.mockReturnValue('enabled');
+    setDisabledState('enabled');
 
     render(<VaultPageClient />);
 
@@ -192,7 +252,7 @@ describe('VaultPageClient', () => {
     expect(screen.queryByTestId('vault-unlock-submit')).not.toBeInTheDocument();
 
     // Reset the mock for other tests
-    mockUseVaultDisabledState.mockReturnValue('locked');
+    setDisabledState('locked');
   });
 
   test('positions VaultUnlockCard before ChangePassphraseCard', () => {
@@ -214,7 +274,7 @@ describe('VaultPageClient', () => {
     test('E1: no-local-vault state shows vault policy reason, not config reason', () => {
       // Policy takes precedence: with no Local Vault, how Google Drive is configured
       // is not the reason the card is unavailable.
-      (useVaultDisabledState as jest.Mock).mockReturnValue('no-local-vault');
+      setDisabledState('no-local-vault');
 
       render(<VaultPageClient />);
 
@@ -232,7 +292,7 @@ describe('VaultPageClient', () => {
     });
 
     test('E2: signed-out state shows vault policy reason, not config reason', () => {
-      (useVaultDisabledState as jest.Mock).mockReturnValue('signed-out');
+      setDisabledState('signed-out');
 
       render(<VaultPageClient />);
 
@@ -263,7 +323,7 @@ describe('VaultPageClient', () => {
       // A locked Vault does not block cloud backup: it touches Ciphertext only,
       // not plaintext, so unlock is not a plaintext-access boundary for it.
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
-      (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
+      setDisabledState('locked');
       mockExportVaultNow.mockResolvedValue(true);
       (useGoogleIdentityScript as jest.Mock).mockReturnValue('ready');
 
@@ -290,7 +350,7 @@ describe('VaultPageClient', () => {
 
     test('E4: enabled state allows cloud backup, renders live card when clientId is set', () => {
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
-      (useVaultDisabledState as jest.Mock).mockReturnValue('enabled');
+      setDisabledState('enabled');
       (useGoogleIdentityScript as jest.Mock).mockReturnValue('ready');
 
       render(<VaultPageClient />);
@@ -311,6 +371,94 @@ describe('VaultPageClient', () => {
 
       // Should render the live cloud backup card
       expect(screen.getByText('Encrypted cloud backup')).toBeInTheDocument();
+    });
+  });
+
+  describe('Heading and layout', () => {
+    test('renders exactly one h1 for each of the enabled, locked, and no-local-vault states', () => {
+      const cases: Array<[string, string]> = [
+        ['enabled', 'Your vault is unlocked'],
+        ['locked', 'Unlock your vault'],
+        ['no-local-vault', 'Vault'],
+        ['signed-out', 'Vault'],
+      ];
+
+      for (const [state, title] of cases) {
+        setDisabledState(state);
+        const { unmount } = render(<VaultPageClient />);
+
+        const h1s = screen.getAllByRole('heading', { level: 1 });
+        expect(h1s).toHaveLength(1);
+        expect(h1s[0].textContent).toBe(title);
+
+        unmount();
+      }
+    });
+
+    test('below md renders the phone sections and not the desktop cards', () => {
+      (useIsMobile as jest.Mock).mockReturnValue(true);
+      setDisabledState('enabled');
+
+      render(<VaultPageClient />);
+
+      // The phone ListGroups: each section heading, and the passphrase row as a link
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Access' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Danger zone' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: /Change passphrase/ }),
+      ).toHaveAttribute('href', '/dashboard/vault/passphrase');
+
+      // The desktop cards are not mounted alongside them
+      expect(
+        screen.queryByTestId('change-passphrase-open'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Encrypted cloud backup'),
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('remove-vault-button')).toHaveLength(1);
+    });
+  });
+
+  describe('Escape copy summary in the unlocked hero', () => {
+    test('a linked, dated summary raises the linked and newest-copy chips', async () => {
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
+      setDisabledState('enabled');
+      (useGoogleIdentityScript as jest.Mock).mockReturnValue('ready');
+      render(<VaultPageClient />);
+
+      fireEvent.click(screen.getByTestId('stub-summary-linked-dated'));
+
+      await waitFor(() =>
+        expect(screen.getByText('Linked to Google Drive')).toBeInTheDocument(),
+      );
+      expect(screen.getByText('Newest copy: 3 days old')).toBeInTheDocument();
+    });
+
+    test('an unlinked summary with no copy removes the chips a linked summary raised', async () => {
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
+      setDisabledState('enabled');
+      (useGoogleIdentityScript as jest.Mock).mockReturnValue('ready');
+      render(<VaultPageClient />);
+
+      // Raise the chips first, so the removal below is observable
+      fireEvent.click(screen.getByTestId('stub-summary-linked-dated'));
+      await waitFor(() =>
+        expect(screen.getByText('Linked to Google Drive')).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Newest copy:/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('stub-summary-unlinked-empty'));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText('Linked to Google Drive'),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText(/Newest copy:/)).not.toBeInTheDocument();
     });
   });
 
@@ -335,7 +483,7 @@ describe('VaultPageClient', () => {
     });
 
     test('raises the callout once a local export has actually succeeded', async () => {
-      (useVaultDisabledState as jest.Mock).mockReturnValue('enabled');
+      setDisabledState('enabled');
       mockExportVaultNow.mockResolvedValue(true);
       render(<VaultPageClient />);
 
@@ -351,7 +499,7 @@ describe('VaultPageClient', () => {
     test('leaves the callout down when the export failed', async () => {
       // The prompt says "you just made an Escape Copy". Raising it when no
       // copy was made tells the User a file exists that does not.
-      (useVaultDisabledState as jest.Mock).mockReturnValue('enabled');
+      setDisabledState('enabled');
       mockExportVaultNow.mockResolvedValue(false);
       render(<VaultPageClient />);
 
@@ -364,7 +512,7 @@ describe('VaultPageClient', () => {
     });
 
     test('raises the callout when a Drive Escape Copy succeeds', async () => {
-      (useVaultDisabledState as jest.Mock).mockReturnValue('enabled');
+      setDisabledState('enabled');
       (useGoogleIdentityScript as jest.Mock).mockReturnValue('ready');
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
       render(<VaultPageClient />);
@@ -381,7 +529,7 @@ describe('VaultPageClient', () => {
     test('keeps the callout up afterwards, because the reminder outlives the moment', async () => {
       // Sticky on purpose: a User who leaves to go find the downloaded file
       // and comes back is exactly the User the reminder is for.
-      (useVaultDisabledState as jest.Mock).mockReturnValue('enabled');
+      setDisabledState('enabled');
       mockExportVaultNow.mockResolvedValue(true);
       render(<VaultPageClient />);
 

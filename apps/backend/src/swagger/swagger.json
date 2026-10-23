@@ -1434,12 +1434,21 @@
 					}
 				]
 			},
+			"FeedbackReportPlatform": {
+				"type": "string",
+				"enum": [
+					"web",
+					"ios",
+					"android"
+				],
+				"description": "Which app sent a Feedback Report, as the Report Context platform: `web` for\nthe dashboard, `ios` and `android` for the mobile app. The database column\nstays a plain string, so rows stored before this type are still readable."
+			},
 			"ReportContextRequest": {
 				"description": "The Report Context the sender saw before sending. It never carries\nscreenshots, logs, or anything read from the Vault, and `path` is the page\npath alone — no query string and no fragment.",
 				"properties": {
 					"platform": {
-						"type": "string",
-						"description": "Which app sent the report — `web` for the dashboard."
+						"$ref": "#/components/schemas/FeedbackReportPlatform",
+						"description": "Which app sent the report: `web` for the dashboard, `ios` or `android` for the mobile app."
 					},
 					"appVersion": {
 						"type": "string"
@@ -1817,6 +1826,11 @@
 					"youtubeAccess": {
 						"type": "boolean",
 						"description": "Whether a Platform Admin currently grants this User YouTube Access (ADR 0129)."
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time",
+						"description": "When the User joined (`User.created_at`)."
 					}
 				},
 				"required": [
@@ -1828,10 +1842,62 @@
 					"role",
 					"disabled",
 					"emailVerified",
-					"youtubeAccess"
+					"youtubeAccess",
+					"createdAt"
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"AdminUserListResponse": {
+				"description": "One page of the Platform Admin users list.",
+				"properties": {
+					"users": {
+						"items": {
+							"$ref": "#/components/schemas/AdminUserIdentity"
+						},
+						"type": "array"
+					},
+					"total": {
+						"type": "number",
+						"format": "double",
+						"description": "Count matching q + status + role, ignoring paging."
+					},
+					"page": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective 1-based page."
+					},
+					"pageSize": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective page size."
+					}
+				},
+				"required": [
+					"users",
+					"total",
+					"page",
+					"pageSize"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AdminUserStatusFilter": {
+				"type": "string",
+				"enum": [
+					"active",
+					"unverified",
+					"disabled"
+				],
+				"description": "User state filter for the Platform Admin users list. `disabled` is a Disabled\nUser; `unverified` is an Unverified User who is not disabled; `active` is\nneither a Disabled User nor an Unverified User."
+			},
+			"AdminUserSort": {
+				"type": "string",
+				"enum": [
+					"newest",
+					"name"
+				],
+				"description": "Sort order for the Platform Admin users list."
 			},
 			"YouTubeDisconnectOutcome": {
 				"type": "string",
@@ -1860,6 +1926,75 @@
 					}
 				],
 				"description": "Identity after a YouTube Access withdrawal, with the disconnect outcome."
+			},
+			"AdminOverviewResponse": {
+				"description": "Platform counts for the admin Overview page. Platform Admin only.",
+				"properties": {
+					"users": {
+						"type": "number",
+						"format": "double",
+						"description": "Total number of Users."
+					},
+					"usersJoinedLast7Days": {
+						"type": "number",
+						"format": "double",
+						"description": "Users whose account was created in the last 7 days (created_at >= now − 7 days).\nUsers created before User.created_at existed were backfilled from the creation time in their cuid id."
+					},
+					"platformAdmins": {
+						"type": "number",
+						"format": "double",
+						"description": "Users whose role is platform_admin."
+					},
+					"unverified": {
+						"type": "number",
+						"format": "double",
+						"description": "Users who have not verified their email."
+					},
+					"unverifiedOverAWeek": {
+						"type": "number",
+						"format": "double",
+						"description": "Users who have not verified their email and whose account was created more than 7 days ago\n(email_verification_timestamp is null AND created_at < now − 7 days).\nUsers created before User.created_at existed were backfilled from the creation time in their cuid id."
+					},
+					"disabled": {
+						"type": "number",
+						"format": "double",
+						"description": "Users who are disabled."
+					},
+					"youtubeAccessPlacesUsed": {
+						"type": "number",
+						"format": "double",
+						"description": "Users ever granted YouTube Access (lifetime, ADR 0129)."
+					},
+					"youtubeAccessPlacesLeft": {
+						"type": "number",
+						"format": "double",
+						"description": "YouTube Access places still available under the ceiling, never negative."
+					},
+					"youtubeAccessCeiling": {
+						"type": "number",
+						"format": "double",
+						"description": "The configured lifetime YouTube Access ceiling."
+					},
+					"feedbackReportsReceived": {
+						"type": "number",
+						"format": "double",
+						"description": "Feedback Reports in the received status."
+					}
+				},
+				"required": [
+					"users",
+					"usersJoinedLast7Days",
+					"platformAdmins",
+					"unverified",
+					"unverifiedOverAWeek",
+					"disabled",
+					"youtubeAccessPlacesUsed",
+					"youtubeAccessPlacesLeft",
+					"youtubeAccessCeiling",
+					"feedbackReportsReceived"
+				],
+				"type": "object",
+				"additionalProperties": false
 			},
 			"AdminFeedbackReporterDto": {
 				"description": "Admin Feedback Reporter identity.",
@@ -1944,18 +2079,36 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"ListAdminFeedbackReportsResponse": {
-				"description": "Response body for list feedback reports endpoint.",
+			"AdminFeedbackReportListResponse": {
+				"description": "Response body for the admin feedback report list: one page of reports, and\nthe total that matches the filters ignoring paging.",
 				"properties": {
 					"items": {
 						"items": {
 							"$ref": "#/components/schemas/AdminFeedbackReportListItemDto"
 						},
 						"type": "array"
+					},
+					"total": {
+						"type": "number",
+						"format": "double",
+						"description": "Count matching the filters, ignoring paging."
+					},
+					"page": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective 1-based page."
+					},
+					"pageSize": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective page size."
 					}
 				},
 				"required": [
-					"items"
+					"items",
+					"total",
+					"page",
+					"pageSize"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -2165,7 +2318,7 @@
 				]
 			},
 			"AdminAuditLogEntry": {
-				"description": "Platform Admin Audit Log entry returned by list APIs.",
+				"description": "Platform Admin Audit Log entry returned by list APIs. Every action targets a\nUser (admin actions the acted-on User, feedback actions the reporter) and the\nactor is always set at write time, so a null id only arises from User\nDeletion's `onDelete: SetNull`. That is what `actorDeleted` and\n`targetDeleted` report; the matching name is null once the User is gone.",
 				"properties": {
 					"id": {
 						"type": "string"
@@ -2180,6 +2333,24 @@
 						"nullable": true,
 						"description": "Null once the affected User has been removed by User Deletion."
 					},
+					"actorName": {
+						"type": "string",
+						"nullable": true,
+						"description": "Display name of the acting User, or null once they are deleted."
+					},
+					"targetName": {
+						"type": "string",
+						"nullable": true,
+						"description": "Display name of the affected User, or null once they are deleted."
+					},
+					"actorDeleted": {
+						"type": "boolean",
+						"description": "True when `actorUserId` is null (User Deletion removed the actor)."
+					},
+					"targetDeleted": {
+						"type": "boolean",
+						"description": "True when `targetUserId` is null (User Deletion removed the target)."
+					},
 					"action": {
 						"$ref": "#/components/schemas/AdminAuditAction"
 					},
@@ -2192,8 +2363,46 @@
 					"id",
 					"actorUserId",
 					"targetUserId",
+					"actorName",
+					"targetName",
+					"actorDeleted",
+					"targetDeleted",
 					"action",
 					"createdAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AdminAuditLogListResponse": {
+				"description": "One page of the Platform Admin Audit Log.",
+				"properties": {
+					"entries": {
+						"items": {
+							"$ref": "#/components/schemas/AdminAuditLogEntry"
+						},
+						"type": "array"
+					},
+					"total": {
+						"type": "number",
+						"format": "double",
+						"description": "Count matching the userId + action filters, ignoring paging."
+					},
+					"page": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective 1-based page."
+					},
+					"pageSize": {
+						"type": "number",
+						"format": "double",
+						"description": "Echoed effective page size."
+					}
+				},
+				"required": [
+					"entries",
+					"total",
+					"page",
+					"pageSize"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -4058,6 +4267,16 @@
 							}
 						}
 					},
+					"422": {
+						"description": "Validation Failed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidateErrorJSON"
+								}
+							}
+						}
+					},
 					"426": {
 						"description": "Below the Version Floor",
 						"content": {
@@ -4913,10 +5132,17 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"items": {
-										"$ref": "#/components/schemas/AdminUserIdentity"
-									},
-									"type": "array"
+									"$ref": "#/components/schemas/AdminUserListResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Validation Failed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidateErrorJSON"
 								}
 							}
 						}
@@ -4932,7 +5158,7 @@
 						}
 					}
 				},
-				"description": "List/search Users (identity fields only). Platform Admin only.",
+				"description": "List/search Users (identity fields only), one page at a time. Platform\nAdmin only.",
 				"tags": [
 					"Platform Admin"
 				],
@@ -4945,11 +5171,62 @@
 				],
 				"parameters": [
 					{
+						"description": "Matches email, name, first name or last name (case-insensitive).",
 						"in": "query",
 						"name": "q",
 						"required": false,
 						"schema": {
 							"type": "string"
+						}
+					},
+					{
+						"description": "`disabled`: Disabled Users. `unverified`: Unverified Users who\nare not disabled. `active`: neither disabled nor unverified.",
+						"in": "query",
+						"name": "status",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/AdminUserStatusFilter"
+						}
+					},
+					{
+						"description": "`platform_admin` or `user`.",
+						"in": "query",
+						"name": "role",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/UserRole"
+						}
+					},
+					{
+						"description": "`newest` (joined, newest first; the default) or `name`.",
+						"in": "query",
+						"name": "sort",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/AdminUserSort"
+						}
+					},
+					{
+						"description": "1-based page number. Defaults to 1.",
+						"in": "query",
+						"name": "page",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
+						}
+					},
+					{
+						"description": "Users per page, 1 to 100. Defaults to 25.",
+						"in": "query",
+						"name": "pageSize",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
 						}
 					}
 				]
@@ -5629,26 +5906,16 @@
 				]
 			}
 		},
-		"/admin/feedback/reports": {
+		"/admin/overview": {
 			"get": {
-				"operationId": "ListFeedbackReports",
+				"operationId": "GetAdminOverview",
 				"responses": {
 					"200": {
 						"description": "Ok",
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ListAdminFeedbackReportsResponse"
-								}
-							}
-						}
-					},
-					"400": {
-						"description": "Invalid filter",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorResponse"
+									"$ref": "#/components/schemas/AdminOverviewResponse"
 								}
 							}
 						}
@@ -5664,7 +5931,56 @@
 						}
 					}
 				},
-				"description": "List Feedback Reports with optional filters (status, kind, platform,\ntrackingIssueNumber, limit). Newest first. Platform Admin only.",
+				"description": "Platform counts for the admin Overview page. Platform Admin only.",
+				"tags": [
+					"Platform Admin"
+				],
+				"security": [
+					{
+						"jwt": [
+							"platform_admin"
+						]
+					}
+				],
+				"parameters": []
+			}
+		},
+		"/admin/feedback/reports": {
+			"get": {
+				"operationId": "ListFeedbackReports",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AdminFeedbackReportListResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Validation Failed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidateErrorJSON"
+								}
+							}
+						}
+					},
+					"426": {
+						"description": "Below the Version Floor",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/VersionFloorRefusal"
+								}
+							}
+						}
+					}
+				},
+				"description": "List Feedback Reports with optional filters (status, kind, platform,\ntrackingIssueNumber), newest first, one page at a time. Platform Admin only.",
 				"tags": [
 					"Platform Admin"
 				],
@@ -5677,6 +5993,7 @@
 				],
 				"parameters": [
 					{
+						"description": "Reports in this Report Status.",
 						"in": "query",
 						"name": "status",
 						"required": false,
@@ -5685,6 +6002,7 @@
 						}
 					},
 					{
+						"description": "Reports of this kind.",
 						"in": "query",
 						"name": "kind",
 						"required": false,
@@ -5693,29 +6011,46 @@
 						}
 					},
 					{
+						"description": "Reports sent from this app: `web`, `ios` or `android`.",
 						"in": "query",
 						"name": "platform",
 						"required": false,
 						"schema": {
-							"type": "string"
+							"$ref": "#/components/schemas/FeedbackReportPlatform"
 						}
 					},
 					{
+						"description": "Reports linked to this GitHub issue number.",
 						"in": "query",
 						"name": "trackingIssueNumber",
 						"required": false,
 						"schema": {
-							"format": "double",
-							"type": "number"
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
 						}
 					},
 					{
+						"description": "1-based page number. Defaults to 1.",
 						"in": "query",
-						"name": "limit",
+						"name": "page",
 						"required": false,
 						"schema": {
-							"format": "double",
-							"type": "number"
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
+						}
+					},
+					{
+						"description": "Reports per page, 1 to 100. Defaults to 25.",
+						"in": "query",
+						"name": "pageSize",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
 						}
 					}
 				]
@@ -6166,10 +6501,17 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"items": {
-										"$ref": "#/components/schemas/AdminAuditLogEntry"
-									},
-									"type": "array"
+									"$ref": "#/components/schemas/AdminAuditLogListResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Validation Failed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidateErrorJSON"
 								}
 							}
 						}
@@ -6185,7 +6527,7 @@
 						}
 					}
 				},
-				"description": "List recent Admin Audit Log entries (newest first). Platform Admin only.",
+				"description": "List Admin Audit Log entries (newest first), one page at a time. Platform\nAdmin only. Each entry carries the actor and target display names; a\ndeleted User (User Deletion) has a null id, `actorDeleted`/`targetDeleted`\ntrue, and a null name. Every action targets a User, and the actor is always\nset at write time, so a null id only comes from User Deletion.",
 				"tags": [
 					"Platform Admin"
 				],
@@ -6198,12 +6540,47 @@
 				],
 				"parameters": [
 					{
+						"description": "Entries where this User is the actor OR the target.",
 						"in": "query",
-						"name": "limit",
+						"name": "userId",
 						"required": false,
 						"schema": {
-							"format": "double",
-							"type": "number"
+							"type": "string"
+						}
+					},
+					{
+						"description": "Entries whose action is in this list. Repeat the parameter\nfor several actions (`?action=disable&action=enable`).",
+						"in": "query",
+						"name": "action",
+						"required": false,
+						"schema": {
+							"type": "array",
+							"items": {
+								"$ref": "#/components/schemas/AdminAuditAction"
+							}
+						}
+					},
+					{
+						"description": "1-based page number. Defaults to 1.",
+						"in": "query",
+						"name": "page",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1
+						}
+					},
+					{
+						"description": "Entries per page, 1 to 100. Defaults to 25.",
+						"in": "query",
+						"name": "pageSize",
+						"required": false,
+						"schema": {
+							"format": "int32",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
 						}
 					}
 				]

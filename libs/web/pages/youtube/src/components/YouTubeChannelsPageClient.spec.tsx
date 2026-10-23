@@ -13,9 +13,14 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
+const mockUseIsMobileState = jest.fn();
+
 jest.mock('@myorganiser/web-ui', () => ({
+  // Real Switch and ChoiceChip render in jsdom; the rest of web-ui is stubbed below.
+  ...jest.requireActual('@myorganiser/web-ui'),
   cn: (...classes: Array<string | undefined>) =>
     classes.filter(Boolean).join(' '),
+  useIsMobileState: () => mockUseIsMobileState(),
   Button: ({ children, ...props }: any) => (
     <button {...props}>{children}</button>
   ),
@@ -26,15 +31,6 @@ jest.mock('@myorganiser/web-ui', () => ({
     <div className={className}>{children}</div>
   ),
   CardTitle: ({ children }: any) => <h2>{children}</h2>,
-  Checkbox: ({ id, checked, onCheckedChange, ...props }: any) => (
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      onChange={(event) => onCheckedChange?.(event.target.checked)}
-      {...props}
-    />
-  ),
   ConfirmDeleteDialog: ({
     open,
     title,
@@ -146,6 +142,7 @@ describe('YouTubeChannelsPageClient', () => {
       loading: false,
       error: null,
     });
+    mockUseIsMobileState.mockReturnValue(false);
     mockUseYouTubeConnect.mockReturnValue(defaultConnect);
     mockUseYouTubeSubscriptions.mockReturnValue(defaultSubs);
     mockUseYouTubeSyncStatus.mockReturnValue({
@@ -290,7 +287,7 @@ describe('YouTubeChannelsPageClient', () => {
       },
     );
 
-    it('request that ran → claim-wait loop stops once', async () => {
+    it('after a request that ran, the claim-wait poll is not repeated on the 5s interval', async () => {
       const refreshSync = jest
         .fn()
         .mockResolvedValue(statusOf({ status: 'never' }));
@@ -329,7 +326,7 @@ describe('YouTubeChannelsPageClient', () => {
       expect(refreshSync).toHaveBeenCalledTimes(1);
     });
 
-    it('dedupe: channelStatus discovering → terminal then request resolves → once', async () => {
+    it('does not refresh again when the request resolves after the terminal poll already refreshed', async () => {
       const refreshSync = jest
         .fn()
         .mockResolvedValue(statusOf({ status: 'never' }));
@@ -593,5 +590,256 @@ describe('YouTubeChannelsPageClient', () => {
         ].forEach((hook) => expect(hook).not.toHaveBeenCalled());
       },
     );
+  });
+  describe('heading and section navigation', () => {
+    const twoSubs = [
+      {
+        id: 'sub-1',
+        channelId: 'ch-1',
+        channelTitle: 'Alpha Channel',
+        channelThumbnail: null,
+        uploadsPlaylistId: 'UU1',
+        enabled: true,
+        lastSyncedAt: null,
+      },
+      {
+        id: 'sub-2',
+        channelId: 'ch-2',
+        channelTitle: 'Beta Channel',
+        channelThumbnail: null,
+        uploadsPlaylistId: 'UU2',
+        enabled: false,
+        lastSyncedAt: null,
+      },
+    ];
+
+    it('renders a Channels h1 and a YouTube section nav with Channels marked as the current page', () => {
+      renderConnected();
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Channels' }),
+      ).toBeInTheDocument();
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(within(nav).getByRole('link', { name: 'Videos' })).toHaveAttribute(
+        'href',
+        '/dashboard/youtube',
+      );
+      expect(within(nav).getByRole('link', { name: 'Shorts' })).toHaveAttribute(
+        'href',
+        '/dashboard/youtube/shorts',
+      );
+      expect(
+        within(nav).getByRole('link', { name: /^Channels/ }),
+      ).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('shows the channel count on the Channels nav link once subscriptions have loaded', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: twoSubs,
+        loading: false,
+      });
+      renderConnected();
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(
+        within(nav).getByRole('link', { name: 'Channels · 2' }),
+      ).toBeInTheDocument();
+    });
+
+    it('omits the channel count from the Channels nav link while subscriptions are loading', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: twoSubs,
+        loading: true,
+      });
+      renderConnected();
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(
+        within(nav).getByRole('link', { name: 'Channels' }),
+      ).toBeInTheDocument();
+      expect(within(nav).queryByText(/Channels ·/)).not.toBeInTheDocument();
+    });
+
+    it('omits the channel count from the Channels nav link on a phone-width layout', () => {
+      mockUseIsMobileState.mockReturnValue(true);
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: twoSubs,
+        loading: false,
+      });
+      renderConnected();
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(
+        within(nav).getByRole('link', { name: 'Channels' }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(within(nav).queryByText(/Channels ·/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('availability gate reason', () => {
+    it('shows the unreachable notice and makes no YouTube hook call when the availability check errors', () => {
+      mockUseYouTubeAvailability.mockReturnValue({
+        available: null,
+        loading: false,
+        error: new Error('Network down'),
+      });
+
+      render(<YouTubeChannelsPageClient />);
+
+      expect(
+        screen.getByRole('heading', {
+          name: "YouTube can't be reached right now",
+        }),
+      ).toBeInTheDocument();
+      [
+        mockUseYouTubeStatus,
+        mockUseYouTubeConnect,
+        mockUseYouTubeSubscriptions,
+        mockUseYouTubeSyncStatus,
+      ].forEach((hook) => expect(hook).not.toHaveBeenCalled());
+    });
+  });
+
+  describe('disconnect outcome', () => {
+    it('shows the revoke-failed notice with a Google permissions link when revoke failed', async () => {
+      const disconnect = jest.fn().mockResolvedValue({
+        revokeFailed: true,
+        googlePermissionsUrl: 'https://myaccount.google.com/permissions',
+        message:
+          'Your data was removed but Google access could not be revoked.',
+      });
+      renderConnected(disconnect);
+      const dialog = openDisconnectDialog();
+
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Disconnect' }),
+        );
+      });
+
+      const notice = await screen.findByRole('status');
+      expect(notice).toHaveTextContent(
+        'Your data was removed but Google access could not be revoked.',
+      );
+      expect(
+        within(notice).getByRole('link', { name: 'Manage Google permissions' }),
+      ).toHaveAttribute('href', 'https://myaccount.google.com/permissions');
+    });
+
+    it('closes the dialog, refreshes status, and shows no notice after a clean disconnect', async () => {
+      const disconnect = jest.fn().mockResolvedValue({ revokeFailed: false });
+      const { refreshStatus } = renderConnected(disconnect);
+      const dialog = openDisconnectDialog();
+
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Disconnect' }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('dialog', { name: 'Disconnect YouTube?' }),
+        ).not.toBeInTheDocument();
+      });
+      expect(refreshStatus).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+  });
+  describe('channel sync cooldown guard', () => {
+    it('keeps Refresh enabled but starts no sync when the client cooldown is active without a retry time', () => {
+      const triggerChannelSync = jest.fn().mockResolvedValue(true);
+      renderConnected(undefined, {
+        status: statusOf({
+          status: 'success',
+          channelStatus: 'never',
+          channelRetryAt: null,
+        }),
+        triggerChannelSync,
+        isChannelCooldownActive: true,
+      });
+
+      const refresh = screen.getByRole('button', { name: 'Refresh channels' });
+      expect(refresh).toBeEnabled();
+      fireEvent.click(refresh);
+
+      expect(triggerChannelSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('connection states', () => {
+    it('shows Loading… and no dashboard while the connection status is loading', () => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: false,
+        status: 'loading',
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubeChannelsPageClient />);
+
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(mockUseYouTubeSubscriptions).not.toHaveBeenCalled();
+    });
+
+    it('shows the connect prompt with the revoked message when the previous connection was revoked', () => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: false,
+        status: 'revoked',
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubeChannelsPageClient />);
+
+      expect(
+        screen.getByText(
+          'Your previous connection was revoked. Please reconnect.',
+        ),
+      ).toBeInTheDocument();
+      expect(mockUseYouTubeSubscriptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('disconnect failure and notice edges', () => {
+    it('shows no revoke-failed notice when revoke failed without a Google permissions URL', async () => {
+      const disconnect = jest.fn().mockResolvedValue({
+        revokeFailed: true,
+        googlePermissionsUrl: null,
+        message: 'Google access could not be revoked.',
+      });
+      renderConnected(disconnect);
+      const dialog = openDisconnectDialog();
+
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Disconnect' }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('dialog', { name: 'Disconnect YouTube?' }),
+        ).not.toBeInTheDocument();
+      });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('shows "Disconnect failed" inside the dialog when the rejection is not an Error', async () => {
+      const disconnect = jest.fn().mockRejectedValue('network-down');
+      renderConnected(disconnect);
+      const dialog = openDisconnectDialog();
+
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Disconnect' }),
+      );
+
+      await waitFor(() => {
+        expect(within(dialog).getByRole('alert')).toHaveTextContent(
+          'Disconnect failed',
+        );
+      });
+    });
   });
 });

@@ -1,28 +1,44 @@
 import Link from 'next/link';
+import {
+  legalSectionTitle,
+  type LegalVariant,
+  PRIVACY_POLICY_SECTIONS,
+} from '../lib/legal-sections';
+import { LEGAL_TEXT } from '../lib/legal-styles';
+import { LegalSection } from './LegalSection';
 
 export interface PrivacyMobileAppSectionProps {
-  /** Section heading level, as PrivacyPolicyContent's. */
-  headingLevel: 'h2' | 'h3';
+  /** Where the section renders: the standalone page (default) or the dialog. */
+  variant?: LegalVariant;
+  /** Page variant only: the section number shown in its badge. */
+  number?: string;
   /** As PrivacyPolicyContent's: '_blank' inside the Sign up dialog. */
   linkTarget?: '_blank';
 }
 
 /** The privacy policy's "The Mobile App" section. */
 export function PrivacyMobileAppSection({
-  headingLevel: Heading,
+  variant = 'page',
+  number,
   linkTarget,
 }: PrivacyMobileAppSectionProps) {
+  const text = LEGAL_TEXT[variant];
+
   return (
-    <section className="mt-6">
-      <Heading className="text-base font-semibold">The Mobile App</Heading>
-      <p className="mt-3 text-sm text-muted-foreground">
+    <LegalSection
+      id="mobile-app"
+      title={legalSectionTitle(PRIVACY_POLICY_SECTIONS, 'mobile-app')}
+      variant={variant}
+      number={number}
+    >
+      <p className={text.paragraph}>
         The MyOrganiser Mobile App for Android is distributed as a download from
         our{' '}
         <Link
           href="/download"
           target={linkTarget}
           rel={linkTarget ? 'noopener noreferrer' : undefined}
-          className="font-medium underline hover:text-foreground"
+          className={text.link}
         >
           download page
         </Link>
@@ -30,7 +46,7 @@ export function PrivacyMobileAppSection({
         download: you add the MyOrganiser web app to your Home Screen instead,
         and this policy covers it as the web app.
       </p>
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className={text.paragraph}>
         The Mobile App uses the same account and the same encrypted Vault as the
         web app, and this policy applies to it in the same way. With each
         request it tells our servers its version number and whether it runs on
@@ -40,6 +56,6 @@ export function PrivacyMobileAppSection({
         face), and your display settings. The Mobile App contains no
         advertising, analytics, or tracking.
       </p>
-    </section>
+    </LegalSection>
   );
 }

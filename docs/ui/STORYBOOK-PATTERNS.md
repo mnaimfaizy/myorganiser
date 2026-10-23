@@ -24,7 +24,9 @@ Both libraries are served by the **same** Storybook instance (`libs/web/ui/.stor
 - Vault UI Components in `libs/web/vault-ui` (`CloudBackupCard`, `LastBackupCard`) — required. They know vault domain, so they are not primitives; they still must be mock-props-expressible.
 - Non-UI modules in `web-vault-ui` (`session`, `vaultGate`, `reconcileRunner`, error-message helpers) — no story.
 
-Feature Components in `libs/web/pages/` are **not** in any story glob. They depend on domain state, so they belong in tests, not Storybook. If a feature component seems worth a story, that is a signal it should have been a UI Primitive or a Vault UI Component — raise it rather than adding a glob.
+Feature Components in `libs/web/pages/` default to no story. They depend on domain state, so they belong in tests. If a feature component seems worth a story, that is usually a signal it should have been a UI Primitive or a Vault UI Component — raise it.
+
+The glob reaches `libs/web/pages/*/src/**` for the exceptions an issue asks for by name: a state carried by colour, which Jest cannot see (the groceries selection states), and the dashboard shell chrome (sidebar, header and account menu, phone tab bar, app bar and More, #1276). Such a story mounts the contexts the component reads — pathname, router, Vault Session, current user — from one fixtures file beside it; it does not mock modules.
 
 ## 2. Title and metadata
 
@@ -38,7 +40,7 @@ export default meta;
 type Story = StoryObj<typeof Card>;
 ```
 
-`title` is `Components/<Name>` for UI Primitives — the sidebar grouping depends on it. Vault UI Components use `Vault/<Name>` (see `LastBackupCard`). `tags: ['autodocs']` is standard for every story file here.
+`title` is `Components/<Name>` for UI Primitives — the sidebar grouping depends on it. Vault UI Components use `Vault/<Name>` (see `LastBackupCard`). The dashboard shell's page-library stories (§1) use `Dashboard/Shell/<Name>`, so the chrome sits together. `tags: ['autodocs']` is standard for every story file here.
 
 ## 3. Pattern A — single component with CVA variants
 
@@ -288,6 +290,6 @@ Running the play tests locally: see [`docs/storybook/README.md`](../storybook/RE
 | Skipping `Toaster` because it is a mount point                           | Never tests GUIDELINES §1 for that primitive                         | `play` that calls `toast()` (§5)                                 |
 | Fetching or generating data in a story                                   | Non-deterministic Chromatic diffs                                    | Fixed props (§10)                                                |
 | `play` asserting mobile behaviour with no `viewport` parameter           | Page renders at 1280×720; the assertion times out                    | Declare `parameters.viewport` (§11)                              |
-| A story for a `libs/web/pages/` component                                | Not in any glob; depends on domain state                             | Test it, or promote it to a primitive or Vault UI Component (§1) |
+| A story for a `libs/web/pages/` component no issue asked for             | Depends on domain state; tests cover it                              | Test it, or promote it to a primitive or Vault UI Component (§1) |
 | A story for a state that renders nothing                                 | Blank canvas; reads as broken, and two of them are indistinguishable | Delete it; assert the absence in the spec (§8)                   |
 | A decorator or caption added to make an empty story legible              | Makes the story visible, not the component                           | Delete the story (§8)                                            |

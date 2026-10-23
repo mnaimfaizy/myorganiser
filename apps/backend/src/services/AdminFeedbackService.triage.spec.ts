@@ -5,7 +5,10 @@ jest.mock('../prisma', () => ({
   createPrismaClient: () => ({}),
 }));
 
-import { TRACKING_ISSUE_LINKED_STATUS } from './feedbackReportConstants';
+import {
+  FEEDBACK_REPORT_PLATFORMS,
+  TRACKING_ISSUE_LINKED_STATUS,
+} from './feedbackReportConstants';
 import {
   AdminFeedbackService,
   AdminFeedbackReportDetailDto,
@@ -275,82 +278,170 @@ describe('AdminFeedbackService — triage paths', () => {
   });
 
   describe('listReports', () => {
-    test('listReports maps filters onto where clause, orders newest-first, and does not over-fetch; invalid status/kind returns 400', async () => {
-      const report1 = makeDetailRow({
-        id: 'report-1',
-        status: 'planned',
-        tracking_issue_number: 42,
-      });
-      const report2 = makeDetailRow({
-        id: 'report-2',
-        status: 'planned',
-        created_at: new Date('2026-01-02T00:00:00.000Z'),
-      });
+    type ListFilters = Parameters<AdminFeedbackService['listReports']>[0];
 
-      // Test valid filters
-      prisma.feedbackReport.findMany.mockResolvedValue([report2, report1]);
+    beforeEach(() => {
+      // listReports reads the count and the page in one $transaction array.
+      prisma.$transaction.mockImplementation((ops: any) => Promise.all(ops));
+      prisma.feedbackReport.count.mockResolvedValue(0);
+      prisma.feedbackReport.findMany.mockResolvedValue([]);
+    });
 
-      const result = await service.listReports({
-        status: 'planned',
-        kind: 'bug_report',
-        platform: 'web',
-        trackingIssueNumber: 42,
-      });
+    test('with no filters queries where {}, skip 0, take 25, newest first with id tie-break, and selects no description', async () => {
+      await service.listReports({});
 
-      expect(result.ok).toBe(true);
-      expect(result.status).toBe(200);
-      const body = result.body as any;
-      expect(body.items.length).toBe(2);
-
-      // Verify findMany was called with correct where clause
+      expect(prisma.feedbackReport.count).toHaveBeenCalledWith({ where: {} });
       const findManyCall = prisma.feedbackReport.findMany.mock
         .calls[0][0] as any;
-      expect(findManyCall.where).toEqual({
-        status: 'planned',
-        kind: 'bug_report',
-        context_platform: 'web',
-        tracking_issue_number: 42,
-      });
-
-      // Verify ordering is newest-first
-      expect(findManyCall.orderBy).toEqual({ created_at: 'desc' });
-
-      // Verify select does not request description or expected_outcome, and
-      // requests only the reporter identity fields
-      expect(findManyCall.select).toBeDefined();
+      expect(findManyCall).toEqual(
+        expect.objectContaining({
+          where: {},
+          skip: 0,
+          take: 25,
+          orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        }),
+      );
       expect(findManyCall.select).not.toHaveProperty('description');
       expect(findManyCall.select).not.toHaveProperty('expected_outcome');
       expect(findManyCall.select.reporter).toEqual({
         select: { id: true, name: true, email: true },
       });
-
-      jest.clearAllMocks();
-      prisma.feedbackReport.findMany.mockResolvedValue([]);
-
-      // Test invalid status
-      const statusResult = await service.listReports({
-        status: 'duplicate',
-      });
-      expect(statusResult.ok).toBe(false);
-      expect(statusResult.status).toBe(400);
-      const statusBody = statusResult.body as any;
-      expect(statusBody.message).toContain('Invalid report status');
-      expect(prisma.feedbackReport.findMany).not.toHaveBeenCalled();
-
-      jest.clearAllMocks();
-
-      // Test invalid kind
-      const kindResult = await service.listReports({
-        kind: 'not_a_kind',
-      });
-      expect(kindResult.ok).toBe(false);
-      expect(kindResult.status).toBe(400);
-      const kindBody = kindResult.body as any;
-      expect(kindBody.message).toContain('Invalid report kind');
-      expect(prisma.feedbackReport.findMany).not.toHaveBeenCalled();
     });
 
-    test('listReports item carries the reporter identity (id, name, email) and keeps reporterUserId', async () => {
+    test('returns the page of items, with total taken from count and page 1 with pageSize 25 echoed', async () => {
+      prisma.feedbackReport.findMany.mockResolvedValue([
+        makeDetailRow({ id: 'report-2', context_platform: 'web' }),
+        makeDetailRow({ id: 'report-1' }),
+      ]);
+      prisma.feedbackReport.count.mockResolvedValue(42);
+
+      const result = await service.listReports({});
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      const body = result.body as any;
+      expect(body.items.map((item: any) => item.id)).toEqual([
+        'report-2',
+        'report-1',
+      ]);
+      expect(body.items[0].platform).toBe('web');
+      expect(body).toMatchObject({ total: 42, page: 1, pageSize: 25 });
+    });
+
+    test('maps status, kind, platform and tracking issue onto one where clause shared by count and findMany', async () => {
+      await service.listReports({
+        status: 'planned',
+        kind: 'bug_report',
+        platform: 'ios',
+        trackingIssueNumber: 42,
+      });
+
+      const expectedWhere = {
+        status: 'planned',
+        kind: 'bug_report',
+        context_platform: 'ios',
+        tracking_issue_number: 42,
+      };
+      expect(prisma.feedbackReport.count).toHaveBeenCalledWith({
+        where: expectedWhere,
+      });
+      expect(prisma.feedbackReport.findMany.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ where: expectedWhere }),
+      );
+    });
+
+    test('page 3 with pageSize 10 skips 20 and takes 10, and the body echoes both', async () => {
+      const result = await service.listReports({ page: 3, pageSize: 10 });
+
+      expect(prisma.feedbackReport.findMany.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+      expect(result.body).toMatchObject({ page: 3, pageSize: 10 });
+    });
+
+    test('accepts numeric strings for page and pageSize, as Number() reads them', async () => {
+      const result = await service.listReports({ page: '2', pageSize: '10' });
+
+      expect(result.ok).toBe(true);
+      expect(prisma.feedbackReport.findMany.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ skip: 10, take: 10 }),
+      );
+      expect(result.body).toMatchObject({ page: 2, pageSize: 10 });
+    });
+
+    test('a page past the end returns no items with status 200 and the total still counted', async () => {
+      prisma.feedbackReport.findMany.mockResolvedValue([]);
+      prisma.feedbackReport.count.mockResolvedValue(7);
+
+      const result = await service.listReports({ page: 5 });
+
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({ items: [], total: 7, page: 5 });
+    });
+
+    test('accepts pageSize 100, the ceiling', async () => {
+      const result = await service.listReports({ pageSize: 100 });
+
+      expect(result.ok).toBe(true);
+      expect(prisma.feedbackReport.findMany.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ take: 100 }),
+      );
+    });
+
+    test.each<[ListFilters, string]>([
+      [{ status: 'duplicate' }, 'Invalid report status.'],
+      [{ kind: 'not_a_kind' }, 'Invalid report kind.'],
+      [{ platform: 'mobile' }, 'Invalid report platform.'],
+      [{ platform: 'Web' }, 'Invalid report platform.'],
+      [{ trackingIssueNumber: 0 }, 'Enter the tracking issue number.'],
+      [{ trackingIssueNumber: -1 }, 'Enter the tracking issue number.'],
+      [{ trackingIssueNumber: 'abc' }, 'Enter the tracking issue number.'],
+    ])(
+      'refuses %j with 400 and makes no Prisma call',
+      async (filters, message) => {
+        const result = await service.listReports(filters);
+
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(400);
+        expect(result.body).toEqual({ message });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.feedbackReport.count).not.toHaveBeenCalled();
+        expect(prisma.feedbackReport.findMany).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each<[ListFilters, string]>([
+      [{ page: 0 }, 'The page must be 1 or more.'],
+      [{ page: 1.5 }, 'The page must be 1 or more.'],
+      [{ pageSize: 0 }, 'The page size must be between 1 and 100.'],
+      [{ pageSize: 101 }, 'The page size must be between 1 and 100.'],
+    ])(
+      'refuses paging %j with 400 and makes no Prisma call',
+      async (filters, message) => {
+        const result = await service.listReports(filters);
+
+        expect(result.ok).toBe(false);
+        expect(result.status).toBe(400);
+        expect(result.body).toEqual({ message });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.feedbackReport.findMany).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each(FEEDBACK_REPORT_PLATFORMS)(
+      'accepts platform %s and filters on context_platform',
+      async (platform) => {
+        const result = await service.listReports({ platform });
+
+        expect(result.ok).toBe(true);
+        expect(prisma.feedbackReport.count).toHaveBeenCalledWith({
+          where: { context_platform: platform },
+        });
+      },
+    );
+
+    test('item carries the reporter identity (id, name, email) and keeps reporterUserId', async () => {
       prisma.feedbackReport.findMany.mockResolvedValue([makeDetailRow()]);
 
       const result = await service.listReports({});
@@ -366,7 +457,7 @@ describe('AdminFeedbackService — triage paths', () => {
       });
     });
 
-    test('listReports item for a removed sender (reporter_user_id null) lists reporter: null', async () => {
+    test('item for a removed sender (reporter_user_id null) lists reporter: null', async () => {
       prisma.feedbackReport.findMany.mockResolvedValue([
         makeDetailRow({
           id: 'report-deleted-sender',
@@ -382,24 +473,6 @@ describe('AdminFeedbackService — triage paths', () => {
       expect(body.items[0].id).toBe('report-deleted-sender');
       expect(body.items[0].reporterUserId).toBeNull();
       expect(body.items[0].reporter).toBeNull();
-    });
-
-    test('listReports with absent filters does not include them in where clause', async () => {
-      prisma.feedbackReport.findMany.mockResolvedValue([]);
-
-      await service.listReports({
-        status: 'planned',
-        // kind, platform, trackingIssueNumber absent
-      });
-
-      const findManyCall = prisma.feedbackReport.findMany.mock
-        .calls[0][0] as any;
-      expect(findManyCall.where).toEqual({
-        status: 'planned',
-      });
-      expect(findManyCall.where).not.toHaveProperty('kind');
-      expect(findManyCall.where).not.toHaveProperty('context_platform');
-      expect(findManyCall.where).not.toHaveProperty('tracking_issue_number');
     });
   });
 

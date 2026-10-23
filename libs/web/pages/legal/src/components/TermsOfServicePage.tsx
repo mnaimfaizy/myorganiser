@@ -1,30 +1,39 @@
-import { Button, Card, CardContent } from '@myorganiser/web-ui';
+import { Button } from '@myorganiser/web-ui';
 import Link from 'next/link';
-import { LegalBackLink } from './LegalBackLink';
-import { OperatorContact } from './OperatorContact';
+import { TERMS_OF_SERVICE_SECTIONS } from '../lib/legal-sections';
+import { LegalPageActions } from './LegalPageActions';
+import { LegalPageBody } from './LegalPageBody';
+import { LegalPageFooter } from './LegalPageFooter';
+import { LegalPageHeader } from './LegalPageHeader';
+import { LegalPageHero } from './LegalPageHero';
+import { LegalPageLayout } from './LegalPageLayout';
+import { legalPageSections, OperatorContact } from './OperatorContact';
 import { TermsOfServiceContent } from './TermsOfServiceContent';
 
 export default function TermsOfServicePage() {
+  const { toc, sectionNumbers } = legalPageSections(TERMS_OF_SERVICE_SECTIONS);
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <Card className="w-full max-w-2xl">
-        <CardContent className="pt-6">
-          <LegalBackLink />
-
-          <h1 className="mt-4 text-lg font-semibold">Terms of Service</h1>
-
-          <TermsOfServiceContent operatorContact={<OperatorContact />} />
-
-          <div className="mt-8 flex flex-col gap-3">
-            <Button asChild variant="outline">
-              <Link href="/">Back to Home</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/privacy">Privacy Policy</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <LegalPageLayout>
+      <LegalPageHeader current="terms" />
+      <LegalPageHero title="Terms of Service" illustration="tasks" />
+      <LegalPageBody toc={toc}>
+        <TermsOfServiceContent
+          operatorContact={
+            <OperatorContact variant="page" number={sectionNumbers.contact} />
+          }
+          sectionNumbers={sectionNumbers}
+        />
+        <LegalPageActions>
+          <Button asChild variant="outline">
+            <Link href="/">Back to Home</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/privacy">Privacy Policy</Link>
+          </Button>
+        </LegalPageActions>
+      </LegalPageBody>
+      <LegalPageFooter />
+    </LegalPageLayout>
   );
 }

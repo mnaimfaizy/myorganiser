@@ -1,0 +1,590 @@
+import * as React from 'react';
+import { cn } from '../../utils';
+
+/** Every section illustration the Web v2.0 design ships. */
+export type IllustrationKind =
+  | 'home'
+  | 'tasks'
+  | 'groceries'
+  | 'subscriptions'
+  | 'addresses'
+  | 'mobile'
+  | 'youtube'
+  | 'vault'
+  | 'feedback'
+  | 'admin'
+  | 'users'
+  | 'audit'
+  | 'inbox'
+  | 'more';
+
+/** The sizes the Web v2.0 design uses: tab bar 28, 32, sidebar 36, 48, cards 64, 96, hero 140. */
+export type IllustrationSize = 28 | 32 | 36 | 48 | 64 | 96 | 112 | 140 | 168;
+
+export interface IllustrationProps {
+  kind: IllustrationKind;
+  /** Edge length in pixels; the drawing is square. Defaults to 64. */
+  size?: IllustrationSize;
+  className?: string;
+}
+
+// Each drawing is the SVG children of one 120 × 120 artboard (design of record:
+// docs/design/web-v2/artboards/Illustration.dc.html). The hex fills are artwork
+// palette literals, not UI colour roles, matching AppLogo.tsx.
+
+function HomeDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#EDE9FE" />
+      <circle cx="98" cy="20" r="30" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="97" rx="34" ry="6" fill="#7C3AED" opacity="0.18" />
+      <rect x="34" y="54" width="52" height="40" rx="6" fill="#FFFFFF" />
+      <path d="M70 54 H80 Q86 54 86 60 V88 Q86 94 80 94 H70 Z" fill="#DDD6FE" />
+      <rect x="73" y="34" width="9" height="18" rx="2" fill="#5B21B6" />
+      <path
+        d="M26 59 L56 32 Q60 28 64 32 L94 59 Q97 64 91 64 H29 Q23 64 26 59 Z"
+        fill="#7C3AED"
+      />
+      <path
+        d="M33 58 L57 36 Q60 33 63 36 L67 40 L43 60 H35 Q31 60 33 58 Z"
+        fill="#A78BFA"
+      />
+      <rect x="38" y="69" width="11" height="11" rx="3" fill="#22D3EE" />
+      <rect x="52" y="70" width="16" height="24" rx="5" fill="#0F766E" />
+      <rect x="54" y="72" width="5" height="20" rx="2.5" fill="#14B8A6" />
+      <circle cx="64" cy="83" r="1.8" fill="#FFFFFF" />
+      <path
+        d="M20 26 L22.5 32 L28.5 34.5 L22.5 37 L20 43 L17.5 37 L11.5 34.5 L17.5 32 Z"
+        fill="#7C3AED"
+        opacity="0.45"
+      />
+    </>
+  );
+}
+
+function TasksDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#CCFBF1" />
+      <circle cx="22" cy="20" r="28" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="62" cy="98" rx="30" ry="5" fill="#0F766E" opacity="0.2" />
+      <rect x="39" y="30" width="50" height="66" rx="9" fill="#5EEAD4" />
+      <rect x="34" y="26" width="50" height="66" rx="9" fill="#FFFFFF" />
+      <rect x="46" y="20" width="26" height="13" rx="5" fill="#0F766E" />
+      <rect x="52" y="23" width="14" height="4" rx="2" fill="#5EEAD4" />
+      <circle cx="45" cy="47" r="6" fill="#14B8A6" />
+      <path
+        d="M41.6 47 L44 49.4 L48.4 44.6 L49.8 45.9 L44 52 L40.2 48.3 Z"
+        fill="#FFFFFF"
+      />
+      <rect x="55" y="45" width="22" height="4" rx="2" fill="#99F6E4" />
+      <circle cx="45" cy="62" r="6" fill="#14B8A6" />
+      <path
+        d="M41.6 62 L44 64.4 L48.4 59.6 L49.8 60.9 L44 67 L40.2 63.3 Z"
+        fill="#FFFFFF"
+      />
+      <rect x="55" y="60" width="17" height="4" rx="2" fill="#99F6E4" />
+      <circle cx="45" cy="77" r="6" fill="#99F6E4" />
+      <circle cx="45" cy="77" r="3.8" fill="#FFFFFF" />
+      <rect x="55" y="75" width="20" height="4" rx="2" fill="#E2E8F0" />
+      <circle cx="88" cy="32" r="10" fill="#7C3AED" />
+      <path
+        d="M88 25.5 L89.7 30.3 L94.5 32 L89.7 33.7 L88 38.5 L86.3 33.7 L81.5 32 L86.3 30.3 Z"
+        fill="#FFFFFF"
+      />
+    </>
+  );
+}
+
+function GroceriesDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#DCFCE7" />
+      <circle cx="98" cy="22" r="28" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="98" rx="32" ry="5" fill="#15803D" opacity="0.2" />
+      <path
+        d="M36 60 A24 24 0 0 1 84 60 L79 60 A19 19 0 0 0 41 60 Z"
+        fill="#5B21B6"
+      />
+      <rect
+        x="62"
+        y="24"
+        width="12"
+        height="40"
+        rx="6"
+        fill="#F59E0B"
+        transform="rotate(22 68 44)"
+      />
+      <rect
+        x="65"
+        y="30"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#FCD34D"
+        transform="rotate(22 68 44)"
+      />
+      <rect
+        x="65"
+        y="38"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#FCD34D"
+        transform="rotate(22 68 44)"
+      />
+      <ellipse cx="80" cy="50" rx="9" ry="12" fill="#22C55E" />
+      <ellipse cx="77" cy="46" rx="3" ry="5" fill="#86EFAC" />
+      <circle cx="46" cy="49" r="12" fill="#F97316" />
+      <circle cx="42" cy="45" r="4" fill="#FDBA74" />
+      <ellipse
+        cx="50"
+        cy="35"
+        rx="5.5"
+        ry="2.6"
+        fill="#15803D"
+        transform="rotate(-30 50 35)"
+      />
+      <path
+        d="M28 59 H92 Q95 59 94.3 62 L87 90 Q86 95 81 95 H39 Q34 95 33 90 L25.7 62 Q25 59 28 59 Z"
+        fill="#7C3AED"
+      />
+      <path d="M75 63 H93.5 L87 90 Q86 95 81 95 H71 Z" fill="#6D28D9" />
+      <rect x="23" y="55" width="74" height="10" rx="5" fill="#8B5CF6" />
+      <rect x="36" y="73" width="48" height="3.5" rx="1.75" fill="#A78BFA" />
+      <rect x="38" y="83" width="44" height="3.5" rx="1.75" fill="#A78BFA" />
+    </>
+  );
+}
+
+function SubscriptionsDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#E0E7FF" />
+      <circle cx="22" cy="98" r="28" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="95" rx="32" ry="5" fill="#3730A3" opacity="0.2" />
+      <rect
+        x="26"
+        y="34"
+        width="60"
+        height="38"
+        rx="8"
+        fill="#A5B4FC"
+        transform="rotate(-10 56 53)"
+      />
+      <rect x="30" y="44" width="62" height="40" rx="8" fill="#4F46E5" />
+      <rect x="30" y="52" width="62" height="7" fill="#3730A3" />
+      <rect x="38" y="66" width="12" height="9" rx="2" fill="#FBBF24" />
+      <rect x="56" y="69" width="26" height="3" rx="1.5" fill="#A5B4FC" />
+      <path
+        d="M38 44 H58 L45 84 H38 Q30 84 30 76 V52 Q30 44 38 44 Z"
+        fill="#FFFFFF"
+        opacity="0.12"
+      />
+      <circle cx="88" cy="84" r="15" fill="#FFFFFF" />
+      <circle cx="88" cy="84" r="8.5" fill="#0F766E" />
+      <circle cx="88" cy="84" r="5.5" fill="#FFFFFF" />
+      <rect x="88" y="74" width="7" height="6" fill="#FFFFFF" />
+      <path d="M86 72.5 L92.5 75.8 L86 79.1 Z" fill="#0F766E" />
+    </>
+  );
+}
+
+function AddressesDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#FFE4E6" />
+      <circle cx="22" cy="22" r="28" fill="#FFFFFF" opacity="0.55" />
+      <path d="M18 74 L41 67 V94 L18 101 Z" fill="#FFFFFF" />
+      <path d="M41 67 L68 74 V101 L41 94 Z" fill="#FECDD3" />
+      <path d="M68 74 L95 67 V94 L68 101 Z" fill="#FFFFFF" />
+      <rect
+        x="24"
+        y="86"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#0F766E"
+        transform="rotate(-16 27.5 87.5)"
+      />
+      <rect
+        x="34"
+        y="83"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#0F766E"
+        transform="rotate(-16 37.5 84.5)"
+      />
+      <rect
+        x="74"
+        y="85"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#0F766E"
+        transform="rotate(-16 77.5 86.5)"
+      />
+      <rect
+        x="84"
+        y="82"
+        width="7"
+        height="3"
+        rx="1.5"
+        fill="#0F766E"
+        transform="rotate(-16 87.5 83.5)"
+      />
+      <ellipse cx="60" cy="84" rx="11" ry="3.5" fill="#9F1239" opacity="0.25" />
+      <path
+        d="M60 20 C47 20 38 29 38 41 C38 56 60 80 60 80 C60 80 82 56 82 41 C82 29 73 20 60 20 Z"
+        fill="#F43F5E"
+      />
+      <path d="M60 20 C73 20 82 29 82 41 C82 56 60 80 60 80 Z" fill="#E11D48" />
+      <circle cx="60" cy="41" r="9.5" fill="#FFFFFF" />
+      <circle cx="60" cy="41" r="4.5" fill="#7C3AED" />
+      <ellipse
+        cx="49"
+        cy="31"
+        rx="5"
+        ry="3"
+        fill="#FFFFFF"
+        opacity="0.45"
+        transform="rotate(-35 49 31)"
+      />
+    </>
+  );
+}
+
+function MobileDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#CFFAFE" />
+      <circle cx="98" cy="98" r="28" fill="#FFFFFF" opacity="0.5" />
+      <ellipse cx="55" cy="99" rx="24" ry="4" fill="#0E7490" opacity="0.22" />
+      <rect x="38" y="24" width="38" height="72" rx="10" fill="#1D283A" />
+      <rect x="34" y="22" width="38" height="72" rx="10" fill="#0F172A" />
+      <rect x="38" y="30" width="30" height="57" rx="5" fill="#06B6D4" />
+      <path d="M38 35 Q38 30 43 30 H57 L38 62 Z" fill="#22D3EE" />
+      <rect x="48" y="25" width="10" height="2.5" rx="1.25" fill="#334155" />
+      <circle cx="53" cy="49" r="6" fill="#FFFFFF" />
+      <path d="M43 67 Q53 55 63 67 V69 H43 Z" fill="#FFFFFF" />
+      <rect x="62" y="32" width="36" height="23" rx="9" fill="#FFFFFF" />
+      <path d="M69 53 L66 62 L77 55 Z" fill="#FFFFFF" />
+      <circle cx="71" cy="43.5" r="2.6" fill="#7C3AED" />
+      <circle cx="80" cy="43.5" r="2.6" fill="#7C3AED" />
+      <circle cx="89" cy="43.5" r="2.6" fill="#7C3AED" />
+    </>
+  );
+}
+
+function YoutubeDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#FFEDD5" />
+      <circle cx="98" cy="22" r="26" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="98" rx="26" ry="4" fill="#C2410C" opacity="0.2" />
+      <rect x="54" y="80" width="12" height="10" fill="#334155" />
+      <rect x="44" y="88" width="32" height="6" rx="3" fill="#1D283A" />
+      <rect x="22" y="30" width="76" height="52" rx="10" fill="#0F172A" />
+      <rect x="27" y="35" width="66" height="42" rx="6" fill="#1D283A" />
+      <path
+        d="M27 41 Q27 35 33 35 H52 L37 77 H33 Q27 77 27 71 Z"
+        fill="#FFFFFF"
+        opacity="0.07"
+      />
+      <circle cx="60" cy="54" r="13" fill="#F97316" />
+      <path d="M56 47.5 L67.5 54 L56 60.5 Z" fill="#FFFFFF" />
+      <rect x="33" y="70" width="54" height="3" rx="1.5" fill="#334155" />
+      <rect x="33" y="70" width="22" height="3" rx="1.5" fill="#F97316" />
+    </>
+  );
+}
+
+function VaultDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#1E1B4B" />
+      <circle cx="60" cy="58" r="42" fill="#7C3AED" opacity="0.28" />
+      <circle cx="98" cy="18" r="24" fill="#312E81" />
+      <ellipse cx="60" cy="98" rx="30" ry="4" fill="#000000" opacity="0.35" />
+      <rect x="34" y="30" width="56" height="60" rx="11" fill="#5B21B6" />
+      <rect x="30" y="26" width="56" height="60" rx="11" fill="#8B5CF6" />
+      <rect x="36" y="32" width="44" height="48" rx="8" fill="#6D28D9" />
+      <circle cx="57" cy="56" r="12" fill="#EDE9FE" />
+      <circle cx="57" cy="56" r="7" fill="#C4B5FD" />
+      <rect x="56" y="45" width="2" height="6" rx="1" fill="#6D28D9" />
+      <rect x="72" y="48" width="4" height="16" rx="2" fill="#EDE9FE" />
+      <rect x="36" y="86" width="9" height="5" rx="2" fill="#4C1D95" />
+      <rect x="71" y="86" width="9" height="5" rx="2" fill="#4C1D95" />
+      <path
+        d="M41 26 H60 L44 86 H41 Q30 86 30 75 V37 Q30 26 41 26 Z"
+        fill="#FFFFFF"
+        opacity="0.1"
+      />
+      <path
+        d="M91 64 L102 68.5 V77 C102 84.5 97 89 91 91.5 C85 89 80 84.5 80 77 V68.5 Z"
+        fill="#14B8A6"
+      />
+      <path
+        d="M86 77.5 L89.5 81 L95.6 74.4 L97.2 75.9 L89.5 84.2 L84.4 79.1 Z"
+        fill="#FFFFFF"
+      />
+    </>
+  );
+}
+
+function FeedbackDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#F5F3FF" />
+      <circle cx="96" cy="24" r="26" fill="#FFFFFF" opacity="0.6" />
+      <ellipse cx="58" cy="100" rx="30" ry="4" fill="#0F172A" opacity="0.16" />
+      <path
+        d="M60 30 H96 C102 30 106 34 106 40 V62 C106 68 102 72 96 72 H90 L92 84 L78 72 H60 C54 72 50 68 50 62 V40 C50 34 54 30 60 30 Z"
+        fill="#14B8A6"
+      />
+      <rect
+        x="60"
+        y="42"
+        width="34"
+        height="5"
+        rx="2.5"
+        fill="#FFFFFF"
+        opacity="0.85"
+      />
+      <rect
+        x="60"
+        y="54"
+        width="24"
+        height="5"
+        rx="2.5"
+        fill="#FFFFFF"
+        opacity="0.6"
+      />
+      <path
+        d="M24 44 H68 C74 44 78 48 78 54 V80 C78 86 74 90 68 90 H44 L28 102 L31 90 H24 C18 90 14 86 14 80 V54 C14 48 18 44 24 44 Z"
+        fill="#7C3AED"
+      />
+      <path
+        d="M46 59 C42 54 34 56 34 62 C34 68 41 72 46 77 C51 72 58 68 58 62 C58 56 50 54 46 59 Z"
+        fill="#FFFFFF"
+      />
+      <ellipse cx="22" cy="52" rx="5" ry="3" fill="#FFFFFF" opacity="0.35" />
+      <circle cx="98" cy="92" r="9" fill="#F97316" />
+      <rect x="96.6" y="86" width="2.8" height="8" rx="1.4" fill="#FFFFFF" />
+      <circle cx="98" cy="97.5" r="1.6" fill="#FFFFFF" />
+    </>
+  );
+}
+
+function AdminDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#E2E8F0" />
+      <circle cx="98" cy="22" r="28" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="98" rx="32" ry="5" fill="#0F172A" opacity="0.18" />
+      <rect x="52" y="82" width="12" height="8" fill="#334155" />
+      <rect x="42" y="88" width="32" height="6" rx="3" fill="#1D283A" />
+      <rect x="26" y="30" width="72" height="56" rx="10" fill="#1D283A" />
+      <rect x="22" y="26" width="72" height="56" rx="10" fill="#0F172A" />
+      <rect x="32" y="34" width="30" height="4" rx="2" fill="#334155" />
+      <rect x="32" y="56" width="8" height="18" rx="2" fill="#7C3AED" />
+      <rect x="44" y="46" width="8" height="28" rx="2" fill="#14B8A6" />
+      <rect x="56" y="52" width="8" height="22" rx="2" fill="#22D3EE" />
+      <rect x="68" y="40" width="8" height="34" rx="2" fill="#A78BFA" />
+      <path
+        d="M22 36 Q22 26 32 26 H50 L30 82 Q22 82 22 74 Z"
+        fill="#FFFFFF"
+        opacity="0.06"
+      />
+      <path
+        d="M91 64 L102 68.5 V77 C102 84.5 97 89 91 91.5 C85 89 80 84.5 80 77 V68.5 Z"
+        fill="#7C3AED"
+      />
+      <path
+        d="M86 77.5 L89.5 81 L95.6 74.4 L97.2 75.9 L89.5 84.2 L84.4 79.1 Z"
+        fill="#FFFFFF"
+      />
+    </>
+  );
+}
+
+function UsersDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#E2E8F0" />
+      <circle cx="22" cy="22" r="28" fill="#FFFFFF" opacity="0.55" />
+      <ellipse cx="60" cy="98" rx="34" ry="5" fill="#0F172A" opacity="0.18" />
+      <path d="M56 94 C56 75 64 64 77 64 C90 64 98 75 98 94 Z" fill="#0F766E" />
+      <circle cx="77" cy="45" r="11" fill="#14B8A6" />
+      <path d="M24 96 C24 77 35 66 50 66 C65 66 76 77 76 96 Z" fill="#7C3AED" />
+      <path d="M50 66 C65 66 76 77 76 96 H58 Z" fill="#6D28D9" />
+      <circle cx="50" cy="48" r="13" fill="#A78BFA" />
+      <ellipse cx="45" cy="43" rx="4" ry="2.5" fill="#FFFFFF" opacity="0.45" />
+      <circle cx="94" cy="30" r="10" fill="#0F172A" />
+      <path
+        d="M89.6 30.2 L92.8 33.4 L98.4 27.4 L99.9 28.8 L92.8 36.3 L88.1 31.6 Z"
+        fill="#FFFFFF"
+      />
+    </>
+  );
+}
+
+function AuditDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#E2E8F0" />
+      <circle cx="98" cy="98" r="28" fill="#FFFFFF" opacity="0.5" />
+      <ellipse cx="56" cy="99" rx="28" ry="4" fill="#0F172A" opacity="0.18" />
+      <rect x="34" y="24" width="48" height="68" rx="8" fill="#CBD5E1" />
+      <rect x="30" y="20" width="48" height="68" rx="8" fill="#FFFFFF" />
+      <rect x="38" y="30" width="30" height="5" rx="2.5" fill="#0F172A" />
+      <circle cx="41" cy="46" r="3.2" fill="#7C3AED" />
+      <rect x="48" y="44" width="22" height="4" rx="2" fill="#CBD5E1" />
+      <circle cx="41" cy="58" r="3.2" fill="#14B8A6" />
+      <rect x="48" y="56" width="18" height="4" rx="2" fill="#CBD5E1" />
+      <circle cx="41" cy="70" r="3.2" fill="#F97316" />
+      <rect x="48" y="68" width="14" height="4" rx="2" fill="#CBD5E1" />
+      <rect
+        x="87"
+        y="82"
+        width="7"
+        height="20"
+        rx="3.5"
+        fill="#0F172A"
+        transform="rotate(-45 90.5 92)"
+      />
+      <circle cx="80" cy="74" r="15" fill="#0F172A" />
+      <circle cx="80" cy="74" r="10.5" fill="#CFFAFE" />
+      <ellipse cx="76" cy="70" rx="3.5" ry="2.2" fill="#FFFFFF" opacity="0.8" />
+    </>
+  );
+}
+
+function InboxDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#E2E8F0" />
+      <circle cx="24" cy="98" r="28" fill="#FFFFFF" opacity="0.5" />
+      <ellipse cx="60" cy="100" rx="34" ry="4" fill="#0F172A" opacity="0.18" />
+      <rect x="40" y="18" width="40" height="30" rx="8" fill="#14B8A6" />
+      <rect
+        x="47"
+        y="26"
+        width="24"
+        height="4"
+        rx="2"
+        fill="#FFFFFF"
+        opacity="0.85"
+      />
+      <rect
+        x="47"
+        y="35"
+        width="16"
+        height="4"
+        rx="2"
+        fill="#FFFFFF"
+        opacity="0.6"
+      />
+      <rect x="32" y="34" width="44" height="30" rx="8" fill="#7C3AED" />
+      <rect
+        x="39"
+        y="42"
+        width="28"
+        height="4"
+        rx="2"
+        fill="#FFFFFF"
+        opacity="0.85"
+      />
+      <rect
+        x="39"
+        y="51"
+        width="18"
+        height="4"
+        rx="2"
+        fill="#FFFFFF"
+        opacity="0.6"
+      />
+      <path
+        d="M20 62 H42 L48 72 H72 L78 62 H100 V88 C100 93 96 96 91 96 H29 C24 96 20 93 20 88 Z"
+        fill="#0F172A"
+      />
+      <path
+        d="M20 62 H42 L48 72 H72 L78 62 H100 V66 H80 L74 76 H46 L40 66 H20 Z"
+        fill="#334155"
+      />
+      <circle cx="94" cy="30" r="10" fill="#F97316" />
+      <rect x="92.6" y="24" width="2.8" height="8" rx="1.4" fill="#FFFFFF" />
+      <circle cx="94" cy="35.5" r="1.6" fill="#FFFFFF" />
+    </>
+  );
+}
+
+function MoreDrawing() {
+  return (
+    <>
+      <rect width="120" height="120" rx="30" fill="#F1F5F9" />
+      <rect x="30" y="30" width="26" height="26" rx="8" fill="#7C3AED" />
+      <rect x="64" y="30" width="26" height="26" rx="8" fill="#14B8A6" />
+      <rect x="30" y="64" width="26" height="26" rx="8" fill="#F97316" />
+      <rect x="64" y="64" width="26" height="26" rx="8" fill="#06B6D4" />
+    </>
+  );
+}
+
+type IllustrationDrawing = () => React.ReactElement;
+
+/**
+ * One drawing per kind. Adding a kind to `IllustrationKind` fails to compile
+ * until it has a drawing here, so the registry cannot drift from the union.
+ */
+const DRAWINGS = {
+  home: HomeDrawing,
+  tasks: TasksDrawing,
+  groceries: GroceriesDrawing,
+  subscriptions: SubscriptionsDrawing,
+  addresses: AddressesDrawing,
+  mobile: MobileDrawing,
+  youtube: YoutubeDrawing,
+  vault: VaultDrawing,
+  feedback: FeedbackDrawing,
+  admin: AdminDrawing,
+  users: UsersDrawing,
+  audit: AuditDrawing,
+  inbox: InboxDrawing,
+  more: MoreDrawing,
+} as const satisfies Record<IllustrationKind, IllustrationDrawing>;
+
+/** Every illustration kind, in registry order. Derived from DRAWINGS so it cannot drift. */
+export const ILLUSTRATION_KINDS = Object.keys(
+  DRAWINGS,
+) as readonly IllustrationKind[];
+
+/** Every size the Web v2.0 design uses. */
+export const ILLUSTRATION_SIZES = [
+  28, 32, 36, 48, 64, 96, 112, 140, 168,
+] as const satisfies readonly IllustrationSize[];
+
+/**
+ * Decorative section illustration. Hidden from assistive technology: the text
+ * beside it carries the meaning, so the SVG has no title and no role.
+ */
+export const Illustration = React.forwardRef<SVGSVGElement, IllustrationProps>(
+  ({ kind, size = 64, className }, ref) => {
+    const Drawing = DRAWINGS[kind];
+    return (
+      <svg
+        ref={ref}
+        width={size}
+        height={size}
+        viewBox="0 0 120 120"
+        aria-hidden="true"
+        focusable="false"
+        className={cn('block shrink-0', className)}
+      >
+        <Drawing />
+      </svg>
+    );
+  },
+);
+Illustration.displayName = 'Illustration';

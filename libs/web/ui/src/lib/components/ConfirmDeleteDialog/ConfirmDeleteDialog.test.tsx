@@ -234,9 +234,7 @@ describe('ConfirmDeleteDialog', () => {
     });
 
     // Find the dialog content element
-    const dialogContent = screen
-      .getByText('Delete?')
-      .closest('[role="dialog"]');
+    const dialogContent = screen.getByRole('alertdialog');
     expect(dialogContent).toBeInTheDocument();
 
     // Send Escape key while pending
@@ -267,9 +265,7 @@ describe('ConfirmDeleteDialog', () => {
       />,
     );
 
-    const dialogContent = screen
-      .getByText('Delete?')
-      .closest('[role="dialog"]');
+    const dialogContent = screen.getByRole('alertdialog');
     expect(dialogContent).toBeInTheDocument();
 
     // Send Escape key while not pending

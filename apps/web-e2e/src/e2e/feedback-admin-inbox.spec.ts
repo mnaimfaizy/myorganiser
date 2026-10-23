@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gotoStable, routeApi } from './helpers';
+import { stubAdminAuditLogs, stubAdminOverview } from './helpers/adminOverview';
 
 /**
  * Feedback inbox access control — admin vs. normal user (issue #1213).
@@ -100,6 +101,9 @@ async function stubAdminFeedbackReports(page: Page) {
               createdAt: new Date().toISOString(),
             },
           ],
+          total: 1,
+          page: 1,
+          pageSize: 100,
         }),
       });
       return;
@@ -136,16 +140,20 @@ test.describe('Feedback inbox access', () => {
     await seedSession(page, PLATFORM_ADMIN);
     await stubAuthRefresh(page, PLATFORM_ADMIN);
     await stubAdminFeedbackReports(page);
+    await stubAdminOverview(page);
+    await stubAdminAuditLogs(page);
 
     await gotoStable(page, '/admin');
 
-    // AdminGuard redirects to /admin/users on initial load
-    await expect(page).toHaveURL(/.*\/admin\/users(?:\/|$|\?)/, {
-      timeout: 60000,
-    });
+    // /admin renders the Overview; AdminGuard lets a platform admin through
+    await expect(page).toHaveURL(/\/admin\/?(\?.*)?$/, { timeout: 60000 });
 
-    // Click the Feedback nav link
-    await page.getByRole('link', { name: 'Feedback' }).click();
+    // Click the Feedback nav link in the admin sidebar (the phone tab bar
+    // carries the same name but is display:none at this viewport)
+    await page
+      .getByRole('navigation', { name: 'Admin sections' })
+      .getByRole('link', { name: /^Feedback/ })
+      .click();
 
     // Assert navigation to /admin/feedback
     await expect(page).toHaveURL(/.*\/admin\/feedback(?:\/|$|\?)/, {

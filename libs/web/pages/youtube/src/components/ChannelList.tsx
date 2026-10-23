@@ -9,14 +9,9 @@ interface ChannelListProps {
   selectedChannelId: string | null;
   /** Id of the detail pane these tabs swap, for `aria-controls`. */
   panelId: string;
-  desktopRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
-  mobileRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
+  channelRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
   onSelect: (channelId: string) => void;
-  onKeyDown: (
-    e: KeyboardEvent<HTMLButtonElement>,
-    index: number,
-    layoutType: 'desktop' | 'mobile',
-  ) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLButtonElement>, index: number) => void;
 }
 
 /**
@@ -29,127 +24,62 @@ interface ChannelListProps {
  * locked prototype predates #261 and has no arrow keys at all, so it is not
  * authority against this.
  *
- * Both layouts are in the DOM at once and hidden by CSS, so every id is
- * per-layout. `aria-orientation` states the axis the arrow keys follow, which
- * is vertical for the desktop rail and horizontal for the mobile chips.
+ * One horizontal chip row on every width. It scrolls inside itself rather than
+ * wrapping, so a long channel list never pushes the page wider than the screen.
  */
 export function ChannelList({
   channels,
   selectedChannelId,
   panelId,
-  desktopRefs,
-  mobileRefs,
+  channelRefs,
   onSelect,
   onKeyDown,
 }: ChannelListProps) {
   return (
-    <>
-      {/* Desktop: Aside channel list */}
-      <aside className="hidden lg:flex w-48 shrink-0 flex-col gap-2">
-        <h2 className="text-sm font-semibold text-foreground">Channels</h2>
-        <div
-          role="tablist"
-          aria-label="Enabled channels"
-          aria-orientation="vertical"
-          className="space-y-1 overflow-y-auto max-h-96"
-        >
-          {channels.map((channel, index) => {
-            const isSelected = channel.channelId === selectedChannelId;
-            const newCount = channel.videos.filter((v) => !v.watched).length;
-            return (
-              <button
-                key={channel.channelId}
-                ref={(el) => {
-                  desktopRefs.current[index] = el;
-                }}
-                id={`channel-tab-desktop-${channel.channelId}`}
-                role="tab"
-                type="button"
-                tabIndex={isSelected ? 0 : -1}
-                onKeyDown={(e) => onKeyDown(e, index, 'desktop')}
-                onClick={() => onSelect(channel.channelId)}
-                aria-selected={isSelected}
-                aria-controls={panelId}
-                className={cn(
-                  'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
-                  isSelected
-                    ? 'bg-brand/10 text-brand'
-                    : 'text-muted-foreground hover:bg-muted',
-                )}
-              >
-                {channel.channelThumbnail ? (
-                  <img
-                    src={channel.channelThumbnail}
-                    alt=""
-                    className="h-6 w-6 rounded-full shrink-0"
-                  />
-                ) : (
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold shrink-0">
-                    {channel.channelTitle.charAt(0)}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{channel.channelTitle}</p>
-                  <p className="truncate text-xs opacity-75">
-                    {channel.videos.length} upload
-                    {channel.videos.length !== 1 ? 's' : ''}
-                    {newCount > 0 && ` · ${newCount} New`}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-
-      {/* Mobile: Channel chips */}
-      <div className="lg:hidden">
-        <div
-          role="tablist"
-          aria-label="Enabled channels"
-          aria-orientation="horizontal"
-          className="flex gap-2 overflow-x-auto pb-2 flex-wrap"
-        >
-          {channels.map((channel, index) => {
-            const isSelected = channel.channelId === selectedChannelId;
-            const uploadCount = channel.videos.length;
-            const newCount = channel.videos.filter((v) => !v.watched).length;
-            return (
-              <button
-                key={channel.channelId}
-                ref={(el) => {
-                  mobileRefs.current[index] = el;
-                }}
-                id={`channel-tab-mobile-${channel.channelId}`}
-                role="tab"
-                type="button"
-                tabIndex={isSelected ? 0 : -1}
-                onKeyDown={(e) => onKeyDown(e, index, 'mobile')}
-                onClick={() => onSelect(channel.channelId)}
-                aria-selected={isSelected}
-                aria-controls={panelId}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors',
-                  isSelected
-                    ? 'bg-brand text-brand-foreground'
-                    : 'bg-muted text-foreground hover:bg-muted',
-                )}
-              >
-                {channel.channelTitle}
-                <span className="ml-1.5 text-xs opacity-70">{uploadCount}</span>
-                {newCount > 0 && (
-                  <span
-                    className="ml-1 font-bold"
-                    aria-label={`${newCount} new`}
-                  >
-                    {newCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </>
+    <div
+      role="tablist"
+      aria-label="Enabled channels"
+      aria-orientation="horizontal"
+      className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1"
+    >
+      {channels.map((channel, index) => {
+        const isSelected = channel.channelId === selectedChannelId;
+        const newCount = channel.videos.filter((v) => !v.watched).length;
+        return (
+          <button
+            key={channel.channelId}
+            ref={(el) => {
+              channelRefs.current[index] = el;
+            }}
+            id={`channel-tab-${channel.channelId}`}
+            role="tab"
+            type="button"
+            tabIndex={isSelected ? 0 : -1}
+            onKeyDown={(e) => onKeyDown(e, index)}
+            onClick={() => onSelect(channel.channelId)}
+            aria-selected={isSelected}
+            aria-controls={panelId}
+            aria-label={
+              newCount > 0
+                ? `${channel.channelTitle}, ${newCount} new`
+                : undefined
+            }
+            className={cn(
+              'flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-body-sm font-medium transition-colors motion-reduce:transition-none',
+              isSelected
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-control-edge bg-raised-surface text-foreground hover:bg-ghost-hover',
+            )}
+          >
+            {channel.channelTitle}
+            {newCount > 0 && (
+              <span aria-hidden="true" className="tabular-nums text-caption">
+                · {newCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }

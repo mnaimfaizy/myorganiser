@@ -51,16 +51,11 @@ async function createTripViaUI(
   page: import('@playwright/test').Page,
   tripName: string,
 ) {
-  const newTrip = page.getByRole('button', { name: 'New trip' });
-  const createFirst = page.getByRole('button', {
-    name: 'Create Your First List',
-  });
-  await expect(newTrip.or(createFirst).first()).toBeVisible({ timeout: 30000 });
-  if (await newTrip.isVisible().catch(() => false)) {
-    await newTrip.click();
-  } else {
-    await createFirst.click();
-  }
+  const newList = page
+    .getByRole('button', { name: 'New list', exact: true })
+    .first();
+  await expect(newList).toBeVisible({ timeout: 30000 });
+  await newList.click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 30000 });
@@ -341,9 +336,11 @@ test.describe('Groceries Vault Sync Convergence (E2E)', () => {
     await unlockWithPassphrase(page1, passphrase);
 
     await expect(
-      page1.getByRole('heading', { name: 'Active trips' }),
+      page1.getByRole('heading', { level: 1, name: 'Groceries' }),
     ).toBeVisible({ timeout: 30000 });
-    await expect(page1.getByRole('button', { name: 'New trip' })).toBeVisible({
+    await expect(
+      page1.getByRole('button', { name: 'New list', exact: true }).first(),
+    ).toBeVisible({
       timeout: 30000,
     });
 

@@ -21,9 +21,11 @@ import adminFeedbackService, {
 } from '../services/AdminFeedbackService';
 import {
   FeedbackReportKind,
+  FeedbackReportPlatform,
   FeedbackReportStatus,
 } from '../services/feedbackReportConstants';
 import { ErrorResponse } from './ErrorResponse';
+import { ValidateErrorJSON } from '../interfaces';
 import { VersionFloorRefusal } from '../types';
 
 /**
@@ -60,10 +62,17 @@ export interface ReopenFeedbackReportRequest {
 }
 
 /**
- * Response body for list feedback reports endpoint.
+ * Response body for the admin feedback report list: one page of reports, and
+ * the total that matches the filters ignoring paging.
  */
-interface ListAdminFeedbackReportsResponse {
+export interface AdminFeedbackReportListResponse {
   items: AdminFeedbackReportListItemDto[];
+  /** Count matching the filters, ignoring paging. */
+  total: number;
+  /** Echoed effective 1-based page. */
+  page: number;
+  /** Echoed effective page size. */
+  pageSize: number;
 }
 
 @Tags('Platform Admin')
@@ -73,18 +82,32 @@ interface ListAdminFeedbackReportsResponse {
 export class AdminFeedbackController extends PlatformAdminControllerBase {
   /**
    * List Feedback Reports with optional filters (status, kind, platform,
-   * trackingIssueNumber, limit). Newest first. Platform Admin only.
+   * trackingIssueNumber), newest first, one page at a time. Platform Admin only.
+   * @param status Reports in this Report Status.
+   * @param kind Reports of this kind.
+   * @param platform Reports sent from this app: `web`, `ios` or `android`.
+   * @param trackingIssueNumber Reports linked to this GitHub issue number.
+   * @param page 1-based page number. Defaults to 1.
+   * @param pageSize Reports per page, 1 to 100. Defaults to 25.
+   * @isInt trackingIssueNumber
+   * @minimum trackingIssueNumber 1
+   * @isInt page
+   * @minimum page 1
+   * @isInt pageSize
+   * @minimum pageSize 1
+   * @maximum pageSize 100
    */
   @Get()
-  @Response<ErrorResponse>(400, 'Invalid filter')
+  @Response<ValidateErrorJSON>(422, 'Validation Failed')
   async listFeedbackReports(
     @Request() req: ExRequest,
     @Query() status?: FeedbackReportStatus,
     @Query() kind?: FeedbackReportKind,
-    @Query() platform?: string,
+    @Query() platform?: FeedbackReportPlatform,
     @Query() trackingIssueNumber?: number,
-    @Query() limit?: number,
-  ): Promise<ListAdminFeedbackReportsResponse> {
+    @Query() page?: number,
+    @Query() pageSize?: number,
+  ): Promise<AdminFeedbackReportListResponse> {
     this.assertPlatformAdmin(req);
 
     const result = await adminFeedbackService.listReports({
@@ -92,11 +115,12 @@ export class AdminFeedbackController extends PlatformAdminControllerBase {
       kind,
       platform,
       trackingIssueNumber,
-      limit,
+      page,
+      pageSize,
     });
 
     this.setStatus(result.status);
-    return result.body as ListAdminFeedbackReportsResponse;
+    return result.body as AdminFeedbackReportListResponse;
   }
 
   /**

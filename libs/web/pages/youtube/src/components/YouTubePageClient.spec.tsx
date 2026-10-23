@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import '@testing-library/jest-dom';
 
@@ -28,6 +28,14 @@ jest.mock('lucide-react', () => ({
   ExternalLink: (props: Record<string, unknown>) => <svg {...props} />,
   ListPlus: (props: Record<string, unknown>) => <svg {...props} />,
   X: (props: Record<string, unknown>) => <svg {...props} />,
+  // Icons rendered by the Videos page header, Queue rail and first look.
+  AlertCircle: (props: Record<string, unknown>) => <svg {...props} />,
+  Check: (props: Record<string, unknown>) => <svg {...props} />,
+  ChevronDown: (props: Record<string, unknown>) => <svg {...props} />,
+  ChevronUp: (props: Record<string, unknown>) => <svg {...props} />,
+  Play: (props: Record<string, unknown>) => <svg {...props} />,
+  Plus: (props: Record<string, unknown>) => <svg {...props} />,
+  Trash2: (props: Record<string, unknown>) => <svg {...props} />,
 }));
 
 // Mock UI components
@@ -77,6 +85,9 @@ jest.mock('@myorganiser/web-ui', () => ({
         </button>
       </div>
     ) : null,
+  Illustration: ({ kind }: any) => (
+    <svg data-testid="illustration" data-kind={kind} />
+  ),
   Input: (props: any) => <input {...props} />,
   Label: ({ children, htmlFor }: any) => (
     <label htmlFor={htmlFor}>{children}</label>
@@ -84,6 +95,7 @@ jest.mock('@myorganiser/web-ui', () => ({
   Skeleton: ({ className }: any) => (
     <div className={className} data-testid="skeleton" />
   ),
+  useIsMobileState: () => mockUseIsMobileState(),
 }));
 
 // Mock hooks
@@ -95,6 +107,7 @@ const mockUseYouTubeCarousel = jest.fn();
 const mockUseYouTubeSyncStatus = jest.fn();
 const mockUseVideoQueue = jest.fn();
 const mockUseChannelUploads = jest.fn();
+const mockUseIsMobileState = jest.fn();
 
 jest.mock('../hooks', () => {
   class YouTubeRequestError extends Error {
@@ -169,6 +182,7 @@ describe('YouTubePageClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
+    mockUseIsMobileState.mockReturnValue(false);
     mockUseYouTubeAvailability.mockReturnValue({
       available: true,
       loading: false,
@@ -1168,7 +1182,7 @@ describe('YouTubePageClient', () => {
       ).toBeInTheDocument();
     });
 
-    it('should show unavailable on availability error', () => {
+    it('shows the unreachable notice with Try again when the availability check errored', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
         loading: false,
@@ -1179,9 +1193,17 @@ describe('YouTubePageClient', () => {
 
       expect(
         screen.getByRole('heading', {
-          name: /YouTube is not available right now/i,
+          name: "YouTube can't be reached right now",
         }),
       ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Try again' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', {
+          name: /YouTube is not available right now/i,
+        }),
+      ).not.toBeInTheDocument();
     });
 
     it('should show unavailable when available is null and not loading', () => {
@@ -1285,5 +1307,295 @@ describe('YouTubePageClient', () => {
         ].forEach((hook) => expect(hook).not.toHaveBeenCalled());
       },
     );
+  });
+
+  describe('page header and subtitle', () => {
+    const oneChannel = (videos: Array<{ watched: boolean }>) => [
+      {
+        channelId: 'ch-1',
+        channelTitle: 'Channel 1',
+        channelThumbnail: null,
+        videos: videos.map((v, i) => ({
+          id: `row-${i}`,
+          videoId: `v-${i}`,
+          channelId: 'ch-1',
+          title: `Upload ${i}`,
+          thumbnail: null,
+          publishedAt: '2026-01-01T00:00:00Z',
+          channelTitle: 'Channel 1',
+          watched: v.watched,
+        })),
+      },
+    ];
+
+    beforeEach(() => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+    });
+
+    it('names the page with one h1 "YouTube"', () => {
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'YouTube' }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+
+    it('states the sync line, channel count and new upload count in the subtitle', () => {
+      mockUseYouTubeCarousel.mockReturnValue({
+        ...defaultCarousel,
+        channels: oneChannel([{ watched: false }, { watched: false }]),
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByText('Checking sync status… · 1 channel · 2 new uploads'),
+      ).toBeInTheDocument();
+    });
+
+    it('uses the singular forms for one channel and one new upload', () => {
+      mockUseYouTubeCarousel.mockReturnValue({
+        ...defaultCarousel,
+        channels: oneChannel([{ watched: false }]),
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByText('Checking sync status… · 1 channel · 1 new upload'),
+      ).toBeInTheDocument();
+    });
+
+    it('omits the new-uploads part of the subtitle when nothing is new', () => {
+      mockUseYouTubeCarousel.mockReturnValue({
+        ...defaultCarousel,
+        channels: oneChannel([{ watched: true }]),
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByText('Checking sync status… · 1 channel'),
+      ).toBeInTheDocument();
+    });
+
+    it('shows the failed sync state and announces it politely', () => {
+      mockUseYouTubeSyncStatus.mockReturnValue({
+        status: statusOf({ status: 'failed', lastSyncError: null }),
+        loading: false,
+        triggerUploadSync: jest.fn(),
+        isCooldownActive: false,
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(screen.getByText('Last sync failed')).toBeInTheDocument();
+      // The detail is drawn once visibly and once inside the polite region.
+      const visibleDetail = screen
+        .getAllByText(/No channel synced on the last attempt/)
+        .filter((el) => el.getAttribute('aria-live') === null);
+      expect(visibleDetail).toHaveLength(1);
+
+      const politeRegions = screen
+        .getAllByRole('status')
+        .filter((el) => el.getAttribute('aria-live') === 'polite');
+      expect(
+        politeRegions.some((el) =>
+          el.textContent?.startsWith('Last sync failed.'),
+        ),
+      ).toBe(true);
+    });
+
+    it('keeps the h1 visually hidden on phone and still shows the subtitle', () => {
+      mockUseIsMobileState.mockReturnValue(true);
+      mockUseYouTubeCarousel.mockReturnValue({
+        ...defaultCarousel,
+        channels: oneChannel([{ watched: false }]),
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'YouTube' }),
+      ).toHaveClass('sr-only');
+      expect(
+        screen.getByText('Checking sync status… · 1 channel · 1 new upload'),
+      ).toBeInTheDocument();
+    });
+
+    it('renders the desktop header while useIsMobileState is undefined', () => {
+      mockUseIsMobileState.mockReturnValue(undefined);
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'YouTube' }),
+      ).not.toHaveClass('sr-only');
+      expect(
+        screen.getByRole('button', { name: 'Sync uploads' }),
+      ).toHaveTextContent('Sync uploads');
+    });
+  });
+
+  describe('section navigation', () => {
+    const twoSubscriptions = [
+      {
+        id: 'sub-1',
+        channelId: 'ch-1',
+        channelTitle: 'Alpha Channel',
+        channelThumbnail: null,
+        uploadsPlaylistId: 'UU1',
+        enabled: true,
+        lastSyncedAt: null,
+      },
+      {
+        id: 'sub-2',
+        channelId: 'ch-2',
+        channelTitle: 'Beta Channel',
+        channelThumbnail: null,
+        uploadsPlaylistId: 'UU2',
+        enabled: false,
+        lastSyncedAt: null,
+      },
+    ];
+
+    beforeEach(() => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: twoSubscriptions,
+        loading: false,
+      });
+    });
+
+    it('marks Videos as the current section and counts all subscriptions on Channels (desktop)', () => {
+      render(<YouTubePageClient />);
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(within(nav).getByRole('link', { name: 'Videos' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(
+        within(nav).getByRole('link', { name: 'Channels · 2' }),
+      ).toHaveAttribute('href', '/dashboard/youtube/channels');
+    });
+
+    it('carries no count on the phone section navigation', () => {
+      mockUseIsMobileState.mockReturnValue(true);
+
+      render(<YouTubePageClient />);
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(
+        within(nav).getByRole('link', { name: 'Channels' }),
+      ).toBeInTheDocument();
+      expect(
+        within(nav).queryByRole('link', { name: /Channels · / }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows Channels without a count while subscriptions are loading', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [],
+        loading: true,
+      });
+
+      render(<YouTubePageClient />);
+
+      const nav = screen.getByRole('navigation', { name: 'YouTube' });
+      expect(
+        within(nav).getByRole('link', { name: 'Channels' }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('sync button', () => {
+    it('shows the text on desktop with its name and title', () => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      const button = screen.getByRole('button', { name: 'Sync uploads' });
+      expect(button).toHaveTextContent('Sync uploads');
+      expect(button).toHaveAttribute('title', 'Sync uploads');
+    });
+
+    it('is icon-only on phone and keeps its name and title', () => {
+      mockUseIsMobileState.mockReturnValue(true);
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      const button = screen.getByRole('button', { name: 'Sync uploads' });
+      expect(button.textContent).toBe('');
+      expect(button).toHaveAttribute('title', 'Sync uploads');
+    });
+
+    it('stays disabled under the cooldown label on phone', () => {
+      mockUseIsMobileState.mockReturnValue(true);
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+      const future = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+      mockUseYouTubeSyncStatus.mockReturnValue({
+        status: { retryAt: future, channelStatus: 'never' },
+        loading: false,
+        triggerUploadSync: jest.fn(),
+        isCooldownActive: true,
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      const button = screen.getByRole('button', {
+        name: /Sync uploads disabled until/i,
+      });
+      expect(button).toBeDisabled();
+    });
+  });
+
+  describe('queue rail placement', () => {
+    beforeEach(() => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+    });
+
+    it('puts the Queue disclosure in the mobile-only column and the rail in the desktop-only column', () => {
+      const { container } = render(<YouTubePageClient />);
+
+      const disclosure = screen.getByText('Queue · 0 of 4').closest('details');
+      expect(disclosure?.parentElement).toHaveClass('md:hidden');
+
+      const desktopRail = container.querySelector(
+        '[aria-labelledby="queue-rail-heading-desktop"]',
+      );
+      expect(desktopRail).toBeInTheDocument();
+      expect(desktopRail?.parentElement).toHaveClass('hidden', 'md:block');
+    });
   });
 });

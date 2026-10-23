@@ -286,10 +286,17 @@ describe('AdminFeedbackController (HTTP integration)', () => {
         },
       ];
 
+      const envelope = {
+        items: mockItems,
+        total: 1,
+        page: 1,
+        pageSize: 25,
+      };
+
       svc.listReports.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        body: { items: mockItems },
+        body: envelope,
       });
 
       const res = await request(app)
@@ -299,18 +306,20 @@ describe('AdminFeedbackController (HTTP integration)', () => {
           kind: 'bug_report',
           platform: 'web',
           trackingIssueNumber: 42,
-          limit: 10,
+          page: 1,
+          pageSize: 25,
         })
         .set('Authorization', 'Bearer admin');
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ items: mockItems });
+      expect(res.body).toEqual(envelope);
       expect(svc.listReports).toHaveBeenCalledWith({
         status: 'planned',
         kind: 'bug_report',
         platform: 'web',
         trackingIssueNumber: 42,
-        limit: 10,
+        page: 1,
+        pageSize: 25,
       });
     });
 
@@ -632,5 +641,167 @@ describe('AdminFeedbackController (HTTP integration)', () => {
       expect(res.body).toEqual({ message: 'Unauthorized' });
       expect(svc.reopenReport).not.toHaveBeenCalled();
     });
+  });
+
+  describe('list paging and validation (HTTP integration)', () => {
+    const mockItem = {
+      id: 'report-1',
+      kind: 'bug_report',
+      status: 'planned',
+      title: 'App crashes on tasks page',
+      platform: 'ios',
+      trackingIssueNumber: 42,
+      reporterUserId: 'user-1',
+      statusChangedAt: '2026-10-17T10:00:00.000Z',
+      createdAt: '2026-10-15T10:00:00.000Z',
+    };
+
+    test('page and pageSize reach the service as numbers, with platform and the service envelope returned', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+      const envelope = {
+        items: [mockItem],
+        total: 1,
+        page: 2,
+        pageSize: 10,
+      };
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: envelope,
+      });
+
+      const res = await request(app)
+        .get('/admin/feedback/reports')
+        .query({ page: 2, pageSize: 10, platform: 'ios' })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(envelope);
+      const [filters] = svc.listReports.mock.calls[0];
+      expect(filters).toEqual(
+        expect.objectContaining({ page: 2, pageSize: 10, platform: 'ios' }),
+      );
+      expect(typeof filters.page).toBe('number');
+      expect(typeof filters.pageSize).toBe('number');
+    });
+
+    test('absent page and pageSize reach the service as undefined', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: { items: [mockItem], total: 1, page: 1, pageSize: 25 },
+      });
+
+      const res = await request(app)
+        .get('/admin/feedback/reports')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      const [filters] = svc.listReports.mock.calls[0];
+      expect(filters.page).toBeUndefined();
+      expect(filters.pageSize).toBeUndefined();
+    });
+
+    test('a page past the end passes the service envelope with empty items and total 7 through with 200', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+      const pastEnd = { items: [], total: 7, page: 3, pageSize: 25 };
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: pastEnd,
+      });
+
+      const res = await request(app)
+        .get('/admin/feedback/reports')
+        .query({ page: 3 })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(pastEnd);
+    });
+
+    test.each([1, 100])(
+      'pageSize=%i is accepted at the boundary and reaches the service',
+      async (pageSize) => {
+        const svc = require('../services/AdminFeedbackService').default;
+        svc.listReports.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          body: { items: [], total: 0, page: 1, pageSize },
+        });
+
+        const res = await request(app)
+          .get('/admin/feedback/reports')
+          .query({ pageSize })
+          .set('Authorization', 'Bearer admin');
+
+        expect(res.status).toBe(200);
+        const [filters] = svc.listReports.mock.calls[0];
+        expect(filters.pageSize).toBe(pageSize);
+      },
+    );
+
+    test('a service refusal (ok: false, 400) is forwarded to the client with its status and message', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+      svc.listReports.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        body: { message: 'Invalid report platform.' },
+      });
+
+      const res = await request(app)
+        .get('/admin/feedback/reports')
+        .query({ platform: 'web' })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ message: 'Invalid report platform.' });
+      expect(svc.listReports).toHaveBeenCalledTimes(1);
+    });
+
+    test('an undeclared limit query param is ignored: 200 and the service never receives limit', async () => {
+      const svc = require('../services/AdminFeedbackService').default;
+      svc.listReports.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: { items: [], total: 0, page: 1, pageSize: 25 },
+      });
+
+      const res = await request(app)
+        .get('/admin/feedback/reports')
+        .query({ limit: 10 })
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      const [filters] = svc.listReports.mock.calls[0];
+      expect(filters).not.toHaveProperty('limit');
+    });
+
+    test.each([
+      ['platform=mobile', { platform: 'mobile' }],
+      ['platform=Web', { platform: 'Web' }],
+      ['page=0', { page: '0' }],
+      ['page=1.5', { page: '1.5' }],
+      ['pageSize=0', { pageSize: '0' }],
+      ['pageSize=101', { pageSize: '101' }],
+      ['trackingIssueNumber=0', { trackingIssueNumber: '0' }],
+      ['trackingIssueNumber=abc', { trackingIssueNumber: 'abc' }],
+      ['status=duplicate', { status: 'duplicate' }],
+    ])(
+      'rejects %s with 422 before the service is called',
+      async (_label, query) => {
+        const svc = require('../services/AdminFeedbackService').default;
+
+        const res = await request(app)
+          .get('/admin/feedback/reports')
+          .query(query)
+          .set('Authorization', 'Bearer admin');
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toBe('Validation Failed');
+        expect(svc.listReports).not.toHaveBeenCalled();
+      },
+    );
   });
 });
