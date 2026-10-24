@@ -62,6 +62,50 @@ test('a reader that can load code at run time is a finding', () => {
   );
 });
 
+test('a capability named only in a comment is not a finding', () => {
+  for (const comment of [
+    '// an inline `import()` of an ESM path',
+    '/* falls back to fetch() when */',
+    '/** @see localStorage */',
+  ]) {
+    assert.deepEqual(
+      capabilityFindings(`<script>${comment}\nconst x = 1;</script>`),
+      [],
+      `expected no finding for ${comment}`,
+    );
+  }
+});
+
+test('a capability in code beside a comment naming it is still a finding', () => {
+  const findings = capabilityFindings(
+    '<script>// an inline `import()` of an ESM path\nawait import("./x.js")</script>',
+  );
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /can load code at run time/u);
+});
+
+test('a comment marker inside a string does not hide the code after it', () => {
+  const findings = capabilityFindings(
+    '<script>const u = "https://x.test/*"; import("./x.js"); const v = "*/";</script>',
+  );
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /can load code at run time/u);
+});
+
+test('a dynamic import spaced away from its parenthesis is still a finding', () => {
+  assert.match(
+    capabilityFindings('<script>await import ("./x.js")</script>')[0],
+    /can load code at run time/u,
+  );
+});
+
+test('a script that does not parse is scanned as written, comments and all', () => {
+  assert.match(
+    capabilityFindings('<script>const = ; // import()</script>')[0],
+    /can load code at run time/u,
+  );
+});
+
 test('a reader that touches browser storage is a finding', () => {
   for (const store of [
     'localStorage.setItem(k, v)',

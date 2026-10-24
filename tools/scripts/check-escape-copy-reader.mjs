@@ -33,7 +33,8 @@
 //      any way to reach the network — `fetch`, `XMLHttpRequest`, `WebSocket`,
 //      `navigator.sendBeacon`, `EventSource`, a dynamic `import()` — for an
 //      external `src`/`href`, and for browser storage, which a page holding
-//      somebody's vault passphrase has no business touching. A reader that
+//      somebody's vault passphrase has no business touching. Script comments
+//      are removed before the search: prose is not a capability. A reader that
 //      phones home is not an escape hatch, and the property is invisible until
 //      the day it matters.
 //   5. **The published checksum is the checksum of the published file**, and

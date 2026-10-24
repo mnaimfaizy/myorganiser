@@ -8,6 +8,7 @@
  * what lets the contract suite prove the checker fails on the drift its header
  * claims to catch (ADR 0085) without building a 500 KB page per assertion.
  */
+import { transformSync } from 'esbuild';
 
 /**
  * Capabilities the reader must not have, and why each one would matter.
@@ -17,6 +18,10 @@
  * time: this is a file Users are told to verify by checksum and then trust
  * with a vault passphrase, and "it is in there but never called" is not a
  * claim a checksum can carry.
+ *
+ * A comment is not "in there" in that sense: it is not code, reachable or
+ * not, so each inline script is scanned with its comments removed. Bundled
+ * dependencies write prose about `import()` and `fetch()` in theirs.
  */
 export const FORBIDDEN_CAPABILITIES = [
   ['fetch(', 'reaches the network'],
@@ -35,15 +40,41 @@ export const FORBIDDEN_CAPABILITIES = [
 /** An external resource reference, which would make the file non-self-contained. */
 const EXTERNAL_REFERENCE = /(?:src|href)\s*=\s*["']\s*(?:https?:)?\/\//giu;
 
+const INLINE_SCRIPT = /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/giu;
+
+/**
+ * The page with every inline script's comments removed, by esbuild's parser
+ * rather than a pattern — a pattern cannot tell `//` in a string from a
+ * comment. Whitespace-only minification leaves strings and identifiers as
+ * written. A script that does not parse is kept verbatim, so the scan fails
+ * closed rather than open.
+ */
+function withoutScriptComments(html) {
+  return html.replace(INLINE_SCRIPT, (whole, open, body, close) => {
+    try {
+      const { code } = transformSync(body, {
+        loader: 'js',
+        minifyWhitespace: true,
+        legalComments: 'none',
+        logLevel: 'silent',
+      });
+      return `${open}${code}${close}`;
+    } catch {
+      return whole;
+    }
+  });
+}
+
 /**
  * Everything wrong with the built page as a *file*: a capability it must not
  * have, or a resource it would have to fetch to render.
  */
 export function capabilityFindings(html) {
   const findings = [];
+  const scanned = withoutScriptComments(html);
 
   for (const [needle, why] of FORBIDDEN_CAPABILITIES) {
-    if (html.includes(needle)) {
+    if (scanned.includes(needle)) {
       findings.push(
         `the built reader contains \`${needle}\`, which ${why}. ADR 0064's reader ` +
           `needs nothing of ours and holds nothing of the User's.`,
