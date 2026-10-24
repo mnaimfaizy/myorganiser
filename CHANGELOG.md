@@ -1,5 +1,125 @@
 # Changelog
 
+## v2.2.0 - 2026-10-24
+
+Date: 2026-10-24
+
+## Changes since v2.1.0
+
+Compare: https://github.com/mnaimfaizy/myorganiser/compare/v2.1.0...v2.2.0
+
+### Features
+
+- **web**: allow LAN hosts for next dev via NEXT_ALLOWED_DEV_ORIGINS (bac94bb)
+- **web-pages-legal**: restyle legal pages onto one public layout (97eacc9)
+- **web-pages-dashboard**: add Storybook stories for dashboard shell (26a7173)
+- **web-account**: redesign feedback reports and dialog (836c7b7)
+- **web-youtube**: redesign YouTube for Web v2.0 (1d0b4ee)
+- **web-admin**: redesign the Feedback inbox and report triage (8f560d0)
+- **web-admin**: redesign the admin user detail page (cb6ae4c)
+- **web-account**: redesign Account for Web v2.0 (7323956)
+- **backend**: page and validate admin feedback report list (07967c9)
+- **web-admin**: redesign the Audit log with names, filters and paging (b61e398)
+- **web-mobile-numbers**: redesign Mobile numbers for Web v2.0 (aee1e91)
+- **backend**: add paging, names and filters to admin audit log (a73e3f8)
+- **web-admin**: redesign Users directory with filters and paging (4418bc2)
+- **web-dashboard**: redesign Home for Web v2.0 (c2b8c62)
+- **web-addresses**: redesign Addresses pages for Web v2.0 (dc4a57e)
+- **backend**: add paging, status/role filters and sort to admin users (d412d2f)
+- **web-groceries**: redesign Groceries pages for Web v2.0 (4b6cb15)
+- **web-subscriptions**: redesign Subscriptions for Web v2.0 (0b827ff)
+- **web-admin**: rebuild admin shell and add Overview page (018e214)
+- **backend**: add User.created_at and 7-day admin overview counts (98c2916)
+- **web-dashboard**: label Vault sub-route breadcrumb segments (deb25ff)
+- **web-vault**: redesign Vault page for Web v2.0 (8866b21)
+- **web-tasks**: redesign tasks page for desktop and phone (61963dd)
+- **backend**: add platform admin overview counts endpoint (43cb0dc)
+- **web-dashboard**: add phone shell with tab bar and More screen (f6d84e7)
+- **web-dashboard**: build navy desktop shell with header (0578fc7)
+- **web-ui**: add empty-state patterns and the shared add-place dialog (b9debb1)
+- **web-ui**: add status, data, dialog and sheet primitives for Web v2.0 (e1197f6)
+- **web-ui**: add RadioGroup and tokens for control part sizes (6dfc5f3)
+- **web-ui**: restyle action and form control primitives for Web v2.0 (91dab81)
+- **web-ui**: add section Illustration and grocery category drawings (f4a6fe8)
+- **design-tokens**: wire focus, control and error roles into Tailwind (2efd3c9)
+- **design-tokens**: add Web v2.0 colour, type and shape tokens (df9dd14)
+
+### Fixes
+
+- **web**: load tailwind theme via createRequire to silence Turbopack (c33956b)
+- **backend**: backfill User.created_at from cuid id (37b1927)
+- **subscriptions**: list other-currency yearly totals on Each year card (09c84d1)
+- **web-admin**: fit long action pills and the phone filter sheet (adb936b)
+- **web-admin**: keep loaded users when a phone load-more fails (ceea71f)
+- **web-e2e**: align specs with Web v2.0 dialog and tasks UI (61e0f56)
+- **web-dashboard**: align phone shell with approved artboards (1fd3042)
+- **web-dashboard**: apply review fixes to the phone shell (02da006)
+- **web-ui**: mark Alert as a client component (342b877)
+- **web-ui**: skip breakpoint assertions in stories at the wrong width (e55ca7a)
+- **web-ui**: label mobile sidebar drawer for screen readers (22a9ec5)
+
+### Documentation
+
+- **backend**: correct admin overview created_at backfill description (8527ae4)
+- **authentication**: re-point stale citations in session lifecycle page (6358570)
+- **web-admin**: state what the user detail copy does, not its history (a036aa3)
+- **web-admin**: drop time-relative claims from feedback comments (f99b20b)
+- **web-admin**: make the audit log comments claim only what holds (01a9d3d)
+- **design**: link Web v2.0 design approval to PRD #1241 (2ece03e)
+- **design**: commit approved Web v2.0 UI/UX design (c54ef04)
+
+### Refactors
+
+- **web-ui**: fold the email fallback into initialsOf (397d10e)
+- **web-ui**: share initialsOf avatar helper across pages (db29f7c)
+- **web-pages-legal**: split legal page layout into named parts (377c692)
+- **web-pages-dashboard**: apply shell story review fixes (0575d60)
+- **web-account**: apply review fixes to the Feedback redesign (72c15e7)
+- **web-youtube**: apply review fixes to the YouTube redesign (5cf31e1)
+- **web-account**: share phone select trigger class (90fa040)
+- **web-admin**: apply review fixes to the admin Overview (8061772)
+- **web**: promote ChoiceChip and use shared delete confirm (2e5417c)
+- **backend**: share admin overview response type from service (060ac0a)
+- **web-dashboard**: use shared helpers in the phone shell (3e64fed)
+- **web-dashboard**: share lock state, log-out and admin check (52c813c)
+- **web-usage-locations**: split PlaceDialog fields into internal parts (061ed19)
+
+### Tests
+
+- **tools**: follow the setup-node v7.1.0 pin in the host-apply fixture (9c9fe74)
+- **mobile-screens**: derive theme fixture from design-token roles (0bcd1bc)
+- **web-e2e**: generate the Mobile numbers layout vault passphrase (b577e9d)
+- **web-e2e**: check Feedback layout and roles at 1440 and 390 (25014bf)
+- **web-admin**: retarget user detail and lifecycle tests to redesign (11ce271)
+- **web-e2e**: add Admin User detail layout spec and unit tests (a08c3ee)
+- **web-e2e**: cover the admin Feedback inbox and report layout (cd57471)
+- **web-e2e**: scope Your reports assertion to breadcrumb link (88b820a)
+- **web-admin**: retarget the Audit log and Recent activity specs (2fbdd07)
+- **web-e2e**: cover the Audit log at 1440 and 390 (d422072)
+- **web-admin**: cover the useAuditLog hook (7823b90)
+- **web-admin**: cover the Users page at desktop and phone widths (fa83c29)
+- **web-e2e**: add the Admin Users layout spec and retarget admin specs (32f01a5)
+- **web-admin**: cover the Users directory helpers and hook (51ca4c3)
+- **web-e2e**: give each Web v2.0 layout spec one top-level describe (b210e25)
+- **web-e2e**: find removal-spec tasks by their row checkbox (b17b7c9)
+- **web-ui**: cover mobile sidebar drawer accessible name (bf086f7)
+
+### CI
+
+- bump actions/setup-node from 7.0.0 to 7.1.0 (8276e7f)
+- bump actions/setup-java from 6.0.1 to 6.1.0 (fb5e320)
+- bump actions/upload-artifact from 7.0.1 to 7.0.2 (13a0bfd)
+- bump actions/download-artifact from 8.0.1 to 8.0.2 (25cef1a)
+
+### Chores
+
+- **deps**: bump next to 16.4.2 to clear high-severity advisories (9de9012)
+- **deps**: bump vite to 6.4.4 to clear high-severity advisory (aaa09e5)
+- **deps**: patch storybook, follow-redirects, and uuid advisories (a6d9348)
+- **storybook**: restore addon-essentials and addon-interactions (187abcb)
+- **tools**: check Feature Library components in component hygiene (ddc8b2d)
+- **sandcastle**: anchor feat/web-v2-0-ui-ux to #1241 (b26000a)
+
 ## v2.1.0 - 2026-10-19
 
 Date: 2026-10-19
