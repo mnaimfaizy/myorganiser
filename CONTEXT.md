@@ -744,6 +744,10 @@ _Avoid_: drift gate, doc gate, coupling check
 A gate some pipeline actually invokes. A checker that exists, passes, and is referenced by neither Husky nor a workflow asserts nothing — a distinct failure from Gate Coverage, which is about a wired gate's reach across projects. Matched by exact script name, including through an aggregate runner that is itself wired.
 _Avoid_: enabled gate, active check, gate coverage (for this sense)
 
+**Contract Suite**:
+The test suite that proves a tooling script does what its header claims — for a checker, that it actually fails on the drift it says it catches. It is wired or it is not, independently of the script it tests: a Wired Gate whose Contract Suite runs nowhere is a header nothing asserts, and a Contract Suite running green says nothing about whether its checker is wired.
+_Avoid_: checker test, script test, unit test (for this sense)
+
 **Meta-Gate**:
 The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
 _Avoid_: gate-of-gates, master gate, gate linter
