@@ -749,7 +749,7 @@ The test suite that proves a tooling script does what its header claims — for 
 _Avoid_: checker test, script test, unit test (for this sense)
 
 **Meta-Gate**:
-The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
+The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. It asserts the same of every Contract Suite: a `*.test.mjs` under `tools/scripts` that no wired script reaches fails by name, matched the same exact-script-name way as a checker (ADR 0135). An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker or suite it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
 _Avoid_: gate-of-gates, master gate, gate linter
 
 **Unasserted Claim**:

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "comment": "Checks `gates:coverage:check` may find unwired without failing (ADR 0043). Every entry names a checker — by `check-*.mjs` filename or by the package.json script that runs it — and carries a written reason. An entry without a reason is rejected, and so is one naming something that no longer exists: an exemption is a decision somebody made, not a gap nobody saw.",
+  "comment": "Checkers and Contract Suites `gates:coverage:check` may find unwired without failing (ADR 0043, ADR 0135). Every entry names a checker or a suite — by filename (`check-*.mjs` or `*.test.mjs`) or by the package.json script that runs it — and carries a written reason. An entry without a reason is rejected, and so is one naming something that no longer exists: an exemption is a decision somebody made, not a gap nobody saw.",
   "optOut": [
     {
       "check": "format:check",

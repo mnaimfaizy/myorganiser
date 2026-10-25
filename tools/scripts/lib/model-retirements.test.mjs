@@ -1,5 +1,5 @@
 /**
- * Run with: yarn agents:models:test  (node --test, no jest project covers tools/)
+ * Run with: yarn agents:models:test
  */
 
 import assert from 'node:assert/strict';

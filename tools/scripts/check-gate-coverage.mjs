@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Asserts that every checker in tools/scripts/ is a Wired Gate — invoked by
-// some hook or workflow — and names the ones that are not (ADR 0043).
+// some hook or workflow — and names the ones that are not (ADR 0043). Also
+// asserts the same for every Contract Suite (`*.test.mjs`) under
+// tools/scripts, naming each one no wired script reaches (ADR 0135 slice 1).
 //
 //   node tools/scripts/check-gate-coverage.mjs
 //
@@ -11,23 +13,34 @@
 // argument — a green pipeline says nothing about whether a gate looked at
 // anything. This is the gate that gates the gates.
 //
+// The suite rule exists for the same reason one level down: a Contract Suite
+// proves a script does what its header claims only while something runs it.
+// Four suites (`ai:commit:test`, `product-name:test`, `nx:targets:test`,
+// `graphify:project-edges:test`) and two copilot-hooks suites with no
+// package.json script at all were in that state when this rule was added.
+//
 // Checkers are found by the `check-*.mjs` filename convention, never by a
 // `*:check` script-name suffix: `openapi:artifacts` and `component:hygiene`
 // carry no such suffix, and the first is one of the two unwired checks that
-// motivated the rule. Wiring is matched by exact script name — a substring
-// match on `yarn openapi:artifacts` also matches `openapi:artifacts:test`, and
-// reporting an unwired check as wired because its contract suite runs is the
-// exact false pass this file exists to prevent.
+// motivated the rule. Suites are found by the `*.test.mjs` filename
+// convention anywhere under tools/scripts, including through lib/, review/,
+// ai/, ci/, and copilot-hooks/. Wiring is matched by exact script name — a
+// substring match on `yarn openapi:artifacts` also matches
+// `openapi:artifacts:test`, and reporting an unwired check as wired because
+// its contract suite runs is the exact false pass this file exists to
+// prevent.
 //
-// A checker the pre-commit hook reaches only through `yarn gates:run` counts as
-// wired, resolved through that aggregate's manifest and no deeper. The decision
-// itself lives in tools/scripts/lib/gate-coverage.mjs; this file is IO.
+// A checker or suite the pre-commit hook reaches only through `yarn
+// gates:run` counts as wired, resolved through that aggregate's manifest and
+// no deeper. The decision itself lives in tools/scripts/lib/gate-coverage.mjs;
+// this file is IO.
 //
 // Deliberate non-gates carry an entry with a written reason in
 // tools/config/gate-coverage-optout.json.
 //
-// Exit 0 = every checker is wired or deliberately opted out. Exit 1 = at least
-// one checker runs nowhere. Exit 2 = the check could not run.
+// Exit 0 = every checker and suite is wired or deliberately opted out. Exit 1
+// = at least one checker or suite runs nowhere. Exit 2 = the check could not
+// run.
 import {
   OPT_OUT_PATH,
   assertGateCoverage,
@@ -44,16 +57,30 @@ if (report.errors.length) {
   process.exit(report.exitCode);
 }
 
-if (report.unwired.length) {
-  console.error(
-    'gate-coverage: checker is invoked by no hook and no workflow (ADR 0043)\n',
-  );
-  for (const { checker, npmScripts } of report.unwired) {
-    const invocation = npmScripts.length
-      ? npmScripts.map((name) => `yarn ${name}`).join(' / ')
-      : `node ${checker}`;
-    console.error(`  ${checker}`);
-    console.error(`    runnable as: ${invocation}`);
+if (report.unwired.length || report.unwiredSuites.length) {
+  if (report.unwired.length) {
+    console.error(
+      'gate-coverage: checker is invoked by no hook and no workflow (ADR 0043)\n',
+    );
+    for (const { checker, npmScripts } of report.unwired) {
+      const invocation = npmScripts.length
+        ? npmScripts.map((name) => `yarn ${name}`).join(' / ')
+        : `node ${checker}`;
+      console.error(`  ${checker}`);
+      console.error(`    runnable as: ${invocation}`);
+    }
+  }
+  if (report.unwiredSuites.length) {
+    console.error(
+      'gate-coverage: suite is invoked by no hook and no workflow (ADR 0135)\n',
+    );
+    for (const { suite, npmScripts } of report.unwiredSuites) {
+      const invocation = npmScripts.length
+        ? npmScripts.map((name) => `yarn ${name}`).join(' / ')
+        : `node --test ${suite}`;
+      console.error(`  ${suite}`);
+      console.error(`    runnable as: ${invocation}`);
+    }
   }
   const aggregateScript = report.aggregate.npmScripts[0] ?? 'gates:run';
   console.error(
@@ -83,4 +110,9 @@ console.log(
     }\`), ` +
     `${report.optedOut.length} checkers opted out, ` +
     `${report.declaredNonGates.length} non-gates declared with a reason`,
+);
+
+console.log(
+  `gate-coverage: ${report.wiredSuites.length} suites wired, ` +
+    `${report.optedOutSuites.length} suites opted out`,
 );

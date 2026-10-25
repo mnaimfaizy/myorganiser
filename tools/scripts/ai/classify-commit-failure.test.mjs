@@ -1,5 +1,5 @@
 /**
- * Run with: yarn ai:commit:test  (node --test, no jest project covers tools/)
+ * Run with: yarn ai:commit:test
  */
 
 import assert from 'node:assert/strict';

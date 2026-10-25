@@ -92,6 +92,14 @@ export function stripComments(text) {
  * runner and never counts as running the file as a checker: `openapi:artifacts:test`
  * runs `check-openapi-artifacts.test.mjs`, which is a contract suite, not a gate.
  *
+ * `node --test` accepts more than one file (`node --test a.test.mjs
+ * b.test.mjs`), which is how a single Contract Suite script such as
+ * `agents:sync:test` runs several files — every trailing non-flag token is
+ * reported as its own test-runner run. A non-test invocation keeps the old,
+ * narrower behaviour of reporting only the first non-flag token as the
+ * script: a trailing argument there is a flag to the checker
+ * (`node check-a.mjs --report out.md`), never a second script.
+ *
  * `gate-manifest.mjs` has its own `parseNodeSegments`, and these are not the
  * same job. That one reads one package.json command, anchored to `^node` per
  * `&&` segment, and keeps the argument list so the manifest can be compared
@@ -102,20 +110,44 @@ export function stripComments(text) {
  */
 export function nodeRuns(command) {
   const runs = [];
-  const pattern = /\bnode\s+((?:-{1,2}[^\s;&|]+\s+)*)([^\s;&|]+)/g;
+  // The captured span stops at a newline as well as at a shell metacharacter:
+  // a multi-file `node --test a.mjs b.mjs` invocation is always one
+  // package.json string (necessarily one line), while pipeline text is
+  // free-form YAML/shell where a later, unrelated step's own `node` call
+  // sits on a following line with nothing but a newline between it and this
+  // one. Capturing across that newline swallowed the next step's tokens —
+  // and the literal words of the YAML around it — into this invocation's
+  // script list (reported false-wired on a real suite, caught by review).
+  const pattern = /\bnode\b([^;&|\n]*)/g;
   for (const match of command.matchAll(pattern)) {
-    const [, flags, script] = match;
-    runs.push({
-      script: normalize(script),
-      isTestRunner: /(^|\s)--test(\s|$)/.test(` ${flags.trim()} `),
-    });
+    const tokens = match[1].trim().split(/\s+/).filter(Boolean);
+    let index = 0;
+    const flags = [];
+    while (index < tokens.length && /^-/.test(tokens[index])) {
+      flags.push(tokens[index]);
+      index += 1;
+    }
+    if (index >= tokens.length) continue;
+    const isTestRunner = flags.some(
+      (flag) => flag === '--test' || flag.startsWith('--test='),
+    );
+    if (!isTestRunner) {
+      runs.push({ script: normalize(tokens[index]), isTestRunner: false });
+      continue;
+    }
+    for (; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (/^-/.test(token)) continue;
+      runs.push({ script: normalize(token), isTestRunner: true });
+    }
   }
   return runs;
 }
 
 /**
  * What a pipeline file invokes: package-manager script names matched as whole
- * tokens, and scripts run directly through `node`.
+ * tokens, scripts run directly through `node`, and suite files run directly
+ * through `node --test`.
  */
 export function pipelineInvocations(text) {
   const source = stripComments(text);
@@ -124,13 +156,15 @@ export function pipelineInvocations(text) {
     /\b(?:corepack\s+)?(?:yarn|npm|pnpm)\s+(?:run\s+)?([A-Za-z0-9][A-Za-z0-9:@._/-]*)/g;
   for (const [, name] of source.matchAll(scriptPattern)) names.add(name);
 
+  const runs = nodeRuns(source);
   const nodeScripts = new Set(
-    nodeRuns(source)
-      .filter((run) => !run.isTestRunner)
-      .map((run) => run.script),
+    runs.filter((run) => !run.isTestRunner).map((run) => run.script),
+  );
+  const nodeTestScripts = new Set(
+    runs.filter((run) => run.isTestRunner).map((run) => run.script),
   );
 
-  return { names, nodeScripts };
+  return { names, nodeScripts, nodeTestScripts };
 }
 
 /** Every `check-*.mjs` in the scripts directory, contract suites excluded. */
@@ -149,6 +183,25 @@ export function listCheckers({
         !entry.name.endsWith('.test.mjs'),
     )
     .map((entry) => normalize(`${scriptsDir}/${entry.name}`))
+    .sort();
+}
+
+/**
+ * Every Contract Suite (`*.test.mjs`) anywhere under the scripts directory,
+ * `lib/`, `review/`, `ai/`, `ci/`, and `copilot-hooks/` included. A suite is
+ * wired or it is not independently of whether the script it tests is a
+ * `check-*.mjs` checker (ADR 0135 slice 1) — this list, unlike
+ * `listCheckers`, is not filtered to the checker-filename convention.
+ */
+export function listSuites({
+  cwd = process.cwd(),
+  scriptsDir = SCRIPTS_DIR,
+} = {}) {
+  const absolute = join(cwd, scriptsDir);
+  if (!existsSync(absolute)) return [];
+  return readdirSync(absolute, { recursive: true })
+    .filter((entry) => entry.endsWith('.test.mjs'))
+    .map((entry) => normalize(`${scriptsDir}/${entry}`))
     .sort();
 }
 
@@ -189,6 +242,7 @@ export function gatherFromDisk({
 
   return {
     checkers: listCheckers({ cwd, scriptsDir }),
+    suites: listSuites({ cwd, scriptsDir }),
     pkgScripts,
     pipelines,
     optOut,
@@ -331,16 +385,99 @@ function resolveAggregate({
 }
 
 /**
- * Decides, for every checker, whether some pipeline reaches it.
+ * Decides, for every target in `targets` (checkers or suites), whether some
+ * pipeline reaches it — directly, by npm script name, or through the
+ * aggregate. Shared between the checker rule and the suite rule so the two
+ * are matched by the exact same mechanics (ADR 0135 slice 1): only the
+ * `npmScriptsRunning` / `invokedPaths` a caller supplies differ, filtered to
+ * non-test or test-runner `node` invocations respectively.
  *
- * Returns `{ exitCode, errors, unwired, wired, optedOut, declaredNonGates }`.
- * Exit 0 = every checker is wired or deliberately opted out. Exit 1 = at least
- * one checker runs nowhere, and every one of them is named. Exit 2 = the check
+ * Mutates `errors` in place with a contradiction when an opted-out target is
+ * actually wired, mirroring the checker rule's existing behaviour.
+ */
+function classifyTargets({
+  targets,
+  key,
+  npmScriptsRunning,
+  invokedNames,
+  invokedPaths,
+  aggregateState,
+  optedOutMap,
+  optOutPath,
+  errors,
+}) {
+  const wired = [];
+  const unwired = [];
+  const optedOut = [];
+
+  for (const target of targets) {
+    const npmScripts = npmScriptsRunning(target);
+    const via = [];
+
+    for (const name of npmScripts) {
+      const files = invokedNames.get(name);
+      if (files) via.push({ kind: 'pipeline', name, files });
+    }
+    const directFiles = invokedPaths.get(target);
+    if (directFiles)
+      via.push({ kind: 'direct', name: target, files: directFiles });
+    if (aggregateState.reached.has(target) && aggregateState.wired) {
+      via.push({
+        kind: 'aggregate',
+        name: aggregateState.wiredVia[0] ?? aggregateState.script,
+        files: aggregateState.wiredVia.flatMap(
+          (name) => invokedNames.get(name) ?? [],
+        ),
+      });
+    }
+
+    // One record per target: reached both directly and through the aggregate
+    // is still one wired target, never two findings that disagree.
+    if (via.length > 0) {
+      wired.push({ [key]: target, npmScripts, via });
+      // Opted out *and* wired is the list disagreeing with the repository, so
+      // it fails here rather than printing a note the aggregate would swallow
+      // on a green run. Declared non-gates are exempt from this: `not a gate`
+      // is a claim about what the script is, not about whether anything runs
+      // it, and the monthly model audit is both.
+      const entry = optedOutMap.get(target);
+      if (entry) {
+        errors.push(
+          `${optOutPath}: \`${entry.check}\` is opted out ("${entry.reason}") ` +
+            `but ${target} is wired via ${via.map((v) => v.name).join(', ')}. ` +
+            'Drop the entry or drop the wiring — the list must not disagree ' +
+            'with the pipelines.',
+        );
+      }
+      continue;
+    }
+
+    const entry = optedOutMap.get(target);
+    if (entry) {
+      optedOut.push({ [key]: target, ...entry });
+      continue;
+    }
+
+    unwired.push({ [key]: target, npmScripts });
+  }
+
+  return { wired, unwired, optedOut };
+}
+
+/**
+ * Decides, for every checker and every Contract Suite, whether some pipeline
+ * reaches it.
+ *
+ * Returns `{ exitCode, errors, unwired, wired, optedOut, unwiredSuites,
+ * wiredSuites, optedOutSuites, declaredNonGates }`. Exit 0 = every checker
+ * and suite is wired or deliberately opted out. Exit 1 = at least one checker
+ * or suite runs nowhere, and every one of them is named. Exit 2 = the check
  * could not run: a missing, malformed, or self-contradicting opt-out list, or
  * a nested aggregate.
  */
 export function assertGateCoverage({
   checkers = [],
+  suites = [],
   pkgScripts = {},
   pipelines = [],
   optOut = null,
@@ -350,8 +487,9 @@ export function assertGateCoverage({
 }) {
   const invokedNames = new Map();
   const invokedPaths = new Map();
+  const invokedTestPaths = new Map();
   for (const { path, text } of pipelines) {
-    const { names, nodeScripts } = pipelineInvocations(text);
+    const { names, nodeScripts, nodeTestScripts } = pipelineInvocations(text);
     for (const name of names) {
       if (!invokedNames.has(name)) invokedNames.set(name, []);
       invokedNames.get(name).push(path);
@@ -360,10 +498,15 @@ export function assertGateCoverage({
       if (!invokedPaths.has(script)) invokedPaths.set(script, []);
       invokedPaths.get(script).push(path);
     }
+    for (const script of nodeTestScripts) {
+      if (!invokedTestPaths.has(script)) invokedTestPaths.set(script, []);
+      invokedTestPaths.get(script).push(path);
+    }
   }
 
   // An npm script "runs" a checker only when it executes the file itself.
-  // `node --test check-x.test.mjs` runs the contracts, never the checker.
+  // `node --test check-x.test.mjs` runs the contracts, never the checker —
+  // and, symmetrically, a suite is run only by the `--test` invocations.
   const runsByNpmScript = new Map(
     Object.entries(pkgScripts).map(([name, command]) => [
       name,
@@ -372,14 +515,26 @@ export function assertGateCoverage({
         .map((run) => run.script),
     ]),
   );
-  const npmScriptsRunning = (path) =>
+  const testRunsByNpmScript = new Map(
+    Object.entries(pkgScripts).map(([name, command]) => [
+      name,
+      nodeRuns(String(command))
+        .filter((run) => run.isTestRunner)
+        .map((run) => run.script),
+    ]),
+  );
+  const npmScriptsRunningChecker = (path) =>
     [...runsByNpmScript]
+      .filter(([, scripts]) => scripts.includes(path))
+      .map(([name]) => name);
+  const npmScriptsRunningSuite = (path) =>
+    [...testRunsByNpmScript]
       .filter(([, scripts]) => scripts.includes(path))
       .map(([name]) => name);
 
   const aggregateState = resolveAggregate({
     aggregate,
-    npmScriptsRunning,
+    npmScriptsRunning: npmScriptsRunningChecker,
     invokedNames,
     invokedPaths,
     readSource,
@@ -392,11 +547,13 @@ export function assertGateCoverage({
 
   const errors = [...aggregateState.errors, ...optOutErrors];
 
-  // An opt-out entry names either a checker (by filename or path) or the npm
-  // script that runs one. `format:check` has no checker file at all, which is
-  // why a script name is a legal key: the list records deliberate non-gates,
-  // and an entry naming nothing at all is stale config, not an exemption.
+  // An opt-out entry names a checker or a suite (by filename or path), or the
+  // npm script that runs one. `format:check` has no checker file at all,
+  // which is why a script name is a legal key: the list records deliberate
+  // non-gates, and an entry naming nothing at all is stale config, not an
+  // exemption.
   const optedOutCheckers = new Map();
+  const optedOutSuites = new Map();
   const declaredNonGates = [];
   for (const entry of optOutEntries) {
     const asPath = normalize(
@@ -406,84 +563,71 @@ export function assertGateCoverage({
       optedOutCheckers.set(asPath, entry);
       continue;
     }
+    if (suites.includes(asPath)) {
+      optedOutSuites.set(asPath, entry);
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(pkgScripts, entry.check)) {
-      const reached = (runsByNpmScript.get(entry.check) ?? []).filter(
+      const reachedCheckers = (runsByNpmScript.get(entry.check) ?? []).filter(
         (script) => checkers.includes(script),
       );
-      if (reached.length === 0) declaredNonGates.push(entry);
-      for (const script of reached) optedOutCheckers.set(script, entry);
+      const reachedSuites = (testRunsByNpmScript.get(entry.check) ?? []).filter(
+        (script) => suites.includes(script),
+      );
+      if (reachedCheckers.length === 0 && reachedSuites.length === 0) {
+        declaredNonGates.push(entry);
+      }
+      for (const script of reachedCheckers) optedOutCheckers.set(script, entry);
+      for (const script of reachedSuites) optedOutSuites.set(script, entry);
       continue;
     }
     errors.push(
-      `${optOutPath}: \`${entry.check}\` is neither a checker in ${SCRIPTS_DIR}/ ` +
-        'nor a script in package.json. An opt-out for something that no longer ' +
-        'exists hides nothing and rots the list.',
+      `${optOutPath}: \`${entry.check}\` is neither a checker nor a suite in ` +
+        `${SCRIPTS_DIR}/ nor a script in package.json. An opt-out for ` +
+        'something that no longer exists hides nothing and rots the list.',
     );
   }
 
-  const wired = [];
-  const unwired = [];
-  const optedOut = [];
+  const checkerResult = classifyTargets({
+    targets: checkers,
+    key: 'checker',
+    npmScriptsRunning: npmScriptsRunningChecker,
+    invokedNames,
+    invokedPaths,
+    aggregateState,
+    optedOutMap: optedOutCheckers,
+    optOutPath,
+    errors,
+  });
 
-  for (const checker of checkers) {
-    const npmScripts = npmScriptsRunning(checker);
-    const via = [];
+  const suiteResult = classifyTargets({
+    targets: suites,
+    key: 'suite',
+    npmScriptsRunning: npmScriptsRunningSuite,
+    invokedNames,
+    invokedPaths: invokedTestPaths,
+    aggregateState,
+    optedOutMap: optedOutSuites,
+    optOutPath,
+    errors,
+  });
 
-    for (const name of npmScripts) {
-      const files = invokedNames.get(name);
-      if (files) via.push({ kind: 'pipeline', name, files });
-    }
-    const directFiles = invokedPaths.get(checker);
-    if (directFiles)
-      via.push({ kind: 'direct', name: checker, files: directFiles });
-    if (aggregateState.reached.has(checker) && aggregateState.wired) {
-      via.push({
-        kind: 'aggregate',
-        name: aggregateState.wiredVia[0] ?? aggregateState.script,
-        files: aggregateState.wiredVia.flatMap(
-          (name) => invokedNames.get(name) ?? [],
-        ),
-      });
-    }
-
-    // One record per checker: reached both directly and through the aggregate
-    // is still one wired checker, never two findings that disagree.
-    if (via.length > 0) {
-      wired.push({ checker, npmScripts, via });
-      // Opted out *and* wired is the list disagreeing with the repository, so
-      // it fails here rather than printing a note the aggregate would swallow
-      // on a green run. Declared non-gates are exempt from this: `not a gate`
-      // is a claim about what the script is, not about whether anything runs
-      // it, and the monthly model audit is both.
-      const entry = optedOutCheckers.get(checker);
-      if (entry) {
-        errors.push(
-          `${optOutPath}: \`${entry.check}\` is opted out ("${entry.reason}") ` +
-            `but ${checker} is wired via ${via.map((v) => v.name).join(', ')}. ` +
-            'Drop the entry or drop the wiring — the list must not disagree ' +
-            'with the pipelines.',
-        );
-      }
-      continue;
-    }
-
-    const entry = optedOutCheckers.get(checker);
-    if (entry) {
-      optedOut.push({ checker, ...entry });
-      continue;
-    }
-
-    unwired.push({ checker, npmScripts });
-  }
-
-  const exitCode = errors.length > 0 ? 2 : unwired.length > 0 ? 1 : 0;
+  const exitCode =
+    errors.length > 0
+      ? 2
+      : checkerResult.unwired.length > 0 || suiteResult.unwired.length > 0
+        ? 1
+        : 0;
   return {
     ok: exitCode === 0,
     exitCode,
     errors,
-    unwired,
-    wired,
-    optedOut,
+    unwired: checkerResult.unwired,
+    wired: checkerResult.wired,
+    optedOut: checkerResult.optedOut,
+    unwiredSuites: suiteResult.unwired,
+    wiredSuites: suiteResult.wired,
+    optedOutSuites: suiteResult.optedOut,
     declaredNonGates,
     aggregate: {
       script: aggregateState.script,

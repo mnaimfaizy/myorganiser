@@ -65,6 +65,7 @@
     "agents:models:test": "node --test tools/scripts/lib/model-retirements.test.mjs",
     "agents:map:check": "node tools/scripts/check-agent-map.mjs",
     "agents:map:test": "node --test tools/scripts/check-agent-map.test.mjs",
+    "copilot-hooks:test": "node --test tools/scripts/copilot-hooks/dep-sync-reminder.test.mjs tools/scripts/copilot-hooks/upstream-brief-suggestion.test.mjs",
     "skills:map:check": "node tools/scripts/check-skill-map.mjs",
     "vault:pages:check": "node tools/scripts/check-vault-pages.mjs",
     "readme:check": "node tools/scripts/check-readme.mjs",

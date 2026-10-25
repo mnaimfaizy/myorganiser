@@ -1026,9 +1026,30 @@ jobs:
       - name: QA Account seeder contracts
         run: corepack yarn qa:accounts:test
 
+      # These four ran in no pipeline until ADR 0135 slice 1 wired them — the
+      # gap the Meta-Gate's suite rule below now catches on the next one.
+      - name: Commit failure classifier contracts
+        run: corepack yarn ai:commit:test
+
+      - name: Product name checker contracts
+        run: corepack yarn product-name:test
+
+      - name: Nx declared-targets checker contracts
+        run: corepack yarn nx:targets:test
+
+      - name: Graphify project-edge benchmark contracts
+        run: corepack yarn graphify:project-edges:test
+
+      # Had no package.json script at all until ADR 0135 slice 1.
+      - name: Copilot hooks contracts
+        run: corepack yarn copilot-hooks:test
+
       # The meta-gate: asserts every check-*.mjs is invoked by some hook or
       # workflow, resolving one level of indirection through the aggregate's
-      # manifest. Nine checkers ran nowhere when ADR 0043 was written.
+      # manifest, and that every *.test.mjs Contract Suite is run by some
+      # wired script the same way (ADR 0135 slice 1). Nine checkers ran
+      # nowhere when ADR 0043 was written; six suites ran nowhere when the
+      # suite rule was added.
       - name: Check gate coverage
         run: corepack yarn gates:coverage:check
 

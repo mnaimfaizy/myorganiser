@@ -10,6 +10,7 @@ import {
   assertGateCoverage,
   gatherFromDisk,
   listCheckers,
+  listSuites,
   nodeRuns,
   pipelineInvocations,
   stripComments,
@@ -56,6 +57,45 @@ test('nodeRuns marks a --test invocation as a test runner, not a checker run', (
   ]);
   assert.deepEqual(nodeRuns('node tools/scripts/check-a.mjs --staged'), [
     { script: 'tools/scripts/check-a.mjs', isTestRunner: false },
+  ]);
+});
+
+test('nodeRuns reports every file a --test invocation runs, not just the first', () => {
+  assert.deepEqual(
+    nodeRuns(
+      'node --test tools/scripts/lib/a.test.mjs tools/scripts/lib/b.test.mjs',
+    ),
+    [
+      { script: 'tools/scripts/lib/a.test.mjs', isTestRunner: true },
+      { script: 'tools/scripts/lib/b.test.mjs', isTestRunner: true },
+    ],
+  );
+});
+
+test('nodeRuns does not let a --test invocation swallow a later, unrelated node call on the next line', () => {
+  const pipeline =
+    '      - name: Step A\n' +
+    '        run: node --test tools/scripts/a.test.mjs\n' +
+    '      - name: Step B\n' +
+    '        run: node tools/scripts/check-b.mjs\n';
+
+  assert.deepEqual(nodeRuns(pipeline), [
+    { script: 'tools/scripts/a.test.mjs', isTestRunner: true },
+    { script: 'tools/scripts/check-b.mjs', isTestRunner: false },
+  ]);
+});
+
+test('listSuites finds *.test.mjs anywhere under the scripts directory', (t) => {
+  const workspace = mkdtempSync(join(tmpdir(), 'gate-coverage-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  mkdirSync(join(workspace, 'tools/scripts/lib'), { recursive: true });
+  writeFileSync(join(workspace, 'tools/scripts/check-a.mjs'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-a.test.mjs'), '');
+  writeFileSync(join(workspace, 'tools/scripts/lib/helper.test.mjs'), '');
+
+  assert.deepEqual(listSuites({ cwd: workspace }), [
+    'tools/scripts/check-a.test.mjs',
+    'tools/scripts/lib/helper.test.mjs',
   ]);
 });
 
@@ -409,6 +449,192 @@ test('a checker invoked directly by path in a workflow counts as wired', () => {
   assert.deepEqual(
     report.wired.map((entry) => entry.via[0].kind),
     ['direct'],
+  );
+});
+
+// The suite rule (ADR 0135 slice 1): every *.test.mjs is run by some wired
+// script, matched by exact script name the same way a checker is.
+
+// Suite case 1 — the defect the rule exists for.
+test('an unreached suite is caught and named', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: [
+      'tools/scripts/check-a.test.mjs',
+      'tools/scripts/check-b.test.mjs',
+    ],
+    pkgScripts: {
+      'a:test': 'node --test tools/scripts/check-a.test.mjs',
+      'b:test': 'node --test tools/scripts/check-b.test.mjs',
+    },
+    pipelines: hook('corepack yarn a:test\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/check-b.test.mjs'],
+  );
+  assert.deepEqual(report.unwiredSuites[0].npmScripts, ['b:test']);
+});
+
+// Suite case 2 — reached through the aggregate manifest, resolved the same
+// way a checker is. No suite goes through the real aggregate today; this
+// proves the mechanism the checker rule already relies on is shared, not
+// checker-specific.
+test('a suite reached only through the aggregate manifest counts as wired', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/check-a.test.mjs'],
+    pkgScripts: {
+      'a:test': 'node --test tools/scripts/check-a.test.mjs',
+      'gates:run': `node ${AGGREGATE}`,
+    },
+    pipelines: hook('corepack yarn gates:run\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([
+      {
+        id: 'a:test',
+        npmScript: 'a:test',
+        script: 'tools/scripts/check-a.test.mjs',
+        args: [],
+      },
+    ]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.wiredSuites.map((entry) => entry.via.map((via) => via.kind)),
+    [['aggregate']],
+  );
+});
+
+// Suite case 3 — reached directly by path in a workflow, with no npm script
+// at all. The copilot-hooks suites had exactly this gap: no package.json
+// script ran them, so even a direct pipeline reference would have had
+// nothing to match against until one existed.
+test('a suite invoked directly by path in a workflow counts as wired', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/copilot-hooks/a.test.mjs'],
+    pkgScripts: {},
+    pipelines: [
+      {
+        path: '.github/workflows/ci.yml',
+        text: '        run: node --test tools/scripts/copilot-hooks/a.test.mjs\n',
+      },
+    ],
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.wiredSuites.map((entry) => entry.via[0].kind),
+    ['direct'],
+  );
+});
+
+// Suite case 4 — an exemption is a decision somebody made, same as a checker.
+test('a suite opt-out with a written reason is honoured', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/check-a.test.mjs'],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([
+      {
+        check: 'check-a.test.mjs',
+        reason: 'Benchmark contract run by hand only, never in a pipeline.',
+      },
+    ]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.optedOutSuites.map((entry) => entry.suite),
+    ['tools/scripts/check-a.test.mjs'],
+  );
+});
+
+// Suite case 5 — a reasonless opt-out is rejected, not silently honoured,
+// same as a checker.
+test('a suite opt-out without a reason is rejected, not silently honoured', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/check-a.test.mjs'],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([{ check: 'check-a.test.mjs' }]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 2);
+  assert.match(report.errors.join('\n'), /carries no written reason/);
+  assert.deepEqual(report.optedOutSuites, []);
+});
+
+// A contract-test suite being opted out does not retroactively exempt its
+// sibling checker, and vice versa — the two opt-out maps stay independent.
+test('a checker opt-out does not exempt its sibling suite', () => {
+  const report = assertGateCoverage({
+    checkers: ['tools/scripts/check-a.mjs'],
+    suites: ['tools/scripts/check-a.test.mjs'],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([{ check: 'check-a.mjs', reason: 'Not a gate.' }]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.optedOut.map((entry) => entry.checker),
+    ['tools/scripts/check-a.mjs'],
+  );
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/check-a.test.mjs'],
+  );
+});
+
+// The false pass the suite rule must not reproduce in the other direction:
+// a checker being wired must not launder its own contract suite as wired.
+test('a checker being wired does not satisfy its sibling suite wiring', () => {
+  const report = assertGateCoverage({
+    checkers: ['tools/scripts/check-a.mjs'],
+    suites: ['tools/scripts/check-a.test.mjs'],
+    pkgScripts: {
+      'a:check': 'node tools/scripts/check-a.mjs',
+      'a:test': 'node --test tools/scripts/check-a.test.mjs',
+    },
+    pipelines: hook('corepack yarn a:check\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/check-a.test.mjs'],
+  );
+});
+
+test('every suite in this repository is wired or opted out with a reason', () => {
+  const report = assertGateCoverage(gatherFromDisk({ cwd: REPO_ROOT }));
+
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    [],
+  );
+  // A floor, deliberately not an exact count — see the matching comment on
+  // the checker-count assertion below.
+  assert.ok(
+    report.wiredSuites.length >= 50,
+    `expected the repository to carry at least fifty suites, found ${report.wiredSuites.length}`,
   );
 });
 
