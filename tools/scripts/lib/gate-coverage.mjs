@@ -556,8 +556,9 @@ export function assertGateCoverage({
   const optedOutSuites = new Map();
   const declaredNonGates = [];
   for (const entry of optOutEntries) {
+    const hasSlash = entry.check.includes('/');
     const asPath = normalize(
-      entry.check.includes('/') ? entry.check : `${SCRIPTS_DIR}/${entry.check}`,
+      hasSlash ? entry.check : `${SCRIPTS_DIR}/${entry.check}`,
     );
     if (checkers.includes(asPath)) {
       optedOutCheckers.set(asPath, entry);
@@ -566,6 +567,27 @@ export function assertGateCoverage({
     if (suites.includes(asPath)) {
       optedOutSuites.set(asPath, entry);
       continue;
+    }
+    // `listCheckers` is flat, so a bare filename always resolves a checker;
+    // `listSuites` is recursive (lib/, review/, ai/, ci/, copilot-hooks/), so
+    // a bare filename for a nested suite needs a basename fallback instead of
+    // the literal SCRIPTS_DIR/<name> path tried above.
+    if (!hasSlash) {
+      const nestedMatches = suites.filter((suite) =>
+        suite.endsWith(`/${entry.check}`),
+      );
+      if (nestedMatches.length === 1) {
+        optedOutSuites.set(nestedMatches[0], entry);
+        continue;
+      }
+      if (nestedMatches.length > 1) {
+        errors.push(
+          `${optOutPath}: \`${entry.check}\` matches more than one suite ` +
+            `(${nestedMatches.join(', ')}). Name the full path instead of ` +
+            'the bare filename so the opt-out exempts exactly one suite.',
+        );
+        continue;
+      }
     }
     if (Object.prototype.hasOwnProperty.call(pkgScripts, entry.check)) {
       const reachedCheckers = (runsByNpmScript.get(entry.check) ?? []).filter(

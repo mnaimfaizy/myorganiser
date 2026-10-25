@@ -60,6 +60,79 @@ test('exits 0 and reports the counts against the real repository', () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /gate-coverage: \d+ checkers wired/);
   assert.match(result.stdout, /non-gates declared with a reason/);
+  assert.match(
+    result.stdout,
+    /gate-coverage: \d+ suites wired, \d+ suites opted out/,
+  );
+});
+
+/**
+ * A fixture with one wired checker and one unwired Contract Suite, so the
+ * suite rule's failure (ADR 0135) can be asserted without the checker rule
+ * (ADR 0043) also firing.
+ */
+function createWorkspaceWithSuite(t, optOutConfig) {
+  const workspace = mkdtempSync(join(tmpdir(), 'gate-coverage-cli-suite-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  mkdirSync(join(workspace, 'tools/scripts'), { recursive: true });
+  mkdirSync(join(workspace, 'tools/config'), { recursive: true });
+  mkdirSync(join(workspace, '.husky'), { recursive: true });
+
+  writeFileSync(join(workspace, 'tools/scripts/check-wired.mjs'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-wired.test.mjs'), '');
+  writeFileSync(
+    join(workspace, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'wired:check': 'node tools/scripts/check-wired.mjs',
+      },
+    }),
+  );
+  writeFileSync(
+    join(workspace, '.husky/pre-commit'),
+    'corepack yarn wired:check\n',
+  );
+  writeFileSync(
+    join(workspace, 'tools/config/gate-coverage-optout.json'),
+    JSON.stringify(optOutConfig),
+  );
+
+  return workspace;
+}
+
+test('exits 1 naming each unwired suite, not a count', (t) => {
+  const workspace = createWorkspaceWithSuite(t, {
+    schemaVersion: 1,
+    optOut: [],
+  });
+
+  const result = run(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /ADR 0135/);
+  assert.match(result.stderr, /tools\/scripts\/check-wired\.test\.mjs/);
+  assert.match(
+    result.stderr,
+    /runnable as: node --test tools\/scripts\/check-wired\.test\.mjs/,
+  );
+});
+
+test('exits 0 when the unwired suite carries an opt-out with a reason', (t) => {
+  const workspace = createWorkspaceWithSuite(t, {
+    schemaVersion: 1,
+    optOut: [
+      {
+        check: 'check-wired.test.mjs',
+        reason: 'Benchmark contract run by hand only, never in a pipeline.',
+      },
+    ],
+  });
+
+  const result = run(workspace);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /1 suites opted out/);
 });
 
 test('exits 1 naming each unwired checker, not a count', (t) => {

@@ -560,6 +560,55 @@ test('a suite opt-out with a written reason is honoured', () => {
   );
 });
 
+// listSuites is recursive (lib/, review/, ai/, ci/, copilot-hooks/), unlike
+// the flat listCheckers, so a bare filename for a nested suite must resolve
+// by basename rather than the literal SCRIPTS_DIR/<name> path a checker uses.
+test('a suite opt-out may name a nested suite by its bare filename', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/lib/check-a.test.mjs'],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([
+      {
+        check: 'check-a.test.mjs',
+        reason: 'Benchmark contract run by hand only, never in a pipeline.',
+      },
+    ]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.optedOutSuites.map((entry) => entry.suite),
+    ['tools/scripts/lib/check-a.test.mjs'],
+  );
+});
+
+// A bare filename shared by two nested suites has no single target to
+// exempt, so it is rejected rather than guessing one.
+test('a suite opt-out naming a bare filename shared by two nested suites is rejected as ambiguous', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: [
+      'tools/scripts/lib/check-a.test.mjs',
+      'tools/scripts/review/check-a.test.mjs',
+    ],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([{ check: 'check-a.test.mjs', reason: 'Not a gate.' }]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 2);
+  assert.match(report.errors.join('\n'), /matches more than one suite/);
+  assert.deepEqual(report.optedOutSuites, []);
+  assert.deepEqual(report.unwiredSuites.map((entry) => entry.suite).sort(), [
+    'tools/scripts/lib/check-a.test.mjs',
+    'tools/scripts/review/check-a.test.mjs',
+  ]);
+});
+
 // Suite case 5 — a reasonless opt-out is rejected, not silently honoured,
 // same as a checker.
 test('a suite opt-out without a reason is rejected, not silently honoured', () => {
