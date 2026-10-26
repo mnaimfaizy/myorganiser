@@ -17,6 +17,10 @@ import test from 'node:test';
 
 import { commitsBetween, pushesFromRuns } from './measure-noise.mjs';
 import { acknowledgementsIn } from './noise.mjs';
+import { isolateGitEnvironment } from '../lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const run = (databaseId, headSha, createdAt) => ({
   databaseId,

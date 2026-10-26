@@ -45,6 +45,7 @@
     "openapi:artifacts": "node tools/scripts/check-openapi-artifacts.mjs",
     "openapi:artifacts:test": "node --test tools/scripts/check-openapi-artifacts.test.mjs",
     "git-assert-clean:test": "node --test tools/scripts/git-assert-clean.test.mjs",
+    "git-environment:test": "node --test tools/scripts/lib/git-environment.test.mjs",
     "storybook": "nx storybook web-ui",
     "build-storybook": "nx build-storybook web-ui --stats-json --skip-nx-cache",
     "test-storybook": "test-storybook --config-dir libs/web/ui/.storybook",

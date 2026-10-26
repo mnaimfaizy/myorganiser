@@ -850,6 +850,14 @@ class YouTubeSyncService {
   /** Upload Sync: refresh Cached Uploads with a per-user 15-minute cooldown. */
   async syncUploads(userId: string): Promise<YouTubeRefreshResult> {
     const integration = await this.requireConnectedIntegration(userId);
+    // With no Enabled Channel there is nothing to fetch, so the request must
+    // not spend the cooldown or record a run the User would then wait out.
+    const enabledChannels = await this.prisma.youTubeSubscription.count({
+      where: { userId, enabled: true },
+    });
+    if (enabledChannels === 0) {
+      return this.noopResult(userId);
+    }
     return this.runManualSync({
       userId,
       stamp: integration.lastManualRefreshAt,

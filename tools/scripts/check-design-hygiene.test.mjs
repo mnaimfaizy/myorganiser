@@ -17,6 +17,10 @@ import {
   LEGACY,
   ROSTER,
 } from './lib/design-page-roster.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-design-hygiene.mjs');

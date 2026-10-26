@@ -6,6 +6,11 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
+
 // Each fixture repository is built and checked in isolation. The old spelling is assembled
 // from parts so that this file does not match the check it tests.
 const HERE = dirname(fileURLToPath(import.meta.url));
