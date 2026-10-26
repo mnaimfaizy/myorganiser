@@ -44,6 +44,32 @@ const OUTSTANDING_LINE =
 // "None" is a way of saying there is nothing outstanding, not an item.
 const NOTHING = /^(?:none|n\/a|nothing|-)?\.?$/i;
 
+// Agents justify the "none" — `OUTSTANDING: none — all criteria verified` — and
+// #1326 was held on exactly that line. A "none" set off from its explanation by
+// punctuation still says nothing is outstanding; "none of the device checks ran"
+// has no separator and stays an item.
+const NOTHING_WITH_REASON =
+  /^(?:none|n\/a|nothing)(?:\.\s|\s*[—–:;,(]|\s+-\s)(.*)$/i;
+
+// When in doubt the slice is held: a false hold costs a person one look, a false
+// clean closes a slice with work left in it. So a reason clears the line only if
+// it affirms the work was checked, and names no exception. A deny-list alone let
+// "none — device check skipped" through, because no listed word was in it.
+// Bare "fails" is not an exception: a gate that fails on drift is the behaviour
+// a slice here verifies, and #1326's own line says "Meta-Gate fails/accepts".
+const AFFIRMS =
+  /\b(?:verified|re-verified|passed|passes|pass|green|clean|done|fixed|complete|completed|met|delivered|checked|confirmed)\b/i;
+
+const EXCEPTION =
+  /\b(?:but|except|however|unless|although|though|yet|still|pending|remaining|remains|left|skipped|skip|deferred|later|follow-up|todo|tbd|needs?|missing|partial|partly|failed|failing|blocked|unable|unverified|unchecked|not|never|no|could not|cannot|\w+n['’]t)\b/i;
+
+const saysNothing = (text) => {
+  if (NOTHING.test(text)) return true;
+  const reason = NOTHING_WITH_REASON.exec(text);
+  if (reason === null) return false;
+  return AFFIRMS.test(reason[1]) && !EXCEPTION.test(reason[1]);
+};
+
 /**
  * The output of the last iteration of the last run in a slice log.
  *
@@ -93,7 +119,7 @@ export function judgeRunOutcome(contents) {
 
   for (const line of output.split('\n')) {
     const marker = OUTSTANDING_LINE.exec(line);
-    if (marker && !NOTHING.test(marker[1])) add(marker[1]);
+    if (marker && !saysNothing(marker[1])) add(marker[1]);
   }
 
   return { clean: outstanding.length === 0, outstanding };
