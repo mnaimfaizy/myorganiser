@@ -119,6 +119,7 @@ jest.mock('../prisma', () => {
       deleteMany: jest.fn(),
       update: jest.fn(),
       findFirst: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(1),
     },
     youTubeVideo: {
       upsert: jest.fn().mockResolvedValue({}),
@@ -1730,6 +1731,89 @@ describe('YouTubeSyncService', () => {
         await expect(youtubeSyncService.syncUploads('user-1')).rejects.toThrow(
           'YouTube account is not connected.',
         );
+        expect(mockPrisma.youTubeSubscription.count).not.toHaveBeenCalled();
+      });
+
+      it('syncUploads should return the noop result and claim nothing when no channel is enabled', async () => {
+        const lastSyncAttemptAt = new Date('2026-01-01');
+        (
+          mockPrisma.youTubeIntegration.findUnique as jest.Mock
+        ).mockResolvedValue({
+          userId: 'user-1',
+          status: 'connected',
+          lastManualRefreshAt: null,
+          lastSyncStatus: 'success',
+          lastSyncAttemptAt,
+          lastSyncError: null,
+          ...defaultChannelSyncFields,
+        });
+        (
+          mockPrisma.youTubeSubscription.count as jest.Mock
+        ).mockResolvedValueOnce(0);
+
+        const videosSpy = jest.spyOn(
+          youtubeSyncService,
+          'syncVideosForUserWithStatus',
+        );
+
+        const result = await youtubeSyncService.syncUploads('user-1');
+
+        expect(result).toEqual({
+          subscriptionsSynced: 0,
+          videosSynced: 0,
+          status: 'success',
+          lastSyncedAt: null,
+          lastSyncAttemptAt,
+          lastSyncError: null,
+          retryAt: null,
+          progress: null,
+          channelStatus: 'never',
+          channelLastAttemptAt: null,
+          channelLastError: null,
+          channelRetryAt: null,
+        });
+        expect(mockPrisma.youTubeSubscription.count).toHaveBeenCalledWith({
+          where: { userId: 'user-1', enabled: true },
+        });
+        expect(mockPrisma.youTubeIntegration.updateMany).not.toHaveBeenCalled();
+        expect(mockPrisma.youTubeIntegration.update).not.toHaveBeenCalled();
+        expect(videosSpy).not.toHaveBeenCalled();
+      });
+
+      it('syncUploads should stay a no-op without touching the stamp when no channel is enabled during an active cooldown', async () => {
+        const lastManualRefreshAt = new Date(Date.now() - 60 * 1000);
+        (
+          mockPrisma.youTubeIntegration.findUnique as jest.Mock
+        ).mockResolvedValue({
+          userId: 'user-1',
+          status: 'connected',
+          lastManualRefreshAt,
+          lastSyncStatus: 'success',
+          lastSyncAttemptAt: new Date('2026-01-01'),
+          lastSyncError: null,
+          ...defaultChannelSyncFields,
+        });
+        (
+          mockPrisma.youTubeSubscription.count as jest.Mock
+        ).mockResolvedValueOnce(0);
+
+        const videosSpy = jest.spyOn(
+          youtubeSyncService,
+          'syncVideosForUserWithStatus',
+        );
+
+        const result = await youtubeSyncService.syncUploads('user-1');
+
+        expect(result.status).toBe('success');
+        expect(result.status).not.toBe('cooldown');
+        expect(result.videosSynced).toBe(0);
+        expect(result.subscriptionsSynced).toBe(0);
+        expect(result.retryAt).toEqual(
+          new Date(lastManualRefreshAt.getTime() + UPLOAD_SYNC_COOLDOWN_MS),
+        );
+        expect(mockPrisma.youTubeIntegration.updateMany).not.toHaveBeenCalled();
+        expect(mockPrisma.youTubeIntegration.update).not.toHaveBeenCalled();
+        expect(videosSpy).not.toHaveBeenCalled();
       });
 
       it('syncUploads should record upload failure via recordSyncState when video sync throws', async () => {
