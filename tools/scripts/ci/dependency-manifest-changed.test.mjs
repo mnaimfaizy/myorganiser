@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from '../testing/git-fixture-env.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DETECTOR = join(HERE, 'dependency-manifest-changed.mjs');
 
@@ -27,7 +29,7 @@ function git(workspace, ...args) {
   return execFileSync(
     'git',
     ['-c', 'user.email=test@example.com', '-c', 'user.name=test', ...args],
-    { cwd: workspace, encoding: 'utf8' },
+    { cwd: workspace, encoding: 'utf8', env: cleanGitEnv() },
   ).trim();
 }
 

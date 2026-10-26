@@ -325,6 +325,21 @@ test('explicit tools/scripts Contract Suite paths remain skipped', (t) => {
   assert.match(result.stdout, /SKIPPED \(Contract Suite/);
 });
 
+test('a Jest spec under tools/scripts is still checked, not skipped as a Contract Suite', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/copilot-hooks/__tests__/widget.spec.ts',
+    "test('widget', () => { console.info('no expect call'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(result.stdout, /SKIPPED/);
+  assert.match(result.stdout, /no-assertions/);
+});
+
 test('missing input remains a bad invocation', (t) => {
   const workspace = createWorkspace(t);
 
