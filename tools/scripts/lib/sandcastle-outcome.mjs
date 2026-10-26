@@ -44,6 +44,25 @@ const OUTSTANDING_LINE =
 // "None" is a way of saying there is nothing outstanding, not an item.
 const NOTHING = /^(?:none|n\/a|nothing|-)?\.?$/i;
 
+// Agents justify the "none" — `OUTSTANDING: none — all criteria verified` — and
+// #1326 was held on exactly that line. A "none" set off from its explanation by
+// punctuation still says nothing is outstanding; "none of the device checks ran"
+// has no separator and stays an item.
+const NOTHING_WITH_REASON =
+  /^(?:none|n\/a|nothing)(?:\.\s|\s*[—–:;,(]|\s+-\s)(.*)$/i;
+
+// A reason that carves out an exception is an item after all. When in doubt the
+// slice is held: a false hold costs a person one look, a false clean closes a
+// slice with work left in it.
+const EXCEPTION =
+  /\b(?:but|except|however|unless|although|though|yet|pending|unverified|not (?:verified|done|delivered|run|checked)|could not|couldn't|cannot|can't)\b/i;
+
+const saysNothing = (text) => {
+  if (NOTHING.test(text)) return true;
+  const reason = NOTHING_WITH_REASON.exec(text);
+  return reason !== null && !EXCEPTION.test(reason[1]);
+};
+
 /**
  * The output of the last iteration of the last run in a slice log.
  *
@@ -93,7 +112,7 @@ export function judgeRunOutcome(contents) {
 
   for (const line of output.split('\n')) {
     const marker = OUTSTANDING_LINE.exec(line);
-    if (marker && !NOTHING.test(marker[1])) add(marker[1]);
+    if (marker && !saysNothing(marker[1])) add(marker[1]);
   }
 
   return { clean: outstanding.length === 0, outstanding };

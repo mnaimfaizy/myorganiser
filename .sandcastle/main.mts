@@ -2313,7 +2313,7 @@ function buildPrompt(
     `  ${OUTSTANDING_MARKER} needs a device — <which criterion or behaviour>`,
     `  ${OUTSTANDING_MARKER} could not read <source> — <what was assumed instead>`,
     ``,
-    `Print none when there is nothing. The orchestrator closes this slice only when there are none; otherwise it integrates your work and hands the slice to a person with your list. An honest list is not a failure. A list with an item missing is.`,
+    `When there is nothing, print exactly \`${OUTSTANDING_MARKER} none\` on its own line, with no explanation after it: your evidence belongs in the handoff markers. Never write "none" followed by an exception ("none, but …", "none — except …"); that exception is an item and gets its own line. The orchestrator closes this slice only when there are none; otherwise it integrates your work and hands the slice to a person with your list. An honest list is not a failure. A list with an item missing is.`,
     ``,
     `## Handoff markers (required)`,
     ``,
