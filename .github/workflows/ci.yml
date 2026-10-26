@@ -785,6 +785,9 @@ jobs:
       - name: Sandcastle spec-anchor contracts
         run: corepack yarn sandcastle:spec-anchor:test
 
+      - name: Sandcastle Claude Code pin contracts
+        run: corepack yarn sandcastle:cli-version:test
+
       - name: Sandcastle run-outcome contracts
         run: corepack yarn sandcastle:outcome:test
 

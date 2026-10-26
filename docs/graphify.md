@@ -308,9 +308,10 @@ explicitly a per-developer step and is **not** needed in the image — the sandb
 server, never the skill.
 
 **The sandbox image must be rebuilt after any Dockerfile change here.** `ensureSandboxImage()` in
-`.sandcastle/main.mts` only builds `sandcastle:myorganiser` when the image is missing, so an
-existing image silently keeps whatever it had before — delete it first (`docker image rm
-sandcastle:myorganiser`) to force a rebuild on the next dispatch.
+`.sandcastle/main.mts` only builds `sandcastle:myorganiser` when the image is missing or, on a
+Claude dispatch, when its Claude Code differs from the `SANDCASTLE_CLAUDE_CODE_*` policy. Any
+other change leaves an existing image silently on whatever it had before — delete it first
+(`docker image rm sandcastle:myorganiser`) to force a rebuild on the next dispatch.
 
 Whether the mount is worth its staleness cost is measured, not assumed: `.sandcastle/main.mts`
 already prints `MCP servers: graphify` or `none invoked` per sub-agent (derived from `mcp__<server>__<tool>`

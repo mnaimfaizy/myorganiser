@@ -96,7 +96,17 @@ RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d 
 RUN npm install -g @github/copilot
 USER ${AGENT_UID}:${AGENT_GID}
 RUN curl https://cursor.com/install -fsS | bash
-RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Claude Code's version is a build arg, not a pin in this file. The dispatcher
+# chooses it from SANDCASTLE_CLAUDE_CODE_UPDATE / SANDCASTLE_CLAUDE_CODE_VERSION
+# (.sandcastle/.env.example), passes the exact version here, and rebuilds an
+# image whose `claude --version` differs. A plain `docker build` gets latest.
+# The CLI's own auto-updater is off: updates happen at dispatch, so the version
+# each slice log names is the one the agent ran. See
+# tools/scripts/lib/sandcastle-cli-version.mjs.
+ARG CLAUDE_CODE_VERSION=latest
+ENV DISABLE_AUTOUPDATER=1
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
 
 # Add Cursor/Claude/uv to PATH
 ENV PATH="/home/agent/.local/bin:$PATH"
