@@ -20,6 +20,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
+
 const SCRIPT = fileURLToPath(
   new URL('./git-assert-clean.mjs', import.meta.url),
 );

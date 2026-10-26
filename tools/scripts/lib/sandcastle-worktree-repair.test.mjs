@@ -19,6 +19,10 @@ import {
   repairOrphanedWorktree,
   WORKTREE_STATES,
 } from './sandcastle-worktree-repair.mjs';
+import { isolateGitEnvironment } from './git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const BRANCH = 'slice/1-demo';
 
