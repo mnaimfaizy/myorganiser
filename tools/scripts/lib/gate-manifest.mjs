@@ -263,6 +263,12 @@ export const GATE_MANIFEST = [
     script: 'tools/scripts/check-checker-contracts.mjs',
     args: [],
   },
+  {
+    id: 'ts-suppressions:check',
+    npmScript: 'ts-suppressions:check',
+    script: 'tools/scripts/check-ts-suppressions.mjs',
+    args: [],
+  },
 ];
 
 const formatInvocation = (script, args) =>

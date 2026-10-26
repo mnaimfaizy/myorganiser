@@ -36,15 +36,56 @@ test('exits 2 when the graph file does not exist', (t) => {
 
 test('exits 2 when no project in the graph has a tsconfig', (t) => {
   // Reporting success here would be the exact defect this script exists for:
-  // a green result that means "nothing was looked at".
+  // a green result that means "nothing was looked at". Run against an empty
+  // workspace, not REPO_ROOT: the real tree always carries
+  // tools/scripts/tsconfig.json (a fixed job, not graph-discovered — see
+  // below), which would otherwise give this fixture a config to find.
+  const workspaceRoot = mkdtempSync(join(tmpdir(), 'typecheck-test-'));
+  t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+  const graph = writeGraph(t, {
+    ghost: { name: 'ghost', data: { root: 'does/not/exist', targets: {} } },
+  });
+
+  const result = runChecker(graph, workspaceRoot);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /no project tsconfigs/);
+});
+
+test('reaches tools/scripts/tsconfig.json as a fixed job, not through the graph', (t) => {
+  // tools/scripts is deliberately not a Declared Nx Target (ADR 0135), so no
+  // graph node names it; this asserts the checker still finds the real
+  // config outside the graph loop. Run against REPO_ROOT, where the config
+  // lives, with a graph that names no other tsconfig so only this job runs.
   const graph = writeGraph(t, {
     ghost: { name: 'ghost', data: { root: 'does/not/exist', targets: {} } },
   });
 
   const result = runChecker(graph, REPO_ROOT);
 
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /no project tsconfigs/);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /1 project config\(s\) compile clean/);
+});
+
+test('fails naming a tools/scripts .ts fixture with a type error', (t) => {
+  // tools/scripts has no .ts files of its own yet, so this writes one
+  // directly into the real directory (cleaned up after) rather than standing
+  // up a second fixture tree — the config under test lives at a fixed path,
+  // not one this test controls.
+  const fixture = join('tools', 'scripts', 'tmp-typecheck-fixture.ts');
+  const absoluteFixture = join(REPO_ROOT, fixture);
+  writeFileSync(absoluteFixture, 'const n: number = "string";\n');
+  t.after(() => rmSync(absoluteFixture, { force: true }));
+
+  const graph = writeGraph(t, {
+    ghost: { name: 'ghost', data: { root: 'does/not/exist', targets: {} } },
+  });
+
+  const result = runChecker(graph, REPO_ROOT);
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /tmp-typecheck-fixture\.ts/);
+  assert.match(result.stderr, /error TS/);
 });
 
 test('accepts a project whose tsconfig compiles', (t) => {
@@ -180,7 +221,10 @@ test('checks a bare tsconfig.json when a project has no production config', (t) 
   assert.equal(result.status, 1, result.stdout);
   assert.match(result.stderr, /tsconfig\.json \(1\)/);
   assert.match(result.stderr, /broken\.ts/);
-  assert.match(result.stderr, /1 of 2 config\(s\)/);
+  // 3, not 2: WORKSPACE_ROOT is REPO_ROOT (see the comment above), which
+  // always carries the real tools/scripts/tsconfig.json as a third, passing
+  // fixed job alongside this fixture's two.
+  assert.match(result.stderr, /1 of 3 config\(s\)/);
 });
 
 test('leaves tsconfig.json alone when a production config exists', (t) => {
@@ -221,5 +265,7 @@ test('leaves tsconfig.json alone when a production config exists', (t) => {
   const result = runChecker(graph, REPO_ROOT);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /1 project config\(s\) compile clean/);
+  // 2, not 1: WORKSPACE_ROOT is REPO_ROOT, which always carries the real
+  // tools/scripts/tsconfig.json as a second, passing fixed job.
+  assert.match(result.stdout, /2 project config\(s\) compile clean/);
 });

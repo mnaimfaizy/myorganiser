@@ -9,8 +9,9 @@
  *
  * Three rules carry all the risk here, and each one is a mistake already made:
  *
- *   1. **Detection is by filename**, `check-*.mjs` in the scripts directory —
- *      never by a `*:check` script-name suffix. `openapi:artifacts` and
+ *   1. **Detection is by filename**, `check-*.mjs` or `check-*.ts` in the
+ *      scripts directory (ADR 0135's expand step — a migrated checker stays
+ *      found) — never by a `*:check` script-name suffix. `openapi:artifacts` and
  *      `component:hygiene` carry no such suffix, and the first is one of the
  *      two unwired checks that motivated the rule. Selecting on a *name* is
  *      also exactly why `check-lint-coverage.mjs` had to exist.
@@ -201,7 +202,13 @@ export function pipelineInvocations(text) {
   return { names, nodeScripts, nodeTestScripts };
 }
 
-/** Every `check-*.mjs` in the scripts directory, contract suites excluded. */
+/**
+ * Every `check-*.mjs` or `check-*.ts` in the scripts directory (flat, not
+ * recursive — checkers live at the top level), contract suites excluded.
+ * `.ts` is included from the expand step on (ADR 0135), ahead of any checker
+ * actually migrating there, the same way `listSuites` already covers
+ * `.test.ts` from slice 1.
+ */
 export function listCheckers({
   cwd = process.cwd(),
   scriptsDir = SCRIPTS_DIR,
@@ -213,8 +220,8 @@ export function listCheckers({
       (entry) =>
         entry.isFile() &&
         entry.name.startsWith('check-') &&
-        entry.name.endsWith('.mjs') &&
-        !entry.name.endsWith('.test.mjs'),
+        /\.(mjs|ts)$/.test(entry.name) &&
+        !/\.test\.(mjs|ts)$/.test(entry.name),
     )
     .map((entry) => normalize(`${scriptsDir}/${entry.name}`))
     .sort();

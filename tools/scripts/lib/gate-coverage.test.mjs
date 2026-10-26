@@ -129,6 +129,37 @@ test('listCheckers finds check-*.mjs by filename and excludes contract suites', 
   ]);
 });
 
+// ADR 0135's expand step: a migrated `check-*.ts` checker must be found the
+// same way its `.mjs` sibling is, and its own `.test.ts` contract suite must
+// still be excluded rather than mistaken for a second checker.
+test('listCheckers finds a migrated check-*.ts checker and excludes its .test.ts suite', (t) => {
+  const workspace = mkdtempSync(join(tmpdir(), 'gate-coverage-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  mkdirSync(join(workspace, 'tools/scripts'), { recursive: true });
+  for (const name of ['check-a.mjs', 'check-b.ts', 'check-b.test.ts']) {
+    writeFileSync(join(workspace, 'tools/scripts', name), '');
+  }
+
+  assert.deepEqual(listCheckers({ cwd: workspace }), [
+    'tools/scripts/check-a.mjs',
+    'tools/scripts/check-b.ts',
+  ]);
+});
+
+test('listSuites finds *.test.ts anywhere under the scripts directory', (t) => {
+  const workspace = mkdtempSync(join(tmpdir(), 'gate-coverage-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  mkdirSync(join(workspace, 'tools/scripts/lib'), { recursive: true });
+  writeFileSync(join(workspace, 'tools/scripts/check-a.ts'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-a.test.ts'), '');
+  writeFileSync(join(workspace, 'tools/scripts/lib/helper.test.ts'), '');
+
+  assert.deepEqual(listSuites({ cwd: workspace }), [
+    'tools/scripts/check-a.test.ts',
+    'tools/scripts/lib/helper.test.ts',
+  ]);
+});
+
 // Contract case 1 — the defect the gate exists for.
 test('an unwired checker is caught and named', () => {
   const report = assertGateCoverage({
@@ -202,6 +233,47 @@ test('the aggregate cannot launder a checker while nothing invokes the aggregate
   assert.deepEqual(
     report.unwired.map((entry) => entry.checker),
     ['tools/scripts/check-a.mjs'],
+  );
+});
+
+// A migrated check-*.ts checker is classified exactly like its .mjs sibling —
+// `assertGateCoverage` never inspects the extension, but the acceptance case
+// is named so the expand step's claim ("the Meta-Gate finds check-*.ts too")
+// is proven at this seam, wired and unwired, not just asserted in prose.
+test('an unwired check-*.ts checker is caught and named', () => {
+  const report = assertGateCoverage({
+    checkers: ['tools/scripts/check-a.ts'],
+    pkgScripts: {},
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.unwired.map((entry) => entry.checker),
+    ['tools/scripts/check-a.ts'],
+  );
+});
+
+test('a check-*.ts checker invoked directly by path in a workflow counts as wired', () => {
+  const report = assertGateCoverage({
+    checkers: ['tools/scripts/check-a.ts'],
+    pkgScripts: {},
+    pipelines: [
+      {
+        path: '.github/workflows/ci.yml',
+        text: '        run: node tools/scripts/check-a.ts\n',
+      },
+    ],
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.wired.map((entry) => entry.via[0].kind),
+    ['direct'],
   );
 });
 
@@ -573,6 +645,34 @@ test('a suite reached only through the tools:test glob counts as wired', () => {
     script: 'tools:test',
     wired: true,
     reached: ['tools/scripts/lib/check-a.test.mjs'],
+  });
+});
+
+// Same mechanism, the other extension: a migrated suite's `.test.ts` file is
+// reached by the glob's real two-pattern command exactly like its `.mjs`
+// sibling, with no separate wiring step of its own.
+test('a .test.ts suite reached only through the tools:test glob counts as wired', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/lib/check-a.test.ts'],
+    pkgScripts: {
+      'tools:test':
+        "node --test 'tools/scripts/**/*.test.mjs' 'tools/scripts/**/*.test.ts'",
+    },
+    pipelines: hook('corepack yarn tools:test\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.wiredSuites.map((entry) => entry.via.map((via) => via.kind)),
+    [['glob']],
+  );
+  assert.deepEqual(report.globTest, {
+    script: 'tools:test',
+    wired: true,
+    reached: ['tools/scripts/lib/check-a.test.ts'],
   });
 });
 

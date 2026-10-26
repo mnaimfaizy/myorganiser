@@ -295,7 +295,7 @@ jobs:
         if: steps.preflight.outputs.skip != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         if: steps.preflight.outputs.skip != 'true'
@@ -628,7 +628,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       # The publisher reaches schema.mjs for the finding shape and the tier
       # labels, and schema.mjs imports zod. This job needs the install like

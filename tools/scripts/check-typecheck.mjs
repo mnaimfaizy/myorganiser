@@ -29,6 +29,14 @@
 // tells sub-agents to run `tsc` over the spec config — the repo treated it as a
 // real gate, just an unautomated one.
 //
+// `tools/scripts/tsconfig.json` is a fixed job, not one discovered through the
+// Nx project graph (ADR 0135): `tools/scripts` is deliberately not a Declared
+// Nx Target, so it is checked whenever the file exists, outside the
+// project-node loop below. Before any script migrates there, its `include`
+// matches nothing and `tsc` reports TS18003 ("no inputs were found") rather
+// than a type error; that is a vacuous pass, not a failure, so it is
+// normalized to one below rather than reported as 1 broken config.
+//
 // Generated code must exist before this runs. `apps/backend/src/prisma` is
 // gitignored, so a fresh checkout has no `@prisma/client` to compile against and
 // backend reports 33 errors that say nothing about the diff. `backend:test`
@@ -73,6 +81,11 @@ const FALLBACK_CONFIG_NAME = 'tsconfig.json';
 // production code and specs compile under different options.
 const SPEC_CONFIG_NAME = 'tsconfig.spec.json';
 
+// Not an Nx project root, so not discovered by the graph loop below — see the
+// file header. `tools-scripts` is a synthetic project name for this job; it
+// names nothing in the Nx graph.
+const TOOLS_SCRIPTS_RELATIVE = join('tools', 'scripts', 'tsconfig.json');
+
 const fail = (msg) => {
   console.error(`typecheck: ${msg}`);
   process.exit(2);
@@ -105,6 +118,14 @@ for (const [name, node] of Object.entries(nodes)) {
   }
 }
 
+if (existsSync(join(WORKSPACE_ROOT, TOOLS_SCRIPTS_RELATIVE))) {
+  jobs.push({
+    name: 'tools-scripts',
+    config: 'tsconfig.json',
+    relative: TOOLS_SCRIPTS_RELATIVE,
+  });
+}
+
 if (jobs.length === 0) fail('no project tsconfigs found');
 
 function runTsc(job) {
@@ -119,6 +140,15 @@ function runTsc(job) {
     child.stderr.on('data', (d) => (output += d));
     child.on('close', (status) => {
       const errors = output.match(/error TS\d+/g) ?? [];
+      // TS18003 ("no inputs were found") means this config's `include` matches
+      // no file yet — true of `tools/scripts/tsconfig.json` before any script
+      // migrates there (ADR 0135) — which is nothing to typecheck, not a type
+      // error. Normalized to a pass only when it is the sole diagnostic: a real
+      // type error alongside it still fails the job.
+      if (errors.length === 1 && errors[0] === 'error TS18003') {
+        resolveJob({ ...job, status: 0, errors: 0, output });
+        return;
+      }
       resolveJob({ ...job, status, errors: errors.length, output });
     });
   });

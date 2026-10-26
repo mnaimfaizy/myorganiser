@@ -1,0 +1,28 @@
+{
+  // ADR 0135's expand step: `tools/scripts` moves to strict TypeScript run by
+  // Node's type stripping, not `tsx` and not a build step, so `module` and
+  // `moduleResolution` are `nodenext` rather than the base tsconfig's
+  // deprecated `node` — this config does not extend tsconfig.base.json at
+  // all, so it never inherits that setting by accident.
+  //
+  // `copilot-hooks/__tests__` is excluded because its specs are Jest
+  // (`describe`/`it`/`expect`, jest globals), typechecked today by
+  // `tools/tsconfig.spec.json`'s `types: ["jest", "node"]`. ADR 0135 moves
+  // them to `node --test` in its own later slice; until then they stay on
+  // the Jest program rather than failing here for missing jest types.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["copilot-hooks/__tests__"]
+}

@@ -4,7 +4,7 @@
   "license": "Elastic-2.0",
   "packageManager": "yarn@4.13.0",
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=22.18.0",
     "yarn": ">=4.13.0"
   },
   "scripts": {
@@ -138,6 +138,8 @@
     "lint:coverage:test": "node --test tools/scripts/check-lint-coverage.test.mjs",
     "typecheck:check": "node tools/scripts/check-typecheck.mjs",
     "typecheck:check:test": "node --test tools/scripts/check-typecheck.test.mjs",
+    "ts-suppressions:check": "node tools/scripts/check-ts-suppressions.mjs",
+    "ts-suppressions:test": "node --test tools/scripts/check-ts-suppressions.test.mjs",
     "review:validate": "node tools/scripts/review/validate-review-report.mjs",
     "review:render": "node tools/scripts/review/render-review-report.mjs",
     "review:test": "node --test tools/scripts/review/schema.test.mjs tools/scripts/review/rules.test.mjs tools/scripts/review/cli.test.mjs tools/scripts/review/resolve-spec.test.mjs tools/scripts/review/publish.test.mjs tools/scripts/review/golden.test.mjs tools/scripts/review/golden-tiers.test.mjs tools/scripts/review/golden-standing.test.mjs tools/scripts/review/golden-results.test.mjs tools/scripts/review/classify-reviewer-run.test.mjs tools/scripts/review/transcript-facts.test.mjs tools/scripts/review/run-facts.test.mjs tools/scripts/review/run-ladder.test.mjs tools/scripts/review/executed-evidence.test.mjs tools/scripts/review/no-install-imports.test.mjs tools/scripts/review/run-facts-wiring.test.mjs tools/scripts/review/run-from-tooling.test.mjs tools/scripts/review/obligations.test.mjs tools/scripts/review/citations.test.mjs tools/scripts/review/escaped-defects.test.mjs tools/scripts/review/measure-escaped-defects.test.mjs tools/scripts/review/noise.test.mjs tools/scripts/review/measure-noise.test.mjs tools/scripts/review/apply-review-tier-label.test.mjs tools/scripts/review/run-review-tier-check.test.mjs",

@@ -2138,10 +2138,10 @@
         <div class="fact">
           <div class="fname">Node &mdash; three scopes, one floor</div>
           <p>
-            CI runners pin exactly <code>'22'</code> at every
+            CI runners pin exactly <code>'22.18'</code> at every
             <code>setup-node</code> step across <code>ci.yml</code>,
             <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>.
-            The repo floor is <code>&gt;=22.0.0</code>
+            The repo floor is <code>&gt;=22.18.0</code>
             (<code>package.json:7</code>). <code>release.mjs</code> refuses a
             major below 22 (<code>release.mjs:22-30</code>). Three scopes, one
             floor &mdash; not a single pinned number.
@@ -2264,10 +2264,10 @@
           <span class="cite">:674</span>
         </li>
         <li>
-          Build Backend <span class="cite">:1304</span>, only when
-          <code>backend</code> is affected <span class="cite">:1308</span>, and
-          Build Frontend <span class="cite">:1350</span>,
-          <span class="cite">:1354</span>
+          Build Backend <span class="cite">:1137</span>, only when
+          <code>backend</code> is affected <span class="cite">:1141</span>, and
+          Build Frontend <span class="cite">:1183</span>,
+          <span class="cite">:1187</span>
         </li>
       </ol>
       <p class="small muted">
@@ -2803,10 +2803,10 @@
       "ci.yml:544": { "file": ".github/workflows/ci.yml", "start": "setup:" },
       "ci.yml:622": { "file": ".github/workflows/ci.yml", "start": "lint:" },
       "ci.yml:674": { "file": ".github/workflows/ci.yml", "start": "test:" },
-      "ci.yml:1304": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1308": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1350": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1354": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:1137": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1141": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1183": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1187": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },
@@ -2884,7 +2884,7 @@
       "dispatch-production-deploy.yml:40": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if [[ ! \"${CREATED_REF}\" =~ ^release/v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then" },
       "dispatch-production-deploy.yml:55": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "| grep -E '^release/v[0-9]+\\.[0-9]+\\.[0-9]+$' \\" },
       "dispatch-production-deploy.yml:93-101": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "await github.rest.actions.createWorkflowDispatch({", "end": "});" },
-      "package.json:7": { "file": "package.json", "start": "\"node\": \">=22.0.0\"," },
+      "package.json:7": { "file": "package.json", "start": "\"node\": \">=22.18.0\"," },
       "package.json:26": { "file": "package.json", "start": "\"release:cut\": \"node tools/scripts/release.mjs cut\"," },
       "package.json:27": { "file": "package.json", "start": "\"release:tag\": \"node tools/scripts/release.mjs tag\"," },
       "publish-github-release.yml:6-8": { "file": ".github/workflows/publish-github-release.yml", "start": "push:", "end": "- 'v*.*.*'" },
@@ -2908,8 +2908,8 @@
 <script type="application/json" id="release-pipeline-manifest">
   {
     "note": "Asserted by tools/scripts/check-deploy-pipeline.mjs against .github/workflows/*.yml.",
-    "ciRunnerNodeMajor": "22",
-    "repoEnginesNodeRange": ">=22.0.0",
+    "ciRunnerNodeMajor": "22.18",
+    "repoEnginesNodeRange": ">=22.18.0",
     "releaseScriptMinNodeMajor": 22,
     "stagingFrontendTarget": "cpanel-ftp",
     "productionFrontendTarget": "cpanel-ftp",

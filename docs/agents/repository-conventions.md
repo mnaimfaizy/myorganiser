@@ -1,6 +1,6 @@
 # Repository Conventions
 
-Process rules moved out of the root [Agent Guide](../../AGENTS.md#do) so it stays short. Read the matching section before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.mjs`. Each rule's source is the ADR it links.
+Process rules moved out of the root [Agent Guide](../../AGENTS.md#do) so it stays short. Read the matching section before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.{mjs,ts}`. Each rule's source is the ADR it links.
 
 ## Notes have homes
 
@@ -16,4 +16,4 @@ ADRs in `docs/adr/` are numbered sequentially from `0001`. Scan for the highest 
 
 ## An artifact asserts what it claims
 
-An artifact states no claim it does not assert ([ADR 0085](../adr/0085-an-artifact-states-no-claim-it-does-not-assert.md)). A `check-*.mjs` header **declares which direction(s) it asserts, and why any omitted direction is omitted** — and a contract suite proves the checker actually fails on the drift that header claims to catch. Neither half stands alone: the header is the specification, the test is what makes it true. Writing the direction down does not make it so, and a header nothing asserts rots like any other unasserted claim — `check-readme.mjs` declared "drift runs both ways" over code that ran one, in exactly the fixed form the convention asks for. The same rule on the page side: a House Explainer Page asserts the facts it states, or states less (see the `design-brief` Skill).
+An artifact states no claim it does not assert ([ADR 0085](../adr/0085-an-artifact-states-no-claim-it-does-not-assert.md)). A `check-*.{mjs,ts}` header **declares which direction(s) it asserts, and why any omitted direction is omitted** — and a contract suite proves the checker actually fails on the drift that header claims to catch. Neither half stands alone: the header is the specification, the test is what makes it true. Writing the direction down does not make it so, and a header nothing asserts rots like any other unasserted claim — `check-readme.mjs` declared "drift runs both ways" over code that ran one, in exactly the fixed form the convention asks for. The same rule on the page side: a House Explainer Page asserts the facts it states, or states less (see the `design-brief` Skill).
