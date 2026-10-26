@@ -72,6 +72,18 @@ test('nodeRuns reports every file a --test invocation runs, not just the first',
   );
 });
 
+test('nodeRuns strips wrapping quotes from a glob token, so the pattern matches real paths', () => {
+  assert.deepEqual(
+    nodeRuns(
+      "node --test 'tools/scripts/**/*.test.mjs' 'tools/scripts/**/*.test.ts'",
+    ),
+    [
+      { script: 'tools/scripts/**/*.test.mjs', isTestRunner: true },
+      { script: 'tools/scripts/**/*.test.ts', isTestRunner: true },
+    ],
+  );
+});
+
 test('nodeRuns does not let a --test invocation swallow a later, unrelated node call on the next line', () => {
   const pipeline =
     '      - name: Step A\n' +
@@ -534,6 +546,84 @@ test('a suite invoked directly by path in a workflow counts as wired', () => {
   assert.deepEqual(
     report.wiredSuites.map((entry) => entry.via[0].kind),
     ['direct'],
+  );
+});
+
+// Suite case 3b — reached through `tools:test`'s own glob (ADR 0135 slice
+// 2), resolved the same way the aggregate's manifest reaches a checker: a
+// suite named nowhere else is wired once `tools:test` is itself invoked.
+test('a suite reached only through the tools:test glob counts as wired', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/lib/check-a.test.mjs'],
+    pkgScripts: {
+      'tools:test': "node --test 'tools/scripts/**/*.test.mjs'",
+    },
+    pipelines: hook('corepack yarn tools:test\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(
+    report.wiredSuites.map((entry) => entry.via.map((via) => via.kind)),
+    [['glob']],
+  );
+  assert.deepEqual(report.globTest, {
+    script: 'tools:test',
+    wired: true,
+    reached: ['tools/scripts/lib/check-a.test.mjs'],
+  });
+});
+
+// The glob cannot launder a suite while nothing invokes `tools:test` itself —
+// the same fail-safe shape as "the aggregate cannot launder a checker while
+// nothing invokes the aggregate".
+test('the glob cannot launder a suite while nothing invokes tools:test', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: ['tools/scripts/lib/check-a.test.mjs'],
+    pkgScripts: {
+      'tools:test': "node --test 'tools/scripts/**/*.test.mjs'",
+    },
+    pipelines: hook('corepack yarn lint\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/lib/check-a.test.mjs'],
+  );
+  assert.equal(report.globTest.wired, false);
+});
+
+// A narrowed glob reaches fewer suites than the full set, and the ones it
+// drops must fail rather than stay laundered as wired by assumption.
+test('a glob pattern narrowed to one directory leaves a suite outside it unwired', () => {
+  const report = assertGateCoverage({
+    checkers: [],
+    suites: [
+      'tools/scripts/check-a.test.mjs',
+      'tools/scripts/lib/check-b.test.mjs',
+    ],
+    pkgScripts: {
+      'tools:test': "node --test 'tools/scripts/*.test.mjs'",
+    },
+    pipelines: hook('corepack yarn tools:test\n'),
+    optOut: optOutList([]),
+    aggregate: aggregateOf([]),
+  });
+
+  assert.equal(report.exitCode, 1);
+  assert.deepEqual(
+    report.wiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/check-a.test.mjs'],
+  );
+  assert.deepEqual(
+    report.unwiredSuites.map((entry) => entry.suite),
+    ['tools/scripts/lib/check-b.test.mjs'],
   );
 });
 

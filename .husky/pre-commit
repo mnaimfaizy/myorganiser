@@ -56,35 +56,15 @@ if ! git diff --cached --quiet --diff-filter=ACMRT -- 'docs/**/*.html'
 then
 corepack yarn design:hygiene --staged
 fi
-# The sandcastle resume, sub-agent-trace, slice-selection, and run-outcome decisions are pure
-# functions with no Nx project of their own, so `affected:lint` and `nx affected -t test` never
-# reach them. Run their contracts whenever a module or its consumer is staged.
-if ! git diff --cached --quiet --diff-filter=ACMRT -- \
- tools/scripts/lib/sandcastle-resume.mjs \
- tools/scripts/lib/sandcastle-resume.test.mjs \
- tools/scripts/lib/sandcastle-subagent-trace.mjs \
- tools/scripts/lib/sandcastle-subagent-trace.test.mjs \
- tools/scripts/lib/sandcastle-spec-anchor.mjs \
- tools/scripts/lib/sandcastle-spec-anchor.test.mjs \
- tools/scripts/lib/sandcastle-slice-selection.mjs \
- tools/scripts/lib/sandcastle-slice-selection.test.mjs \
- tools/scripts/lib/sandcastle-outcome.mjs \
- tools/scripts/lib/sandcastle-outcome.test.mjs \
- tools/scripts/lib/sandcastle-worktree-repair.mjs \
- tools/scripts/lib/sandcastle-worktree-repair.test.mjs \
- tools/scripts/review/resolve-spec.mjs \
- .sandcastle/main.mts \
- .sandcastle/dispatch-waves.mts
-then
-corepack yarn sandcastle:resume:test
-corepack yarn sandcastle:subagent-trace:test
-corepack yarn sandcastle:slice-selection:test
-corepack yarn sandcastle:outcome:test
-corepack yarn sandcastle:worktree-repair:test
-# The anchor asserts against the real resolver, so a change to resolve-spec.mjs
-# is a change to this contract even when no sandcastle file is staged.
-corepack yarn sandcastle:spec-anchor:test
-fi
+# The full tools/scripts suite set (ADR 0135) takes about 34s in one
+# `node --test` run, so a tooling commit should pay for its own suite rather
+# than the whole set — and a commit outside tooling should pay nothing.
+# `tools/scripts/lib/tools-test-selection.mjs` is the pure decision: the
+# suites staged directly, plus the suite paired by name with each staged
+# script. CI's `tools:test` still runs the full set on every push and pull
+# request, so this incomplete local selection is a speed trade-off, not the
+# only place the full set runs.
+corepack yarn tools:test:staged
 # The five sandcastle atlas pages state constants that live as module-local literals in the
 # two orchestrator files and in the slice-selection lib they share, as exports in
 # sandcastle-resume.mjs and sandcastle-subagent-trace.mjs, and as JSON in the model policy,
@@ -111,19 +91,5 @@ if ! git diff --cached --quiet --diff-filter=ACMRTD -- \
  .sandcastle/dispatch-waves.mts
 then
 corepack yarn sandcastle:map:check
-fi
-# The merge-base proof gate and the push planner are pure functions with no Nx project of
-# their own, so `affected:lint` and `nx affected -t test` never reach them. One is the only
-# thing standing between a fabricated PrAuthor draft and GitHub (#456); the other decides
-# whether the runner may rewrite a remote branch. Run their contracts whenever either
-# module, its tests, or the runner that calls them is staged.
-if ! git diff --cached --quiet --diff-filter=ACMRT -- \
- tools/scripts/lib/pr-merge-base.mjs \
- tools/scripts/lib/pr-merge-base.test.mjs \
- tools/scripts/lib/pr-push-plan.mjs \
- tools/scripts/lib/pr-push-plan.test.mjs \
- tools/scripts/ai/create-pr.mjs
-then
-corepack yarn ai:create-pr:test
 fi
 corepack yarn affected:lint --uncommitted --outputStyle=static

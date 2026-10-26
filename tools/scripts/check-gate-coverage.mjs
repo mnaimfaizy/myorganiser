@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Asserts that every checker in tools/scripts/ is a Wired Gate — invoked by
 // some hook or workflow — and names the ones that are not (ADR 0043). Also
-// asserts the same for every Contract Suite (`*.test.mjs`) under
-// tools/scripts, naming each one no wired script reaches (ADR 0135 slice 1).
+// asserts the same for every Contract Suite (`*.test.mjs` or `*.test.ts`)
+// under tools/scripts, naming each one no wired script reaches (ADR 0135).
 //
 //   node tools/scripts/check-gate-coverage.mjs
 //
@@ -22,18 +22,21 @@
 // Checkers are found by the `check-*.mjs` filename convention, never by a
 // `*:check` script-name suffix: `openapi:artifacts` and `component:hygiene`
 // carry no such suffix, and the first is one of the two unwired checks that
-// motivated the rule. Suites are found by the `*.test.mjs` filename
-// convention anywhere under tools/scripts, including through lib/, review/,
-// ai/, ci/, and copilot-hooks/. Wiring is matched by exact script name — a
-// substring match on `yarn openapi:artifacts` also matches
+// motivated the rule. Suites are found by the `*.test.mjs`/`*.test.ts`
+// filename convention anywhere under tools/scripts, including through lib/,
+// review/, ai/, ci/, and copilot-hooks/. Wiring is matched by exact script
+// name — a substring match on `yarn openapi:artifacts` also matches
 // `openapi:artifacts:test`, and reporting an unwired check as wired because
 // its contract suite runs is the exact false pass this file exists to
 // prevent.
 //
 // A checker or suite the pre-commit hook reaches only through `yarn
 // gates:run` counts as wired, resolved through that aggregate's manifest and
-// no deeper. The decision itself lives in tools/scripts/lib/gate-coverage.mjs;
-// this file is IO.
+// no deeper. A suite, and only a suite, also counts as wired when it is
+// reached through `tools:test`'s own glob while that target is itself wired
+// (ADR 0135 slice 2) — resolved from the live glob pattern, not assumed, so a
+// pattern narrowed later still fails on the suites it drops. The decision
+// itself lives in tools/scripts/lib/gate-coverage.mjs; this file is IO.
 //
 // Deliberate non-gates carry an entry with a written reason in
 // tools/config/gate-coverage-optout.json.
@@ -112,7 +115,12 @@ console.log(
     `${report.declaredNonGates.length} non-gates declared with a reason`,
 );
 
+const throughGlob = report.wiredSuites.filter((entry) =>
+  entry.via.some((via) => via.kind === 'glob'),
+).length;
+
 console.log(
-  `gate-coverage: ${report.wiredSuites.length} suites wired, ` +
+  `gate-coverage: ${report.wiredSuites.length} suites wired ` +
+    `(${throughGlob} reached through \`yarn ${report.globTest.script}\`), ` +
     `${report.optedOutSuites.length} suites opted out`,
 );

@@ -47,17 +47,32 @@
  * `assertGateCoverage` is pure — every input is passed in, so the contract
  * tests exercise fixtures rather than the repository. `gatherFromDisk` is the
  * only part that reads files.
+ *
+ * A fourth rule governs suites only (ADR 0135 slice 2): `tools:test`'s own
+ * glob reaches a suite the same way the aggregate's manifest reaches a
+ * checker. Its reach is resolved from the live `node --test` command,
+ * never assumed — a pattern narrowed later drops exactly the suites it no
+ * longer matches, and those report unwired rather than staying laundered.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { GATE_MANIFEST } from './gate-manifest.mjs';
+import { globToRegExp } from './glob.mjs';
 
 export const SCRIPTS_DIR = 'tools/scripts';
 export const OPT_OUT_PATH = 'tools/config/gate-coverage-optout.json';
 export const OPT_OUT_SCHEMA_VERSION = 1;
 export const AGGREGATE_SCRIPT = 'tools/scripts/run-assertion-gates.mjs';
+/**
+ * The glob runner (ADR 0135 slice 2): a plain npm script, not a file, so it
+ * is matched by exact script name rather than by path like the aggregate.
+ * Once it is wired, every suite its own glob pattern reaches counts as
+ * wired too — resolved from the live `tools:test` command rather than
+ * assumed, so a pattern someone narrows later fails safe instead of lying.
+ */
+export const GLOB_TEST_SCRIPT = 'tools:test';
 
 /**
  * Husky hooks and GitHub workflows — the pipelines that can invoke a gate.
@@ -107,8 +122,24 @@ export function stripComments(text) {
  * `node` call arrives mid-line (`run: node tools/scripts/x.mjs`), and it must
  * tell a checker run from a `--test` run — a distinction the manifest never
  * meets, because no manifest entry is a contract suite.
+ *
+ * A token wrapped in matching quotes has them stripped before normalising:
+ * `tools:test`'s own glob arguments are single-quoted in package.json so the
+ * invoking shell never pathname-expands `**` itself, and an unstripped quote
+ * character would stop that pattern from ever matching a real suite path.
  */
 export function nodeRuns(command) {
+  const unquote = (token) => {
+    const quote = token[0];
+    if (
+      (quote === "'" || quote === '"') &&
+      token.length > 1 &&
+      token[token.length - 1] === quote
+    ) {
+      return token.slice(1, -1);
+    }
+    return token;
+  };
   const runs = [];
   // The captured span stops at a newline as well as at a shell metacharacter:
   // a multi-file `node --test a.mjs b.mjs` invocation is always one
@@ -132,13 +163,16 @@ export function nodeRuns(command) {
       (flag) => flag === '--test' || flag.startsWith('--test='),
     );
     if (!isTestRunner) {
-      runs.push({ script: normalize(tokens[index]), isTestRunner: false });
+      runs.push({
+        script: normalize(unquote(tokens[index])),
+        isTestRunner: false,
+      });
       continue;
     }
     for (; index < tokens.length; index += 1) {
       const token = tokens[index];
       if (/^-/.test(token)) continue;
-      runs.push({ script: normalize(token), isTestRunner: true });
+      runs.push({ script: normalize(unquote(token)), isTestRunner: true });
     }
   }
   return runs;
@@ -187,11 +221,15 @@ export function listCheckers({
 }
 
 /**
- * Every Contract Suite (`*.test.mjs`) anywhere under the scripts directory,
- * `lib/`, `review/`, `ai/`, `ci/`, and `copilot-hooks/` included. A suite is
- * wired or it is not independently of whether the script it tests is a
- * `check-*.mjs` checker (ADR 0135 slice 1) — this list, unlike
- * `listCheckers`, is not filtered to the checker-filename convention.
+ * Every Contract Suite (`*.test.mjs` or `*.test.ts`) anywhere under the
+ * scripts directory, `lib/`, `review/`, `ai/`, `ci/`, and `copilot-hooks/`
+ * included. A suite is wired or it is not independently of whether the
+ * script it tests is a `check-*.mjs` checker (ADR 0135 slice 1) — this list,
+ * unlike `listCheckers`, is not filtered to the checker-filename convention.
+ * `.test.ts` is included from slice 1 on even though migration has not
+ * started: `tools:test`'s glob (ADR 0135 slice 2) already covers both
+ * extensions, and a suite this function cannot see is a suite the Meta-Gate
+ * cannot name as unwired either.
  */
 export function listSuites({
   cwd = process.cwd(),
@@ -200,7 +238,7 @@ export function listSuites({
   const absolute = join(cwd, scriptsDir);
   if (!existsSync(absolute)) return [];
   return readdirSync(absolute, { recursive: true })
-    .filter((entry) => entry.endsWith('.test.mjs'))
+    .filter((entry) => /\.test\.(mjs|ts)$/.test(entry))
     .map((entry) => normalize(`${scriptsDir}/${entry}`))
     .sort();
 }
@@ -386,11 +424,13 @@ function resolveAggregate({
 
 /**
  * Decides, for every target in `targets` (checkers or suites), whether some
- * pipeline reaches it — directly, by npm script name, or through the
- * aggregate. Shared between the checker rule and the suite rule so the two
- * are matched by the exact same mechanics (ADR 0135 slice 1): only the
- * `npmScriptsRunning` / `invokedPaths` a caller supplies differ, filtered to
- * non-test or test-runner `node` invocations respectively.
+ * pipeline reaches it — directly, by npm script name, through the
+ * aggregate, or (suites only) through the `tools:test` glob. Shared between
+ * the checker rule and the suite rule so the two are matched by the exact
+ * same mechanics (ADR 0135 slice 1): only the `npmScriptsRunning` /
+ * `invokedPaths` a caller supplies differ, filtered to non-test or
+ * test-runner `node` invocations respectively. `globState` is omitted for
+ * the checker call: the glob names no checker, only suites.
  *
  * Mutates `errors` in place with a contradiction when an opted-out target is
  * actually wired, mirroring the checker rule's existing behaviour.
@@ -402,6 +442,7 @@ function classifyTargets({
   invokedNames,
   invokedPaths,
   aggregateState,
+  globState,
   optedOutMap,
   optOutPath,
   errors,
@@ -428,6 +469,13 @@ function classifyTargets({
         files: aggregateState.wiredVia.flatMap(
           (name) => invokedNames.get(name) ?? [],
         ),
+      });
+    }
+    if (globState?.reached.has(target) && globState.wired) {
+      via.push({
+        kind: 'glob',
+        name: globState.script,
+        files: globState.files,
       });
     }
 
@@ -540,6 +588,24 @@ export function assertGateCoverage({
     readSource,
   });
 
+  // `tools:test` is a plain npm script, not a file, so it is wired the same
+  // way a checker's own npm script is: its exact name invoked by some
+  // pipeline. What it *reaches* is resolved from its live command rather
+  // than assumed to be "every suite" — a pattern someone narrows later
+  // (dropping `lib/` from the glob, say) then reaches fewer suites, and the
+  // ones it drops report unwired instead of staying silently laundered.
+  const globPatterns = (testRunsByNpmScript.get(GLOB_TEST_SCRIPT) ?? []).map(
+    globToRegExp,
+  );
+  const globState = {
+    script: GLOB_TEST_SCRIPT,
+    wired: invokedNames.has(GLOB_TEST_SCRIPT),
+    files: invokedNames.get(GLOB_TEST_SCRIPT) ?? [],
+    reached: new Set(
+      suites.filter((suite) => globPatterns.some((re) => re.test(suite))),
+    ),
+  };
+
   const { entries: optOutEntries, errors: optOutErrors } = parseOptOut(
     optOut,
     optOutPath,
@@ -629,6 +695,7 @@ export function assertGateCoverage({
     invokedNames,
     invokedPaths: invokedTestPaths,
     aggregateState,
+    globState,
     optedOutMap: optedOutSuites,
     optOutPath,
     errors,
@@ -656,6 +723,11 @@ export function assertGateCoverage({
       wired: aggregateState.wired,
       npmScripts: aggregateState.npmScripts,
       reached: [...aggregateState.reached].sort(),
+    },
+    globTest: {
+      script: globState.script,
+      wired: globState.wired,
+      reached: [...globState.reached].sort(),
     },
   };
 }

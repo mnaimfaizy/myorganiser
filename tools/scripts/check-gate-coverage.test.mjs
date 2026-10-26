@@ -60,10 +60,8 @@ test('exits 0 and reports the counts against the real repository', () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /gate-coverage: \d+ checkers wired/);
   assert.match(result.stdout, /non-gates declared with a reason/);
-  assert.match(
-    result.stdout,
-    /gate-coverage: \d+ suites wired, \d+ suites opted out/,
-  );
+  assert.match(result.stdout, /gate-coverage: \d+ suites wired/);
+  assert.match(result.stdout, /\d+ suites opted out/);
 });
 
 /**
