@@ -49,7 +49,20 @@ pipeline.
    setups, but `.sandcastle/.env` is ignored and must never be committed.
 5. The `sandcastle:myorganiser` image builds automatically on first run if missing. It
    already bakes in Claude Code, Cursor, and GitHub Copilot CLI so the `--agent` flag only
-   switches which provider Sandcastle launches.
+   switches which provider Sandcastle launches. Which Claude Code it carries is set in the
+   environment, next to the other `SANDCASTLE_*` variables (see `.sandcastle/.env.example`),
+   so changing it needs no commit:
+   - `SANDCASTLE_CLAUDE_CODE_UPDATE=auto` (the default) follows the latest release. Each
+     dispatch asks the installer's release channel for the current version.
+   - `SANDCASTLE_CLAUDE_CODE_UPDATE=manual` with `SANDCASTLE_CLAUDE_CODE_VERSION=<x.y.z>`
+     stays on that version. A version set on its own also means manual.
+
+   Each Claude dispatch rebuilds the image when its `claude --version` differs from what the
+   policy asks for, then prints the version. A Cursor or Copilot dispatch skips the check,
+   since Claude Code never runs in it. Every Claude slice log names the version too, as
+   `[#<issue>] Claude Code <version> (auto: latest release, sandcastle:myorganiser)`. The
+   CLI's own auto-updater is off inside the image, so updates happen only at dispatch and the
+   logged version is the one the agent ran. Offline, auto mode keeps the existing image.
 
 The dispatch host does **not** need native build tools — compilation happens in-container.
 
@@ -615,21 +628,21 @@ To reproduce the sandbox behavior locally: `MYORGANISER_SANDBOX=1 yarn nx test t
 - **Retire the old cache:** delete `.sandcastle/node_modules_linux_cache/` if present — it's no
   longer used (the seed step and lockfile-hash invalidation were removed).
 - **Rebuild the sandbox image after any `.sandcastle/Dockerfile` change:**
-  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing, so an
-  existing image silently keeps the old contents. Force a rebuild with
+  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing or, on a
+  Claude dispatch, its Claude Code differs from what the `SANDCASTLE_CLAUDE_CODE_*` policy asks for, so any
+  other change leaves an existing image silently on the old contents. Force a rebuild with
   `docker image rm sandcastle:myorganiser` before the next dispatch. See `docs/graphify.md` for
   why this matters for the mounted graphify graph.
-- **The sandbox image's Node is pinned to 22.16 — do not float it to `node:22`.** Node 22.17
-  reimplemented `fs.cpSync` in C++ and the new version returns `EACCES` for a recursive directory
-  copy whose destination is on a Docker Desktop bind mount. The retired `@nx/next:build` executor
-  copied `public/` into `dist/` with exactly that call, so **every** slice's build gate failed with
-  `NX EACCES, Permission denied 'dist/apps/web/public'` — always after a clean compile and
-  typecheck, which made it look like a code failure when it was not. Since ADR 0083 the web build
-  is plain `next build` into `apps/web/.next` and no longer makes that copy; the pin stays
-  until a recursive cpSync onto the mount is ruled out for every other build step. It is not permissions: it
-  fails as root, `access()` reports RWX, and `cp -R` works on the same path. Bisected 22.16.0 OK /
-  22.17.1 EACCES / 22.23.2 EACCES / 24.19.0 EACCES. CI is unaffected (ext4, not VirtioFS). See the
-  comment on `FROM` in `.sandcastle/Dockerfile` before changing it.
+- **The sandbox image's Node is pinned to a Node 22 minor (22.23) — do not float it to `node:22`.**
+  It must be 22.18 or later, because ADR 0135 runs `tools/scripts` `.ts` files with a bare
+  `node script.ts`. The previous 22.16 pin guarded a recursive `fs.cpSync` onto a Docker Desktop
+  bind mount, which Node 22.17+ once failed with `EACCES`; the retired `@nx/next:build` executor
+  made that copy, and every slice's build gate failed with
+  `NX EACCES, Permission denied 'dist/apps/web/public'` after a clean compile and typecheck. A
+  re-check on 2026-10-26 (Docker Desktop 29.9.2) found the copy works on 22.16.0 and 22.23.4 alike,
+  and nothing in the gate's build path makes it any more. A passing test suite does not exercise
+  the copy, so repeat that check before moving the pin. See the comment on `FROM` in
+  `.sandcastle/Dockerfile` for the details.
 - **Never put the repo on `/mnt/d`** (or any drvfs/9P mount) for dispatch — that's the ~29 min
   trap.
 - **`Could not fetch from origin (reusing worktree at … as-is, …)` is expected — ignore it.** It

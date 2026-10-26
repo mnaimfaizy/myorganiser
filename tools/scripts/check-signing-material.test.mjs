@@ -21,12 +21,15 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
 import {
   FORBIDDEN_EXTENSIONS,
   PUBLIC_DEBUG_KEYSTORE_BLOB,
   isServiceAccountKey,
 } from './check-signing-material.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const CHECKER = resolve('tools/scripts/check-signing-material.mjs');
 const DEBUG_KEYSTORE = readFileSync(
@@ -51,7 +54,6 @@ const git = (cwd, args) => {
   const r = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
-    env: cleanGitEnv(),
   });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();

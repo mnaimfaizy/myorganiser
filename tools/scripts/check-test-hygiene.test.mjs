@@ -6,7 +6,10 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const CHECKER = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -37,7 +40,6 @@ function git(workspace, ...args) {
   return execFileSync('git', args, {
     cwd: workspace,
     encoding: 'utf8',
-    env: cleanGitEnv(),
   });
 }
 

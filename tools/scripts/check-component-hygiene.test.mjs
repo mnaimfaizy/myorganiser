@@ -12,7 +12,10 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-component-hygiene.mjs');
@@ -86,7 +89,6 @@ function git(workspace, ...args) {
   return execFileSync('git', args, {
     cwd: workspace,
     encoding: 'utf8',
-    env: cleanGitEnv(),
   });
 }
 

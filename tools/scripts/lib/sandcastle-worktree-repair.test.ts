@@ -19,6 +19,10 @@ import {
   repairOrphanedWorktree,
   WORKTREE_STATES,
 } from './sandcastle-worktree-repair.ts';
+import { isolateGitEnvironment } from './git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const BRANCH = 'slice/1-demo';
 

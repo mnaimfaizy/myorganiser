@@ -20,7 +20,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const SCRIPT = fileURLToPath(
   new URL('./git-assert-clean.mjs', import.meta.url),
@@ -33,7 +36,6 @@ const repo = () => {
     execFileSync('git', args, {
       cwd: dir,
       stdio: 'ignore',
-      env: cleanGitEnv(),
     });
   git('init', '--quiet');
   // Identity and signing are set locally: a contributor's global config must not

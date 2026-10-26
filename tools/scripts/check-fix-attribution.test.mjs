@@ -16,7 +16,10 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 import { judge } from './check-fix-attribution.mjs';
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const CHECKER = resolve('tools/scripts/check-fix-attribution.mjs');
 
@@ -24,7 +27,6 @@ const git = (cwd, args) => {
   const r = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
-    env: cleanGitEnv(),
   });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();

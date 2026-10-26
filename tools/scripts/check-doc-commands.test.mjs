@@ -6,7 +6,10 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-doc-commands.mjs');
@@ -23,7 +26,6 @@ function createRepo(t) {
     execFileSync('git', args, {
       cwd: workspace,
       stdio: 'ignore',
-      env: cleanGitEnv(),
     });
   git('init', '-q');
   git('config', 'user.email', 'test@example.com');
@@ -41,12 +43,11 @@ function commitAll({ workspace, git }) {
   execFileSync('git', ['add', '-A'], {
     cwd: workspace,
     stdio: 'ignore',
-    env: cleanGitEnv(),
   });
   execFileSync('git', ['commit', '-q', '-m', 'fixture'], {
     cwd: workspace,
     stdio: 'ignore',
-    env: { ...cleanGitEnv(), GIT_AUTHOR_NAME: 'T', GIT_COMMITTER_NAME: 'T' },
+    env: { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_COMMITTER_NAME: 'T' },
   });
   void git;
 }

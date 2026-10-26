@@ -17,7 +17,10 @@ import {
   LEGACY,
   ROSTER,
 } from './lib/design-page-roster.ts';
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-design-hygiene.mjs');
@@ -67,7 +70,7 @@ const FIXTURE_PAGES = [
 ];
 
 function gitInWorkspace(workspace, args) {
-  spawnSync('git', args, { cwd: workspace, env: cleanGitEnv() });
+  spawnSync('git', args, { cwd: workspace });
 }
 
 function createWorkspace(t) {

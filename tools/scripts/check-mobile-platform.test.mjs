@@ -6,7 +6,10 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-mobile-platform.mjs');
@@ -23,7 +26,6 @@ function createRepo(t) {
   execFileSync('git', ['init', '-q'], {
     cwd: workspace,
     stdio: 'ignore',
-    env: cleanGitEnv(),
   });
   return workspace;
 }
@@ -46,7 +48,6 @@ function commitAll(workspace) {
   execFileSync('git', ['add', '-A'], {
     cwd: workspace,
     stdio: 'ignore',
-    env: cleanGitEnv(),
   });
 }
 

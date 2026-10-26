@@ -53,6 +53,14 @@ import {
   specAnchorMessage,
 } from '../tools/scripts/lib/sandcastle-spec-anchor.ts';
 import {
+  LATEST_RELEASE_URL,
+  claudeCodeLogLine,
+  claudeCodePolicy,
+  describeClaudeCodeMode,
+  parseClaudeCodeVersion,
+  parseReleaseVersion,
+} from '../tools/scripts/lib/sandcastle-cli-version.ts';
+import {
   COMPLETION_PROMISE,
   NEEDS_HUMAN_LABEL,
   OUTSTANDING_MARKER,
@@ -120,26 +128,102 @@ function fail(message: string, code = 1): never {
   process.exit(code);
 }
 
-function ensureSandboxImage(): void {
+/** The Claude Code version the sandbox image carries, or null without one. */
+function imageClaudeCodeVersion(): string | null {
+  const probe = spawnSync(
+    'docker',
+    ['run', '--rm', '--entrypoint', 'claude', SANDBOX_IMAGE, '--version'],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  return probe.status === 0 ? parseClaudeCodeVersion(probe.stdout) : null;
+}
+
+/** The current release on the channel the installer reads, or null offline. */
+async function latestClaudeCodeRelease(): Promise<string | null> {
+  try {
+    const response = await fetch(LATEST_RELEASE_URL, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    return response.ok ? parseReleaseVersion(await response.text()) : null;
+  } catch {
+    return null;
+  }
+}
+
+type SandboxClaudeCode = { version: string; mode: 'auto' | 'manual' };
+
+/**
+ * Builds the sandbox image when it is missing, or when its Claude Code is not
+ * the version the policy asks for, and returns the version it verified.
+ * Without the version check an existing image keeps whatever CLI it was built
+ * with, whatever the environment says.
+ *
+ * Auto mode asks the release channel for the current version on every
+ * dispatch. Offline, it keeps an existing image as it is, and builds a missing
+ * one with the installer's own `latest`.
+ *
+ * With no policy — a Cursor or Copilot dispatch, where Claude Code never runs
+ * — the image is only built when missing, and no version is returned to log.
+ */
+async function ensureSandboxImage(
+  policy: ReturnType<typeof claudeCodePolicy> | null,
+): Promise<SandboxClaudeCode | null> {
   const image = spawnSync('docker', ['image', 'inspect', SANDBOX_IMAGE], {
     encoding: 'utf8',
     windowsHide: true,
   });
+  if (!policy && image.status === 0) return null;
+  const installed =
+    policy && image.status === 0 ? imageClaudeCodeVersion() : null;
 
-  if (image.status === 0) return;
+  let wanted: string | null;
+  if (!policy) {
+    wanted = null;
+  } else if (policy.mode === 'manual') {
+    wanted = policy.version;
+  } else {
+    wanted = await latestClaudeCodeRelease();
+    if (!wanted) {
+      console.warn(
+        `Could not read the latest Claude Code release from ${LATEST_RELEASE_URL}.`,
+      );
+      if (installed) {
+        console.warn(`Keeping ${SANDBOX_IMAGE} on Claude Code ${installed}.`);
+        return { version: installed, mode: policy.mode };
+      }
+    }
+  }
 
+  if (policy && installed && installed === wanted) {
+    return { version: installed, mode: policy.mode };
+  }
   console.log(
-    `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
+    policy && image.status === 0
+      ? `Sandbox image ${SANDBOX_IMAGE} carries Claude Code ${installed ?? '(none found)'}, ` +
+          `but ${describeClaudeCodeMode(policy.mode)} wants ${wanted}; rebuilding it before dispatch...`
+      : `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
   );
+
+  // `sandcastle docker build-image` passes only the uid/gid build args, so this
+  // is its build with the Claude Code version added.
+  const buildArgs: Record<string, string> = {
+    CLAUDE_CODE_VERSION: wanted ?? 'latest',
+  };
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  if (uid !== undefined) buildArgs.AGENT_UID = String(uid);
+  if (gid !== undefined) buildArgs.AGENT_GID = String(gid);
   const build = spawnSync(
-    'corepack',
+    'docker',
     [
-      'yarn',
-      'sandcastle',
-      'docker',
-      'build-image',
-      '--image-name',
+      'build',
+      '-t',
       SANDBOX_IMAGE,
+      ...Object.entries(buildArgs).flatMap(([key, value]) => [
+        '--build-arg',
+        `${key}=${value}`,
+      ]),
+      join(process.cwd(), '.sandcastle'),
     ],
     { encoding: 'utf8', stdio: 'inherit', windowsHide: true },
   );
@@ -163,6 +247,15 @@ function ensureSandboxImage(): void {
       `Docker image ${SANDBOX_IMAGE} was reported built but is not available.`,
     );
   }
+  if (!policy) return null;
+  const built = imageClaudeCodeVersion();
+  if (!built || (wanted && built !== wanted)) {
+    fail(
+      `Docker image ${SANDBOX_IMAGE} was built but carries Claude Code ` +
+        `${built ?? '(none found)'}, not ${wanted ?? 'a readable version'}.`,
+    );
+  }
+  return { version: built, mode: policy.mode };
 }
 
 /**
@@ -405,6 +498,12 @@ Environment:
   SANDCASTLE_CURSOR_MODEL
   SANDCASTLE_COPILOT_MODEL
 
+Claude Code in the sandbox image (rebuilt at dispatch when it differs):
+  SANDCASTLE_CLAUDE_CODE_UPDATE   \`auto\` follows the latest release; \`manual\` stays on
+                                  SANDCASTLE_CLAUDE_CODE_VERSION. Unset: auto, or
+                                  manual when a version is set.
+  SANDCASTLE_CLAUDE_CODE_VERSION  Exact version for manual mode, e.g. 2.1.310.
+
 Claude auth (see docs/sandcastle/RUNBOOK.md):
   CLAUDE_CODE_OAUTH_TOKEN  Pro/Max subscription token from \`claude setup-token\`.
                            Takes precedence; ANTHROPIC_API_KEY is then NOT forwarded.
@@ -600,7 +699,27 @@ const claudeAuth = gateOnly
 // all had their say. Building this image can take minutes; there is no reason to
 // pay for it before we know the run can actually authenticate. A --dry-run never
 // launches a container, so it must not pay for the image either.
-if (!dryRun) ensureSandboxImage();
+// The Claude Code policy is read either way, so a typo in its variables fails a
+// dry run too instead of waiting for the first real dispatch.
+let claudeCodeUpdatePolicy: ReturnType<typeof claudeCodePolicy>;
+try {
+  claudeCodeUpdatePolicy = claudeCodePolicy(process.env);
+} catch (error) {
+  fail((error as Error).message);
+}
+// Only a Claude dispatch runs Claude Code, so only it checks or rebuilds for the
+// CLI version, and only its slice logs name one.
+const sandboxClaudeCode = dryRun
+  ? null
+  : await ensureSandboxImage(
+      agentKind === 'claude' ? claudeCodeUpdatePolicy : null,
+    );
+if (sandboxClaudeCode) {
+  console.log(
+    `Sandbox image ${SANDBOX_IMAGE}: Claude Code ${sandboxClaudeCode.version} ` +
+      `(${describeClaudeCodeMode(sandboxClaudeCode.mode)}).`,
+  );
+}
 
 // ─── Fetch PRD issue ──────────────────────────────────────────────────────────
 
@@ -2313,7 +2432,7 @@ function buildPrompt(
     `  ${OUTSTANDING_MARKER} needs a device — <which criterion or behaviour>`,
     `  ${OUTSTANDING_MARKER} could not read <source> — <what was assumed instead>`,
     ``,
-    `Print none when there is nothing. The orchestrator closes this slice only when there are none; otherwise it integrates your work and hands the slice to a person with your list. An honest list is not a failure. A list with an item missing is.`,
+    `When there is nothing, print exactly \`${OUTSTANDING_MARKER} none\` on its own line, with no explanation after it: your evidence belongs in the handoff markers. Never write "none" followed by an exception ("none, but …", "none — except …"); that exception is an item and gets its own line. The orchestrator closes this slice only when there are none; otherwise it integrates your work and hands the slice to a person with your list. An honest list is not a failure. A list with an item missing is.`,
     ``,
     `## Handoff markers (required)`,
     ``,
@@ -2949,6 +3068,16 @@ while (pendingSlices.length > 0) {
       }),
     );
 
+    if (sandboxClaudeCode && result.logFilePath) {
+      appendFileSync(
+        result.logFilePath,
+        `\n${claudeCodeLogLine({
+          issueNumber: issue.number,
+          ...sandboxClaudeCode,
+          image: SANDBOX_IMAGE,
+        })}\n`,
+      );
+    }
     logRunUsage(issue.number, agentKind, model, result);
     captureSubagentTraces(issue, result);
 

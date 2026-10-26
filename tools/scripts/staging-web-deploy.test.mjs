@@ -39,6 +39,10 @@ import {
   SERVICE_WORKER_CSP,
   hashDependencies,
 } from './lib/staging-web-deploy.ts';
+import { isolateGitEnvironment } from './lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const CLI = join(
   dirname(fileURLToPath(import.meta.url)),

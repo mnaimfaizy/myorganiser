@@ -17,7 +17,10 @@ import test from 'node:test';
 
 import { commitsBetween, pushesFromRuns } from './measure-noise.mjs';
 import { acknowledgementsIn } from './noise.mjs';
-import { cleanGitEnv } from '../testing/git-fixture-env.mjs';
+import { isolateGitEnvironment } from '../lib/git-environment.ts';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
+isolateGitEnvironment();
 
 const run = (databaseId, headSha, createdAt) => ({
   databaseId,
@@ -79,7 +82,6 @@ const repoWithCommits = (messages) => {
     execFileSync('git', args, {
       cwd: dir,
       encoding: 'utf8',
-      env: cleanGitEnv(),
     });
   run('init', '--quiet', '--initial-branch=main');
   run('config', 'user.email', 'test@example.com');
