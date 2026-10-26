@@ -1,26 +1,30 @@
-# Pinned to 22.16 deliberately — do NOT float to `node:22`.
+# Pinned to a Node 22 minor — do NOT float to `node:22`. A floating tag drifts
+# under every rebuild, and drift is what broke the gate last time (below).
 #
-# Node 22.17 reimplemented `fs.cpSync` in C++, and the new implementation returns
-# EACCES for a recursive directory copy whose DESTINATION is on a Docker Desktop
-# bind mount (VirtioFS/gRPC-FUSE). It is not a permission fault: it fails as root
-# too, `access()` reports RWX, and `cp -R`, `copyFileSync` and `mkdirSync` all
-# succeed on the same path. Bisected on one mount, one source, one uid:
+# It is 22.23, not 22.16, because ADR 0135 runs tools/scripts `.ts` files with a
+# bare `node script.ts`, which needs Node's default type stripping (22.18+).
+# 22.16 cannot run them, and CI's `node-version: 22` can, so the old pin made the
+# sandbox fail checks that CI passes.
 #
-#   22.16.0  OK      22.17.1  EACCES      22.23.2  EACCES      24.19.0  EACCES
+# The old pin guarded a recursive `fs.cpSync` onto a Docker Desktop bind mount
+# (VirtioFS/gRPC-FUSE). Node 22.17 reimplemented `cpSync` in C++, and on the
+# Docker Desktop of the time it returned EACCES for such a copy — not a permission
+# fault: root failed too, `access()` reported RWX, and `cp -R` worked. Bisected
+# then: 22.16.0 OK, 22.17.1 / 22.23.2 / 24.19.0 EACCES. The retired
+# `@nx/next:build` executor made exactly that copy (`public/` into `dist/`), so
+# every slice's build gate failed after a clean compile and typecheck.
 #
-# The retired `@nx/next:build` executor copied `public/` into `dist/` with exactly
-# that call, so every slice's build gate failed on macOS once the image drifted
-# ahead of the host's Node 22.13 — always AFTER a clean compile and typecheck,
-# which is what made it read as a code failure. It hit the agent sandbox too, not
-# just the gate: both run builds inside a bind-mounted worktree. Since ADR 0083 the
-# web app builds with plain `next build` into `apps/web/.next`, which no
-# longer makes that copy; the pin stays until something verifies no other build
-# step reaches a recursive cpSync onto the mount.
+# Re-checked 2026-10-26 on Docker Desktop 29.9.2, with a recursive cpSync onto a
+# /Volumes/Backup bind mount, as root and as uid 501, into new and existing
+# directories, mount->mount and container->mount: 22.16.0 and 22.23.4 both OK.
+# Nothing in the gate's build path makes the copy any more: since ADR 0083 the web
+# app builds with plain `next build`, the only repo callers are the `package`
+# targets' copy scripts (release packaging, never the gate), and in dependencies
+# only Next's opt-in bundle analyzer calls it.
 #
-# CI floats on `node-version: 22` and is unaffected (ext4, not VirtioFS), so this
-# pin makes the sandbox lag CI by design. Before unpinning, verify with a recursive
-# cpSync into a bind-mounted directory — a passing test suite will not catch it.
-FROM node:22.16-bookworm
+# Before moving this pin, repeat that check: a passing test suite does not
+# exercise the copy, so it cannot catch the regression.
+FROM node:22.23-bookworm
 
 # Install system dependencies.
 # build-essential + python3: required to compile native modules (bcrypt).
