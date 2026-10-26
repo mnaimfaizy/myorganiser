@@ -12,6 +12,10 @@ import {
   isModuleIdentifier,
   isRepoPath,
 } from './check-doc-file-refs.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-doc-file-refs.mjs');

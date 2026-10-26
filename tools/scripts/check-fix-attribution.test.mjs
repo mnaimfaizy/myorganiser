@@ -16,6 +16,10 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 import { judge } from './check-fix-attribution.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const CHECKER = resolve('tools/scripts/check-fix-attribution.mjs');
 

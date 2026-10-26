@@ -797,6 +797,9 @@ jobs:
       - name: Tree-clean assertion contracts
         run: corepack yarn git-assert-clean:test
 
+      - name: Git-fixture environment isolation contracts
+        run: corepack yarn git-environment:test
+
       - name: Env-declared checker contracts
         run: corepack yarn env:declared:test
 

@@ -26,6 +26,10 @@ import {
   PUBLIC_DEBUG_KEYSTORE_BLOB,
   isServiceAccountKey,
 } from './check-signing-material.mjs';
+import { isolateGitEnvironment } from './lib/git-environment.mjs';
+
+// Husky runs this suite with the hook's GIT_DIR; see git-environment.mjs.
+isolateGitEnvironment();
 
 const CHECKER = resolve('tools/scripts/check-signing-material.mjs');
 const DEBUG_KEYSTORE = readFileSync(
