@@ -1,5 +1,5 @@
 // Contracts for check-checker-contracts.ts's command-line surface, following
-// check-nx-declared-targets.test.mjs's shape: the checker runs as a real
+// check-nx-declared-targets.test.ts's shape: the checker runs as a real
 // subprocess against a fixture workspace, because it reads
 // tools/scripts/check-*.{mjs,ts} from disk the same way tools/scripts/lib/gate-coverage.ts
 // does. Unlike the Declared Target ratchet this checker never shells out to

@@ -7,7 +7,7 @@
 // The skill is portable (ADR 0018, retained by ADR 0084), so this file and the
 // two modules beside it import only Node built-ins and each other. A consuming
 // repo wires it through a thin checker of its own; in this one that is
-// `tools/scripts/check-upstream-briefs.mjs`, which exists so the Meta-Gate can
+// `tools/scripts/check-upstream-briefs.ts`, which exists so the Meta-Gate can
 // see the gate (ADR 0084 item 10).
 //
 // WHAT COMES OUT

@@ -38,7 +38,7 @@ TestRunner does not echo the annotated copy forward.
 Keeping TestReviewer on Haiku is only sound if its checklist really is mechanical.
 It was not: items like _"tests would fail if the implementation were broken"_ need
 mutation testing, and a cheap model marks them PASS every time. The checklist is
-therefore split — `tools/scripts/check-test-hygiene.mjs` decides the mechanical
+therefore split — `tools/scripts/check-test-hygiene.ts` decides the mechanical
 items deterministically, unverifiable items were removed, and the residual judgment
 items each require a cited line. The alternative, upgrading the reviewer's model,
 was rejected: it pays per-run for checks a script settles once, and leaves the

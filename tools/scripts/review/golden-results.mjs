@@ -3,7 +3,7 @@
  * including voids, which are recorded as voids and never as misses or
  * catches (ADR 0101). Every replay run appends a line for every case it
  * ran; the ledger's Runs table is generated from the accumulated lines by
- * `renderRunsTable`, and `check-review-golden-results.mjs` fails when the
+ * `renderRunsTable`, and `check-review-golden-results.ts` fails when the
  * two disagree.
  *
  * Everything here is pure except `appendResultLine`, which is the one write

@@ -3,14 +3,14 @@
  * to it (issue #1031, ADR 0123).
  *
  * Three readers need these and must not each keep a copy:
- * `check-review-rules.mjs` asserts the brief files against the rule catalogue
+ * `check-review-rules.ts` asserts the brief files against the rule catalogue
  * and the skill against the template, and `transcript-facts.mjs` recognises
  * an axis's dispatch in a reviewer transcript by them. A template the skill
  * states one way and the transcript reader expects another would report every
  * correct dispatch as steered.
  *
  * Keyed by finding axis. `satisfies` is not available in a .mjs file, so
- * `check-review-rules.mjs` asserts the keys against `FINDING_AXES`.
+ * `check-review-rules.ts` asserts the keys against `FINDING_AXES`.
  */
 export const BRIEFS = Object.freeze({
   standards: '.agents/skills/code-review/STANDARDS_BRIEF.md',

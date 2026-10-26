@@ -1,7 +1,7 @@
 /**
  * Project tag discipline: every Nx project carries exactly one tag from each
  * dimension in `tools/config/nx-project-tags.json`, and nothing else in the
- * `<dimension>:` namespace. Consumed by `check-nx-project-tags.mjs`.
+ * `<dimension>:` namespace. Consumed by `check-nx-project-tags.ts`.
  *
  * Why a gate rather than a convention: `@nx/enforce-module-boundaries` only
  * constrains projects whose tags match a constraint. An untagged project

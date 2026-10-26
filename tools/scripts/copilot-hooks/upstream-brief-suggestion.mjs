@@ -15,7 +15,7 @@
  *
  * Version comparison, range parsing, adapter reading, and ledger lookup are
  * the skill's — imported rather than re-implemented, the same way
- * `check-upstream-briefs.mjs` does, so a range this hook treats as covering
+ * `check-upstream-briefs.ts` does, so a range this hook treats as covering
  * is a range `ledger.mjs` would carry forward (ADR 0018 keeps that logic in
  * the skill; this file is allowed to import it).
  */

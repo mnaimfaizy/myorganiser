@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Shared empty-tier backfill for Review Tier and Code Review (#790).
 //
-// A crash before check-review-tier.mjs finish() used to leave $GITHUB_OUTPUT
+// A crash before check-review-tier.ts finish() used to leave $GITHUB_OUTPUT
 // empty, so `--tier` failed the validator and cascaded into Agent Review Ran
 // plus Publish Review. Both workflows used to carry matching grep/echo shell
 // for that; they already diverge in exit policy, which is why this script

@@ -6,12 +6,12 @@
     "tools/scripts/check-auth-pages.ts",
     "tools/scripts/check-docs-notes.ts",
     "tools/scripts/check-libs-markdown.ts",
-    "tools/scripts/check-nx-project-tags.mjs",
-    "tools/scripts/check-review-golden-set.mjs",
-    "tools/scripts/check-review-obligation-answers.mjs",
-    "tools/scripts/check-review-pages.mjs",
-    "tools/scripts/check-sandcastle-map.mjs",
-    "tools/scripts/check-skill-map.mjs",
-    "tools/scripts/check-vault-pages.mjs"
+    "tools/scripts/check-nx-project-tags.ts",
+    "tools/scripts/check-review-golden-set.ts",
+    "tools/scripts/check-review-obligation-answers.ts",
+    "tools/scripts/check-review-pages.ts",
+    "tools/scripts/check-sandcastle-map.ts",
+    "tools/scripts/check-skill-map.ts",
+    "tools/scripts/check-vault-pages.ts"
   ]
 }

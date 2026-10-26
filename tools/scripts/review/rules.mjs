@@ -39,7 +39,7 @@
  * Everything here is pure except `loadRuleCatalogue`, which reads the file.
  * Cross-file agreement — obligation ids, cited documents, the ids each
  * axis's brief file offers its sub-agent — is asserted by
- * `tools/scripts/check-review-rules.mjs`, not here.
+ * `tools/scripts/check-review-rules.ts`, not here.
  */
 
 import { readFileSync } from 'node:fs';

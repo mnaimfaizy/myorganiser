@@ -82,7 +82,7 @@ generated file — and says nothing about target shape. It needed a scope, not a
   or a `test` target default. The `@nx/jest:jest` key in `targetDefaults` stops matching anything
   and becomes dead config.
 - Target names stay stable. CI, Husky, and root scripts invoke `lint`, `test`, `build`, and `serve`
-  by name, and `check-nx-project-tags.mjs` reads only `tags`, so nothing downstream observes which
+  by name, and `check-nx-project-tags.ts` reads only `tags`, so nothing downstream observes which
   kind of target answers.
 - The next Nx work item is the v23 hop, and it carries the Playwright and build/serve group of
   decision 3 rather than a separate migration.

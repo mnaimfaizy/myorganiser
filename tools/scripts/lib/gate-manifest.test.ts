@@ -15,9 +15,9 @@ import {
 import { createGateManifestWorkspace } from './gate-manifest-test-workspace.ts';
 
 test('parseNodeSegments reads a single bare node invocation', () => {
-  const segments = parseNodeSegments('node tools/scripts/check-readme.mjs');
+  const segments = parseNodeSegments('node tools/scripts/check-readme.ts');
   assert.deepEqual(segments, [
-    { script: 'tools/scripts/check-readme.mjs', args: [] },
+    { script: 'tools/scripts/check-readme.ts', args: [] },
   ]);
 });
 

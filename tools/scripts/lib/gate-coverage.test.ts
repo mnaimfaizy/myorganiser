@@ -294,11 +294,11 @@ test('a check-*.ts checker invoked directly by path in a workflow counts as wire
 // Contract case 3 — the false pass reproduced while writing the rule.
 test('a contract-test script does not satisfy its sibling checker wiring', () => {
   const report = assertGateCoverage({
-    checkers: ['tools/scripts/check-openapi-artifacts.mjs'],
+    checkers: ['tools/scripts/check-openapi-artifacts.ts'],
     pkgScripts: {
-      'openapi:artifacts': 'node tools/scripts/check-openapi-artifacts.mjs',
+      'openapi:artifacts': 'node tools/scripts/check-openapi-artifacts.ts',
       'openapi:artifacts:test':
-        'node --test tools/scripts/check-openapi-artifacts.test.mjs',
+        'node --test tools/scripts/check-openapi-artifacts.test.ts',
     },
     pipelines: [
       {
@@ -313,7 +313,7 @@ test('a contract-test script does not satisfy its sibling checker wiring', () =>
   assert.equal(report.exitCode, 1);
   assert.deepEqual(
     report.unwired.map((entry) => entry.checker),
-    ['tools/scripts/check-openapi-artifacts.mjs'],
+    ['tools/scripts/check-openapi-artifacts.ts'],
   );
 });
 

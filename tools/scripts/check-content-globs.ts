@@ -28,7 +28,7 @@
 //     `content` array of a `tailwind.config.*` pulled in by `@config`.
 //
 // Why `yarn tailwind:classes:check` does not already cover content globs: it
-// scans its own hard-coded source list (`SOURCES` in check-tailwind-classes.mjs)
+// scans its own hard-coded source list (`SOURCES` in check-tailwind-classes.ts)
 // and never reads a config's `content` array, so a dead content glob passes it.
 //
 // Globs resolve relative to the config file's directory. Storybook resolves

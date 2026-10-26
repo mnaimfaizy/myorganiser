@@ -486,7 +486,7 @@ export const REPLAY_SCORE = 'review:golden:score';
 // directly or through run-from-tooling.mjs, which the replay uses so it reads
 // the workspace's repository from the tooling copy.
 const REPLAY_OBLIGATION_CHECK_RUN =
-  /\bnode\s+(?:\S*run-from-tooling\.mjs"?\s+)?\S*check-review-obligation-answers\.mjs\b/;
+  /\bnode\s+(?:\S*run-from-tooling\.mjs"?\s+)?\S*check-review-obligation-answers\.ts\b/;
 const REPLAY_SCORE_RUN = /\bnode\s+\S*score-golden-case\.mjs\s+--case\b/;
 
 const runs = (body, script, invocation) =>

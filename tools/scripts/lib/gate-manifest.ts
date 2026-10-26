@@ -32,13 +32,13 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'readme:check',
     npmScript: 'readme:check',
-    script: 'tools/scripts/check-readme.mjs',
+    script: 'tools/scripts/check-readme.ts',
     args: [],
   },
   {
     id: 'openapi:artifacts',
     npmScript: 'openapi:artifacts',
-    script: 'tools/scripts/check-openapi-artifacts.mjs',
+    script: 'tools/scripts/check-openapi-artifacts.ts',
     args: [],
   },
   {
@@ -68,7 +68,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'vault:pages:check',
     npmScript: 'vault:pages:check',
-    script: 'tools/scripts/check-vault-pages.mjs',
+    script: 'tools/scripts/check-vault-pages.ts',
     args: [],
   },
   {
@@ -80,55 +80,55 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'nx:tags:check',
     npmScript: 'nx:tags:check',
-    script: 'tools/scripts/check-nx-project-tags.mjs',
+    script: 'tools/scripts/check-nx-project-tags.ts',
     args: [],
   },
   {
     id: 'nx:targets:check',
     npmScript: 'nx:targets:check',
-    script: 'tools/scripts/check-nx-declared-targets.mjs',
+    script: 'tools/scripts/check-nx-declared-targets.ts',
     args: [],
   },
   {
     id: 'review:concurrency:check',
     npmScript: 'review:concurrency:check',
-    script: 'tools/scripts/check-review-concurrency.mjs',
+    script: 'tools/scripts/check-review-concurrency.ts',
     args: [],
   },
   {
     id: 'review:pages:check',
     npmScript: 'review:pages:check',
-    script: 'tools/scripts/check-review-pages.mjs',
+    script: 'tools/scripts/check-review-pages.ts',
     args: [],
   },
   {
     id: 'review:checklist:check',
     npmScript: 'review:checklist:check',
-    script: 'tools/scripts/check-review-checklist.mjs',
+    script: 'tools/scripts/check-review-checklist.ts',
     args: [],
   },
   {
     id: 'review:allowlist:check',
     npmScript: 'review:allowlist:check',
-    script: 'tools/scripts/check-review-tool-allowlist.mjs',
+    script: 'tools/scripts/check-review-tool-allowlist.ts',
     args: [],
   },
   {
     id: 'review:golden:check',
     npmScript: 'review:golden:check',
-    script: 'tools/scripts/check-review-golden-set.mjs',
+    script: 'tools/scripts/check-review-golden-set.ts',
     args: [],
   },
   {
     id: 'review:golden:results:check',
     npmScript: 'review:golden:results:check',
-    script: 'tools/scripts/check-review-golden-results.mjs',
+    script: 'tools/scripts/check-review-golden-results.ts',
     args: [],
   },
   {
     id: 'review:rules:check',
     npmScript: 'review:rules:check',
-    script: 'tools/scripts/check-review-rules.mjs',
+    script: 'tools/scripts/check-review-rules.ts',
     args: [],
   },
   {
@@ -146,7 +146,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'runner-image:check',
     npmScript: 'runner-image:check',
-    script: 'tools/scripts/check-runner-image.mjs',
+    script: 'tools/scripts/check-runner-image.ts',
     args: [],
   },
   {
@@ -188,7 +188,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'product-name:check',
     npmScript: 'product-name:check',
-    script: 'tools/scripts/check-product-name.mjs',
+    script: 'tools/scripts/check-product-name.ts',
     args: [],
   },
   {
@@ -200,7 +200,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'tailwind:classes:check',
     npmScript: 'tailwind:classes:check',
-    script: 'tools/scripts/check-tailwind-classes.mjs',
+    script: 'tools/scripts/check-tailwind-classes.ts',
     args: [],
   },
   {
@@ -212,7 +212,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'web:app-icons:check',
     npmScript: 'web:app-icons:check',
-    script: 'tools/scripts/check-web-app-icons.mjs',
+    script: 'tools/scripts/check-web-app-icons.ts',
     args: [],
   },
   {
@@ -232,7 +232,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'signing-material:check',
     npmScript: 'signing-material:check',
-    script: 'tools/scripts/check-signing-material.mjs',
+    script: 'tools/scripts/check-signing-material.ts',
     args: [],
   },
   // The file-reading half of the Prisma migration gate (ADR 0094). Whether
@@ -243,7 +243,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'prisma:migrations:check',
     npmScript: 'prisma:migrations:check',
-    script: 'tools/scripts/check-prisma-migrations.mjs',
+    script: 'tools/scripts/check-prisma-migrations.ts',
     args: [],
   },
   // The validator this adapter calls ships inside the skill directory, which
@@ -252,7 +252,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'upstream:briefs:check',
     npmScript: 'upstream:briefs:check',
-    script: 'tools/scripts/check-upstream-briefs.mjs',
+    script: 'tools/scripts/check-upstream-briefs.ts',
     args: [],
   },
   // The meta-gate reads this manifest to resolve one level of indirection, so
@@ -274,7 +274,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'ts-suppressions:check',
     npmScript: 'ts-suppressions:check',
-    script: 'tools/scripts/check-ts-suppressions.mjs',
+    script: 'tools/scripts/check-ts-suppressions.ts',
     args: [],
   },
 ];

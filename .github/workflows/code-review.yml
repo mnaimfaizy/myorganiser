@@ -97,7 +97,7 @@ permissions:
 # `if:` is read, so "the job skips" is not the same as "the run is harmless" —
 # the run still joins the group and, with `cancel-in-progress`, takes the
 # review with it. Why that keeps happening, and to which pull requests, is in
-# the header of tools/scripts/check-review-concurrency.mjs; it is written once,
+# the header of tools/scripts/check-review-concurrency.ts; it is written once,
 # there, because that file is what enforces it.
 #
 # What this expression does:

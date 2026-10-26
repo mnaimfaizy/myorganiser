@@ -39,9 +39,9 @@ instruction_globs:
 
 script_globs:
   - tools/scripts/check-component-hygiene.ts
-  - tools/scripts/check-test-hygiene.mjs
-  - tools/scripts/check-readme.mjs
-  - tools/scripts/check-vault-pages.mjs
+  - tools/scripts/check-test-hygiene.ts
+  - tools/scripts/check-readme.ts
+  - tools/scripts/check-vault-pages.ts
   - tools/scripts/check-auth-pages.ts
   - tools/scripts/check-mobile-platform.ts
 

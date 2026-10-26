@@ -1282,7 +1282,7 @@
           <code>Agent Review Ran</code> is eligible to be required but is not
           required yet &mdash; that needs the GitHub ruleset,
           <code>REQUIRED_CHECK_CONTEXTS</code>, and the job-name resolution
-          in <code>check-review-pages.mjs</code> (today <code>ci.yml</code>
+          in <code>check-review-pages.ts</code> (today <code>ci.yml</code>
           only) to change together (ADR 0073, Consequences). Neither check is
           ever a review approval (ADR 0070 item 6).
           <code>review:human</code> additionally needs a code-owner approval,
@@ -1727,7 +1727,7 @@
 
   <footer class="pagefoot">
     <div>
-      <code>tools/scripts/check-review-pages.mjs</code> diffs this page
+      <code>tools/scripts/check-review-pages.ts</code> diffs this page
       against its sources on every commit; it reads the embedded
       <code>review-lifecycle-manifest</code> block below.
       <code>requiredCheckContexts</code> are <code>ci.yml</code> job names,

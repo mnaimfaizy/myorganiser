@@ -43,7 +43,7 @@ function splitFlowList(inner) {
 
 /**
  * `ecosystems:` — a list of `{lead, members: {add, remove}}` mappings. This
- * repo has no YAML parser (`resolveBriefDir` in `check-upstream-briefs.mjs`
+ * repo has no YAML parser (`resolveBriefDir` in `check-upstream-briefs.ts`
  * faces the same constraint for `brief_dir`), and the schema ADAPTER.md
  * documents is exactly this narrow, so it is matched line-by-line rather
  * than parsed generally:

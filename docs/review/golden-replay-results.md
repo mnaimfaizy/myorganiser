@@ -833,7 +833,7 @@ below is generated from that record by
 generated-page checks (`review:pages:check`, `agents:map:check`): generate
 from source, diff against what is committed, fail on drift. Do not hand-edit
 between the markers; edit the record and regenerate with
-`node tools/scripts/check-review-golden-results.mjs --write` instead, which
+`node tools/scripts/check-review-golden-results.ts --write` instead, which
 is what the scheduled replay runs after it appends to the record. The
 table above this section is historical, hand-written, and untouched by the
 check — the generated table starts from the first recorded line (issue

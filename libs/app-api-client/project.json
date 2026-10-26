@@ -17,7 +17,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "{workspaceRoot}",
-        "commands": ["node tools/scripts/check-openapi-artifacts.mjs"]
+        "commands": ["node tools/scripts/check-openapi-artifacts.ts"]
       }
     }
   },

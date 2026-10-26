@@ -3,7 +3,7 @@
  *
  * Two checkers need the same split and needed it differently at first:
  * `check-doc-commands.ts` asks which tokens name a file, and
- * `check-review-tool-allowlist.mjs` asks whether a command's leading tokens
+ * `check-review-tool-allowlist.ts` asks whether a command's leading tokens
  * are the ones an allowlist entry permits. Both answers are wrong the moment
  * the split is wrong, and both are wrong in the same way — a quoted argument
  * cut on its spaces becomes several tokens nobody wrote. `"Vault Trust

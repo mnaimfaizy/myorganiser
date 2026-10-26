@@ -5,7 +5,7 @@
  * baseline, so the count of untested checkers can only shrink (ADR 0085).
  *
  * ADR 0085's finding is that "state your direction in the header" is not
- * enough — `check-readme.mjs` stated its direction in exactly the fixed form
+ * enough — `check-readme.ts` stated its direction in exactly the fixed form
  * the convention asked for and still had it wrong, because nothing made the
  * claim true. A contract suite is what makes it true. This checker does not
  * grade what a suite asserts; it asserts only that one exists, the same way

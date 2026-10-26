@@ -6,7 +6,7 @@
 //   node tools/scripts/check-checker-contracts.ts [--print]
 //
 // ADR 0043 already asked a checker's header to state which drift direction(s)
-// it asserts. Only 5 of 35 non-test checkers did — and check-readme.mjs, the
+// it asserts. Only 5 of 35 non-test checkers did — and check-readme.ts, the
 // one that followed the convention best, stated in exactly the fixed form the
 // convention asked for that "drift runs both ways" over code that implements
 // one direction. Writing a direction down does not make it true; a contract
@@ -23,7 +23,7 @@
 // checker that is no longer debt (it gained a suite, or the checker itself is
 // gone) is stale.
 //
-// This mirrors tools/scripts/check-nx-declared-targets.mjs (ADR 0082)
+// This mirrors tools/scripts/check-nx-declared-targets.ts (ADR 0082)
 // deliberately — same ratchet shape, including that a baseline entry
 // covering nothing fails as stale. Unlike
 // tools/config/gate-coverage-optout.json, there is deliberately no

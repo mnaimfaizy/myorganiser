@@ -592,7 +592,7 @@ yarn nx run-many -t lint --fix --exclude=api-specs,app-api-client
 ```
 
 `api-specs` and `app-api-client` alias their `lint` target to
-`tools/scripts/check-openapi-artifacts.mjs`, an artifact checker that takes no `--fix` and treats the
+`tools/scripts/check-openapi-artifacts.ts`, an artifact checker that takes no `--fix` and treats the
 flag as a path. A bare `yarn nx run-many -t lint --fix` therefore fails on those two projects; exclude
 them, or fix per project. Plain `yarn lint` passes no flags and covers all of them.
 

@@ -24,7 +24,7 @@ Supersedes the `/wayfinder` route decision in [ADR 0029](0029-wayfinder-is-an-ap
 
 ## Consequences
 
-- `EXTERNAL_SKILLS.md` has one approval tier. `check-skill-map.mjs` fails if a `## Personal Scope` heading reappears, so the tier cannot return without superseding this ADR.
+- `EXTERNAL_SKILLS.md` has one approval tier. `check-skill-map.ts` fails if a `## Personal Scope` heading reappears, so the tier cannot return without superseding this ADR.
 - `ask-matt` routes a foggy effort to `/grill-with-docs` instead of `/wayfinder`. That is the on-ramp that was doing the work anyway: interview until the abstractions have edges, then `/to-prd` once the goal sentence is writable.
 - The skill atlas loses **Tier 3** entirely. It existed to draw approved-but-not-installed externals, and no such thing remains — every approved external is project scope and already drawn as an Upstream-Owned node in Tier 1.
 - The reasons for specific exclusions are kept in `EXTERNAL_SKILLS.md` rather than deleted with the entries. A future reader proposing `tailwind-design-system` should find out it conflicts with the tokens rule without rediscovering it.

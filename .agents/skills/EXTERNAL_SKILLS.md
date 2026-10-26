@@ -10,7 +10,7 @@ For fast-moving framework knowledge, use `upstream-brief`. It compares repo-owne
 
 ## Project Scope — Upstream-Owned, committed
 
-Installed into `.agents/skills/` and committed. These are **Upstream-Owned Skills** (`CONTEXT.md`): never hand-edit them, and refresh them only through the CLI. `skills-lock.json` is the registry — `check-skill-map.mjs` reads it to decide which directories are ours.
+Installed into `.agents/skills/` and committed. These are **Upstream-Owned Skills** (`CONTEXT.md`): never hand-edit them, and refresh them only through the CLI. `skills-lock.json` is the registry — `check-skill-map.ts` reads it to decide which directories are ours.
 
 - `GoogleChrome/modern-web-guidance@modern-web-guidance`
 - `mattpocock/skills@codebase-design`

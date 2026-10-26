@@ -35,7 +35,7 @@ if ! git diff --cached --quiet --diff-filter=ACMRTD -- \
  skills-lock.json \
  .prettierignore \
  .gitattributes \
- tools/scripts/check-skill-map.mjs
+ tools/scripts/check-skill-map.ts
 then
 corepack yarn skills:map:check
 fi
@@ -79,7 +79,7 @@ if ! git diff --cached --quiet --diff-filter=ACMRTD -- \
  docs/sandcastle/gates.html \
  docs/sandcastle/logs.html \
  docs/sandcastle/resume.html \
- tools/scripts/check-sandcastle-map.mjs \
+ tools/scripts/check-sandcastle-map.ts \
  tools/scripts/lib/sandcastle-resume.ts \
  tools/scripts/lib/sandcastle-subagent-trace.ts \
  tools/scripts/lib/sandcastle-slice-selection.ts \

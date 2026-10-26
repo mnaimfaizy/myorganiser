@@ -157,7 +157,7 @@ naming a check script after yarn or corepack yarn is not on the allowlist.
 openapi:check in particular is not a bare script at all — it resyncs and can
 rewrite files in the checkout, so it is not something a reviewer should run
 either way; for the generated-output triggers below, `node
-tools/scripts/check-openapi-artifacts.mjs` is the safe, non-mutating check
+tools/scripts/check-openapi-artifacts.ts` is the safe, non-mutating check
 built for this obligation's own incident (issue #408) and is fine to run.
 When you didn't run the gate, write `not run` for both fields; that is a
 complete answer, not a missing one.

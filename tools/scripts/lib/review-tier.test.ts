@@ -357,7 +357,7 @@ test('the summary names the tier, lists every signal, and points at the checker'
     head: 'b'.repeat(40),
   });
   assert.match(md, /^## Review Tier: `review:human`/);
-  assert.match(md, /check-review-tier\.mjs/);
+  assert.match(md, /check-review-tier\.ts/);
   assert.match(md, /\| reach \| `human` \|/);
   assert.match(md, /Range: `aaaaaaa\.\.bbbbbbb`/);
   for (const s of result.signals)

@@ -2,7 +2,7 @@
  * Renders the web app's installable icons from the AppLogo shield and the
  * design-token build. Shared by the generator
  * (tools/scripts/generate-web-app-icons.mjs), which writes them, and the
- * check (tools/scripts/check-web-app-icons.mjs), which compares them with the
+ * check (tools/scripts/check-web-app-icons.ts), which compares them with the
  * committed files — so the check renders exactly what the generator would.
  *
  * The icon has one source and it is not in this file: the shield and check

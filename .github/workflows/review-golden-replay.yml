@@ -322,7 +322,7 @@ jobs:
           OVERLAY=(.agents/skills/code-review .agents/skills/upstream-brief .claude tools/scripts/copilot-hooks .github/actions/code-reviewer)
           TOOLING_HEAD="$(git rev-parse HEAD)"
           mkdir -p "$TOOLING"
-          git archive "$TOOLING_HEAD" tools/scripts/review tools/scripts/lib tools/scripts/check-review-obligation-answers.mjs tools/config | tar -x -C "$TOOLING"
+          git archive "$TOOLING_HEAD" tools/scripts/review tools/scripts/lib tools/scripts/check-review-obligation-answers.ts tools/config | tar -x -C "$TOOLING"
           ln -s "$GITHUB_WORKSPACE/node_modules" "$TOOLING/node_modules"
           git checkout --quiet --detach "$CASE_HEAD"
           rm -rf "${OVERLAY[@]}"
@@ -444,7 +444,7 @@ jobs:
           # to decide whether a self-contradiction raised its finding.
           set +e
           CR="$PWD/tmp/code-review"
-          node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" check-review-obligation-answers.mjs \
+          node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" check-review-obligation-answers.ts \
             "$CR/obligations.json" \
             "$CR/obligations.answers.json" \
             --report "$CR/report.json" \
@@ -692,7 +692,7 @@ jobs:
       # request, over a drift none of them introduced. The checker imports
       # only Node built-ins, so nothing is installed here.
       - name: Regenerate the ledger from the record
-        run: node tools/scripts/check-review-golden-results.mjs --write
+        run: node tools/scripts/check-review-golden-results.ts --write
 
       - name: Commit the results record
         run: |

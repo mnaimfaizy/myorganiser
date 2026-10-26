@@ -70,7 +70,7 @@ entry has no reason to exist.
 - A live reviewer run against a real Pull Request after this change still produces `executed`
   evidence, so the scoping removes a writable surface without removing the capability ADR 0071 item 4
   exists to preserve.
-- `tools/scripts/check-review-tool-allowlist.mjs` parses `Write(...)` and `Edit(...)` as opaque tool
+- `tools/scripts/check-review-tool-allowlist.ts` parses `Write(...)` and `Edit(...)` as opaque tool
   grants, the same as it already reads `Read` and `Agent`; it asserts instructed commands against
   `Bash(...)` entries and takes no position on a path-scoped grant, so this change needs no update
   there. (ADR 0118 item 2 has since given it a position on how such a grant is anchored.)

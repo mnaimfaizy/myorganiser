@@ -527,7 +527,7 @@ test('a replay that runs both scripts by file, from extracted tooling, is sound'
       replaySteps({
         check: [
           '        run: |',
-          '          node tools/scripts/check-review-obligation-answers.mjs w a \\',
+          '          node tools/scripts/check-review-obligation-answers.ts w a \\',
           '            --report "$CR/report.json"',
         ],
         score: [
@@ -545,7 +545,7 @@ test('a check run through run-from-tooling is a run', () => {
       replaySteps({
         check: [
           '        run: |',
-          '          node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" check-review-obligation-answers.mjs \\',
+          '          node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" check-review-obligation-answers.ts \\',
           '            w a --report "$CR/report.json"',
         ],
       }),
@@ -560,7 +560,7 @@ test('naming the scripts without running them is not running them', () => {
   const [f] = replayObligationCheckFindings(
     replaySteps({
       check: [
-        '        run: git archive HEAD tools/scripts/check-review-obligation-answers.mjs',
+        '        run: git archive HEAD tools/scripts/check-review-obligation-answers.ts',
       ],
       score: [
         '        run: node tools/scripts/review/score-golden-case.mjs --show x',

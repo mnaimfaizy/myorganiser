@@ -167,7 +167,7 @@ persisted nothing (issue #718) — and the `axis + source + file` tuple that rep
 because one source, `smell-baseline`, covered twelve separate rules (issue #724). The rule id is
 still not the whole identity: two defects under one rule in one file are told apart by their lines
 (issue #940). Each brief carries the ids for its own axis and no others. The rule-catalogue gate
-([`check-review-rules.mjs`](../../../tools/scripts/check-review-rules.mjs)) asserts each brief
+([`check-review-rules.ts`](../../../tools/scripts/check-review-rules.ts)) asserts each brief
 against the catalogue, and that the shared block is the same text in both.
 
 ### 4. Take the obligation worklist

@@ -8,7 +8,7 @@
  * trustworthy, provided every rule matches on masked source and reads any text
  * it needs back out of the raw source at the same index.
  *
- * Consumers: check-test-hygiene.mjs, check-component-hygiene.ts
+ * Consumers: check-test-hygiene.ts, check-component-hygiene.ts
  */
 
 /**

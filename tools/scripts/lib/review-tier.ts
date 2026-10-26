@@ -619,7 +619,7 @@ export function renderReviewTierSummary(
   const lines = [
     `## Review Tier: \`${result.label}\``,
     '',
-    `_${TIER_MEANING[result.tier]}._ Computed from the diff by \`tools/scripts/check-review-tier.mjs\` (ADR 0070); the label is a display of this output, not the other way round.`,
+    `_${TIER_MEANING[result.tier]}._ Computed from the diff by \`tools/scripts/check-review-tier.ts\` (ADR 0070); the label is a display of this output, not the other way round.`,
     '',
   ];
   if (base && head)

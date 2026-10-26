@@ -10,7 +10,7 @@
  *
  * The exported constants are the names the House Explainer Page manifest
  * (`docs/review/finding-lifecycle.html`) asserts against through
- * `tools/scripts/check-review-pages.mjs`. Rename here and that gate fails,
+ * `tools/scripts/check-review-pages.ts`. Rename here and that gate fails,
  * which is the point.
  */
 

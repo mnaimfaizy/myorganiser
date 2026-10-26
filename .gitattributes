@@ -30,7 +30,7 @@
 # Upstream-Owned Skills (ADR 0030): preserve upstream content exactly as installed, and keep
 # their diffs collapsed since nobody reviews them line by line. Repo-native skills are excluded
 # deliberately — they are hand-written instruction files, and marking them generated hid their
-# diffs from review. Keep in step with skills-lock.json; check-skill-map.mjs asserts it.
+# diffs from review. Keep in step with skills-lock.json; check-skill-map.ts asserts it.
 .agents/skills/codebase-design/** linguist-generated=true whitespace=-trailing-space
 .agents/skills/diagnosing-bugs/** linguist-generated=true whitespace=-trailing-space
 .agents/skills/domain-modeling/** linguist-generated=true whitespace=-trailing-space

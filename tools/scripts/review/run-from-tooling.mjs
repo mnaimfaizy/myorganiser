@@ -5,7 +5,7 @@
 //   node <tooling>/tools/scripts/review/run-from-tooling.mjs <script> [args...]
 //
 // <script> is relative to tools/scripts (`review/select-obligations.mjs`,
-// `check-review-obligation-answers.mjs`). The golden replay's working tree is
+// `check-review-obligation-answers.ts`). The golden replay's working tree is
 // a case head, whose tools/ predate the review scripts, so it runs them from a
 // copy of the pull request's tooling extracted outside the workspace. Those
 // scripts read their catalogues relative to the working directory and shell

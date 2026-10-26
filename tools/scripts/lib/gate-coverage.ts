@@ -112,7 +112,7 @@ export function stripComments(text: string): string {
  * Flags between `node` and its script are skipped so `node --enable-source-maps
  * x.mjs` still resolves to `x.mjs`. `node --test <file>` is reported as a test
  * runner and never counts as running the file as a checker: `openapi:artifacts:test`
- * runs `check-openapi-artifacts.test.mjs`, which is a contract suite, not a gate.
+ * runs `check-openapi-artifacts.test.ts`, which is a contract suite, not a gate.
  *
  * `node --test` accepts more than one file (`node --test a.test.mjs
  * b.test.mjs`), which is how a single Contract Suite script such as

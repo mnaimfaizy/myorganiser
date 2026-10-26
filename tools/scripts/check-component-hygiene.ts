@@ -10,7 +10,7 @@
  * spend its pass on the questions a script cannot answer — is the compound
  * split right, is this component doing too much, is the abstraction sound.
  *
- * Companion to check-test-hygiene.mjs; see docs/ui/GUIDELINES.md for the rules
+ * Companion to check-test-hygiene.ts; see docs/ui/GUIDELINES.md for the rules
  * this enforces and docs/adr/0014-component-pipeline-guardrails.md for why.
  *
  * Scopes: UI Primitives (libs/web/ui/src/lib/components/), Feature Components

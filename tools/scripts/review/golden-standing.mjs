@@ -105,7 +105,7 @@ const standingNote = (s) => {
 /**
  * The ledger's standing table: each case's rate and number of scored runs.
  * Rendered from the set and the record, and asserted against the ledger by
- * check-review-golden-results.mjs.
+ * check-review-golden-results.ts.
  */
 export function renderStandingTable(set, records) {
   const header =

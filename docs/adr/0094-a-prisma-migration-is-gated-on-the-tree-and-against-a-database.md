@@ -20,7 +20,7 @@ A Prisma migration is gated in **two tiers**, because the two questions worth as
 have very different costs.
 
 **Tier 1 — the tree.** `yarn prisma:migrations:check`
-(`tools/scripts/check-prisma-migrations.mjs`) is a file-reading Assertion Gate in the `gates:run`
+(`tools/scripts/check-prisma-migrations.ts`) is a file-reading Assertion Gate in the `gates:run`
 manifest, so the pre-commit hook and CI both run it. It asserts only what can be read off the
 tree: that every entry beside `migration_lock.toml` is a directory named
 `<14-digit timestamp>_<lowercase_snake_slug>`, that no two migrations share a timestamp, that

@@ -186,7 +186,7 @@ You run the commands in this review, so these rules are yours.
 - **Executed evidence runs in a tree you cannot keep.** Existing targets (`yarn nx test <project>`,
   `yarn nx lint <project>`) may run in the checkout, and so may a check gate's own script, invoked
   directly through `node` and not through the package manager. That is how typechecking runs here
-  too: `node tools/scripts/check-typecheck.mjs` covers the projects that have no `typecheck`
+  too: `node tools/scripts/check-typecheck.ts` covers the projects that have no `typecheck`
   target. No other package script is granted. A test file under `tools/scripts` belongs to no Nx
   project, so run it with `node --test <file>`: a package script that wraps it, the one
   `AGENTS.md` documents included, is refused (issue #1058). A throwaway reproduction goes in

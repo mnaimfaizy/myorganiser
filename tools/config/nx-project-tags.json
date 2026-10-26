@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Every Nx project carries exactly one tag from each dimension. `type` and `scope` drive @nx/enforce-module-boundaries in eslint.config.js; `tier` is the Review Tier classifier's primary signal (ADR 0070 item 4). Asserted by tools/scripts/check-nx-project-tags.mjs.",
+  "description": "Every Nx project carries exactly one tag from each dimension. `type` and `scope` drive @nx/enforce-module-boundaries in eslint.config.js; `tier` is the Review Tier classifier's primary signal (ADR 0070 item 4). Asserted by tools/scripts/check-nx-project-tags.ts.",
   "dimensions": {
     "type": {
       "app": "A deployable application. May depend on anything below it, never on another app.",

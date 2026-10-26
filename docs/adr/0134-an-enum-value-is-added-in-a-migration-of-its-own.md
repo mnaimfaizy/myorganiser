@@ -15,7 +15,7 @@ The shared host runs PostgreSQL 11 or earlier, which refuses `ADD VALUE` beside 
 ## Decision
 
 - **One enum value per migration, alone.** A migration that adds an enum value holds only that statement. Any table change made for the same feature goes in a migration of its own beside it.
-- **The checker asserts it from the tree.** `check-prisma-migrations.mjs` splits each `migration.sql` into statements, ignoring a `;` inside a comment, a quoted string or a dollar-quoted body. It fails any migration with an `ALTER TYPE ... ADD VALUE` statement and more than one statement. This needs no database, so it runs in the pre-commit aggregate with ADR 0094's other tier-1 assertions.
+- **The checker asserts it from the tree.** `check-prisma-migrations.ts` splits each `migration.sql` into statements, ignoring a `;` inside a comment, a quoted string or a dollar-quoted body. It fails any migration with an `ALTER TYPE ... ADD VALUE` statement and more than one statement. This needs no database, so it runs in the pre-commit aggregate with ADR 0094's other tier-1 assertions.
 - **The two broken migrations were split in place.** Each now keeps its first enum value. The remaining values and the `User` columns moved to new migrations with timestamps right after the original (`…064935`, `…064936`, `…140001`–`…140003`). Every statement uses `IF NOT EXISTS`, so a database that already ran the combined form applies the new migrations as no-ops. Only local development databases had run them: production's last release predates both, and staging stopped on the first.
 
 ## Considered Options

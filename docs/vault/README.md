@@ -48,7 +48,7 @@ that sent readers to the wrong slot — see [ADR 0051](../adr/0051-a-pinned-valu
 Values the pages show that are **not** yet assertable are listed in each manifest under
 `notYetExported` — currently the KDF and cipher figures, which are module-private constants. To
 bring them under the check, export them and add them to `SOURCES` in
-`tools/scripts/check-vault-pages.mjs`.
+`tools/scripts/check-vault-pages.ts`.
 
 ## Changing them
 

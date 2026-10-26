@@ -1,5 +1,5 @@
 /**
- * The decision behind `nx:targets:check` (`tools/scripts/check-nx-declared-targets.mjs`):
+ * The decision behind `nx:targets:check` (`tools/scripts/check-nx-declared-targets.ts`):
  * a ratchet holding Declared Targets on `@nx/*` executors to a fixed baseline,
  * so the count can only shrink toward Nx's Inferred Targets (ADR 0082).
  *

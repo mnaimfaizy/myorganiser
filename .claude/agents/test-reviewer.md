@@ -28,7 +28,7 @@ the gate, and a gate the author fills in for you is not a gate.
 1. Run the mechanical hygiene script — it owns every check that does not need judgment:
 
    ```bash
-   node tools/scripts/check-test-hygiene.mjs <test-file-path>
+   node tools/scripts/check-test-hygiene.ts <test-file-path>
    ```
 
    Report its output verbatim. Do not re-derive those checks by reading the file.
@@ -124,7 +124,7 @@ Two tiers, deliberately separated.
 
 ### Tier 1 — mechanical (owned by the script, not by you)
 
-`check-test-hygiene.mjs` decides these. Report its output; do not re-check them by eye:
+`check-test-hygiene.ts` decides these. Report its output; do not re-check them by eye:
 
 `jest.mock()` ordering against workspace imports · mock setup in `beforeAll()` ·
 duplicate top-level `describe` blocks and helpers · unused `jest.Mock` casts ·

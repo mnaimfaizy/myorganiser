@@ -2,13 +2,13 @@
 
 Issue #438 was filed after release v0.4.0 shipped the focused YouTube experience with nine new production environment variables and a cron wiring requirement, none of which reached `docs/deployment/CPANEL_STAGING_DEPLOYMENT_PLAN_MYORGANISER.md` (since renamed [`CPANEL_BACKEND_HOSTING.md`](../deployment/CPANEL_BACKEND_HOSTING.md), #437). Following that deployment doc exactly produced an API that could neither authenticate cron nor send mail. The issue proposed the obvious fix: detect when a backend or frontend surface changes and fail the commit unless documentation changed too.
 
-That is a different kind of gate from anything this repo has. `check-readme.mjs`, `check-libs-markdown.ts`, `check-skill-map.mjs`, `check-docs-notes.ts`, `check-openapi-artifacts.mjs`, `check-lint-coverage.ts`, `check-vault-pages.mjs`, and `check-auth-pages.ts` all compare two artifacts and fail on a factual mismatch. Not one of them says "you touched X, therefore touch Y."
+That is a different kind of gate from anything this repo has. `check-readme.ts`, `check-libs-markdown.ts`, `check-skill-map.ts`, `check-docs-notes.ts`, `check-openapi-artifacts.ts`, `check-lint-coverage.ts`, `check-vault-pages.ts`, and `check-auth-pages.ts` all compare two artifacts and fail on a factual mismatch. Not one of them says "you touched X, therefore touch Y."
 
 ## Decision
 
 A gate in this repo is an **Assertion Gate** (`CONTEXT.md`): it compares two artifacts and fails on a factual mismatch, naming the specific fact that is wrong. It never fails on the shape of a diff.
 
-A gate is never satisfied by editing a file. `check-vault-pages.mjs` does not ask whether the vault page changed; it asserts that thirty specific claims still match the source constants. That is the shape.
+A gate is never satisfied by editing a file. `check-vault-pages.ts` does not ask whether the vault page changed; it asserts that thirty specific claims still match the source constants. That is the shape.
 
 The incident that motivated #438 is assertable under this rule and needs no coupling: the backend reads `YOUTUBE_CRON_SECRET`, so `.env.example` must declare it, and a deployment doc that declares an env var absent from `.env.example` is wrong. Both are factual comparisons.
 
@@ -25,7 +25,7 @@ The incident that motivated #438 is assertable under this rule and needs no coup
 ## Consequences
 
 - **Prose drift is not caught, and this ADR does not pretend otherwise.** "Here is how the cron is wired" is unassertable. Review is the only defence, exactly as ADR 0041 concedes for note placement. Coupling would not have caught it either.
-- Backend controllers, Prisma schema, frontend routes, and new top-level libs leave #438's scope. The last two are already asserted by `check-readme.mjs`; the first two have no doc making a machine-comparable claim about them, and inventing one to justify a gate is the coupling gate wearing a disguise.
+- Backend controllers, Prisma schema, frontend routes, and new top-level libs leave #438's scope. The last two are already asserted by `check-readme.ts`; the first two have no doc making a machine-comparable claim about them, and inventing one to justify a gate is the coupling gate wearing a disguise.
 - `.env.example` becomes the single source of truth for the environment surface, with one-way subset assertions from backend reads and from deployment-doc env lists. The direction is recorded in the checker's header, not here.
 - Every `check-*.mjs` must be wired or carry a written reason in the `gates:coverage:check` opt-out list. An opt-out becomes a decision someone made rather than a gap nobody saw.
 - Wiring by exact script name is required. During the design of #438 a substring match on `yarn openapi:artifacts` matched `openapi:artifacts:test` and reported the unwired check as wired — the false pass this rule exists to prevent, reproduced while writing the rule.

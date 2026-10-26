@@ -16,7 +16,7 @@ same thing — one run's decision, read by the next.
 node .agents/skills/upstream-brief/resolve-ledger.mjs
 ```
 
-It asserts nothing and always exits 0. The gate is `tools/scripts/check-upstream-briefs.mjs`,
+It asserts nothing and always exits 0. The gate is `tools/scripts/check-upstream-briefs.ts`,
 which fails on a declined entry whose Ecosystem or path is gone.
 
 ## Carry-forward

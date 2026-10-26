@@ -18,7 +18,7 @@
 //
 // NOT A GATE. It asserts nothing and always exits 0, exactly like
 // `resolve-baseline.mjs`: a declined entry pointing at a deleted file is a
-// failure, and the gate that fails on it is `check-upstream-briefs.mjs` in
+// failure, and the gate that fails on it is `check-upstream-briefs.ts` in
 // `tools/scripts/`, where the Meta-Gate can see it. This command reports the
 // same condition so a developer meets it before CI does.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -108,7 +108,7 @@ export const readDeclaredLeads = (read) =>
     fallback: [],
   });
 
-/** `brief_dir:`, matched rather than parsed — see `check-upstream-briefs.mjs`. */
+/** `brief_dir:`, matched rather than parsed — see `check-upstream-briefs.ts`. */
 export const readBriefDir = (read) =>
   fromAdapter(read, {
     json: (parsed) =>
@@ -151,7 +151,7 @@ export function readCommittedReports(read, list, briefDir) {
  *   because the two must agree: a site that is a directory, or a file this
  *   process cannot read, exists for the gate and would read as
  *   `site-not-found` here, and this command's whole claim is that it reports
- *   the condition `check-upstream-briefs.mjs` fails on.
+ *   the condition `check-upstream-briefs.ts` fails on.
  * @param {Array<{lead: string, ok: boolean, baseline?: string, reason?: string}>} io.resolved
  *   the Baseline resolution for every declared Ecosystem
  * @returns {{lines: string[], briefDir: string}}

@@ -24,7 +24,7 @@ import {
   verifyCitation,
 } from './obligations.mjs';
 
-const CHECKER = 'tools/scripts/check-review-obligation-answers.mjs';
+const CHECKER = 'tools/scripts/check-review-obligation-answers.ts';
 const FIXTURES = join('tools', 'scripts', 'review', 'fixtures', '2026-09-10');
 
 const obligation = (over = {}) => ({

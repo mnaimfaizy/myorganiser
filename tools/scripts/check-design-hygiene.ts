@@ -4,7 +4,7 @@
  * Deterministic mechanical checks for House Explainer Pages — the self-contained
  * HTML artifacts the Designer sub-agent produces (`.github/agents/designer.agent.md`).
  *
- * Companion to check-test-hygiene.mjs and check-component-hygiene.ts. The rules
+ * Companion to check-test-hygiene.ts and check-component-hygiene.ts. The rules
  * live in tools/scripts/lib/design-page-scan.ts, which is pure; this file reads
  * the filesystem facts those rules compare against and decides what is in scope.
  *
