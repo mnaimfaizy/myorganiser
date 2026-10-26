@@ -523,7 +523,7 @@ export function normalizeDeclinedEntry(raw) {
  *   declined_opportunities:
  *     - ecosystem: nx
  *       url: https://nx.dev/concepts/inferred-tasks
- *       site: tools/scripts/check-component-hygiene.mjs
+ *       site: tools/scripts/check-component-hygiene.ts
  *       reason: tracked for next quarter, not this one
  *       baseline_range: '>=22.0.0 <23.0.0'
  *       quote: 'Inferred tasks keep project configuration in step ...'

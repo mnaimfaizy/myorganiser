@@ -3,7 +3,7 @@
  * the Designer sub-agent produces (`.github/agents/designer.agent.md`).
  *
  * This module is pure: every filesystem fact it needs is passed in. The CLI that
- * reads those facts is `tools/scripts/check-design-hygiene.mjs`.
+ * reads those facts is `tools/scripts/check-design-hygiene.ts`.
  *
  * Each rule here exists because a real dispatch got it wrong, and because a model
  * asked to confirm "the page has no root-svg <title>" will glance at it and say

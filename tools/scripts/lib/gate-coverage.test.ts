@@ -497,9 +497,9 @@ test('an aggregate listing itself is an error', () => {
 // findings that disagree.
 test('a checker wired directly and through the aggregate counts once', () => {
   const report = assertGateCoverage({
-    checkers: ['tools/scripts/check-adr-numbering.mjs'],
+    checkers: ['tools/scripts/check-adr-numbering.ts'],
     pkgScripts: {
-      'adr:numbering:check': 'node tools/scripts/check-adr-numbering.mjs',
+      'adr:numbering:check': 'node tools/scripts/check-adr-numbering.ts',
       'gates:run': `node ${AGGREGATE}`,
     },
     pipelines: [
@@ -514,7 +514,7 @@ test('a checker wired directly and through the aggregate counts once', () => {
       {
         id: 'adr:numbering:check',
         npmScript: 'adr:numbering:check',
-        script: 'tools/scripts/check-adr-numbering.mjs',
+        script: 'tools/scripts/check-adr-numbering.ts',
         args: [],
       },
     ]),

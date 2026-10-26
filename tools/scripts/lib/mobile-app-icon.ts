@@ -2,7 +2,7 @@
  * Plans the mobile app icon for iOS and Android from the BrandMark shield.
  * Shared by the generator (tools/scripts/generate-mobile-app-icon.mjs), which
  * writes every output and rasterises the PNGs through Chromium, and the check
- * (tools/scripts/check-mobile-app-icon.mjs), which compares the text outputs
+ * (tools/scripts/check-mobile-app-icon.ts), which compares the text outputs
  * with the committed files — so the check builds exactly what the generator
  * would. Nothing here launches a browser.
  *

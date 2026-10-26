@@ -12,7 +12,7 @@
  * button and the Drive backup both call — and hands the gate whatever it
  * produces today.
  *
- * It is not application code and ships in nothing: `tools/scripts/check-escape-copy-reader.mjs`
+ * It is not application code and ships in nothing: `tools/scripts/check-escape-copy-reader.ts`
  * bundles this file for Node, runs it, and throws the result away.
  */
 import {

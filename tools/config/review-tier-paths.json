@@ -31,6 +31,7 @@
       "reason": "The Assertion Gates, the hook that runs them, the config they read, and this map are the things that decide what merges; the map protects itself (ADR 0070 item 3). project.json is here because tier:* tags are the classifier's primary signal.",
       "patterns": [
         "tools/scripts/check-*.mjs",
+        "tools/scripts/check-*.ts",
         "tools/scripts/run-assertion-gates.mjs",
         "tools/scripts/lib/**",
         "tools/scripts/ai/**",

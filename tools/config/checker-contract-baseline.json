@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "comment": "The contract-suite coverage ratchet baseline for tools/scripts/check-checker-contracts.mjs (`yarn checker-contracts:check`). Every entry names a tools/scripts/check-*.mjs checker that carries no sibling check-*.test.mjs contract suite proving it fails on the drift its header claims to catch (ADR 0085; PRD #772, slice #775). The list can only shrink as later slices add a suite for one of these checkers. A checker present here that gains a suite fails the check as stale — remove it in the same change that adds the suite. A checker found on the tree with no suite and no entry here fails the check as new, untracked debt. Deliberately no written-reason opt-out: a per-checker \"not worth testing\" judgment call is exactly the discretion this baseline exists to remove.",
+  "comment": "The contract-suite coverage ratchet baseline for tools/scripts/check-checker-contracts.ts (`yarn checker-contracts:check`). Every entry names a tools/scripts/check-*.{mjs,ts} checker that carries no sibling check-*.test.{mjs,ts} contract suite proving it fails on the drift its header claims to catch (ADR 0085; PRD #772, slice #775). The list can only shrink as later slices add a suite for one of these checkers. A checker present here that gains a suite fails the check as stale — remove it in the same change that adds the suite. A checker found on the tree with no suite and no entry here fails the check as new, untracked debt. Deliberately no written-reason opt-out: a per-checker \"not worth testing\" judgment call is exactly the discretion this baseline exists to remove.",
   "baseline": [
-    "tools/scripts/check-adr-numbering.mjs",
-    "tools/scripts/check-auth-pages.mjs",
-    "tools/scripts/check-docs-notes.mjs",
-    "tools/scripts/check-libs-markdown.mjs",
+    "tools/scripts/check-adr-numbering.ts",
+    "tools/scripts/check-auth-pages.ts",
+    "tools/scripts/check-docs-notes.ts",
+    "tools/scripts/check-libs-markdown.ts",
     "tools/scripts/check-nx-project-tags.mjs",
     "tools/scripts/check-review-golden-set.mjs",
     "tools/scripts/check-review-obligation-answers.mjs",

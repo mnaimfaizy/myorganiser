@@ -181,7 +181,7 @@ if (existsSync(AGENTS_MIRROR)) {
   note(`${AGENTS_MIRROR} not found — run \`yarn agents:sync\``);
 }
 
-// Agent display names come from frontmatter, same as check-agent-map.mjs.
+// Agent display names come from frontmatter, same as check-agent-map.ts.
 const agentNames = canonical.map((f) => {
   const m = readFileSync(join(AGENTS_DIR, f), 'utf8').match(/^name:\s*(.+)$/m);
   if (!m) fail(`${f} has no name: in its frontmatter`);
@@ -527,7 +527,7 @@ if (!fmBlock) {
   }
 }
 
-// Every sub-agent named in the manifest must actually be rendered, per check-agent-map.mjs.
+// Every sub-agent named in the manifest must actually be rendered, per check-agent-map.ts.
 for (const a of manifest.subAgentsUnreferencedBySkills ?? []) {
   if (!page.includes(`"${a}"`))
     note(`${a} is in the manifest but never rendered in the page`);

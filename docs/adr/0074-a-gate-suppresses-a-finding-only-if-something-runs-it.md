@@ -13,7 +13,7 @@ under-specified in fact: it tests whether a checker **would** fail, and never wh
 **invokes** it.
 
 [ADR 0043](0043-gates-assert-facts.md) already settled the opposite question
-for the repository at large. `tools/scripts/check-gate-coverage.mjs` — the Meta-Gate — asserts that
+for the repository at large. `tools/scripts/check-gate-coverage.ts` — the Meta-Gate — asserts that
 every checker in `tools/scripts/` is invoked by some hook or workflow, and names the ones that are
 not. Its whole premise is that **a checker nothing runs is not a gate**. A checker that is
 deliberately not a gate needs a written reason in `tools/config/gate-coverage-optout.json`; there

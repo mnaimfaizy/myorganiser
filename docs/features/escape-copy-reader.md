@@ -98,7 +98,7 @@ It runs in CI, not in the pre-commit aggregate, because it builds a page and run
 | `apps/escape-copy-reader/src/main.ts`          | The page: file picker, secret field, rendering. No crypto.          |
 | `apps/escape-copy-reader/src/index.html`       | The page shell, with placeholders the build splices into.           |
 | `tools/scripts/build-escape-copy-reader.mjs`   | The build.                                                          |
-| `tools/scripts/check-escape-copy-reader.mjs`   | The gate.                                                           |
+| `tools/scripts/check-escape-copy-reader.ts`    | The gate.                                                           |
 | `.github/workflows/publish-github-release.yml` | Builds and attaches the reader to each release.                     |
 
 The split is load-bearing. The reader's crypto is **bundled from the app's own**, never hand-copied:

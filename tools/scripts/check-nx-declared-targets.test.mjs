@@ -1,8 +1,8 @@
 // Contracts for check-nx-declared-targets.mjs's command-line surface,
-// following check-gate-coverage.test.mjs's shape: the checker runs as a real
+// following check-gate-coverage.test.ts's shape: the checker runs as a real
 // subprocess against a miniature git repository, because it reads tracked
 // project.json files with `git ls-files` the same way
-// check-mobile-platform.mjs and check-nx-project-tags.mjs read their corpus.
+// check-mobile-platform.ts and check-nx-project-tags.mjs read their corpus.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

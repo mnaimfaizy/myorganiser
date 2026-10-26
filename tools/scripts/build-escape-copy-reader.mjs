@@ -19,7 +19,7 @@
 // design tokens are inlined from `libs/design-tokens/src/generated/tokens.css`
 // so the page has no stylesheet link and no font URL.
 //
-// `tools/scripts/check-escape-copy-reader.mjs` is the gate over the output.
+// `tools/scripts/check-escape-copy-reader.ts` is the gate over the output.
 // This script only builds; it asserts nothing.
 //
 // Exit 0 = built. Exit 1 = the build failed.

@@ -1,6 +1,6 @@
 /**
- * The decision behind `gates:coverage:check` (`tools/scripts/check-gate-coverage.mjs`):
- * which `check-*.mjs` scripts are Wired Gates, and which run nowhere.
+ * The decision behind `gates:coverage:check` (`tools/scripts/check-gate-coverage.ts`):
+ * which `check-*.{mjs,ts}` scripts are Wired Gates, and which run nowhere.
  *
  * ADR 0043's corollary is that a gate nobody runs asserts nothing, so a
  * checker no pipeline invokes is a defect of the same class as a checker that
@@ -14,7 +14,7 @@
  *      found) — never by a `*:check` script-name suffix. `openapi:artifacts` and
  *      `component:hygiene` carry no such suffix, and the first is one of the
  *      two unwired checks that motivated the rule. Selecting on a *name* is
- *      also exactly why `check-lint-coverage.mjs` had to exist.
+ *      also exactly why `check-lint-coverage.ts` had to exist.
  *   2. **Matching is exact.** During design a substring match on
  *      `yarn openapi:artifacts` also matched `openapi:artifacts:test` and
  *      reported the unwired check as wired. A contract-test script never

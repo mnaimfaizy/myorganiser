@@ -29,7 +29,7 @@ by most, and silently broken by the cases nobody looked at.
 The obvious remedy — assert that an ADR merged on `main` does not say
 `proposed` — cannot be written honestly. On a `pull_request`, CI checks out
 `refs/pull/N/merge`. That vantage point is what makes
-`check-adr-numbering.mjs` true, because a duplicate number is visible as a
+`check-adr-numbering.ts` true, because a duplicate number is visible as a
 duplicate in the merged tree. It does the opposite here: in that same tree an
 ADR the pull request is _adding_ is indistinguishable by content from one that
 merged a month ago. Telling them apart requires git, and the resulting check
@@ -56,7 +56,7 @@ second word, and a second word is a second step.
 
 `proposed` therefore has no correct moment, and the assertion collapses to a
 directory listing: **no ADR's status slot reads `proposed`**, in either form
-the corpus uses. `tools/scripts/check-adr-status.mjs` asserts it, wired into
+the corpus uses. `tools/scripts/check-adr-status.ts` asserts it, wired into
 the `gates:run` aggregate, with a contract suite as ADR 0085 requires.
 
 Reading both forms is load-bearing rather than thorough: a checker that knew

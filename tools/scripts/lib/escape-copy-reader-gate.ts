@@ -2,7 +2,7 @@
  * The decisions behind `yarn escape-copy-reader:check`, separated from its IO
  * so they can be exercised against fixtures.
  *
- * `tools/scripts/check-escape-copy-reader.mjs` is the half that builds the
+ * `tools/scripts/check-escape-copy-reader.ts` is the half that builds the
  * reader, runs the real exporter and evaluates the built page; this half is
  * every judgment that file makes about what it got back. Splitting them is
  * what lets the contract suite prove the checker fails on the drift its header

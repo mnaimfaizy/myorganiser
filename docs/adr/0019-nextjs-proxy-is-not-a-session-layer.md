@@ -20,7 +20,7 @@ Instruction truth for this pin lives in `AGENTS.md`. Other instruction files poi
 - **Record both official lines and pick no winner** (`proxy` equals middleware vs Node-only / keep Edge `middleware`) — rejected. Agents invent `middleware.ts`. This app has no Edge requirement. “Middleware” here already means Express.
 - **Teach `proxy.ts` as the default place for auth checks** — rejected. Upstream itself says Proxy is not a full session or authorization solution. Session and Vault Unlock already have homes.
 - **Hard-ban any future Proxy** — rejected. A later ticket may need request interception. The standing constraint is “do not add the layer unless asked,” not “the file is forbidden forever.”
-- **Enforce “no Proxy” in `check-component-hygiene.mjs`** — rejected. That script never scans `apps/web`. A layout invariant at the wrong layer is ADR 0014’s false-positive class.
+- **Enforce “no Proxy” in `check-component-hygiene.ts`** — rejected. That script never scans `apps/web`. A layout invariant at the wrong layer is ADR 0014’s false-positive class.
 
 ## Consequences
 

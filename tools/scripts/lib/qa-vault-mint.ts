@@ -1,6 +1,6 @@
 /**
  * Bundles `libs/web/vault/src/qa/mintQaVault.ts` for Node and returns its exports,
- * the way `check-escape-copy-reader.mjs` runs its own harness.
+ * the way `check-escape-copy-reader.ts` runs its own harness.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -17,7 +17,7 @@ export async function loadQaVaultMint(workspaceRoot: string): Promise<unknown> {
         join(workspaceRoot, 'libs/web/vault/src/qa/mintQaVault.ts'),
       ],
       bundle: true,
-      // CommonJS for the reason `check-escape-copy-reader.mjs` gives: the
+      // CommonJS for the reason `check-escape-copy-reader.ts` gives: the
       // `web-vault` sources reach axios, whose `require` calls esbuild's ESM
       // output cannot run.
       format: 'cjs',

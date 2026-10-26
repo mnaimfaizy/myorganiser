@@ -925,7 +925,7 @@ The sub-agent responsible for creating or editing a React component from a Struc
 _Avoid_: Frontend agent, UI agent, component writer
 
 **ComponentReviewer**:
-The sub-agent that gates a component produced by ComponentBuilder. Runs `check-component-hygiene.mjs`, `tsc`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project serves as the importer check. Always runs after ComponentBuilder. Produces a report only — no code edits.
+The sub-agent that gates a component produced by ComponentBuilder. Runs `check-component-hygiene.ts`, `tsc`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project serves as the importer check. Always runs after ComponentBuilder. Produces a report only — no code edits.
 _Avoid_: Code reviewer, linter agent, review agent
 
 **DepSync**:

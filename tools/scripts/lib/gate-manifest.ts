@@ -44,25 +44,25 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'env:declared:check',
     npmScript: 'env:declared:check',
-    script: 'tools/scripts/check-env-declared.mjs',
+    script: 'tools/scripts/check-env-declared.ts',
     args: [],
   },
   {
     id: 'env:deployment:check',
     npmScript: 'env:deployment:check',
-    script: 'tools/scripts/check-env-deployment.mjs',
+    script: 'tools/scripts/check-env-deployment.ts',
     args: [],
   },
   {
     id: 'feature-index:check',
     npmScript: 'feature-index:check',
-    script: 'tools/scripts/check-feature-index.mjs',
+    script: 'tools/scripts/check-feature-index.ts',
     args: [],
   },
   {
     id: 'agents:map:check',
     npmScript: 'agents:map:check',
-    script: 'tools/scripts/check-agent-map.mjs',
+    script: 'tools/scripts/check-agent-map.ts',
     args: [],
   },
   {
@@ -74,7 +74,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'auth:pages:check',
     npmScript: 'auth:pages:check',
-    script: 'tools/scripts/check-auth-pages.mjs',
+    script: 'tools/scripts/check-auth-pages.ts',
     args: [],
   },
   {
@@ -134,13 +134,13 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'deploy:pages:check',
     npmScript: 'deploy:pages:check',
-    script: 'tools/scripts/check-deploy-pipeline.mjs',
+    script: 'tools/scripts/check-deploy-pipeline.ts',
     args: [],
   },
   {
     id: 'host-apply:workflow:check',
     npmScript: 'host-apply:workflow:check',
-    script: 'tools/scripts/check-host-apply-workflow.mjs',
+    script: 'tools/scripts/check-host-apply-workflow.ts',
     args: [],
   },
   {
@@ -164,25 +164,25 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'adr:numbering:check',
     npmScript: 'adr:numbering:check',
-    script: 'tools/scripts/check-adr-numbering.mjs',
+    script: 'tools/scripts/check-adr-numbering.ts',
     args: [],
   },
   {
     id: 'adr:status:check',
     npmScript: 'adr:status:check',
-    script: 'tools/scripts/check-adr-status.mjs',
+    script: 'tools/scripts/check-adr-status.ts',
     args: [],
   },
   {
     id: 'docs:commands:check',
     npmScript: 'docs:commands:check',
-    script: 'tools/scripts/check-doc-commands.mjs',
+    script: 'tools/scripts/check-doc-commands.ts',
     args: [],
   },
   {
     id: 'docs:file-refs:check',
     npmScript: 'docs:file-refs:check',
-    script: 'tools/scripts/check-doc-file-refs.mjs',
+    script: 'tools/scripts/check-doc-file-refs.ts',
     args: [],
   },
   {
@@ -194,7 +194,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'enum:fanout:check',
     npmScript: 'enum:fanout:check',
-    script: 'tools/scripts/check-enum-fanout.mjs',
+    script: 'tools/scripts/check-enum-fanout.ts',
     args: [],
   },
   {
@@ -206,7 +206,7 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'content-globs:check',
     npmScript: 'content-globs:check',
-    script: 'tools/scripts/check-content-globs.mjs',
+    script: 'tools/scripts/check-content-globs.ts',
     args: [],
   },
   {
@@ -218,13 +218,13 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'mobile:app-icon:check',
     npmScript: 'mobile:app-icon:check',
-    script: 'tools/scripts/check-mobile-app-icon.mjs',
+    script: 'tools/scripts/check-mobile-app-icon.ts',
     args: [],
   },
   {
     id: 'mobile-platform:check',
     npmScript: 'mobile-platform:check',
-    script: 'tools/scripts/check-mobile-platform.mjs',
+    script: 'tools/scripts/check-mobile-platform.ts',
     args: [],
   },
   // Reads the index, so in the pre-commit hook it refuses what is staged and
@@ -262,13 +262,13 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'gates:coverage:check',
     npmScript: 'gates:coverage:check',
-    script: 'tools/scripts/check-gate-coverage.mjs',
+    script: 'tools/scripts/check-gate-coverage.ts',
     args: [],
   },
   {
     id: 'checker-contracts:check',
     npmScript: 'checker-contracts:check',
-    script: 'tools/scripts/check-checker-contracts.mjs',
+    script: 'tools/scripts/check-checker-contracts.ts',
     args: [],
   },
   {

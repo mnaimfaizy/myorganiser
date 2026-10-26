@@ -34,7 +34,7 @@ ComponentReviewer: Skipped — ComponentBuilder did not complete (Status: BLOCKE
    the same mode pre-commit enforces on staged component paths (ADR 0014):
 
    ```bash
-   node tools/scripts/check-component-hygiene.mjs <path> [<path> ...] --max-warnings=0
+   node tools/scripts/check-component-hygiene.ts <path> [<path> ...] --max-warnings=0
    ```
 
    Report its output verbatim. Do not re-derive those checks by reading the file.
@@ -91,7 +91,7 @@ importer: name it in `Required Revisions`.
 
 ### Tier 1 — mechanical (owned by the script and the compiler)
 
-`check-component-hygiene.mjs` decides these; report its output, do not re-check by eye:
+`check-component-hygiene.ts` decides these; report its output, do not re-check by eye:
 
 `forwardRef` without `displayName` · template-concatenated `className` instead of
 `cn()` · missing barrel export · deep imports past `@myorganiser/web-ui` ·

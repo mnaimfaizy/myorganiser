@@ -1,6 +1,6 @@
 // Loads the Nx project graph for the workspace-level check scripts.
 //
-// Both `check-lint-coverage.mjs` and `check-typecheck.mjs` need the same thing:
+// Both `check-lint-coverage.ts` and `check-typecheck.mjs` need the same thing:
 // every project's name, root, and targets, in one read rather than one
 // `nx show project` per project. `nx graph --file` gives that in a single call.
 //

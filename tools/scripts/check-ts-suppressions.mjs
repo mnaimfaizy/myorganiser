@@ -22,7 +22,7 @@
 // `@ts-ignore`, and `@ts-expect-error` are directives TypeScript itself
 // recognises only in a comment, so matching the literal text is exactly
 // what the compiler does, with none of the false-positive risk a bare
-// substring match on an import specifier has in `check-mobile-platform.mjs`.
+// substring match on an import specifier has in `check-mobile-platform.ts`.
 //
 // `copilot-hooks/__tests__` is excluded, mirroring `tools/scripts/tsconfig.json`:
 // those specs are still Jest, not yet subject to ADR 0135's strict-TypeScript

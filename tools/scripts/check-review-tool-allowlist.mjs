@@ -282,7 +282,7 @@ const die = (msg) => {
  * no particular value, so it can neither satisfy nor contradict an entry's
  * token and is read as matching either way.
  *
- * Deliberately not called `isPlaceholder`: `check-doc-commands.mjs` has a
+ * Deliberately not called `isPlaceholder`: `check-doc-commands.ts` has a
  * predicate by that name asking a different question — whether a token names
  * one file — and it answers `true` for a glob, which this one must not.
  */

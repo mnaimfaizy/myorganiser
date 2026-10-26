@@ -24,7 +24,7 @@
 
 <style>
 /* House faces. Spliced verbatim from docs/vault/lifecycle.html via
-   `node tools/scripts/check-design-hygiene.mjs --print-font-block` — the same
+   `node tools/scripts/check-design-hygiene.ts --print-font-block` — the same
    block, byte for byte, that docs/sandcastle/*.html and docs/agents/*.html
    carry. Base64 data URIs, so the page still renders from disk and inside a
    sandbox with no network. Do not re-encode or re-subset. */
@@ -2303,10 +2303,10 @@
     <div>
       Diff this page against the source with the embedded
       <code>release-pipeline-manifest</code> block below, which
-      <code>tools/scripts/check-deploy-pipeline.mjs</code> reads
+      <code>tools/scripts/check-deploy-pipeline.ts</code> reads
       against <code>.github/workflows/*.yml</code> directly, the way
-      <code>check-env-deployment.mjs</code> reads the deployment docs and
-      <code>check-agent-map.mjs</code> diffs an embedded manifest against its
+      <code>check-env-deployment.ts</code> reads the deployment docs and
+      <code>check-agent-map.ts</code> diffs an embedded manifest against its
       source of truth. That checker is wired as
       <code>deploy:pages:check</code>, alongside
       <code>vault:pages:check</code> and <code>auth:pages:check</code>, so
@@ -2907,7 +2907,7 @@
 
 <script type="application/json" id="release-pipeline-manifest">
   {
-    "note": "Asserted by tools/scripts/check-deploy-pipeline.mjs against .github/workflows/*.yml.",
+    "note": "Asserted by tools/scripts/check-deploy-pipeline.ts against .github/workflows/*.yml.",
     "ciRunnerNodeMajor": "22.18",
     "repoEnginesNodeRange": ">=22.18.0",
     "releaseScriptMinNodeMajor": 22,

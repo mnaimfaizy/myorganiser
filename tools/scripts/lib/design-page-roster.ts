@@ -4,7 +4,7 @@
  * three lineages of HTML page and only one is this convention.
  *
  * This lives in its own module so the roster has exactly one definition. It was a
- * `const` inside `check-design-hygiene.mjs`, which the CLI cannot export without
+ * `const` inside `check-design-hygiene.ts`, which the CLI cannot export without
  * running its whole main body on import, so the contract suite kept a hand-copied
  * mirror. The mirror rotted the first time the roster grew: the fixture workspace
  * writes one page per entry, so a page added to the checker and not to the copy

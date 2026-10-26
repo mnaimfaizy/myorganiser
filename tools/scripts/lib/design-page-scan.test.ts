@@ -1869,7 +1869,7 @@ test('maskHtmlComments also blanks script and style block comments', () => {
   // named for. It previously passed a bare `/* … */` with no element around it,
   // and passed only because masking ran document-wide — the defect that let a
   // glob in prose blank the rest of a page. In prose those bytes are not a
-  // comment, and `a glob in prose does not hide…` in check-design-hygiene.test.mjs
+  // comment, and `a glob in prose does not hide…` in check-design-hygiene.test.ts
   // asserts that directly.
   const source = 'a\n<style>/* hidden\nlines */</style>\nb';
   const masked = maskHtmlComments(source);

@@ -56,7 +56,7 @@
 //   Every `*.json` directly in the brief directory. Not a filename pattern:
 //   a report that escaped the gate through a typo'd name is exactly the
 //   failure mode the Meta-Gate exists to prevent, one level down. The scan is
-//   non-recursive, matching `check-docs-notes.mjs`, so a brief that needs an
+//   non-recursive, matching `check-docs-notes.ts`, so a brief that needs an
 //   assets folder is unaffected — and a JSON file in the brief directory that
 //   is not a report belongs in a subdirectory of it.
 //

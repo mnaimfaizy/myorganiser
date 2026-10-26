@@ -91,7 +91,7 @@ test('every tools/scripts suite that runs git init isolates its git environment'
   const names = initSuites.map((path) => relative(REPO_ROOT, path));
   // A detector that matched nothing would pass vacuously.
   assert.ok(
-    names.includes('tools/scripts/check-fix-attribution.test.mjs'),
+    names.includes('tools/scripts/check-fix-attribution.test.ts'),
     `detector missed a known git-init suite; found: ${names.join(', ')}`,
   );
 
@@ -133,7 +133,7 @@ test('a git-init suite run under a hook GIT_DIR leaves the outer repository unto
 
   const result = spawnSync(
     process.execPath,
-    ['--test', join(SCRIPTS_DIR, 'check-fix-attribution.test.mjs')],
+    ['--test', join(SCRIPTS_DIR, 'check-fix-attribution.test.ts')],
     { cwd: REPO_ROOT, env: hooked.env, encoding: 'utf8' },
   );
 

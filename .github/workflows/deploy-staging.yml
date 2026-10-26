@@ -531,7 +531,7 @@ jobs:
           # its default exclusions instead of adding to them.
           rm -f dist/deploy/web/web.zip
 
-      # Pinned by check-deploy-pipeline.mjs: the `exclude` below must keep
+      # Pinned by check-deploy-pipeline.ts: the `exclude` below must keep
       # `**/.htaccess`.
       - name: Deploy web app to cPanel (staging)
         uses: samkirkland/ftp-deploy-action@110f9186c050f71550953127052e77650219c287 # v4.4.0

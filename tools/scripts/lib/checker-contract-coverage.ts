@@ -1,7 +1,7 @@
 /**
  * The decision behind `checker-contracts:check`
- * (`tools/scripts/check-checker-contracts.mjs`): a ratchet holding
- * contract-suite coverage for `tools/scripts/check-*.mjs` checkers to a fixed
+ * (`tools/scripts/check-checker-contracts.ts`): a ratchet holding
+ * contract-suite coverage for `tools/scripts/check-*.{mjs,ts}` checkers to a fixed
  * baseline, so the count of untested checkers can only shrink (ADR 0085).
  *
  * ADR 0085's finding is that "state your direction in the header" is not
@@ -9,11 +9,12 @@
  * the convention asked for and still had it wrong, because nothing made the
  * claim true. A contract suite is what makes it true. This checker does not
  * grade what a suite asserts; it asserts only that one exists, the same way
- * `check-lint-coverage.mjs` asserts a source file has *a* test, not that the
+ * `check-lint-coverage.ts` asserts a source file has *a* test, not that the
  * test is any good.
  *
- * Coverage is file adjacency: `tools/scripts/check-x.mjs` "has a contract
- * suite" iff `tools/scripts/check-x.test.mjs` exists. This is the same
+ * Coverage is file adjacency: `tools/scripts/check-x.{mjs,ts}` "has a contract
+ * suite" iff the sibling `tools/scripts/check-x.test.{mjs,ts}` exists, in the
+ * checker's own extension (ADR 0135). This is the same
  * convention the rest of the checkers already use for their own tests, and
  * it is what `--test` filters on in `tools/scripts/lib/gate-coverage.ts`.
  *
@@ -25,7 +26,7 @@
  * a checker that is no longer debt, whether because it gained a suite or
  * because the checker itself is gone). Both directions are asserted; neither
  * is omitted, which is the header claim this file's own contract suite
- * (`tools/scripts/check-checker-contracts.test.mjs`) proves true.
+ * (`tools/scripts/check-checker-contracts.test.ts`) proves true.
  *
  * Deliberately no written-reason opt-out list, unlike
  * `tools/config/gate-coverage-optout.json`. ADR 0085 rejects "not worth

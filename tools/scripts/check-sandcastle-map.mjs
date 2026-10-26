@@ -10,7 +10,7 @@
 //   assertedFromExports          Every key resolves to a real `export` in one of the
 //                                sandcastle libs, or to a JSON path in the model policy /
 //                                package.json / a CI workflow. Verified by IMPORTING and
-//                                READING, the way tools/scripts/check-agent-map.mjs does.
+//                                READING, the way tools/scripts/check-agent-map.ts does.
 //
 //   assertedFromOrchestratorSource
 //                                Module-local literals inside .sandcastle/main.mts,

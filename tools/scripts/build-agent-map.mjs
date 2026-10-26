@@ -29,7 +29,7 @@
 //
 // Note: docs/agents/orchestration-map.html was produced by an earlier revision of this script
 // that carried a hand-written interaction script, and its source export no longer exists, so
-// that page is not reproducible from here either. It remains covered by check-agent-map.mjs.
+// that page is not reproducible from here either. It remains covered by check-agent-map.ts.
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.ts';

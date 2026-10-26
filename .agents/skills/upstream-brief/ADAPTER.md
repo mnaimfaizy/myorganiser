@@ -64,7 +64,7 @@ An Upstream Opportunity a human declined, remembered so the next run does not pr
 declined_opportunities:
   - ecosystem: nx
     url: https://nx.dev/concepts/inferred-tasks
-    site: tools/scripts/check-component-hygiene.mjs
+    site: tools/scripts/check-component-hygiene.ts
     reason: the migration is tracked for next quarter, not this one
     baseline_range: '>=22.0.0 <23.0.0'
     quote: Inferred tasks keep project configuration in step with the tools actually installed.

@@ -12,7 +12,7 @@
  * the first.
  *
  * Three properties are load-bearing and are asserted by
- * `tools/scripts/check-escape-copy-reader.mjs`:
+ * `tools/scripts/check-escape-copy-reader.ts`:
  *
  *   1. **Nothing is sent.** No `fetch`, no `XMLHttpRequest`, no `WebSocket`,
  *      no dynamic `import()`, and no external `src`/`href` in the page. The
@@ -265,7 +265,7 @@ if (typeof document !== 'undefined') {
 /**
  * The reader's own API, exposed for the gate.
  *
- * `tools/scripts/check-escape-copy-reader.mjs` loads the built HTML, evaluates
+ * `tools/scripts/check-escape-copy-reader.ts` loads the built HTML, evaluates
  * the script it carries outside a browser, and opens a freshly produced
  * envelope through this handle. That is ADR 0064's second decision, and it is
  * only an assertion about the artifact if it runs the artifact.

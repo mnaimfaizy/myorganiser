@@ -99,7 +99,7 @@ UI Primitives and Vault UI Components keep the compound-in-one-file pattern in �
 
 A re-export barrel is not a Feature Component and this rule does not reach it: `components/index.ts` declares nothing and has no component to name. A file that re-exports **and** declares an exported component is not a barrel — it is a component file called `index`, and the rule applies to it in full.
 
-`check-component-hygiene.mjs` asserts this. A Feature exception is a `{ path, reason }` entry in that script — there is no comment-in-file escape.
+`check-component-hygiene.ts` asserts this. A Feature exception is a `{ path, reason }` entry in that script — there is no comment-in-file escape.
 
 ### Split signals — extract a component when any of these are true
 
@@ -376,7 +376,7 @@ const handleDelete = useCallback((id: string) => {
 return <TodoItem onDelete={handleDelete} />;
 ```
 
-Inline arrows and function expressions (`onX={() => { … }}`, `onX={function () { … }}`) are the same violation. `check-component-hygiene.mjs` reports them: a PASS is a claim that §5.6 holds, including this form.
+Inline arrows and function expressions (`onX={() => { … }}`, `onX={function () { … }}`) are the same violation. `check-component-hygiene.ts` reports them: a PASS is a claim that §5.6 holds, including this form.
 
 **Thin-wrapper exception.** An expression-bodied arrow whose body is a single call to a `useCallback` already in this file, or to a name not declared as a local function (a prop or a `useState` setter), may bind extra arguments:
 
@@ -440,11 +440,11 @@ This document is the source of truth. The agents do not paraphrase it into their
 
 Enforcement is split three ways by what each layer can actually decide:
 
-| Layer                         | Owns                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check-component-hygiene.mjs` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX, export/basename match (Feature: one exported component named after the file; primitive/vault-ui/Feature Library (any other `libs/web/<lib>` tagged `type:feature` + `scope:web`): basename matches the compound root). Deterministic — a script counts where a model estimates. |
-| `tsc --noEmit` + `eslint`     | Type correctness, importer compatibility, `any`, unused vars, hook dependency arrays.                                                                                                                                                                                                                                                                                                                                                                                   |
-| ComponentReviewer             | Judgment: is the composition pattern right, is the component in the right scope, is it mixing too many concerns, is the client boundary correct, should this be Radix, accessibility beyond the shape rules.                                                                                                                                                                                                                                                            |
+| Layer                        | Owns                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-component-hygiene.ts` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX, export/basename match (Feature: one exported component named after the file; primitive/vault-ui/Feature Library (any other `libs/web/<lib>` tagged `type:feature` + `scope:web`): basename matches the compound root). Deterministic — a script counts where a model estimates. |
+| `tsc --noEmit` + `eslint`    | Type correctness, importer compatibility, `any`, unused vars, hook dependency arrays.                                                                                                                                                                                                                                                                                                                                                                                   |
+| ComponentReviewer            | Judgment: is the composition pattern right, is the component in the right scope, is it mixing too many concerns, is the client boundary correct, should this be Radix, accessibility beyond the shape rules.                                                                                                                                                                                                                                                            |
 
 Run the shape rules yourself at any time:
 

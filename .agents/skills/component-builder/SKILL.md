@@ -65,7 +65,7 @@ Pass the Structured Spec to the `ComponentBuilder` sub-agent (canonical `.github
 
 Required on `gate:standard` and `gate:full` after ComponentBuilder. Pass the ComponentBuilder Report to `ComponentReviewer` (canonical `.github/agents/component-reviewer.agent.md`). Skip Builder/Reviewer only for `gate:mechanical` rename/import/dead-delete.
 
-ComponentReviewer runs `check-component-hygiene.mjs`, `tsc --noEmit`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project is the importer check — nobody reads importer files one by one.
+ComponentReviewer runs `check-component-hygiene.ts`, `tsc --noEmit`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project is the importer check — nobody reads importer files one by one.
 
 ### Step 4 — Handle the Verdict
 

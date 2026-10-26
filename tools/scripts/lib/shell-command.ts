@@ -2,7 +2,7 @@
  * Splitting a documented shell command into tokens.
  *
  * Two checkers need the same split and needed it differently at first:
- * `check-doc-commands.mjs` asks which tokens name a file, and
+ * `check-doc-commands.ts` asks which tokens name a file, and
  * `check-review-tool-allowlist.mjs` asks whether a command's leading tokens
  * are the ones an allowlist entry permits. Both answers are wrong the moment
  * the split is wrong, and both are wrong in the same way — a quoted argument
