@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { copyFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -12,54 +13,91 @@ const RUNNER = join(
   dirname(fileURLToPath(import.meta.url)),
   'run-assertion-gates.mjs',
 );
+const STUB_SCRIPT = 'tools/scripts/check-stub.mjs';
 
 // ADR 0043: each `corepack yarn` line costs ~1.3s of overhead against ~350ms
 // of work. Issue #735: a 5000ms wall-clock cap on the whole aggregate is
 // platform-sensitive and roster-sensitive, so it went red on Windows while
 // the property it was defending stayed healthy.
 //
-// The bound is per-checker cost divided by a same-run bare-node spawn.
-// Adding a checker scales both sides; there is no platform branch.
+// The bound is calibrated in the same run and environment as the measurement:
+// a bare `node -e 0` spawn, which is what the aggregate pays per checker, and
+// a bare `corepack yarn node -e 0` line, which is what the rejected shape pays.
+// Per-checker cost fails once it is more than halfway from the first to the
+// second. There is no constant and no platform branch.
 //
-// Threshold placement is pinned by the Agent Brief on issue #735 (Windows 11,
-// Node 22.19.0) — not the issue body, which only reports whole-aggregate
-// wall clock, and not the earlier "Measurement refresh — 2026-09-22" comment,
-// which reports different spawn and aggregate figures. The brief's spawn and
-// per-checker figures, and ADR 0043's yarn-line overhead, live in the
-// constants below. Bound of 8 sits between those two ratios so it fails
-// once cost is more than halfway to a yarn-line spawn.
-// Headroom at writing is HEADROOM_AT_WRITING = 8 / (372/96) = 2.06× —
-// more than twice the Agent Brief's Windows cost, less than halfway to
-// the yarn-line shape. The calibration test asserts that 2.06× figure
-// so the stated margin cannot drift from the constants silently.
-const AGENT_BRIEF_WINDOWS_BASELINE_MS = 96;
-const AGENT_BRIEF_WINDOWS_PER_CHECKER_MS = 372;
-const ADR_0043_YARN_LINE_MS = 1300;
-const MAX_CHECKER_COST_IN_BASELINES = 8;
-const YARN_SHAPE_IN_BASELINES =
-  ADR_0043_YARN_LINE_MS / AGENT_BRIEF_WINDOWS_BASELINE_MS;
-const AGENT_BRIEF_RATIO_IN_BASELINES =
-  AGENT_BRIEF_WINDOWS_PER_CHECKER_MS / AGENT_BRIEF_WINDOWS_BASELINE_MS;
-const HEADROOM_AT_WRITING =
-  MAX_CHECKER_COST_IN_BASELINES / AGENT_BRIEF_RATIO_IN_BASELINES;
+// Two fixed figures came before this, and each failed somewhere:
+// - The bound was 8× a bare spawn, placed below ADR 0043's 1.3s yarn line over
+//   issue #735's 96ms Windows spawn (13.5×). On a macOS host a warm yarn line
+//   measured 237ms against a 36ms spawn, 6.6×, so one yarn line per checker
+//   passed the bound it existed to fail.
+// - The timed run was the real roster, so the cost included checker work, which
+//   reads the repo. In the sandcastle sandbox the repo is a VirtioFS bind mount
+//   while a bare spawn reads only the image: one cold run measured a 14ms spawn
+//   against 824ms per checker (57×), warm runs 6.6–7.8×, and slice #1328 hit
+//   9.9×, against 3.4× on the host. A yarn line does that same work, so ADR
+//   0043's argument is about overhead alone. The aggregate is timed over stub
+//   checkers in a temp workspace instead; the real roster's correctness is
+//   the first test's job.
 
-function measureBareNodeSpawnMs(rounds = 5) {
+function averageSpawnMs(spawn, rounds) {
   let total = 0;
   for (let i = 0; i < rounds; i += 1) {
     const startedAt = performance.now();
-    const result = spawnSync(process.execPath, ['-e', '0'], {
-      encoding: 'utf8',
-    });
-    assert.equal(result.status, 0, result.stderr);
+    const result = spawn();
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     total += performance.now() - startedAt;
   }
   return total / rounds;
 }
 
-function checkerCostInBaselines(elapsedMs, checkerCount, baselineMs) {
-  assert.ok(checkerCount > 0, 'checkerCount must be positive');
-  assert.ok(baselineMs > 0, 'baseline must be a positive measured spawn');
-  return elapsedMs / checkerCount / baselineMs;
+// Through a shell, as `.husky/pre-commit` runs it, and so Windows resolves
+// `corepack.cmd`. From the repo root, so Yarn reads this checkout's install.
+function spawnYarnLine(command) {
+  return spawnSync(`corepack yarn ${command}`, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    shell: true,
+  });
+}
+
+function calibrate() {
+  const baselineMs = averageSpawnMs(
+    () => spawnSync(process.execPath, ['-e', '0'], { encoding: 'utf8' }),
+    5,
+  );
+  const yarnLineMs = averageSpawnMs(() => spawnYarnLine('node -e 0'), 3);
+  assert.ok(
+    yarnLineMs > baselineMs,
+    `a yarn line (${yarnLineMs.toFixed(0)}ms) must cost more than the bare ` +
+      `spawn it wraps (${baselineMs.toFixed(0)}ms)`,
+  );
+  const boundMs = baselineMs + (yarnLineMs - baselineMs) / 2;
+  const describe = (perCheckerMs) =>
+    `${perCheckerMs.toFixed(0)}ms per checker against a bound of ` +
+    `${boundMs.toFixed(0)}ms, halfway from a ${baselineMs.toFixed(0)}ms ` +
+    `node spawn to a ${yarnLineMs.toFixed(0)}ms yarn line`;
+  return { baselineMs, boundMs, describe };
+}
+
+function stubManifest(count) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `stub-${i}`,
+    npmScript: `stub-${i}:check`,
+    script: STUB_SCRIPT,
+    args: [],
+  }));
+}
+
+function perCheckerMs(manifest, options) {
+  const startedAt = performance.now();
+  const results = runGateManifest(manifest, options);
+  const elapsedMs = performance.now() - startedAt;
+  assert.ok(
+    results.every((result) => result.status === 0),
+    results.map((result) => `${result.stdout}${result.stderr}`).join('\n'),
+  );
+  return elapsedMs / manifest.length;
 }
 
 test('the aggregate runs every gate against the real repo and exits 0', () => {
@@ -84,115 +122,93 @@ test('the aggregate runs every gate against the real repo and exits 0', () => {
 });
 
 // Guards the aggregate decision itself: replacing it with one `corepack yarn`
-// line per checker would cost ~1.3s of overhead per check (ADR 0043). A
-// direct `node` run of the aggregate is timed here against a same-run spawn
-// so the bound stays meaningful as the roster grows and across platforms.
-test('the aggregate stays well under a yarn-line per-checker cost', () => {
-  const baselineMs = measureBareNodeSpawnMs();
+// line per checker would cost a yarn line of overhead per check (ADR 0043).
+// The runner and its manifest check against package.json run unchanged; only
+// the checkers it spawns are stubs, so what is timed is the aggregate shape.
+test('the aggregate stays well under a yarn-line per-checker cost', (t) => {
+  const workspace = createGateManifestWorkspace(t, {
+    prefix: 'gate-aggregate-',
+    scripts: [...new Set(GATE_MANIFEST.map(({ script }) => script))],
+  });
+  copyFileSync(
+    join(REPO_ROOT, 'package.json'),
+    join(workspace, 'package.json'),
+  );
+
+  const { boundMs, describe } = calibrate();
   const startedAt = performance.now();
   const result = spawnSync(process.execPath, [RUNNER], {
-    cwd: REPO_ROOT,
+    cwd: workspace,
     encoding: 'utf8',
   });
   const elapsedMs = performance.now() - startedAt;
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
-  const checkerCount = GATE_MANIFEST.length;
-  const ratio = checkerCostInBaselines(elapsedMs, checkerCount, baselineMs);
+  const costMs = elapsedMs / GATE_MANIFEST.length;
   assert.ok(
-    ratio < MAX_CHECKER_COST_IN_BASELINES,
-    `expected per-checker cost well under the corepack-yarn shape ` +
-      `(${YARN_SHAPE_IN_BASELINES.toFixed(1)}× a same-run node spawn, bound ` +
-      `${MAX_CHECKER_COST_IN_BASELINES}×); took ${ratio.toFixed(2)}× ` +
-      `(${elapsedMs.toFixed(0)}ms across ${checkerCount} checkers, ` +
-      `baseline ${baselineMs.toFixed(0)}ms)`,
+    costMs < boundMs,
+    `expected the aggregate well under the corepack-yarn shape; took ` +
+      `${describe(costMs)} (${GATE_MANIFEST.length} checkers)`,
   );
 });
 
-test('a per-checker cost at the yarn-line shape fails the bound', () => {
-  const baselineMs = measureBareNodeSpawnMs();
-  const holdMs = Math.ceil(baselineMs * YARN_SHAPE_IN_BASELINES);
-  const startedAt = performance.now();
-  const result = spawnSync(
-    process.execPath,
-    ['-e', `setTimeout(() => {}, ${holdMs})`],
-    { encoding: 'utf8' },
-  );
-  const elapsedMs = performance.now() - startedAt;
+// The bound must fail the shape it guards against, measured the same way.
+// Three checkers suffice: per-checker cost does not depend on roster size.
+test('a yarn line per checker fails the bound', (t) => {
+  const workspace = createGateManifestWorkspace(t, {
+    prefix: 'gate-yarn-line-',
+    scripts: [STUB_SCRIPT],
+  });
 
-  assert.equal(result.status, 0, result.stderr);
-  const ratio = checkerCostInBaselines(elapsedMs, 1, baselineMs);
-  assert.ok(
-    ratio > MAX_CHECKER_COST_IN_BASELINES,
-    `expected a ${YARN_SHAPE_IN_BASELINES.toFixed(1)}×-baseline hold to exceed the ` +
-      `bound of ${MAX_CHECKER_COST_IN_BASELINES}×; took ${ratio.toFixed(2)}× ` +
-      `(${elapsedMs.toFixed(0)}ms vs ${baselineMs.toFixed(0)}ms baseline)`,
-  );
-});
+  const { boundMs, describe } = calibrate();
+  const costMs = perCheckerMs(stubManifest(3), {
+    cwd: workspace,
+    spawn: (entry, cwd) => {
+      const result = spawnYarnLine(
+        `node ${JSON.stringify(join(cwd, entry.script))}`,
+      );
+      return {
+        status: result.status,
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
+      };
+    },
+  });
 
-test('the bound sits between the Agent Brief Windows cost and the yarn shape', () => {
-  assert.equal(AGENT_BRIEF_RATIO_IN_BASELINES.toFixed(3), '3.875');
-  assert.equal(HEADROOM_AT_WRITING.toFixed(2), '2.06');
   assert.ok(
-    checkerCostInBaselines(
-      AGENT_BRIEF_WINDOWS_PER_CHECKER_MS,
-      1,
-      AGENT_BRIEF_WINDOWS_BASELINE_MS,
-    ) < MAX_CHECKER_COST_IN_BASELINES,
-  );
-  assert.ok(
-    checkerCostInBaselines(
-      ADR_0043_YARN_LINE_MS,
-      1,
-      AGENT_BRIEF_WINDOWS_BASELINE_MS,
-    ) > MAX_CHECKER_COST_IN_BASELINES,
+    costMs > boundMs,
+    `expected a yarn line per checker to exceed the bound; took ` +
+      describe(costMs),
   );
 });
 
 test('per-checker cost does not rise when the roster grows', (t) => {
-  const script = 'tools/scripts/check-stub.mjs';
   const workspace = createGateManifestWorkspace(t, {
     prefix: 'gate-roster-',
-    scripts: [script],
+    scripts: [STUB_SCRIPT],
   });
 
   const largeN = GATE_MANIFEST.length;
   const smallN = Math.max(2, Math.floor(largeN / 2));
-  const baselineMs = measureBareNodeSpawnMs();
+  const { baselineMs, boundMs, describe } = calibrate();
 
-  function ratioFor(n) {
-    const manifest = Array.from({ length: n }, (_, i) => ({
-      id: `stub-${i}`,
-      npmScript: `stub-${i}:check`,
-      script,
-      args: [],
-    }));
-    const startedAt = performance.now();
-    const results = runGateManifest(manifest, { cwd: workspace });
-    const elapsedMs = performance.now() - startedAt;
-    assert.ok(
-      results.every((result) => result.status === 0),
-      results.map((result) => result.stderr).join('\n'),
-    );
-    return checkerCostInBaselines(elapsedMs, n, baselineMs);
-  }
-
-  const ratioSmall = ratioFor(smallN);
-  const ratioLarge = ratioFor(largeN);
+  const costSmall = perCheckerMs(stubManifest(smallN), { cwd: workspace });
+  const costLarge = perCheckerMs(stubManifest(largeN), { cwd: workspace });
 
   assert.ok(
-    ratioSmall < MAX_CHECKER_COST_IN_BASELINES,
-    `small roster (${smallN}) took ${ratioSmall.toFixed(2)}×`,
+    costSmall < boundMs,
+    `small roster (${smallN}) took ${describe(costSmall)}`,
   );
   assert.ok(
-    ratioLarge < MAX_CHECKER_COST_IN_BASELINES,
-    `large roster (${largeN}) took ${ratioLarge.toFixed(2)}×`,
+    costLarge < boundMs,
+    `large roster (${largeN}) took ${describe(costLarge)}`,
   );
   assert.ok(
-    ratioLarge <= ratioSmall + 1,
+    costLarge <= costSmall + baselineMs,
     `adding checkers must not consume bound headroom: ` +
-      `${ratioSmall.toFixed(2)}× at n=${smallN} vs ` +
-      `${ratioLarge.toFixed(2)}× at n=${largeN}`,
+      `${costSmall.toFixed(0)}ms per checker at n=${smallN} vs ` +
+      `${costLarge.toFixed(0)}ms at n=${largeN} ` +
+      `(slack one ${baselineMs.toFixed(0)}ms spawn)`,
   );
 });
