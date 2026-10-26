@@ -97,13 +97,14 @@ RUN npm install -g @github/copilot
 USER ${AGENT_UID}:${AGENT_GID}
 RUN curl https://cursor.com/install -fsS | bash
 
-# Claude Code is pinned to an exact version, and the auto-updater is off, so
-# every slice in an image runs the same CLI. Unpinned, the installer takes
-# whatever is latest on the day the image is built, and nothing records it.
-# Bump the pin here only: the orchestrator rebuilds an image whose
-# `claude --version` differs from it, and writes the version into each slice's
-# log. See tools/scripts/lib/sandcastle-cli-version.mjs.
-ARG CLAUDE_CODE_VERSION=2.1.310
+# Claude Code's version is a build arg, not a pin in this file. The dispatcher
+# chooses it from SANDCASTLE_CLAUDE_CODE_UPDATE / SANDCASTLE_CLAUDE_CODE_VERSION
+# (.sandcastle/.env.example), passes the exact version here, and rebuilds an
+# image whose `claude --version` differs. A plain `docker build` gets latest.
+# The CLI's own auto-updater is off: updates happen at dispatch, so the version
+# each slice log names is the one the agent ran. See
+# tools/scripts/lib/sandcastle-cli-version.mjs.
+ARG CLAUDE_CODE_VERSION=latest
 ENV DISABLE_AUTOUPDATER=1
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
 

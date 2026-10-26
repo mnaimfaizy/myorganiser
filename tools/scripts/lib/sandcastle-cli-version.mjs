@@ -1,50 +1,93 @@
 /**
- * The Claude Code version a sandcastle slice runs, pinned and reported.
+ * Which Claude Code a sandcastle slice runs, chosen from the environment and
+ * reported in the slice log.
  *
- * `.sandcastle/Dockerfile` installs Claude Code at the version its
- * `ARG CLAUDE_CODE_VERSION` names, with the auto-updater off, so every slice in
- * an image runs the same CLI. The orchestrator only builds the image when it is
- * missing, so a bumped pin would otherwise never reach an image that already
- * exists: before dispatch it reads the version the image actually carries,
- * rebuilds when that differs from the pin, and writes the version into each
- * slice's log — the way the CI reviewer's log names the CLI
- * `anthropics/claude-code-action` ran.
+ * Two variables, set wherever the other `SANDCASTLE_*` ones are (the 1Password
+ * Environment, or `.sandcastle/.env`), so changing the CLI never needs a commit:
+ *
+ *   SANDCASTLE_CLAUDE_CODE_UPDATE   auto | manual. Unset means auto, or manual
+ *                                   when a version is set.
+ *   SANDCASTLE_CLAUDE_CODE_VERSION  The exact version manual mode installs.
+ *
+ * Auto follows the latest release: each dispatch asks the release channel the
+ * installer uses which version is current, and rebuilds the image when it
+ * carries another. Manual holds the image at the named version. Either way the
+ * update happens at dispatch, never inside a running slice — the image is
+ * built with the CLI's own auto-updater off, so the version the log names is
+ * the version the agent ran.
  *
  * Run the tests with: yarn sandcastle:cli-version:test
  */
 
-const PIN_PATTERN = /^ARG CLAUDE_CODE_VERSION=(\S+)\s*$/m;
-const SEMVER = /^\d+\.\d+\.\d+(?:-\S+)?$/;
-const VERSION_OUTPUT = /^(\d+\.\d+\.\d+(?:-\S+)?) \(Claude Code\)\s*$/;
+export const UPDATE_VARIABLE = 'SANDCASTLE_CLAUDE_CODE_UPDATE';
+export const VERSION_VARIABLE = 'SANDCASTLE_CLAUDE_CODE_VERSION';
+
+/** The channel `https://claude.ai/install.sh` reads "latest" from. */
+export const LATEST_RELEASE_URL =
+  'https://downloads.claude.ai/claude-code-releases/latest';
+
+const UPDATE_MODES = ['auto', 'manual'];
+const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const VERSION_OUTPUT = /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?) \(Claude Code\)$/;
 
 /**
- * Pure: the Claude Code version a Dockerfile pins.
+ * Pure: the update policy the environment asks for.
  *
- * Throws rather than returning a fallback: an image built without a pin is
- * the unpinned state this module exists to end.
+ * Throws on a value it cannot honour rather than guessing, as
+ * `SANDCASTLE_CLAUDE_AUTH` does: a typo in either variable would otherwise
+ * run a CLI nobody chose.
  *
- * @param {string} dockerfile
- * @returns {string}
+ * @param {Record<string, string | undefined>} env
+ * @returns {{ mode: 'auto' } | { mode: 'manual', version: string }}
  */
-export const pinnedClaudeCodeVersion = (dockerfile) => {
-  const match = PIN_PATTERN.exec(dockerfile);
-  if (!match) {
+export const claudeCodePolicy = (env) => {
+  const rawMode = (env[UPDATE_VARIABLE] ?? '').trim().toLowerCase();
+  const version = (env[VERSION_VARIABLE] ?? '').trim();
+
+  if (rawMode && !UPDATE_MODES.includes(rawMode)) {
     throw new Error(
-      'the sandbox Dockerfile has no `ARG CLAUDE_CODE_VERSION=<version>` line',
+      `${UPDATE_VARIABLE} must be "auto" or "manual" (got "${rawMode}").`,
     );
   }
-  const version = match[1];
-  if (!SEMVER.test(version)) {
+  if (version && !SEMVER.test(version)) {
     throw new Error(
-      `CLAUDE_CODE_VERSION must be an exact version, got "${version}"`,
+      `${VERSION_VARIABLE} must be an exact version such as 2.1.310 (got "${version}").`,
     );
   }
-  return version;
+
+  const mode = rawMode || (version ? 'manual' : 'auto');
+  if (mode === 'manual') {
+    if (!version) {
+      throw new Error(
+        `${UPDATE_VARIABLE}=manual needs ${VERSION_VARIABLE} set to the version to install.`,
+      );
+    }
+    return { mode, version };
+  }
+  if (version) {
+    throw new Error(
+      `${UPDATE_VARIABLE}=auto follows the latest release, so ${VERSION_VARIABLE}=${version} ` +
+        `would be ignored. Unset one of them.`,
+    );
+  }
+  return { mode };
+};
+
+/**
+ * Pure: the version a release-channel response names, or null when the body
+ * is anything else (an error page, an empty reply).
+ *
+ * @param {string} body
+ * @returns {string | null}
+ */
+export const parseReleaseVersion = (body) => {
+  const text = body.trim();
+  return SEMVER.test(text) ? text : null;
 };
 
 /**
  * Pure: the version in `claude --version` output, or null when the output is
- * not that shape (no CLI on PATH, an error page, a renamed product).
+ * not that shape (no CLI on PATH, an error, a renamed product).
  *
  * @param {string} stdout
  * @returns {string | null}
@@ -53,10 +96,19 @@ export const parseClaudeCodeVersion = (stdout) =>
   VERSION_OUTPUT.exec(stdout.trim())?.[1] ?? null;
 
 /**
- * Pure: the line a slice log carries for the CLI it ran.
+ * Pure: how a log names where the version came from.
  *
- * @param {{ issueNumber: number, version: string, image: string }} input
+ * @param {'auto' | 'manual'} mode
  * @returns {string}
  */
-export const claudeCodeLogLine = ({ issueNumber, version, image }) =>
-  `  [#${issueNumber}] Claude Code ${version} (pinned in ${image})`;
+export const describeClaudeCodeMode = (mode) =>
+  mode === 'auto' ? 'auto: latest release' : `manual: ${VERSION_VARIABLE}`;
+
+/**
+ * Pure: the line a slice log carries for the CLI it ran.
+ *
+ * @param {{ issueNumber: number, version: string, mode: 'auto' | 'manual', image: string }} input
+ * @returns {string}
+ */
+export const claudeCodeLogLine = ({ issueNumber, version, mode, image }) =>
+  `  [#${issueNumber}] Claude Code ${version} (${describeClaudeCodeMode(mode)}, ${image})`;

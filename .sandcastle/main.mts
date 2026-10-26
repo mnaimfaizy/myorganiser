@@ -53,9 +53,12 @@ import {
   specAnchorMessage,
 } from '../tools/scripts/lib/sandcastle-spec-anchor.mjs';
 import {
+  LATEST_RELEASE_URL,
   claudeCodeLogLine,
+  claudeCodePolicy,
+  describeClaudeCodeMode,
   parseClaudeCodeVersion,
-  pinnedClaudeCodeVersion,
+  parseReleaseVersion,
 } from '../tools/scripts/lib/sandcastle-cli-version.mjs';
 import {
   COMPLETION_PROMISE,
@@ -135,42 +138,85 @@ function imageClaudeCodeVersion(): string | null {
   return probe.status === 0 ? parseClaudeCodeVersion(probe.stdout) : null;
 }
 
+/** The current release on the channel the installer reads, or null offline. */
+async function latestClaudeCodeRelease(): Promise<string | null> {
+  try {
+    const response = await fetch(LATEST_RELEASE_URL, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    return response.ok ? parseReleaseVersion(await response.text()) : null;
+  } catch {
+    return null;
+  }
+}
+
+type SandboxClaudeCode = { version: string; mode: 'auto' | 'manual' };
+
 /**
  * Builds the sandbox image when it is missing, or when its Claude Code is not
- * the version the Dockerfile pins, and returns the verified version. Without
- * the version check an existing image keeps whatever CLI it was built with,
- * whatever the pin says.
+ * the version the policy asks for, and returns the version it verified.
+ * Without the version check an existing image keeps whatever CLI it was built
+ * with, whatever the environment says.
+ *
+ * Auto mode asks the release channel for the current version on every
+ * dispatch. Offline, it keeps an existing image as it is, and builds a missing
+ * one with the installer's own `latest`.
  */
-function ensureSandboxImage(): string {
-  const pinned = pinnedClaudeCodeVersion(
-    readFileSync(join(process.cwd(), '.sandcastle', 'Dockerfile'), 'utf8'),
-  );
+async function ensureSandboxImage(
+  policy: ReturnType<typeof claudeCodePolicy>,
+): Promise<SandboxClaudeCode> {
   const image = spawnSync('docker', ['image', 'inspect', SANDBOX_IMAGE], {
     encoding: 'utf8',
     windowsHide: true,
   });
+  const installed = image.status === 0 ? imageClaudeCodeVersion() : null;
 
-  if (image.status === 0) {
-    const installed = imageClaudeCodeVersion();
-    if (installed === pinned) return pinned;
-    console.log(
-      `Sandbox image ${SANDBOX_IMAGE} carries Claude Code ${installed ?? '(none found)'}, ` +
-        `but the Dockerfile pins ${pinned}; rebuilding it before dispatch...`,
-    );
+  let wanted: string | null;
+  if (policy.mode === 'manual') {
+    wanted = policy.version;
   } else {
-    console.log(
-      `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
-    );
+    wanted = await latestClaudeCodeRelease();
+    if (!wanted) {
+      console.warn(
+        `Could not read the latest Claude Code release from ${LATEST_RELEASE_URL}.`,
+      );
+      if (installed) {
+        console.warn(`Keeping ${SANDBOX_IMAGE} on Claude Code ${installed}.`);
+        return { version: installed, mode: policy.mode };
+      }
+    }
   }
+
+  if (installed && installed === wanted) {
+    return { version: installed, mode: policy.mode };
+  }
+  console.log(
+    image.status === 0
+      ? `Sandbox image ${SANDBOX_IMAGE} carries Claude Code ${installed ?? '(none found)'}, ` +
+          `but ${describeClaudeCodeMode(policy.mode)} wants ${wanted}; rebuilding it before dispatch...`
+      : `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
+  );
+
+  // `sandcastle docker build-image` passes only the uid/gid build args, so this
+  // is its build with the Claude Code version added.
+  const buildArgs: Record<string, string> = {
+    CLAUDE_CODE_VERSION: wanted ?? 'latest',
+  };
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  if (uid !== undefined) buildArgs.AGENT_UID = String(uid);
+  if (gid !== undefined) buildArgs.AGENT_GID = String(gid);
   const build = spawnSync(
-    'corepack',
+    'docker',
     [
-      'yarn',
-      'sandcastle',
-      'docker',
-      'build-image',
-      '--image-name',
+      'build',
+      '-t',
       SANDBOX_IMAGE,
+      ...Object.entries(buildArgs).flatMap(([key, value]) => [
+        '--build-arg',
+        `${key}=${value}`,
+      ]),
+      join(process.cwd(), '.sandcastle'),
     ],
     { encoding: 'utf8', stdio: 'inherit', windowsHide: true },
   );
@@ -195,13 +241,13 @@ function ensureSandboxImage(): string {
     );
   }
   const built = imageClaudeCodeVersion();
-  if (built !== pinned) {
+  if (!built || (wanted && built !== wanted)) {
     fail(
-      `Docker image ${SANDBOX_IMAGE} was rebuilt but carries Claude Code ` +
-        `${built ?? '(none found)'}, not the pinned ${pinned}.`,
+      `Docker image ${SANDBOX_IMAGE} was built but carries Claude Code ` +
+        `${built ?? '(none found)'}, not ${wanted ?? 'a readable version'}.`,
     );
   }
-  return pinned;
+  return { version: built, mode: policy.mode };
 }
 
 /**
@@ -444,6 +490,12 @@ Environment:
   SANDCASTLE_CURSOR_MODEL
   SANDCASTLE_COPILOT_MODEL
 
+Claude Code in the sandbox image (rebuilt at dispatch when it differs):
+  SANDCASTLE_CLAUDE_CODE_UPDATE   \`auto\` follows the latest release; \`manual\` stays on
+                                  SANDCASTLE_CLAUDE_CODE_VERSION. Unset: auto, or
+                                  manual when a version is set.
+  SANDCASTLE_CLAUDE_CODE_VERSION  Exact version for manual mode, e.g. 2.1.310.
+
 Claude auth (see docs/sandcastle/RUNBOOK.md):
   CLAUDE_CODE_OAUTH_TOKEN  Pro/Max subscription token from \`claude setup-token\`.
                            Takes precedence; ANTHROPIC_API_KEY is then NOT forwarded.
@@ -639,10 +691,21 @@ const claudeAuth = gateOnly
 // all had their say. Building this image can take minutes; there is no reason to
 // pay for it before we know the run can actually authenticate. A --dry-run never
 // launches a container, so it must not pay for the image either.
-const sandboxClaudeCodeVersion = dryRun ? null : ensureSandboxImage();
-if (sandboxClaudeCodeVersion) {
+// The Claude Code policy is read either way, so a typo in its variables fails a
+// dry run too instead of waiting for the first real dispatch.
+let claudeCodeUpdatePolicy: ReturnType<typeof claudeCodePolicy>;
+try {
+  claudeCodeUpdatePolicy = claudeCodePolicy(process.env);
+} catch (error) {
+  fail((error as Error).message);
+}
+const sandboxClaudeCode = dryRun
+  ? null
+  : await ensureSandboxImage(claudeCodeUpdatePolicy);
+if (sandboxClaudeCode) {
   console.log(
-    `Sandbox image ${SANDBOX_IMAGE}: Claude Code ${sandboxClaudeCodeVersion} (pinned).`,
+    `Sandbox image ${SANDBOX_IMAGE}: Claude Code ${sandboxClaudeCode.version} ` +
+      `(${describeClaudeCodeMode(sandboxClaudeCode.mode)}).`,
   );
 }
 
@@ -2993,12 +3056,12 @@ while (pendingSlices.length > 0) {
       }),
     );
 
-    if (sandboxClaudeCodeVersion && result.logFilePath) {
+    if (sandboxClaudeCode && result.logFilePath) {
       appendFileSync(
         result.logFilePath,
         `\n${claudeCodeLogLine({
           issueNumber: issue.number,
-          version: sandboxClaudeCodeVersion,
+          ...sandboxClaudeCode,
           image: SANDBOX_IMAGE,
         })}\n`,
       );
