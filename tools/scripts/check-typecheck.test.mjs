@@ -88,6 +88,24 @@ test('fails naming a tools/scripts .ts fixture with a type error', (t) => {
   assert.match(result.stderr, /error TS/);
 });
 
+test('node runs a valid tools/scripts .ts fixture directly, with no build step', (t) => {
+  // The other half of ADR 0135's expand step: a .ts file with no type errors
+  // must be directly executable by `node`, the same way check-*.mjs files
+  // are today. engines.node's >=22.18 floor is the first Node 22 that strips
+  // types by default, so this needs no flag.
+  const fixture = join('tools', 'scripts', 'tmp-direct-run-fixture.ts');
+  const absoluteFixture = join(REPO_ROOT, fixture);
+  writeFileSync(absoluteFixture, 'const n: number = 1;\nconsole.log(n);\n');
+  t.after(() => rmSync(absoluteFixture, { force: true }));
+
+  const result = spawnSync(process.execPath, [absoluteFixture], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), '1');
+});
+
 test('accepts a project whose tsconfig compiles', (t) => {
   // A real project, compiled by the real tsc. `design-tokens` is two source
   // files and one config, so this stays quick while still proving the spawn,
