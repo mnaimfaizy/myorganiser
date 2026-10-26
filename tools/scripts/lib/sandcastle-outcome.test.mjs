@@ -65,10 +65,10 @@ test('a "none" followed by its justification is not an item', () => {
   const result = judgeRunOutcome(
     run(
       'Iteration 1/2',
-      'OUTSTANDING: none — all acceptance criteria verified directly (four suites wired in CI, `gates:coverage:check` green), both code-review findings fixed and re-verified, and the working tree is clean.',
+      'OUTSTANDING: none — all acceptance criteria verified directly (four suites + copilot-hooks wired in CI, Meta-Gate fails/accepts per fixture, `gates:coverage:check` green on the real tree, stale headers confirmed dropped), both code-review findings fixed and re-verified, and the working tree is clean.',
       'OUTSTANDING: None. Every criterion was checked.',
       'OUTSTANDING: nothing: the review passed',
-      '- OUTSTANDING: n/a (docs-only slice)',
+      '- OUTSTANDING: n/a (docs-only slice, all checks green)',
       'OUTSTANDING: none - all green',
       COMPLETION_PROMISE,
     ),
@@ -91,6 +91,32 @@ test('a "none" whose reason carves out an exception is an item', () => {
     'none — except the device check, which needs a phone',
     'none, but the Husky selection is unverified',
     'nothing: the CI step could not be run here',
+  ]);
+});
+
+// A deny-list alone read these as clean: none of them uses an exception word
+// the first version listed, and each one names work left in the slice.
+test('a "none" whose reason does not affirm the work is an item', () => {
+  const { clean, outstanding } = judgeRunOutcome(
+    run(
+      'Iteration 1/2',
+      'OUTSTANDING: none — device check skipped',
+      'OUTSTANDING: none — still needs a phone',
+      'OUTSTANDING: none; follow-up remaining',
+      'OUTSTANDING: none (docs-only slice)',
+      'OUTSTANDING: none — tests passed, though the e2e spec was not run',
+      'OUTSTANDING: none — verified, but CI wasn’t reachable',
+      COMPLETION_PROMISE,
+    ),
+  );
+  assert.equal(clean, false);
+  assert.deepEqual(outstanding, [
+    'none — device check skipped',
+    'none — still needs a phone',
+    'none; follow-up remaining',
+    'none (docs-only slice)',
+    'none — tests passed, though the e2e spec was not run',
+    'none — verified, but CI wasn’t reachable',
   ]);
 });
 

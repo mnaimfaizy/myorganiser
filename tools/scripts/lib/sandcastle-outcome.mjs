@@ -51,16 +51,23 @@ const NOTHING = /^(?:none|n\/a|nothing|-)?\.?$/i;
 const NOTHING_WITH_REASON =
   /^(?:none|n\/a|nothing)(?:\.\s|\s*[—–:;,(]|\s+-\s)(.*)$/i;
 
-// A reason that carves out an exception is an item after all. When in doubt the
-// slice is held: a false hold costs a person one look, a false clean closes a
-// slice with work left in it.
+// When in doubt the slice is held: a false hold costs a person one look, a false
+// clean closes a slice with work left in it. So a reason clears the line only if
+// it affirms the work was checked, and names no exception. A deny-list alone let
+// "none — device check skipped" through, because no listed word was in it.
+// Bare "fails" is not an exception: a gate that fails on drift is the behaviour
+// a slice here verifies, and #1326's own line says "Meta-Gate fails/accepts".
+const AFFIRMS =
+  /\b(?:verified|re-verified|passed|passes|pass|green|clean|done|fixed|complete|completed|met|delivered|checked|confirmed)\b/i;
+
 const EXCEPTION =
-  /\b(?:but|except|however|unless|although|though|yet|pending|unverified|not (?:verified|done|delivered|run|checked)|could not|couldn't|cannot|can't)\b/i;
+  /\b(?:but|except|however|unless|although|though|yet|still|pending|remaining|remains|left|skipped|skip|deferred|later|follow-up|todo|tbd|needs?|missing|partial|partly|failed|failing|blocked|unable|unverified|unchecked|not|never|no|could not|cannot|\w+n['’]t)\b/i;
 
 const saysNothing = (text) => {
   if (NOTHING.test(text)) return true;
   const reason = NOTHING_WITH_REASON.exec(text);
-  return reason !== null && !EXCEPTION.test(reason[1]);
+  if (reason === null) return false;
+  return AFFIRMS.test(reason[1]) && !EXCEPTION.test(reason[1]);
 };
 
 /**
