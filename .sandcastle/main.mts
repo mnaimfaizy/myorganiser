@@ -53,6 +53,11 @@ import {
   specAnchorMessage,
 } from '../tools/scripts/lib/sandcastle-spec-anchor.mjs';
 import {
+  claudeCodeLogLine,
+  parseClaudeCodeVersion,
+  pinnedClaudeCodeVersion,
+} from '../tools/scripts/lib/sandcastle-cli-version.mjs';
+import {
   COMPLETION_PROMISE,
   NEEDS_HUMAN_LABEL,
   OUTSTANDING_MARKER,
@@ -120,17 +125,43 @@ function fail(message: string, code = 1): never {
   process.exit(code);
 }
 
-function ensureSandboxImage(): void {
+/** The Claude Code version the sandbox image carries, or null without one. */
+function imageClaudeCodeVersion(): string | null {
+  const probe = spawnSync(
+    'docker',
+    ['run', '--rm', '--entrypoint', 'claude', SANDBOX_IMAGE, '--version'],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  return probe.status === 0 ? parseClaudeCodeVersion(probe.stdout) : null;
+}
+
+/**
+ * Builds the sandbox image when it is missing, or when its Claude Code is not
+ * the version the Dockerfile pins, and returns the verified version. Without
+ * the version check an existing image keeps whatever CLI it was built with,
+ * whatever the pin says.
+ */
+function ensureSandboxImage(): string {
+  const pinned = pinnedClaudeCodeVersion(
+    readFileSync(join(process.cwd(), '.sandcastle', 'Dockerfile'), 'utf8'),
+  );
   const image = spawnSync('docker', ['image', 'inspect', SANDBOX_IMAGE], {
     encoding: 'utf8',
     windowsHide: true,
   });
 
-  if (image.status === 0) return;
-
-  console.log(
-    `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
-  );
+  if (image.status === 0) {
+    const installed = imageClaudeCodeVersion();
+    if (installed === pinned) return pinned;
+    console.log(
+      `Sandbox image ${SANDBOX_IMAGE} carries Claude Code ${installed ?? '(none found)'}, ` +
+        `but the Dockerfile pins ${pinned}; rebuilding it before dispatch...`,
+    );
+  } else {
+    console.log(
+      `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
+    );
+  }
   const build = spawnSync(
     'corepack',
     [
@@ -163,6 +194,14 @@ function ensureSandboxImage(): void {
       `Docker image ${SANDBOX_IMAGE} was reported built but is not available.`,
     );
   }
+  const built = imageClaudeCodeVersion();
+  if (built !== pinned) {
+    fail(
+      `Docker image ${SANDBOX_IMAGE} was rebuilt but carries Claude Code ` +
+        `${built ?? '(none found)'}, not the pinned ${pinned}.`,
+    );
+  }
+  return pinned;
 }
 
 /**
@@ -600,7 +639,12 @@ const claudeAuth = gateOnly
 // all had their say. Building this image can take minutes; there is no reason to
 // pay for it before we know the run can actually authenticate. A --dry-run never
 // launches a container, so it must not pay for the image either.
-if (!dryRun) ensureSandboxImage();
+const sandboxClaudeCodeVersion = dryRun ? null : ensureSandboxImage();
+if (sandboxClaudeCodeVersion) {
+  console.log(
+    `Sandbox image ${SANDBOX_IMAGE}: Claude Code ${sandboxClaudeCodeVersion} (pinned).`,
+  );
+}
 
 // ─── Fetch PRD issue ──────────────────────────────────────────────────────────
 
@@ -2949,6 +2993,16 @@ while (pendingSlices.length > 0) {
       }),
     );
 
+    if (sandboxClaudeCodeVersion && result.logFilePath) {
+      appendFileSync(
+        result.logFilePath,
+        `\n${claudeCodeLogLine({
+          issueNumber: issue.number,
+          version: sandboxClaudeCodeVersion,
+          image: SANDBOX_IMAGE,
+        })}\n`,
+      );
+    }
     logRunUsage(issue.number, agentKind, model, result);
     captureSubagentTraces(issue, result);
 

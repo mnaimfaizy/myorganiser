@@ -49,7 +49,12 @@ pipeline.
    setups, but `.sandcastle/.env` is ignored and must never be committed.
 5. The `sandcastle:myorganiser` image builds automatically on first run if missing. It
    already bakes in Claude Code, Cursor, and GitHub Copilot CLI so the `--agent` flag only
-   switches which provider Sandcastle launches.
+   switches which provider Sandcastle launches. Claude Code is pinned by
+   `ARG CLAUDE_CODE_VERSION` in `.sandcastle/Dockerfile`, with its auto-updater off. Each
+   dispatch prints the version the image carries, and rebuilds the image when it differs from
+   the pin. Every slice log names it too, as
+   `[#<issue>] Claude Code <version> (pinned in sandcastle:myorganiser)`. To move to a newer
+   CLI, bump the pin and dispatch.
 
 The dispatch host does **not** need native build tools — compilation happens in-container.
 
@@ -615,8 +620,9 @@ To reproduce the sandbox behavior locally: `MYORGANISER_SANDBOX=1 yarn nx test t
 - **Retire the old cache:** delete `.sandcastle/node_modules_linux_cache/` if present — it's no
   longer used (the seed step and lockfile-hash invalidation were removed).
 - **Rebuild the sandbox image after any `.sandcastle/Dockerfile` change:**
-  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing, so an
-  existing image silently keeps the old contents. Force a rebuild with
+  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing or its
+  Claude Code differs from the `CLAUDE_CODE_VERSION` pin, so any other change leaves an
+  existing image silently on the old contents. Force a rebuild with
   `docker image rm sandcastle:myorganiser` before the next dispatch. See `docs/graphify.md` for
   why this matters for the mounted graphify graph.
 - **The sandbox image's Node is pinned to a Node 22 minor (22.23) — do not float it to `node:22`.**

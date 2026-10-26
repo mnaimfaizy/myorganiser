@@ -187,6 +187,7 @@
     "sandcastle:slice-selection:test": "node --test tools/scripts/lib/sandcastle-slice-selection.test.mjs",
     "sandcastle:subagent-trace:test": "node --test tools/scripts/lib/sandcastle-subagent-trace.test.mjs",
     "sandcastle:spec-anchor:test": "node --test tools/scripts/lib/sandcastle-spec-anchor.test.mjs",
+    "sandcastle:cli-version:test": "node --test tools/scripts/lib/sandcastle-cli-version.test.mjs",
     "sandcastle:outcome:test": "node --test tools/scripts/lib/sandcastle-outcome.test.mjs",
     "sandcastle:worktree-repair:test": "node --test tools/scripts/lib/sandcastle-worktree-repair.test.mjs",
     "dispatch-agents": "npx tsx .sandcastle/main.mts",

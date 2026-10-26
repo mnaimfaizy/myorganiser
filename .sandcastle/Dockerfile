@@ -96,7 +96,16 @@ RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d 
 RUN npm install -g @github/copilot
 USER ${AGENT_UID}:${AGENT_GID}
 RUN curl https://cursor.com/install -fsS | bash
-RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Claude Code is pinned to an exact version, and the auto-updater is off, so
+# every slice in an image runs the same CLI. Unpinned, the installer takes
+# whatever is latest on the day the image is built, and nothing records it.
+# Bump the pin here only: the orchestrator rebuilds an image whose
+# `claude --version` differs from it, and writes the version into each slice's
+# log. See tools/scripts/lib/sandcastle-cli-version.mjs.
+ARG CLAUDE_CODE_VERSION=2.1.292
+ENV DISABLE_AUTOUPDATER=1
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
 
 # Add Cursor/Claude/uv to PATH
 ENV PATH="/home/agent/.local/bin:$PATH"
