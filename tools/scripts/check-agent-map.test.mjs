@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.mjs';
+import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-agent-map.mjs');

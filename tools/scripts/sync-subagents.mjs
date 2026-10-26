@@ -14,8 +14,8 @@ import {
   renderGrant,
   validateToolMap,
   writeGrant,
-} from './lib/agent-tool-grants.mjs';
-import { renderHarnessSections } from './lib/harness-sections.mjs';
+} from './lib/agent-tool-grants.ts';
+import { renderHarnessSections } from './lib/harness-sections.ts';
 
 const repoRoot = process.cwd();
 
@@ -57,7 +57,7 @@ const HARNESS_CONFIG = {
   },
 };
 
-const USAGE = `Usage:\n  node tools/scripts/sync-subagents.mjs --check\n  node tools/scripts/sync-subagents.mjs --apply [--no-prune]\n\nNotes:\n  - Canonical source is .github/agents/*.agent.md\n  - Tool grants are rendered from the canonical tools: roles through\n    tools/config/agent-tool-map.json (Cursor: a derived readonly flag). A target whose\n    grant differs is reported as toolDrift; --apply rewrites only the grant lines and\n    prints each change labelled as widened or narrowed.\n  - All other existing target frontmatter is preserved verbatim; the body is synced.\n  - A target whose frontmatter cannot be parsed is reported as malformed and skipped,\n    never rewritten.\n  - Canonical bodies may scope a section to specific harnesses:\n      <!-- harness:claude,cursor -->  ...  <!-- /harness -->\n    Unmarked content goes to every harness. See tools/scripts/lib/harness-sections.mjs.\n  - Missing target files are created with rendered frontmatter.\n  - --apply prunes extra files by default (disable with --no-prune).\n`;
+const USAGE = `Usage:\n  node tools/scripts/sync-subagents.mjs --check\n  node tools/scripts/sync-subagents.mjs --apply [--no-prune]\n\nNotes:\n  - Canonical source is .github/agents/*.agent.md\n  - Tool grants are rendered from the canonical tools: roles through\n    tools/config/agent-tool-map.json (Cursor: a derived readonly flag). A target whose\n    grant differs is reported as toolDrift; --apply rewrites only the grant lines and\n    prints each change labelled as widened or narrowed.\n  - All other existing target frontmatter is preserved verbatim; the body is synced.\n  - A target whose frontmatter cannot be parsed is reported as malformed and skipped,\n    never rewritten.\n  - Canonical bodies may scope a section to specific harnesses:\n      <!-- harness:claude,cursor -->  ...  <!-- /harness -->\n    Unmarked content goes to every harness. See tools/scripts/lib/harness-sections.ts.\n  - Missing target files are created with rendered frontmatter.\n  - --apply prunes extra files by default (disable with --no-prune).\n`;
 
 function parseArgs(argv) {
   const args = new Set(argv.slice(2));

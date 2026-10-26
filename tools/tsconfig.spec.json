@@ -11,5 +11,12 @@
   // nothing, so they match no consumer's tsconfig `include` and would
   // otherwise be the one TypeScript file in the workspace that
   // `yarn typecheck:check` never compiles.
-  "include": ["**/*.spec.ts", "**/*.test.ts", "**/*.d.ts", "testing/**/*.ts"]
+  //
+  // No `**/*.test.ts` pattern: every `.test.ts` under `tools/` is one of
+  // ADR 0135's migrated Contract Suites (`node --test`, not Jest), already
+  // compiled under `tools/scripts/tsconfig.json`'s `nodenext`/strict options.
+  // Matching them here too would recompile them under this config's
+  // `commonjs`/`node`/Jest options instead, which rejects their `.ts`-suffixed
+  // imports and `node:test` default imports outright.
+  "include": ["**/*.spec.ts", "**/*.d.ts", "testing/**/*.ts"]
 }

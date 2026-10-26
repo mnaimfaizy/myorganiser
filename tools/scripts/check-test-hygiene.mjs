@@ -26,7 +26,7 @@ import {
   lineOf,
   maskNonCode,
   normalize,
-} from './lib/source-scan.mjs';
+} from './lib/source-scan.ts';
 
 const USAGE = `Usage:
   node tools/scripts/check-test-hygiene.mjs <file> [<file> ...]
@@ -37,6 +37,9 @@ const USAGE = `Usage:
 Runs the mechanical (non-judgment) TestReviewer checklist items against Jest
 test files. E2E specs under apps/web-e2e are skipped — they have their
 own rules in .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
+tools/scripts/**/*.test.ts Contract Suites are skipped too — they are
+node --test suites asserting with node:assert, not Jest specs asserting with
+expect(), and ADR 0135 covers them with their own tooling.
 `;
 
 const TEST_PATHS = [
@@ -356,6 +359,13 @@ function isE2E(file) {
   return path.normalize(file).replace(/\\/g, '/').includes('apps/web-e2e/');
 }
 
+/** A `node --test` Contract Suite (ADR 0135), not a Jest spec: it asserts
+ *  with `node:assert`, never `expect()`, so the Jest-oriented checks below
+ *  would read it as having none. */
+function isToolsScripts(file) {
+  return path.normalize(file).replace(/\\/g, '/').includes('tools/scripts/');
+}
+
 function collectGitFiles(mode) {
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
     encoding: 'utf8',
@@ -380,16 +390,18 @@ function collectGitFiles(mode) {
   return output
     .split('\0')
     .filter(Boolean)
-    .filter((file) => !isE2E(file));
+    .filter((file) => !isE2E(file) && !isToolsScripts(file));
 }
 
 function printResults(results, concise) {
   for (const result of results) {
     if (result.skipped) {
       if (!concise) {
-        console.log(
-          `\n${result.file}\n  SKIPPED (E2E spec — structural rules live in the Playwright skill)`,
-        );
+        const reason =
+          result.skipped === 'tools-scripts'
+            ? 'Contract Suite — asserts with node:assert, not expect() (ADR 0135)'
+            : 'E2E spec — structural rules live in the Playwright skill';
+        console.log(`\n${result.file}\n  SKIPPED (${reason})`);
       }
       continue;
     }
@@ -456,6 +468,10 @@ async function main() {
   for (const file of files) {
     if (isE2E(file)) {
       results.push({ file, skipped: 'e2e', findings: [] });
+      continue;
+    }
+    if (isToolsScripts(file)) {
+      results.push({ file, skipped: 'tools-scripts', findings: [] });
       continue;
     }
     let findings;

@@ -45,7 +45,7 @@ import {
   splitToolList,
   unknownGrantedPrograms,
 } from './check-review-tool-allowlist.mjs';
-import { tokenize } from './lib/shell-command.mjs';
+import { tokenize } from './lib/shell-command.ts';
 
 const entry = (raw) => parseToolEntry(raw);
 const permits = (raw, command) => matchesEntry(entry(raw), tokenize(command));

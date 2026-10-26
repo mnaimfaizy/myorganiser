@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { GhJsonError, ghJson } from './lib/gh.mjs';
+import { GhJsonError, ghJson } from './lib/gh.ts';
 import {
   AbandonedCutError,
   assertNothingLeftUnstaged,
@@ -13,11 +13,11 @@ import {
   releaseCommitPaths,
   resolveNotesPlan,
   upsertChangelogSection,
-} from './lib/release-notes.mjs';
+} from './lib/release-notes.ts';
 import {
   evaluateStagingHostApply,
   normalizeJobs,
-} from './lib/staging-host-apply-guard.mjs';
+} from './lib/staging-host-apply-guard.ts';
 
 function assertNodeVersion() {
   const major = Number(String(process.versions.node).split('.')[0]);

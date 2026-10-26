@@ -206,6 +206,13 @@ test('--all checks tracked Jest files, excludes E2E, and prints concise output',
     'apps/web-e2e/src/e2e/ignored.spec.ts',
     "test('e2e', () => { console.info('not Jest'); });\n",
   );
+  writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import assert from 'node:assert/strict';\n" +
+      "import test from 'node:test';\n" +
+      "test('widget', () => { assert.ok(true); });\n",
+  );
   git(workspace, 'add', '.');
 
   const result = runChecker(workspace, '--all');
@@ -214,6 +221,7 @@ test('--all checks tracked Jest files, excludes E2E, and prints concise output',
   assert.match(result.stdout, /invalid\.spec\.tsx/);
   assert.doesNotMatch(result.stdout, /valid\.test\.ts\n\s+PASS/);
   assert.doesNotMatch(result.stdout, /ignored\.spec\.ts/);
+  assert.doesNotMatch(result.stdout, /widget\.test\.ts/);
   assert.match(
     result.stdout,
     /Checked 2 Jest files: 1 error\(s\), 0 warning\(s\)/,
@@ -293,6 +301,22 @@ test('explicit E2E paths remain skipped', (t) => {
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /SKIPPED \(E2E spec/);
+});
+
+test('explicit tools/scripts Contract Suite paths remain skipped', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import assert from 'node:assert/strict';\n" +
+      "import test from 'node:test';\n" +
+      "test('widget', () => { assert.ok(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /SKIPPED \(Contract Suite/);
 });
 
 test('missing input remains a bad invocation', (t) => {

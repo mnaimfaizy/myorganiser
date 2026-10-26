@@ -27,7 +27,7 @@ const REPO = resolve(HERE, '..', '..');
 
 const STAGING = '.github/workflows/deploy-staging.yml';
 const PRODUCTION = '.github/workflows/deploy-production.yml';
-const HOST_APPLY_LIB = 'tools/scripts/lib/host-apply.mjs';
+const HOST_APPLY_LIB = 'tools/scripts/lib/host-apply.ts';
 
 const FIXTURE_FILES = [STAGING, PRODUCTION, HOST_APPLY_LIB];
 

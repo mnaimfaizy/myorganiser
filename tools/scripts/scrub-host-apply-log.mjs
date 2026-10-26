@@ -15,7 +15,7 @@
 // Exit 2 = bad invocation.
 import { existsSync, readFileSync } from 'node:fs';
 
-import { findHostApplyLogLeaks } from './lib/host-apply.mjs';
+import { findHostApplyLogLeaks } from './lib/host-apply.ts';
 
 const [, , logPath] = process.argv;
 

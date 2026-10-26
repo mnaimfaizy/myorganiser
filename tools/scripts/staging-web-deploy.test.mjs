@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import {
   fileAtCommitMentions,
   isStrictAncestor,
-} from './lib/staging-web-deploy-git.mjs';
+} from './lib/staging-web-deploy-git.ts';
 import {
   BUILD_ID_CONFIG,
   BUILD_ID_VARIABLE,

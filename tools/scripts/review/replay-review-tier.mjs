@@ -16,8 +16,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { ghJson } from '../lib/gh.mjs';
-import { loadProjectGraph } from '../lib/nx-graph.mjs';
+import { ghJson } from '../lib/gh.ts';
+import { loadProjectGraph } from '../lib/nx-graph.ts';
 import {
   REVIEW_TIERS,
   classifyReviewTier,

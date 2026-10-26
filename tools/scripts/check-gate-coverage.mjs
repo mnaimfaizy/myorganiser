@@ -89,7 +89,7 @@ if (report.unwired.length || report.unwiredSuites.length) {
   console.error(
     '\nA gate that runs nowhere asserts nothing. Wire each one by its exact' +
       '\nscript name into .husky/pre-commit or a workflow, or declare it in the' +
-      '\naggregate manifest (tools/scripts/lib/gate-manifest.mjs) so' +
+      '\naggregate manifest (tools/scripts/lib/gate-manifest.ts) so' +
       `\n\`yarn ${aggregateScript}\` runs it. If it is deliberately not a gate, add` +
       `\nan entry to ${OPT_OUT_PATH} with a written reason.`,
   );

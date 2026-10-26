@@ -9,7 +9,7 @@
 // or a colour token the generator reads, skip the re-run, and the installed
 // icon silently stops matching the brand mark. This renders the icons in
 // memory through the generator's own module (tools/scripts/lib/
-// web-app-icons.mjs) and compares them with the committed files.
+// web-app-icons.ts) and compares them with the committed files.
 //
 // The comparison is on decoded pixels, not file bytes: the same pixels can be
 // encoded to different PNG bytes by a different zlib build, and a gate that
@@ -29,7 +29,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { renderWebAppIcons } from './lib/web-app-icons.mjs';
+import { renderWebAppIcons } from './lib/web-app-icons.ts';
 
 const root = process.cwd();
 

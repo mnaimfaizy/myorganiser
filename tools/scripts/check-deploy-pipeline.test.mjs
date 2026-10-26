@@ -26,7 +26,7 @@ const REPO = resolve(HERE, '..', '..');
 const PAGE = 'docs/deployment/release-pipeline.html';
 const STAGING = '.github/workflows/deploy-staging.yml';
 const PRODUCTION = '.github/workflows/deploy-production.yml';
-const CUT_GUARD = 'tools/scripts/lib/staging-host-apply-guard.mjs';
+const CUT_GUARD = 'tools/scripts/lib/staging-host-apply-guard.ts';
 
 const FIXTURE_FILES = [
   PAGE,
@@ -37,7 +37,7 @@ const FIXTURE_FILES = [
   '.github/workflows/publish-github-release.yml',
   'package.json',
   'tools/scripts/release.mjs',
-  'tools/scripts/lib/staging-host-apply-guard.mjs',
+  'tools/scripts/lib/staging-host-apply-guard.ts',
 ];
 
 function createWorkspace(t) {

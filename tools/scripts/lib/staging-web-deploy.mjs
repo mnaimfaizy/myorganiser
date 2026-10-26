@@ -32,7 +32,7 @@
  */
 import { createHash } from 'node:crypto';
 
-import { UPLOAD_JOB } from './staging-host-apply-guard.mjs';
+import { UPLOAD_JOB } from './staging-host-apply-guard.ts';
 
 /** A page the Node process renders, so its HTML carries the running build id. */
 export const RUNNING_BUILD_PATH = '/login';
@@ -117,7 +117,7 @@ export function isSameSite(webOrigin, apiOrigin) {
 /**
  * The commit named by Staging's latest successful backend upload, or null.
  *
- * `jobs` is what `normalizeJobs` in staging-host-apply-guard.mjs returns for
+ * `jobs` is what `normalizeJobs` in staging-host-apply-guard.ts returns for
  * recent `Deploy Staging` runs. Only a dispatched run names its commit, so
  * null means either that nothing was uploaded in the window read or that the
  * latest upload was a scheduled one — which the schedule may follow freely,

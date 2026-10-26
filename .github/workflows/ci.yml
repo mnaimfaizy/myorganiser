@@ -879,7 +879,7 @@ jobs:
       # introduced it, because the aggregate is what `.husky/pre-commit` calls
       # and wiring it there sooner would have blocked every commit in the
       # repository. It has passed since the contradiction was fixed, so it now
-      # sits in `tools/scripts/lib/gate-manifest.mjs` with the rest.
+      # sits in `tools/scripts/lib/gate-manifest.ts` with the rest.
       - name: Check the reviewer may run what it is told to run
         run: corepack yarn review:allowlist:check
 

@@ -13,7 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { APPLY_JOB, UPLOAD_JOB } from './staging-host-apply-guard.mjs';
+import { APPLY_JOB, UPLOAD_JOB } from './staging-host-apply-guard.ts';
 import {
   BUNDLE_HTACCESS,
   PLAN_INSTALL_OWED,

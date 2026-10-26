@@ -59,8 +59,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { GATE_MANIFEST } from './gate-manifest.mjs';
-import { globToRegExp } from './glob.mjs';
+import { GATE_MANIFEST } from './gate-manifest.ts';
+import { globToRegExp } from './glob.ts';
 
 export const SCRIPTS_DIR = 'tools/scripts';
 export const OPT_OUT_PATH = 'tools/config/gate-coverage-optout.json';
@@ -116,7 +116,7 @@ export function stripComments(text) {
  * script: a trailing argument there is a flag to the checker
  * (`node check-a.mjs --report out.md`), never a second script.
  *
- * `gate-manifest.mjs` has its own `parseNodeSegments`, and these are not the
+ * `gate-manifest.ts` has its own `parseNodeSegments`, and these are not the
  * same job. That one reads one package.json command, anchored to `^node` per
  * `&&` segment, and keeps the argument list so the manifest can be compared
  * invocation-for-invocation. This one scans free-form pipeline text, where a
@@ -381,7 +381,7 @@ function parseOptOut(raw, optOutPath) {
 function isAggregateSource(source) {
   if (/\brunGateManifest\s*\(/.test(source)) return true;
   return (
-    /gate-manifest\.mjs|GATE_MANIFEST/.test(source) &&
+    /gate-manifest\.(?:mjs|ts)|GATE_MANIFEST/.test(source) &&
     /\bspawn(?:Sync)?\s*\(|\bexecFile(?:Sync)?\s*\(/.test(source)
   );
 }

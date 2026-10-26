@@ -7,7 +7,7 @@
 //
 //   node tools/scripts/run-tools-test-selection.mjs
 //
-// The decision is pure (tools/scripts/lib/tools-test-selection.mjs).
+// The decision is pure (tools/scripts/lib/tools-test-selection.ts).
 // `selectAndRun` below is the orchestration layer — selection, the message,
 // and the exit code — and is itself pure given its collaborators, so its own
 // Contract Suite drives it with stubbed git/suite/runner functions rather
@@ -19,7 +19,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 
 import { listSuites } from './lib/gate-coverage.mjs';
-import { selectStagedSuites } from './lib/tools-test-selection.mjs';
+import { selectStagedSuites } from './lib/tools-test-selection.ts';
 
 /**
  * Selects the suites a commit's staged files choose, runs them through
@@ -62,8 +62,22 @@ function runNodeTest(selected) {
   // `tools:test`'s own glob sweep can still run this file's sibling checks
   // nested inside a `node --test` of its own, so the env var is stripped
   // before the suites below get a chance to run at all.
+  //
+  // Husky invokes this script as a `git commit` hook, so git sets GIT_DIR
+  // (and friends) in this process's own environment for its hook tree.
+  // Several suites below build a throwaway git fixture under a temp
+  // directory and run `git` there with only `cwd` pointed at it — `cwd`
+  // does not override an inherited GIT_DIR, so without stripping these a
+  // suite's fixture command resolves against the real repository instead
+  // of its temp one and can corrupt its index (observed: `core.bare`
+  // flipped to `true` and the index replaced with the fixture's few files,
+  // from a nested `git init`/`git add -A`).
   const childEnv = { ...process.env };
   delete childEnv.NODE_TEST_CONTEXT;
+  delete childEnv.GIT_DIR;
+  delete childEnv.GIT_WORK_TREE;
+  delete childEnv.GIT_INDEX_FILE;
+  delete childEnv.GIT_COMMON_DIR;
 
   const result = spawnSync(process.execPath, ['--test', ...selected], {
     stdio: 'inherit',

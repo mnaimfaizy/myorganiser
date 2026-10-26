@@ -22,10 +22,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { globToRegExp } from './glob.mjs';
+import { globToRegExp } from './glob.ts';
 
 // Re-exported so this module's contract tests and callers keep one import
-// site, while the implementation lives in glob.mjs beside the obligation
+// site, while the implementation lives in glob.ts beside the obligation
 // selector that used to carry a second, divergent copy.
 export { globToRegExp };
 

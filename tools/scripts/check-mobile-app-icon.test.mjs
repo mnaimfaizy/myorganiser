@@ -16,7 +16,7 @@ import {
   ROLES,
   TOKENS,
   planMobileAppIcon,
-} from './lib/mobile-app-icon.mjs';
+} from './lib/mobile-app-icon.ts';
 
 // Each fixture workspace holds copies of the real BrandMark and token build,
 // the text outputs planned from them, a placeholder file at every PNG path

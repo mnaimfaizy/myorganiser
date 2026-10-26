@@ -32,7 +32,7 @@
 // that page is not reproducible from here either. It remains covered by check-agent-map.mjs.
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.mjs';
+import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.ts';
 
 const [srcDir, dcFile, outFile] = process.argv.slice(2);
 if (!srcDir || !dcFile || !outFile) {

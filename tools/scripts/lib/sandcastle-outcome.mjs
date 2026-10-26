@@ -14,7 +14,7 @@
  * without a sandbox, a network, or GitHub.
  */
 
-import { RUN_START_MARKER } from './sandcastle-resume.mjs';
+import { RUN_START_MARKER } from './sandcastle-resume.ts';
 
 /** What an agent prints when it has stopped working on the slice. */
 export const COMPLETION_PROMISE = '<promise>COMPLETE</promise>';

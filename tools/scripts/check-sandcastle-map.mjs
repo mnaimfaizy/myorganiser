@@ -45,15 +45,15 @@
 // Exit 0 = in sync. Exit 1 = drift (fix the page, or the source moved). Exit 2 = could not run.
 import { readFileSync, existsSync } from 'node:fs';
 
-const RESUME = 'tools/scripts/lib/sandcastle-resume.mjs';
-const TRACE = 'tools/scripts/lib/sandcastle-subagent-trace.mjs';
+const RESUME = 'tools/scripts/lib/sandcastle-resume.ts';
+const TRACE = 'tools/scripts/lib/sandcastle-subagent-trace.ts';
 const OUTCOME = 'tools/scripts/lib/sandcastle-outcome.mjs';
 const POLICY = 'tools/config/agent-model-policy.json';
 const PKG = 'package.json';
 const MAIN = '.sandcastle/main.mts';
 const WAVES = '.sandcastle/dispatch-waves.mts';
 const CI = '.github/workflows/ci.yml';
-const SELECTION = 'tools/scripts/lib/sandcastle-slice-selection.mjs';
+const SELECTION = 'tools/scripts/lib/sandcastle-slice-selection.ts';
 
 const PAGES = [
   ['docs/sandcastle/dispatch-map.html', 'sandcastle-dispatch-manifest'],

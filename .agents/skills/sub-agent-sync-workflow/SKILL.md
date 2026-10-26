@@ -61,7 +61,7 @@ Rules:
 - `.github/agents` is canonical, not a render target, so Copilot reads the file with the markers
   still in it and sees every block. Keep block contents short and self-labeling
   (`**Claude Code —** ...`) so that reads as a reference table, not as contradictory instructions.
-- Implementation and tests: `tools/scripts/lib/harness-sections.mjs`, run with `yarn agents:sync:test`.
+- Implementation and tests: `tools/scripts/lib/harness-sections.ts`, run with `yarn agents:sync:test`.
 
 ## Tool Grants
 
@@ -77,7 +77,7 @@ overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-d
   committing.
 - If the vocabulary cannot express a grant, add an entry under `overrides` in the map, keyed by agent
   then harness, with a written `reason`. A recurring override should become a role instead.
-- Implementation and tests: `tools/scripts/lib/agent-tool-grants.mjs`, run with `yarn agents:sync:test`.
+- Implementation and tests: `tools/scripts/lib/agent-tool-grants.ts`, run with `yarn agents:sync:test`.
 
 ## Commands
 

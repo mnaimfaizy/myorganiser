@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-component-hygiene.mjs');
-const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.mjs');
+const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.ts');
 
 function writeFixture(workspace, relativePath, content) {
   const file = join(workspace, relativePath);
@@ -62,7 +62,7 @@ function createWorkspace(t) {
   );
   writeFixture(
     workspace,
-    'tools/scripts/lib/source-scan.mjs',
+    'tools/scripts/lib/source-scan.ts',
     readFileSync(SCAN_SOURCE, 'utf8'),
   );
 

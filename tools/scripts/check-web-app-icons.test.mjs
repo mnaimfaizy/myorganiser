@@ -17,7 +17,7 @@ import {
   ICONS_DIR,
   TOKENS,
   renderWebAppIcons,
-} from './lib/web-app-icons.mjs';
+} from './lib/web-app-icons.ts';
 
 // Each fixture workspace holds copies of the real AppLogo and token build, the
 // icons rendered from them, and whatever drift the test plants afterwards.

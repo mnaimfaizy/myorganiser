@@ -64,9 +64,9 @@ import {
   createCheckerFail,
   hasPathPlaceholder,
   listTrackedMarkdown,
-} from './lib/doc-paths.mjs';
-import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.mjs';
-import { tokenize } from './lib/shell-command.mjs';
+} from './lib/doc-paths.ts';
+import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.ts';
+import { tokenize } from './lib/shell-command.ts';
 
 const PREFIX = 'doc-nx-targets';
 const EXEMPTIONS_PATH = 'tools/config/doc-nx-targets-exemptions.json';

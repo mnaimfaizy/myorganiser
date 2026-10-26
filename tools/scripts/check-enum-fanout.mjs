@@ -33,7 +33,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
-import { GUARDED_ENUMS } from './lib/enum-fanout-guarded.mjs';
+import { GUARDED_ENUMS } from './lib/enum-fanout-guarded.ts';
 
 const require = createRequire(import.meta.url);
 const cwd = process.cwd();

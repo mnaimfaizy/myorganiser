@@ -53,7 +53,7 @@ const STAGING_HOST_APPLY_GUARD = join(
   'tools',
   'scripts',
   'lib',
-  'staging-host-apply-guard.mjs',
+  'staging-host-apply-guard.ts',
 );
 
 /** The workflows whose runners the page claims share one Node pin. The monthly

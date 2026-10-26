@@ -38,12 +38,12 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 
-import { ghJson } from './lib/gh.mjs';
-import { normalizeJobs } from './lib/staging-host-apply-guard.mjs';
+import { ghJson } from './lib/gh.ts';
+import { normalizeJobs } from './lib/staging-host-apply-guard.ts';
 import {
   fileAtCommitMentions,
   isStrictAncestor,
-} from './lib/staging-web-deploy-git.mjs';
+} from './lib/staging-web-deploy-git.ts';
 import {
   BUILD_ID_CONFIG,
   BUILD_ID_VARIABLE,

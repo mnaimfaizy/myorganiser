@@ -3,7 +3,7 @@
 // its collaborators, so this drives it with stubbed staged files, suites,
 // and runner — never a real git repository or a real `node --test` child
 // process. The pure selection decision itself is covered by
-// tools/scripts/lib/tools-test-selection.mjs's own Contract Suite; the three
+// tools/scripts/lib/tools-test-selection.ts's own Contract Suite; the three
 // functions that touch git, the filesystem, or a child process are IO and
 // untested here, the same as any other checker's CLI shell in this codebase.
 import assert from 'node:assert/strict';

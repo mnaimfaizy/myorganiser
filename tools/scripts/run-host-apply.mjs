@@ -12,7 +12,7 @@ import {
   HostApplyRefusal,
   assertAppRootGuard,
   buildHostApplyScript,
-} from './lib/host-apply.mjs';
+} from './lib/host-apply.ts';
 
 const [, , environment] = process.argv;
 

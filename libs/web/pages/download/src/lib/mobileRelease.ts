@@ -23,7 +23,7 @@ export interface MobileReleaseLinks {
 
 /**
  * The links for Mobile Release `version`. The asset names are the ones the
- * publish command attaches (tools/scripts/lib/mobile-release.mjs).
+ * publish command attaches (tools/scripts/lib/mobile-release.ts).
  */
 export function mobileReleaseLinks(version: string): MobileReleaseLinks {
   const tag = `mobile-v${version}`;

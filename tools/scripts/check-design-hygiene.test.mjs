@@ -16,14 +16,14 @@ import {
   CANONICAL_FONT_PAGE,
   LEGACY,
   ROSTER,
-} from './lib/design-page-roster.mjs';
+} from './lib/design-page-roster.ts';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-design-hygiene.mjs');
 const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-scan.mjs');
-const SHARED_SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.mjs');
-const ROSTER_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-roster.mjs');
-const BASELINE_LIB_SOURCE = join(SCRIPT_DIR, 'lib', 'baseline-file.mjs');
+const SHARED_SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.ts');
+const ROSTER_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-roster.ts');
+const BASELINE_LIB_SOURCE = join(SCRIPT_DIR, 'lib', 'baseline-file.ts');
 const ANCHOR_BASELINE_FILE = 'tools/config/citation-anchor-baseline.json';
 
 const FONT_BLOCK =
@@ -65,6 +65,20 @@ const FIXTURE_PAGES = [
   ...new Set([...ROSTER_PAGES, ...LEGACY_PAGES, CANONICAL_FONT_PAGE]),
 ];
 
+// Strips GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE / GIT_COMMON_DIR so a `git`
+// call scoped to the fixture `workspace` cannot inherit them from the real
+// repository and resolve there instead — fatal under Husky, which sets them
+// for its own hook process tree. Node's `cwd` option alone does not override
+// an inherited `GIT_DIR`; git prefers the environment variable.
+function gitInWorkspace(workspace, args) {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_COMMON_DIR;
+  spawnSync('git', args, { cwd: workspace, env });
+}
+
 function createWorkspace(t) {
   const workspace = mkdtempSync(join(tmpdir(), 'design-hygiene-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
@@ -81,17 +95,17 @@ function createWorkspace(t) {
   );
   write(
     workspace,
-    'tools/scripts/lib/source-scan.mjs',
+    'tools/scripts/lib/source-scan.ts',
     readFileSync(SHARED_SCAN_SOURCE, 'utf8'),
   );
   write(
     workspace,
-    'tools/scripts/lib/design-page-roster.mjs',
+    'tools/scripts/lib/design-page-roster.ts',
     readFileSync(ROSTER_SOURCE, 'utf8'),
   );
   write(
     workspace,
-    'tools/scripts/lib/baseline-file.mjs',
+    'tools/scripts/lib/baseline-file.ts',
     readFileSync(BASELINE_LIB_SOURCE, 'utf8'),
   );
   // Empty by default: a fixture page carrying an unanchored citation is held to
@@ -110,8 +124,8 @@ function createWorkspace(t) {
   // The checker resolves a bare-name citation with `git ls-files` (basenameIndex,
   // check-design-hygiene.mjs), so citation tests need a real index to search —
   // not a commit, just files staged so `git ls-files` can see them.
-  spawnSync('git', ['init', '-q'], { cwd: workspace });
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['init', '-q']);
+  gitInWorkspace(workspace, ['add', '-A']);
 
   return workspace;
 }
@@ -276,9 +290,9 @@ test('an anchor naming a file that cannot be read is a finding, not a skip', (t)
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': {
+        'tools/scripts/lib/source-scan.ts:2': {
           file: 'does/not/exist.mjs',
           start: 'whatever text',
         },
@@ -310,7 +324,7 @@ test('an anchor whose cited line is past the end of its own file is a finding', 
       },
     }),
   );
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   const result = run(workspace, 'docs/sandcastle/waves.html');
 
@@ -331,7 +345,7 @@ test('a citation with no anchor fails on a page the baseline does not name', (t)
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
     }),
   );
 
@@ -339,7 +353,7 @@ test('a citation with no anchor fails on a page the baseline does not name', (t)
 
   assert.equal(result.status, 1);
   assert.match(result.stdout, /ERROR citation-missing-anchor/);
-  assert.match(result.stdout, /source-scan\.mjs:2/);
+  assert.match(result.stdout, /source-scan\.ts:2/);
 });
 
 test('the same citation passes while its page is on the anchor baseline', (t) => {
@@ -348,7 +362,7 @@ test('the same citation passes while its page is on the anchor baseline', (t) =>
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
     }),
   );
   writeAnchorBaseline(workspace, ['docs/sandcastle/waves.html']);
@@ -382,12 +396,12 @@ test('a baselined page whose citations are all anchored is reported as a stale e
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': {
-          file: 'tools/scripts/lib/source-scan.mjs',
+        'tools/scripts/lib/source-scan.ts:2': {
+          file: 'tools/scripts/lib/source-scan.ts',
           start: readFileSync(
-            join(workspace, 'tools/scripts/lib/source-scan.mjs'),
+            join(workspace, 'tools/scripts/lib/source-scan.ts'),
             'utf8',
           ).split('\n')[1],
         },
@@ -409,12 +423,12 @@ test('a baselined page whose citations are all anchored is reported as a stale e
 // the one four sandcastle pages passed review on: an entry the gate never looks
 // up can quote anything, and reads as though it had been checked.
 
-/** An anchor quoting `tools/scripts/lib/source-scan.mjs` at 1-based `line`. */
+/** An anchor quoting `tools/scripts/lib/source-scan.ts` at 1-based `line`. */
 function sourceScanAnchor(workspace, line) {
   return {
-    file: 'tools/scripts/lib/source-scan.mjs',
+    file: 'tools/scripts/lib/source-scan.ts',
     start: readFileSync(
-      join(workspace, 'tools/scripts/lib/source-scan.mjs'),
+      join(workspace, 'tools/scripts/lib/source-scan.ts'),
       'utf8',
     ).split('\n')[line - 1],
   };
@@ -426,10 +440,10 @@ test('an anchor that keys no citation on the page fails, even when what it quote
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': sourceScanAnchor(workspace, 2),
-        'tools/scripts/lib/source-scan.mjs:3': sourceScanAnchor(workspace, 3),
+        'tools/scripts/lib/source-scan.ts:2': sourceScanAnchor(workspace, 2),
+        'tools/scripts/lib/source-scan.ts:3': sourceScanAnchor(workspace, 3),
       },
     }),
   );
@@ -438,7 +452,7 @@ test('an anchor that keys no citation on the page fails, even when what it quote
 
   assert.equal(result.status, 1);
   assert.match(result.stdout, /ERROR citation-anchor-orphan/);
-  assert.match(result.stdout, /source-scan\.mjs:3/);
+  assert.match(result.stdout, /source-scan\.ts:3/);
   assert.doesNotMatch(result.stdout, /citation-anchor-mismatch/);
 });
 
@@ -448,9 +462,9 @@ test('the anchor baseline does not excuse an orphan anchor — the hatch is abou
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:3': sourceScanAnchor(workspace, 3),
+        'tools/scripts/lib/source-scan.ts:3': sourceScanAnchor(workspace, 3),
       },
     }),
   );
@@ -471,10 +485,10 @@ test('a legacy page with an orphan anchor still fails', (t) => {
     workspace,
     page,
     pageWithCitation('legacy', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': sourceScanAnchor(workspace, 2),
-        'tools/scripts/lib/source-scan.mjs:3': sourceScanAnchor(workspace, 3),
+        'tools/scripts/lib/source-scan.ts:2': sourceScanAnchor(workspace, 2),
+        'tools/scripts/lib/source-scan.ts:3': sourceScanAnchor(workspace, 3),
       },
     }),
   );
@@ -486,16 +500,16 @@ test('a legacy page with an orphan anchor still fails', (t) => {
 });
 
 test('a continuation line with no leading colon fails — the gate cannot read it', (t) => {
-  // `source-scan.mjs:2, 3` renders as two cited lines and parses as one. The
+  // `source-scan.ts:2, 3` renders as two cited lines and parses as one. The
   // house form is `:2, :3`.
   const workspace = createWorkspace(t);
   write(
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2, 3',
+      citation: 'tools/scripts/lib/source-scan.ts:2, 3',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': sourceScanAnchor(workspace, 2),
+        'tools/scripts/lib/source-scan.ts:2': sourceScanAnchor(workspace, 2),
       },
     }),
   );
@@ -513,10 +527,10 @@ test('the same lines written in the house continuation form pass', (t) => {
     workspace,
     'docs/sandcastle/waves.html',
     pageWithCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2, :3',
+      citation: 'tools/scripts/lib/source-scan.ts:2, :3',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': sourceScanAnchor(workspace, 2),
-        'tools/scripts/lib/source-scan.mjs:3': sourceScanAnchor(workspace, 3),
+        'tools/scripts/lib/source-scan.ts:2': sourceScanAnchor(workspace, 2),
+        'tools/scripts/lib/source-scan.ts:3': sourceScanAnchor(workspace, 3),
       },
     }),
   );
@@ -572,7 +586,7 @@ test('a citation rendered from script data fails without an anchor', (t) => {
     workspace,
     'docs/sandcastle/waves.html',
     pageWithScriptCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
     }),
   );
 
@@ -588,10 +602,10 @@ test('a citation rendered from script data fails when its anchor does not match 
     workspace,
     'docs/sandcastle/waves.html',
     pageWithScriptCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': {
-          file: 'tools/scripts/lib/source-scan.mjs',
+        'tools/scripts/lib/source-scan.ts:2': {
+          file: 'tools/scripts/lib/source-scan.ts',
           start: 'not what the line says',
         },
       },
@@ -610,9 +624,9 @@ test('a citation rendered from script data passes with a matching anchor, which 
     workspace,
     'docs/sandcastle/waves.html',
     pageWithScriptCitation('waves', {
-      citation: 'tools/scripts/lib/source-scan.mjs:2',
+      citation: 'tools/scripts/lib/source-scan.ts:2',
       anchor: {
-        'tools/scripts/lib/source-scan.mjs:2': sourceScanAnchor(workspace, 2),
+        'tools/scripts/lib/source-scan.ts:2': sourceScanAnchor(workspace, 2),
       },
     }),
   );
@@ -657,7 +671,7 @@ test('a citation on a roster page resolves against a real file in the tree', (t)
       '<svg viewBox="0 0 10 10" role="img" aria-label="Diagram"></svg>',
       [
         '<svg viewBox="0 0 10 10" role="img" aria-label="Diagram"></svg>',
-        '<span class="cite">tools/scripts/lib/source-scan.mjs:2</span>',
+        '<span class="cite">tools/scripts/lib/source-scan.ts:2</span>',
       ].join('\n'),
     ),
   );
@@ -681,7 +695,7 @@ test('a citation past the end of a real file fails on a roster page', (t) => {
       '<svg viewBox="0 0 10 10" role="img" aria-label="Diagram"></svg>',
       [
         '<svg viewBox="0 0 10 10" role="img" aria-label="Diagram"></svg>',
-        '<span class="cite">tools/scripts/lib/source-scan.mjs:99999</span>',
+        '<span class="cite">tools/scripts/lib/source-scan.ts:99999</span>',
       ].join('\n'),
     ),
   );
@@ -690,7 +704,7 @@ test('a citation past the end of a real file fails on a roster page', (t) => {
 
   assert.equal(result.status, 1);
   assert.match(result.stdout, /ERROR citation-unresolved/);
-  assert.match(result.stdout, /source-scan\.mjs/);
+  assert.match(result.stdout, /source-scan\.ts/);
 });
 
 test("a citation to a file's real last line resolves, and the line past it does not", (t) => {
@@ -700,7 +714,7 @@ test("a citation to a file's real last line resolves, and the line past it does 
   // silently accepting a citation to the line just past every file's real end.
   const workspace = createWorkspace(t);
   write(workspace, 'target.txt', 'one\ntwo\nthree\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
   write(
     workspace,
     'docs/sandcastle/waves.html',
@@ -756,7 +770,7 @@ test('a citation whose name is short a directory prefix still resolves by suffix
       ].join('\n'),
     ),
   );
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   // This page cites without an anchor on purpose: the subject here is resolution,
   // so the anchor requirement is held off with the baseline rather than satisfied.
@@ -965,7 +979,7 @@ test('a comment inside a script is still masked', (t) => {
 test('a citation with a matching anchor passes', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', 'key: value\nline two\nline three\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -992,7 +1006,7 @@ test('a citation with a matching anchor passes', (t) => {
 test('a citation with a mismatched anchor fails', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', 'key: value\nline two\nline three\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -1020,7 +1034,7 @@ test('a citation with a mismatched anchor fails', (t) => {
 test('a citation with no anchor is a finding', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', 'key: value\nline two\nline three\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -1047,7 +1061,7 @@ test('a citation with no anchor is a finding', (t) => {
 test('a range citation with matching start and end anchors passes', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', 'line one\nline two\nline three\nline four\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -1073,7 +1087,7 @@ test('a range citation with matching start and end anchors passes', (t) => {
 test('a range citation with mismatched end anchor fails', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', 'line one\nline two\nline three\nline four\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -1101,7 +1115,7 @@ test('a range citation with mismatched end anchor fails', (t) => {
 test('anchor comparison normalizes whitespace', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'target.yml', '  key:   value  \nline two\nline three\n');
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,
@@ -1131,7 +1145,7 @@ test('anchor comparison unescapes HTML entities', (t) => {
     'target.yml',
     '"quoted" & <bracketed>\nline two\nline three\n',
   );
-  spawnSync('git', ['add', '-A'], { cwd: workspace });
+  gitInWorkspace(workspace, ['add', '-A']);
 
   write(
     workspace,

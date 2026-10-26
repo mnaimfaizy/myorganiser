@@ -51,7 +51,7 @@
 // assertion against the sources would pass while the thing we publish is
 // broken, which is the failure mode ADR 0043 is about.
 //
-// The judgments themselves live in tools/scripts/lib/escape-copy-reader-gate.mjs
+// The judgments themselves live in tools/scripts/lib/escape-copy-reader-gate.ts
 // so the contract suite can exercise each one against a fixture instead of
 // building a 500 KB page per assertion; this file is IO.
 //
@@ -84,7 +84,7 @@ import {
   spacingLiteralFindings,
   schemaVersionFindings,
   sectionFindings,
-} from './lib/escape-copy-reader-gate.mjs';
+} from './lib/escape-copy-reader-gate.ts';
 
 /** Where else the published filenames are written down. */
 const VAULT_PAGE_CONSTANTS =

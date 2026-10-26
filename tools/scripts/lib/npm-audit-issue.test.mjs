@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { TRIAGE_STATE_LABELS } from './nightly-e2e-rot-issue.mjs';
+import { TRIAGE_STATE_LABELS } from './nightly-e2e-rot-issue.ts';
 import {
   AUDIT_ADVISORY_LIMIT,
   AUDIT_ISSUE_CREATE_LABELS,

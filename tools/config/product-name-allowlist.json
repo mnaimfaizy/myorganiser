@@ -20,7 +20,7 @@
       "reason": "Byte-for-byte snapshots of issue bodies taken for the golden review set. A snapshot that is edited no longer records what the reviewer was given."
     },
     {
-      "path": "tools/scripts/lib/qa-accounts.mjs",
+      "path": "tools/scripts/lib/qa-accounts.ts",
       "reason": "QA Account credentials are derived from the old-spelling email suffix and hash salt. Kept by the user's decision so QA credentials do not change (ADR 0122)."
     },
     {
@@ -28,7 +28,7 @@
       "reason": "Holds the QA Account emails on the old-spelling `.test` domain. Kept with qa-accounts.mjs so QA credentials do not change (ADR 0122)."
     },
     {
-      "path": "tools/scripts/lib/qa-accounts.test.mjs",
+      "path": "tools/scripts/lib/qa-accounts.test.ts",
       "reason": "Pins the QA Account email suffix that qa-accounts.mjs still uses. Changes only together with it."
     }
   ]

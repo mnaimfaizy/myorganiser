@@ -36,8 +36,8 @@ import {
   gitIgnoredPaths,
   isRepoPathToken,
   listTrackedMarkdown,
-} from './lib/doc-paths.mjs';
-import { tokenize } from './lib/shell-command.mjs';
+} from './lib/doc-paths.ts';
+import { tokenize } from './lib/shell-command.ts';
 
 const fail = createCheckerFail('doc-commands');
 

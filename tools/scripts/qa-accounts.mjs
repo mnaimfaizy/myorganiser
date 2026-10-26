@@ -34,8 +34,8 @@ import {
   qaUserDrift,
   readQaAccounts,
   vaultMetaMatches,
-} from './lib/qa-accounts.mjs';
-import { loadQaVaultMint } from './lib/qa-vault-mint.mjs';
+} from './lib/qa-accounts.ts';
+import { loadQaVaultMint } from './lib/qa-vault-mint.ts';
 
 const require = createRequire(import.meta.url);
 const workspaceRoot = resolve(

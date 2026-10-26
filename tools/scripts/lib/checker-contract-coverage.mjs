@@ -35,7 +35,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readBaselineEnvelope } from './baseline-file.mjs';
+import { readBaselineEnvelope } from './baseline-file.ts';
 
 export const BASELINE_PATH = join(
   'tools',

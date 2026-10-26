@@ -35,7 +35,7 @@ import {
   buildActivateCommand,
   buildSelectorProbeScript,
   findHostApplyLogLeaks,
-} from './lib/host-apply.mjs';
+} from './lib/host-apply.ts';
 
 const [, , environment] = process.argv;
 
@@ -413,7 +413,7 @@ ${buildSelectorProbeScript(env('SELECTOR_APP_KEY'))}`,
     fail(
       'selector store',
       `found DATABASE_URL at ${hit.path} under "${hit.envField}", but buildSelectorLoadStep pins .cpanel/nodejsapps.json under "envvars".\n` +
-        '  Update the pinned path/field in tools/scripts/lib/host-apply.mjs before the first apply.',
+        '  Update the pinned path/field in tools/scripts/lib/host-apply.ts before the first apply.',
     );
     return;
   }

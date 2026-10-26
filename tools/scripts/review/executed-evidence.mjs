@@ -60,7 +60,7 @@
  * matches. A command run more than once matches if any run agrees.
  */
 
-import { simpleCommands } from '../lib/shell-command.mjs';
+import { simpleCommands } from '../lib/shell-command.ts';
 
 /**
  * A simple command's words, with the quotes and backslashes taken off. A

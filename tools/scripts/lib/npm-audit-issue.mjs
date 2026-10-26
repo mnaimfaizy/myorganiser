@@ -26,7 +26,7 @@
  * Run the tests with: yarn npm-audit:issue:test
  */
 
-import { findOpenRotIssue, recoveryAction } from './nightly-e2e-rot-issue.mjs';
+import { findOpenRotIssue, recoveryAction } from './nightly-e2e-rot-issue.ts';
 
 export { recoveryAction };
 

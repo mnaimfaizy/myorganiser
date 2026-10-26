@@ -75,9 +75,9 @@ import {
   DESIGN_EXPORTS_DIR,
   LEGACY,
   ROSTER,
-} from './lib/design-page-roster.mjs';
-import { readBaselineEnvelope } from './lib/baseline-file.mjs';
-import { citableLines, reportFindings } from './lib/source-scan.mjs';
+} from './lib/design-page-roster.ts';
+import { readBaselineEnvelope } from './lib/baseline-file.ts';
+import { citableLines, reportFindings } from './lib/source-scan.ts';
 
 // Pages whose citations are not yet anchored (ADR 0085; PRD #772). The rule is
 // per citation, so this list is the only thing holding a page back from it — and

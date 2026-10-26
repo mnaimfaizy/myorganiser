@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import {
   loadGithubLabelCatalog,
   provisionLabels,
-} from '../lib/github-labels.mjs';
+} from '../lib/github-labels.ts';
 
 const REPO = 'mnaimfaizy/myorganiser';
 const LABELS = provisionLabels(loadGithubLabelCatalog());

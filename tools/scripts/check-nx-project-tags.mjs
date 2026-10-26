@@ -19,7 +19,7 @@ import {
   NX_PROJECT_TAGS_CONFIG_PATH,
   assertProjectTags,
   loadTagVocabulary,
-} from './lib/nx-project-tags.mjs';
+} from './lib/nx-project-tags.ts';
 
 const fail = (msg) => {
   console.error(`nx-project-tags: ${msg}`);

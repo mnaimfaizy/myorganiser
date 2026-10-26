@@ -11,7 +11,7 @@
 // Exit 0 = in sync. Exit 1 = drift (fix the page). Exit 2 = the check could not run.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.mjs';
+import { AGENT_MAP_MANIFEST_NOTE } from './lib/agent-map-manifest-note.ts';
 
 const PAGE = 'docs/agents/orchestration-map.html';
 const JOURNEY = 'docs/agents/agent-journey.html';
@@ -106,7 +106,7 @@ function checkReviewedAt(manifest, path) {
 function checkManifestNote(manifest, path) {
   if (manifest.note !== AGENT_MAP_MANIFEST_NOTE) {
     findings.push(
-      `manifest note drift: ${path} note does not match tools/scripts/lib/agent-map-manifest-note.mjs`,
+      `manifest note drift: ${path} note does not match tools/scripts/lib/agent-map-manifest-note.ts`,
     );
   }
 }

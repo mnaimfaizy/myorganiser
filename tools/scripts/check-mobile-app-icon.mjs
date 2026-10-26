@@ -8,7 +8,7 @@
 // The icons ship inside the native projects, so a changed shield or Brand
 // Primitive without a re-run leaves the installed app wearing the old mark,
 // and nothing in review shows it. This builds every output in memory through
-// the generator's own module (tools/scripts/lib/mobile-app-icon.mjs).
+// the generator's own module (tools/scripts/lib/mobile-app-icon.ts).
 //
 // Directions:
 // - Sources → text outputs, exactly: the SVG masters, the Android vector
@@ -32,7 +32,7 @@
 // Exit 2 = the check could not run (a source value could not be read).
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { planMobileAppIcon } from './lib/mobile-app-icon.mjs';
+import { planMobileAppIcon } from './lib/mobile-app-icon.ts';
 
 const root = process.cwd();
 

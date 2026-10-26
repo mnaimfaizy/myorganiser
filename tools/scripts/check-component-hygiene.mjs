@@ -68,7 +68,7 @@ import {
   normalize,
   parenAfter,
   reportFindings,
-} from './lib/source-scan.mjs';
+} from './lib/source-scan.ts';
 
 const USAGE = `Usage:
   node tools/scripts/check-component-hygiene.mjs <file> [<file> ...] [--max-warnings=0]

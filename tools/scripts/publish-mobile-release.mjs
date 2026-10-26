@@ -4,7 +4,7 @@
 //
 //   yarn mobile:release:publish --version 1.0.0 [--apk <path>]
 //
-// What it checks, writes, and sends is in lib/mobile-release.mjs. This file
+// What it checks, writes, and sends is in lib/mobile-release.ts. This file
 // only wires it to the Android SDK's `apksigner` and `aapt2`, git, `gh`, and
 // the file system. The runbook's "Publish to a GitHub Release" section
 // (docs/deployment/MOBILE_RELEASE_PROCESS.md) says when to run it.
@@ -23,14 +23,14 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { gh } from './lib/gh.mjs';
+import { gh } from './lib/gh.ts';
 import {
   DOWNLOAD_PAGE_VERSION_FILE,
   MobileReleaseRefusal,
   publishMobileRelease,
   releaseCreateArgs,
   sha256Of,
-} from './lib/mobile-release.mjs';
+} from './lib/mobile-release.ts';
 
 const fail = (message, code) => {
   console.error(`mobile-release: ${message}`);

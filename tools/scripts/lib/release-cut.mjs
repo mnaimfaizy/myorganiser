@@ -5,11 +5,11 @@
  * Kept out of `tools/scripts/release.mjs` so they can run against a scratch
  * repository under test; that script runs top-level and exits the process.
  * These throw `AbandonedCutError` instead, and the script turns it into its
- * usual `die()`. The pure parts they build on live in `release-notes.mjs`.
+ * usual `die()`. The pure parts they build on live in `release-notes.ts`.
  */
 import { execSync } from 'node:child_process';
 
-import { abandonedCutSteps, unstagedPaths } from './release-notes.mjs';
+import { abandonedCutSteps, unstagedPaths } from './release-notes.ts';
 
 /** A cut that stopped after creating the release branch. */
 export class AbandonedCutError extends Error {

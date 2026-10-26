@@ -11,7 +11,7 @@
 import {
   HostApplyRefusal,
   assertHostApplyProbesHealthy,
-} from './lib/host-apply.mjs';
+} from './lib/host-apply.ts';
 
 const [, , docsStatusArg, cronStatusArg] = process.argv;
 const docsStatus = Number(docsStatusArg);

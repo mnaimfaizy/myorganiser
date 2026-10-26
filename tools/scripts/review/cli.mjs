@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { gh as runGh, ghJson as runGhJson } from '../lib/gh.mjs';
+import { gh as runGh, ghJson as runGhJson } from '../lib/gh.ts';
 
 /**
  * Split argv into `{ positional, flags }`. A flag is `--name value`; a flag

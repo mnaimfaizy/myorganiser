@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import {
   requireBackendBuild,
   spawnBackendMain,
-} from './lib/spawn-backend-main.mjs';
+} from './lib/spawn-backend-main.ts';
 
 const require = createRequire(import.meta.url);
 const { config: loadEnv } = require('dotenv');

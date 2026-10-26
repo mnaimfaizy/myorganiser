@@ -9,7 +9,7 @@ import process from 'node:process';
 import {
   parseRetirementTable,
   retirementFindings,
-} from './lib/model-retirements.mjs';
+} from './lib/model-retirements.ts';
 
 const repoRoot = process.cwd();
 const policyPath = path.join(

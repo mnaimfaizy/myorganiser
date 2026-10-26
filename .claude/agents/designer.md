@@ -132,7 +132,7 @@ never happened.
 ## Contradictions Are Findings
 
 While grounding the page you will read source that disagrees with the docs describing
-it — `sandcastle-subagent-trace.mjs` claiming sub-agent transcripts reach the host
+it — `sandcastle-subagent-trace.ts` claiming sub-agent transcripts reach the host
 "verbatim" when they pass through `rewriteSessionCwd` is a real example, found this way.
 
 Source wins, and the disagreement is a deliverable. Render the behaviour, and report

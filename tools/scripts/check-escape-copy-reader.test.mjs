@@ -2,7 +2,7 @@
 // each drift its header claims to catch, rather than merely saying so.
 //
 // The judgments are exercised directly against fixtures, which is why they
-// live in tools/scripts/lib/escape-copy-reader-gate.mjs at all: the checker
+// live in tools/scripts/lib/escape-copy-reader-gate.ts at all: the checker
 // itself builds a 500 KB page and runs PBKDF2 at 310,000 iterations four
 // times, so a suite that drove it end-to-end per assertion would cost minutes
 // to assert seconds of logic. The one end-to-end case below covers the wiring
@@ -21,7 +21,7 @@ import {
   spacingLiteralFindings,
   schemaVersionFindings,
   sectionFindings,
-} from './lib/escape-copy-reader-gate.mjs';
+} from './lib/escape-copy-reader-gate.ts';
 import {
   READER_FILENAME,
   composeReaderHtml,

@@ -33,9 +33,9 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
-import { GUARDED_ENUMS } from '../lib/enum-fanout-guarded.mjs';
-import { globToRegExp } from '../lib/glob.mjs';
-import { citableLines } from '../lib/source-scan.mjs';
+import { GUARDED_ENUMS } from '../lib/enum-fanout-guarded.ts';
+import { globToRegExp } from '../lib/glob.ts';
+import { citableLines } from '../lib/source-scan.ts';
 
 // Re-exported: callers and tests of this module treat glob matching as
 // part of the selector's surface. The implementation is shared with the

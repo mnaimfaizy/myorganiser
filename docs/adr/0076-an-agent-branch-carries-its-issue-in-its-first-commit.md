@@ -48,7 +48,7 @@ identically into the code and into the summary of the code.
    already carries the number; the commit is what survives integration into a branch whose name
    does not.
 
-4. The message is built by `tools/scripts/lib/sandcastle-spec-anchor.mjs`, which **asks**
+4. The message is built by `tools/scripts/lib/sandcastle-spec-anchor.ts`, which **asks**
    `discoverSpec` whether a branch name already carries the issue rather than restating its regex.
    A copy of the pattern is not a contract with it: the copy agrees on whatever examples a test
    lists and drifts silently on everything else, and a test enumerating six branch names is that
@@ -81,7 +81,7 @@ identically into the code and into the summary of the code.
 - Branches created before this decision have no anchor. They resolve a spec only if one of their
   commits happens to reference an issue, and otherwise review one axis, as they did before.
 
-- `sandcastle-spec-anchor.mjs` imports from `tools/scripts/review/resolve-spec.mjs`, so the
+- `sandcastle-spec-anchor.ts` imports from `tools/scripts/review/resolve-spec.mjs`, so the
   orchestrator now depends on a review script. That edge is deliberate: it is the only way the two
   cannot disagree, and it is one direction only — the resolver knows nothing about sandcastle.
 

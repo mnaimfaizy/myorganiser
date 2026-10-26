@@ -76,7 +76,7 @@ The cleanup was deliberately split by risk: named props-interface extraction was
 
 ## Consequences
 
-- New: `tools/scripts/check-component-hygiene.mjs`, `yarn component:hygiene`, and `tools/scripts/lib/source-scan.mjs` — shared lexical helpers now used by both hygiene scripts (the test script was refactored onto it with byte-identical output).
+- New: `tools/scripts/check-component-hygiene.mjs`, `yarn component:hygiene`, and `tools/scripts/lib/source-scan.ts` — shared lexical helpers now used by both hygiene scripts (the test script was refactored onto it with byte-identical output).
 - `ComponentReviewer` gains `execute`; its tool grant must stay `[read, search, execute]` across all four harnesses.
 - `docs/ui/GUIDELINES.md` §8 documents the three-layer split; the agents no longer paraphrase §§1–7.
 - Targeted scans remain useful during development, while CI and staged pre-commit checks enforce the zero-warning baseline explicitly.

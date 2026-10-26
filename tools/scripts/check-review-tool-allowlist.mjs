@@ -134,7 +134,7 @@
 // matches nothing.
 import { readFileSync } from 'node:fs';
 
-import { tokenize } from './lib/shell-command.mjs';
+import { tokenize } from './lib/shell-command.ts';
 import { isMain } from './review/cli.mjs';
 
 export const ACTION = '.github/actions/code-reviewer/action.yml';

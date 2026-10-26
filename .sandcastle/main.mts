@@ -29,7 +29,7 @@ import {
   validateDiscardScope,
   extractMaintainerNotes,
   withMaintainerNotes,
-} from '../tools/scripts/lib/sandcastle-resume.mjs';
+} from '../tools/scripts/lib/sandcastle-resume.ts';
 import {
   blockedBy,
   blocks,
@@ -41,17 +41,17 @@ import {
   isSatisfiedAsDependency,
   selectPrdSlices,
   unfinishedDependencies,
-} from '../tools/scripts/lib/sandcastle-slice-selection.mjs';
+} from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 import {
   parseSubagentTranscript,
   formatSubagentIndex,
   formatTokens,
-} from '../tools/scripts/lib/sandcastle-subagent-trace.mjs';
+} from '../tools/scripts/lib/sandcastle-subagent-trace.ts';
 import {
   branchNameCarriesIssue,
   prdBranchSlug,
   specAnchorMessage,
-} from '../tools/scripts/lib/sandcastle-spec-anchor.mjs';
+} from '../tools/scripts/lib/sandcastle-spec-anchor.ts';
 import {
   COMPLETION_PROMISE,
   NEEDS_HUMAN_LABEL,
@@ -830,7 +830,7 @@ function planPrdRun(prd: number): RunPlan {
   // `## Blocked by` names another slice of this PRD is admitted, and `## Blocked by`
   // ordering in the dispatch loop decides when it may actually run. A slice whose
   // label is NOT explained that way stays out: it means something this code cannot
-  // evaluate. See tools/scripts/lib/sandcastle-slice-selection.mjs.
+  // evaluate. See tools/scripts/lib/sandcastle-slice-selection.ts.
   const selection = selectPrdSlices(everyIssue, {
     prd,
     only: issueNumber,

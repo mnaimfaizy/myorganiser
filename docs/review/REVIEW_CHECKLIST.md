@@ -313,7 +313,7 @@ Two kinds of file are never a site (`excludePaths`):
   the list, and the pinned table's `satisfies` clause ties them back.
 
 The catalogue entry names no enum. It says `"guardedEnums"`, and the loader
-expands that from `tools/scripts/lib/enum-fanout-guarded.mjs`, the list the
+expands that from `tools/scripts/lib/enum-fanout-guarded.ts`, the list the
 checker reads, into the paths above. The selector reads the member values at
 the reviewed head, not from the tooling tree, because a replay's head can
 predate members the tooling knows. Without values at that head, only the

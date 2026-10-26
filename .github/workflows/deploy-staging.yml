@@ -3,7 +3,7 @@ name: Deploy Staging
 # runs-on is pinned to ubuntu-24.04. See docs/deployment/CI_CD_AND_RELEASE_PROCESS.md#runner-image.
 
 # `release:cut` reads the commit a run uploaded out of this name, by looking
-# for a 40-character SHA (tools/scripts/lib/staging-host-apply-guard.mjs), so
+# for a 40-character SHA (tools/scripts/lib/staging-host-apply-guard.ts), so
 # the name may only carry a commit the run is certain to upload.
 #
 #   - A dispatched run uploads `github.sha`, and says so.

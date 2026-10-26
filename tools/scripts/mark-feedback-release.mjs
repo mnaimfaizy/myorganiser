@@ -5,7 +5,7 @@
 //   RELEASE_REF=release/v1.4.0 API_ORIGIN=… FEEDBACK_RELEASE_SECRET=… \
 //     node tools/scripts/mark-feedback-release.mjs
 //
-// What it reads, sends, and refuses is in lib/feedback-release.mjs. This file
+// What it reads, sends, and refuses is in lib/feedback-release.ts. This file
 // only wires it to git and fetch, from a checkout of the release branch with
 // its tags (fetch-depth: 0).
 //
@@ -13,7 +13,7 @@
 // Release stays live and its reports stay Planned, so the job can be re-run.
 import { execFileSync } from 'node:child_process';
 
-import { markFeedbackRelease } from './lib/feedback-release.mjs';
+import { markFeedbackRelease } from './lib/feedback-release.ts';
 
 const runGit = (args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

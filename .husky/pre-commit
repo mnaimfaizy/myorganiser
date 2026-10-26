@@ -59,7 +59,7 @@ fi
 # The full tools/scripts suite set (ADR 0135) takes about 34s in one
 # `node --test` run, so a tooling commit should pay for its own suite rather
 # than the whole set — and a commit outside tooling should pay nothing.
-# `tools/scripts/lib/tools-test-selection.mjs` is the pure decision: the
+# `tools/scripts/lib/tools-test-selection.ts` is the pure decision: the
 # suites staged directly, plus the suite paired by name with each staged
 # script. CI's `tools:test` still runs the full set on every push and pull
 # request, so this incomplete local selection is a speed trade-off, not the
@@ -67,7 +67,7 @@ fi
 corepack yarn tools:test:staged
 # The five sandcastle atlas pages state constants that live as module-local literals in the
 # two orchestrator files and in the slice-selection lib they share, as exports in
-# sandcastle-resume.mjs and sandcastle-subagent-trace.mjs, and as JSON in the model policy,
+# sandcastle-resume.ts and sandcastle-subagent-trace.ts, and as JSON in the model policy,
 # package.json, and the CI workflow. They rot the moment any of those move, and
 # the checker passed green through the whole of #467 precisely because it asserted constants
 # while the prose went false around them — so the guard must list every input it reads, plus
@@ -80,9 +80,9 @@ if ! git diff --cached --quiet --diff-filter=ACMRTD -- \
  docs/sandcastle/logs.html \
  docs/sandcastle/resume.html \
  tools/scripts/check-sandcastle-map.mjs \
- tools/scripts/lib/sandcastle-resume.mjs \
- tools/scripts/lib/sandcastle-subagent-trace.mjs \
- tools/scripts/lib/sandcastle-slice-selection.mjs \
+ tools/scripts/lib/sandcastle-resume.ts \
+ tools/scripts/lib/sandcastle-subagent-trace.ts \
+ tools/scripts/lib/sandcastle-slice-selection.ts \
  tools/scripts/lib/sandcastle-outcome.mjs \
  tools/config/agent-model-policy.json \
  package.json \

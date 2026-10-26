@@ -21,7 +21,7 @@
 // per-check npm scripts remain for isolated runs, and CI still invokes each
 // check as its own named step for a readable failure.
 //
-// The manifest (tools/scripts/lib/gate-manifest.mjs) is asserted against
+// The manifest (tools/scripts/lib/gate-manifest.ts) is asserted against
 // package.json before anything runs: a checker quietly dropped from it would
 // be exactly the unwired-gate defect this file exists to close.
 //
@@ -33,7 +33,7 @@ import {
   GATE_MANIFEST,
   assertManifestAgainstDisk,
   runGateManifest,
-} from './lib/gate-manifest.mjs';
+} from './lib/gate-manifest.ts';
 
 const cwd = process.cwd();
 const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
@@ -46,7 +46,7 @@ if (!manifestCheck.ok) {
   for (const finding of manifestCheck.findings) console.error(`  - ${finding}`);
   console.error(
     '\nA checker dropped from this manifest is silently unwired (ADR 0043).' +
-      ' Fix tools/scripts/lib/gate-manifest.mjs or package.json, whichever is wrong.',
+      ' Fix tools/scripts/lib/gate-manifest.ts or package.json, whichever is wrong.',
   );
   process.exit(2);
 }

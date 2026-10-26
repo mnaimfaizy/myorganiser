@@ -30,7 +30,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { HOST_APPLY_SECRET_NAMES } from './lib/host-apply.mjs';
+import { HOST_APPLY_SECRET_NAMES } from './lib/host-apply.ts';
 
 const ROOT = resolve(process.argv[2] ?? '.');
 const WORKFLOWS = join('.github', 'workflows');

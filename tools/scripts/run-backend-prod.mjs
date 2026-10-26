@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   requireBackendBuild,
   spawnBackendMain,
-} from './lib/spawn-backend-main.mjs';
+} from './lib/spawn-backend-main.ts';
 
 const workspaceRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),

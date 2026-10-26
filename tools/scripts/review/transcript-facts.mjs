@@ -18,7 +18,7 @@
  * never an empty list. Read naively, a CLI release that renamed one field
  * would report "no sub-agent read its brief" on every pull request.
  */
-import { simpleCommands, tokenize } from '../lib/shell-command.mjs';
+import { simpleCommands, tokenize } from '../lib/shell-command.ts';
 import { BRIEFS, axisNamedBy, isOnTemplate } from './briefs.mjs';
 
 export const RUN_FACTS_SCHEMA_VERSION = 1;

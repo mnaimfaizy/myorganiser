@@ -1017,7 +1017,7 @@ test('an enum-shaped line outside the guarded definition does not fire the fan-o
 });
 
 test('the fan-out obligation fires on every enum enum:fanout:check guards', async () => {
-  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.mjs');
+  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.ts');
   assert.ok(GUARDED_ENUMS.length > 0);
   for (const guard of GUARDED_ENUMS) {
     // A member added where the enum is defined.
@@ -1138,7 +1138,7 @@ const generatedSites = (diffText, membersOf = () => VAULT_MEMBERS) =>
   }).selected.find((o) => o.id === ENUM_FANOUT)?.sites ?? [];
 
 test('a consumer listing members as property names inside a value root fires', async () => {
-  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.mjs');
+  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.ts');
   for (const root of GUARDED_ENUMS[0].valueRoots) {
     const file = `${root}lib/vault/envelope.ts`;
     assert.deepEqual(
@@ -1188,7 +1188,7 @@ test('with no member values at head, only the enum-qualified shapes fire', () =>
 });
 
 test('the catalogue names no enum: every one comes from the checker list, both ways', async () => {
-  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.mjs');
+  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.ts');
   const raw = JSON.parse(
     readFileSync(
       new URL('../../config/review-obligations.json', import.meta.url),
@@ -1268,7 +1268,7 @@ test('the selector reads member values from the reviewed head, not the tooling t
 });
 
 test("the checker's declaration sites are not consumers and never a site", async () => {
-  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.mjs');
+  const { GUARDED_ENUMS } = await import('../lib/enum-fanout-guarded.ts');
   for (const { path } of GUARDED_ENUMS[0].declarationSites)
     assert.deepEqual(
       generatedSites(

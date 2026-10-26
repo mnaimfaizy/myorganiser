@@ -26,8 +26,8 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { gh } from './lib/gh.mjs';
-import { loadProjectGraph } from './lib/nx-graph.mjs';
+import { gh } from './lib/gh.ts';
+import { loadProjectGraph } from './lib/nx-graph.ts';
 import {
   classifyReviewTier,
   errorResult,

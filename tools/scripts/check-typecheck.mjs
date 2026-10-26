@@ -50,7 +50,7 @@ import { existsSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.mjs';
+import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.ts';
 
 // A project's production programs. Every one that exists is checked.
 //

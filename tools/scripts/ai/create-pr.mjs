@@ -11,11 +11,11 @@ import {
   rejectedPrLabels,
   surfaceLabelNames,
   syncSurfaceLabelChanges,
-} from '../lib/github-labels.mjs';
+} from '../lib/github-labels.ts';
 import {
   checkMergeBaseProof,
   isAgentDraftInvocation,
-} from '../lib/pr-merge-base.mjs';
+} from '../lib/pr-merge-base.ts';
 import {
   FORCE_FLAG,
   PUSH_ACTIONS,
@@ -23,7 +23,7 @@ import {
   findOrphanedRemoteCommits,
   parseCherryOutput,
   parseCommitRecords,
-} from '../lib/pr-push-plan.mjs';
+} from '../lib/pr-push-plan.ts';
 
 const usage = `Usage:
   corepack yarn ai:create-pr [options]

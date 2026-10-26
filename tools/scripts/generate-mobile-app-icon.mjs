@@ -3,7 +3,7 @@
  * Usage: yarn mobile:app-icon:generate
  *
  * What the outputs are and where every value comes from lives in
- * tools/scripts/lib/mobile-app-icon.mjs, which this script and
+ * tools/scripts/lib/mobile-app-icon.ts, which this script and
  * `yarn mobile:app-icon:check` share. This file writes the text outputs as
  * planned and rasterises the PNGs through Playwright's Chromium, as
  * generate-og-image.mjs does.
@@ -16,7 +16,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
-import { planMobileAppIcon } from './lib/mobile-app-icon.mjs';
+import { planMobileAppIcon } from './lib/mobile-app-icon.ts';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const fromRoot = (path) => resolve(repoRoot, path);

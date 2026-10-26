@@ -44,7 +44,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.mjs';
+import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.ts';
 
 const GATE_TARGET = 'lint';
 const CONFIG_NAMES = [

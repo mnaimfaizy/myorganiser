@@ -53,7 +53,7 @@ import {
   hasPathPlaceholder,
   isRepoPathToken,
   listTrackedMarkdown,
-} from './lib/doc-paths.mjs';
+} from './lib/doc-paths.ts';
 
 const PREFIX = 'doc-file-refs';
 const EXEMPTIONS_PATH = 'tools/config/doc-file-refs-exemptions.json';

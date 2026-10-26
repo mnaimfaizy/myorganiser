@@ -26,7 +26,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { blockAfter, citableLines, lineOf } from './source-scan.mjs';
+import { blockAfter, citableLines, lineOf } from './source-scan.ts';
 
 const blank = (match) => match.replace(/[^\n]/g, ' ');
 
@@ -662,7 +662,7 @@ function locateMarkupCitations(source) {
 //
 // A lexer, not a parser: enough JavaScript to tell a string from the code,
 // comments and regex literals around it, and no more. `maskNonCode` in
-// source-scan.mjs walks the same states and is deliberately not shared — it
+// source-scan.ts walks the same states and is deliberately not shared — it
 // blanks strings where this collects them, and it has no need of the two things
 // that make this one longer, nested templates and regex literals.
 
