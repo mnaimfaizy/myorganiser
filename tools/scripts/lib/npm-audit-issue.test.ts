@@ -16,11 +16,11 @@ import {
   parseAuditAdvisories,
   recoveryAction,
   recoveryComment,
-} from './npm-audit-issue.mjs';
+} from './npm-audit-issue.ts';
 
 const WORKFLOW = readFileSync('.github/workflows/ci.yml', 'utf8');
 
-const jobBlock = (source, jobId) => {
+const jobBlock = (source: string, jobId: string) => {
   const jobsAt = source.search(/^jobs:\s*$/m);
   assert.notEqual(jobsAt, -1, 'workflow has no jobs:');
   const body = source.slice(jobsAt);
@@ -31,7 +31,7 @@ const jobBlock = (source, jobId) => {
   return next === -1 ? rest : rest.slice(0, next);
 };
 
-const stepBlock = (job, name) => {
+const stepBlock = (job: string, name: string) => {
   const start = job.indexOf(`- name: ${name}`);
   assert.notEqual(start, -1, `no step named ${name}`);
   const rest = job.slice(start + 1);
@@ -190,7 +190,7 @@ test('the failure report caps the table and counts what it left out', () => {
     sha: 'abc1234',
     advisories,
   });
-  assert.equal(body.match(/^\| `pkg-/gm).length, AUDIT_ADVISORY_LIMIT);
+  assert.equal(body.match(/^\| `pkg-/gm)!.length, AUDIT_ADVISORY_LIMIT);
   assert.match(body, /3 more/);
 });
 
@@ -339,7 +339,7 @@ for (const [jobId, status, outcome] of [
     assert.match(job, /contents: read/);
     assert.doesNotMatch(job, /contents: write/);
     assert.doesNotMatch(job, /pull-requests:/);
-    assert.match(job, /npm-audit-issue\.mjs/);
+    assert.match(job, /npm-audit-issue\.ts/);
     assert.match(job, /findOpenAuditIssue/);
   });
 }

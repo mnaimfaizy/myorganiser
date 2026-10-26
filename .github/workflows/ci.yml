@@ -250,7 +250,7 @@ jobs:
 
       # Same shape as nightly-e2e.yml: one open issue that gets commented on,
       # rather than a new issue for every failing push. The title and label
-      # list live in tools/scripts/lib/npm-audit-issue.mjs — not a second copy
+      # list live in tools/scripts/lib/npm-audit-issue.ts — not a second copy
       # here. Advisory text is third-party input, so it arrives through the
       # environment and is never interpolated into the script.
       - name: Open or update the audit issue
@@ -267,7 +267,7 @@ jobs:
               findOpenAuditIssue,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.ts`,
               ).href
             );
 
@@ -352,7 +352,7 @@ jobs:
               recoveryComment,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.ts`,
               ).href
             );
 

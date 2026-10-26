@@ -2,8 +2,8 @@
  * The JSON-envelope shape every shrink-only baseline file shares: an
  * `existsSync` guard, a `JSON.parse` with a wrapped error, a strict
  * `schemaVersion` check, and an `Array.isArray("baseline")` check. Two
- * ratchet checkers — `nx-declared-targets.mjs` (ADR 0082) and
- * `checker-contract-coverage.mjs` (ADR 0085) — read a baseline file with
+ * ratchet checkers — `nx-declared-targets.ts` (ADR 0082) and
+ * `checker-contract-coverage.ts` (ADR 0085) — read a baseline file with
  * this exact envelope and differ only in what an individual entry looks
  * like (a composite `{ project, target, executor }` key versus a bare
  * checker path) and in what else the file carries alongside `baseline`

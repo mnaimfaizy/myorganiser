@@ -34,13 +34,13 @@
 // every baseline entry still lacks one. Exit 1 = a checker lacks both a
 // suite and a baseline entry, or a baseline entry's checker is no longer
 // debt. Exit 2 = the baseline is missing/malformed, or no checkers were found.
-import { listCheckers } from './lib/gate-coverage.mjs';
+import { listCheckers } from './lib/gate-coverage.ts';
 import {
   BASELINE_PATH,
   classifyCheckers,
   compareBaseline,
   readBaseline,
-} from './lib/checker-contract-coverage.mjs';
+} from './lib/checker-contract-coverage.ts';
 
 const cwd = process.cwd();
 const printOnly = process.argv.includes('--print');

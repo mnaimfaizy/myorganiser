@@ -36,7 +36,7 @@
 // reached through `tools:test`'s own glob while that target is itself wired
 // (ADR 0135 slice 2) — resolved from the live glob pattern, not assumed, so a
 // pattern narrowed later still fails on the suites it drops. The decision
-// itself lives in tools/scripts/lib/gate-coverage.mjs; this file is IO.
+// itself lives in tools/scripts/lib/gate-coverage.ts; this file is IO.
 //
 // Deliberate non-gates carry an entry with a written reason in
 // tools/config/gate-coverage-optout.json.
@@ -48,7 +48,7 @@ import {
   OPT_OUT_PATH,
   assertGateCoverage,
   gatherFromDisk,
-} from './lib/gate-coverage.mjs';
+} from './lib/gate-coverage.ts';
 
 const report = assertGateCoverage(gatherFromDisk());
 

@@ -58,11 +58,11 @@ import {
   OUTSTANDING_MARKER,
   formatHeldComment,
   judgeRunOutcome,
-} from '../tools/scripts/lib/sandcastle-outcome.mjs';
+} from '../tools/scripts/lib/sandcastle-outcome.ts';
 import {
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
-} from '../tools/scripts/lib/sandcastle-worktree-repair.mjs';
+} from '../tools/scripts/lib/sandcastle-worktree-repair.ts';
 
 const REPO = 'mnaimfaizy/myorganiser';
 const SANDBOX_IMAGE = 'sandcastle:myorganiser';
@@ -1351,7 +1351,7 @@ function staleWorkBranchesFor(issue: Issue): string[] {
 // directory (its gitdir names a host path the container cannot see), leaving files
 // git no longer recognises. Re-register before any git call in the directory, or
 // the checkpoint capture and the resume rebuild both fail on "is not a working
-// tree". See tools/scripts/lib/sandcastle-worktree-repair.mjs.
+// tree". See tools/scripts/lib/sandcastle-worktree-repair.ts.
 function ensureWorktreeRegistered(
   issueNumber: number,
   worktreePath: string,

@@ -23,7 +23,7 @@
  *      lowers a tier, and only on a fresh run.
  */
 
-import { planRelabel } from '../lib/review-tier.mjs';
+import { planRelabel } from '../lib/review-tier.ts';
 
 import { evidenceText } from './evidence.mjs';
 import {

@@ -9,7 +9,7 @@ const REVIEW_TIER = readFileSync('.github/workflows/review-tier.yml', 'utf8');
 const CODE_REVIEW = readFileSync('.github/workflows/code-review.yml', 'utf8');
 const ACTION = readFileSync('.github/actions/code-reviewer/action.yml', 'utf8');
 
-const jobBlock = (source, jobId) => {
+const jobBlock = (source: string, jobId: string) => {
   const jobsAt = source.search(/^jobs:\s*$/m);
   assert.notEqual(jobsAt, -1, 'workflow has no jobs:');
   const body = source.slice(jobsAt);
@@ -20,7 +20,7 @@ const jobBlock = (source, jobId) => {
   return next === -1 ? rest : rest.slice(0, next);
 };
 
-const stepNamed = (job, name) => {
+const stepNamed = (job: string, name: string) => {
   const start = job.indexOf(`- name: ${name}`);
   assert.notEqual(start, -1, `no step named ${name}`);
   const rest = job.slice(start);

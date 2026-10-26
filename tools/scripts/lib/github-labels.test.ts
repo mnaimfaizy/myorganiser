@@ -20,7 +20,7 @@ import {
   triggerLabelNames,
   syncSurfaceLabelChanges,
 } from './github-labels.ts';
-import { NEEDS_HUMAN_LABEL } from './sandcastle-outcome.mjs';
+import { NEEDS_HUMAN_LABEL } from './sandcastle-outcome.ts';
 
 // ADR 0025 as amended by ADR 0049: `qa` moved to the Orchestration vocabulary, so it is no
 // longer a Surface Label and may not appear on a Pull Request. `grilling` was added there too.

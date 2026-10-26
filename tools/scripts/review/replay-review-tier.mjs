@@ -22,7 +22,7 @@ import {
   REVIEW_TIERS,
   classifyReviewTier,
   loadPathMap,
-} from '../lib/review-tier.mjs';
+} from '../lib/review-tier.ts';
 
 const args = process.argv.slice(2);
 const opt = (flag, fallback) => {

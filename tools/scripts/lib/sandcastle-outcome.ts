@@ -47,10 +47,12 @@ const NOTHING = /^(?:none|n\/a|nothing|-)?\.?$/i;
 /**
  * The output of the last iteration of the last run in a slice log.
  *
- * @param {string} contents the whole log file
- * @returns {string}
+ * `contents` is the whole log file. It is optional because a slice can be
+ * judged before its log exists — a missing log is "nothing was printed", not
+ * an error, and the caller in `.sandcastle/main.mts` reads a file that may
+ * not be there.
  */
-export function lastIterationOutput(contents) {
+export function lastIterationOutput(contents: string | undefined): string {
   const text = String(contents ?? '');
   const lastRunStart = text.lastIndexOf(RUN_START_MARKER);
   const run = lastRunStart === -1 ? text : text.slice(lastRunStart);
@@ -71,15 +73,19 @@ export function lastIterationOutput(contents) {
  * Which of the two happened is only in what the agent says next — so the prompt
  * requires every unresolved blocking finding to be printed as an OUTSTANDING
  * line, and this reads those.
- *
- * @param {string} contents the whole slice log
- * @returns {{ clean: boolean, outstanding: string[] }}
  */
-export function judgeRunOutcome(contents) {
+
+/** The verdict on one slice run: clean enough to close, and why not. */
+export interface RunOutcome {
+  clean: boolean;
+  outstanding: string[];
+}
+
+export function judgeRunOutcome(contents: string | undefined): RunOutcome {
   const output = lastIterationOutput(contents);
-  const outstanding = [];
-  const seen = new Set();
-  const add = (item) => {
+  const outstanding: string[] = [];
+  const seen = new Set<string>();
+  const add = (item: string) => {
     if (seen.has(item)) return;
     seen.add(item);
     outstanding.push(item);
@@ -99,13 +105,21 @@ export function judgeRunOutcome(contents) {
   return { clean: outstanding.length === 0, outstanding };
 }
 
+/** The slice a held comment describes: its items, its branch, and its commits. */
+export interface HeldSlice {
+  outstanding: readonly string[];
+  integrationBranch: string;
+  commits: number;
+}
+
 /**
  * The comment a held slice gets: why it was not closed, and what it needs.
- *
- * @param {{ outstanding: string[], integrationBranch: string, commits: number }} held
- * @returns {string}
  */
-export function formatHeldComment({ outstanding, integrationBranch, commits }) {
+export function formatHeldComment({
+  outstanding,
+  integrationBranch,
+  commits,
+}: HeldSlice): string {
   return [
     `Agent finished with ${commits} commit(s), integrated into the local \`${integrationBranch}\` and marked \`status:done\` so a re-run will not dispatch it again.`,
     ``,

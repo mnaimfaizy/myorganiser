@@ -7,25 +7,26 @@
  * These throw `AbandonedCutError` instead, and the script turns it into its
  * usual `die()`. The pure parts they build on live in `release-notes.ts`.
  */
-import { execSync } from 'node:child_process';
+import { execSync, type StdioOptions } from 'node:child_process';
 
 import { abandonedCutSteps, unstagedPaths } from './release-notes.ts';
 
 /** A cut that stopped after creating the release branch. */
 export class AbandonedCutError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'AbandonedCutError';
   }
 }
 
+export interface CutStepOptions {
+  cwd?: string;
+}
+
 /**
  * Paths git reports as changed but not staged, untracked ones included.
- *
- * @param {{cwd?: string}} [options]
- * @returns {string[]}
  */
-export function readUnstagedPaths({ cwd } = {}) {
+export function readUnstagedPaths({ cwd }: CutStepOptions = {}): string[] {
   // Raw output: trimming would eat the first line's status column.
   return unstagedPaths(
     execSync('git status --porcelain', {
@@ -41,10 +42,12 @@ export function readUnstagedPaths({ cwd } = {}) {
  * generated output had drifted from its contract, which belongs in its own
  * pull request rather than inside the release commit.
  *
- * @param {string} releaseBranch
- * @param {{cwd?: string}} [options]
+ * @param releaseBranch e.g. `release/v1.2.3`
  */
-export function assertNothingLeftUnstaged(releaseBranch, { cwd } = {}) {
+export function assertNothingLeftUnstaged(
+  releaseBranch: string,
+  { cwd }: CutStepOptions = {},
+): void {
   const leftover = readUnstagedPaths({ cwd });
   if (leftover.length > 0) {
     throw new AbandonedCutError(
@@ -61,15 +64,14 @@ export function assertNothingLeftUnstaged(releaseBranch, { cwd } = {}) {
  * release branch checked out with uncommitted changes, so the error names the
  * way back to a clean main.
  *
- * @param {string} command
- * @param {string} releaseBranch
- * @param {{cwd?: string, stdio?: import('node:child_process').StdioOptions}} [options]
+ * @param command the shell command this step runs
+ * @param releaseBranch e.g. `release/v1.2.3`
  */
 export function runOrAbandonCut(
-  command,
-  releaseBranch,
-  { cwd, stdio = 'inherit' } = {},
-) {
+  command: string,
+  releaseBranch: string,
+  { cwd, stdio = 'inherit' }: CutStepOptions & { stdio?: StdioOptions } = {},
+): void {
   try {
     execSync(command, { cwd, stdio });
   } catch {

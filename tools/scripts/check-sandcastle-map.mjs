@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'node:fs';
 
 const RESUME = 'tools/scripts/lib/sandcastle-resume.ts';
 const TRACE = 'tools/scripts/lib/sandcastle-subagent-trace.ts';
-const OUTCOME = 'tools/scripts/lib/sandcastle-outcome.mjs';
+const OUTCOME = 'tools/scripts/lib/sandcastle-outcome.ts';
 const POLICY = 'tools/config/agent-model-policy.json';
 const PKG = 'package.json';
 const MAIN = '.sandcastle/main.mts';

@@ -1,6 +1,6 @@
 // Contracts for the checker's command-line surface: the exit code a pipeline
 // reads, and the message a developer reads. The decision itself is covered by
-// tools/scripts/lib/gate-coverage.test.mjs against fixtures; what is asserted
+// tools/scripts/lib/gate-coverage.test.ts against fixtures; what is asserted
 // here is the mapping onto exit 0 / 1 / 2, and that a failure names each
 // unwired checker rather than reporting a count.
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * Tests for staging-web-deploy.mjs — the decisions behind Staging's web deploy
+ * Tests for staging-web-deploy.ts — the decisions behind Staging's web deploy
  * (issue #1138, ADR 0128). Every read of a host, of git and of the Actions API
  * is a stub here; the command-line glue that makes the real reads is tested in
  * ../staging-web-deploy.test.mjs.
@@ -47,7 +47,10 @@ import {
   readRunningHtml,
   readUploadedState,
   siteOf,
-} from './staging-web-deploy.mjs';
+  type Fetcher,
+  type ScheduleFacts,
+} from './staging-web-deploy.ts';
+import type { JobRecord } from './staging-host-apply-guard.ts';
 
 const CLI = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -65,7 +68,7 @@ const DEPS_2 = { next: '16.0.0', react: '19.0.0', sharp: '0.34.0' };
 const HASH_1 = hashDependencies({ dependencies: DEPS_1 });
 const HASH_2 = hashDependencies({ dependencies: DEPS_2 });
 
-const html = (sha) => `<html><script>self.b="${sha}"</script></html>`;
+const html = (sha: string) => `<html><script>self.b="${sha}"</script></html>`;
 
 const GOOD_SW_HEADERS = {
   'cache-control': SERVICE_WORKER_CACHE_CONTROL,
@@ -73,9 +76,13 @@ const GOOD_SW_HEADERS = {
 };
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const readRepo = (path) => readFileSync(join(REPO, path), 'utf8');
+const readRepo = (path: string) => readFileSync(join(REPO, path), 'utf8');
 
-const response = (status, body = '', headers = {}) => ({
+const response = (
+  status: number,
+  body = '',
+  headers: Record<string, string> = {},
+) => ({
   ok: status >= 200 && status < 300,
   status,
   headers: new Headers(headers),
@@ -91,13 +98,26 @@ const response = (status, body = '', headers = {}) => ({
  *     'throw', or a function of the attempt number returning any of those;
  *   - `sw`: headers (200), null (404) or 'throw'.
  */
-function host({ login = null, state = undefined, sw = GOOD_SW_HEADERS } = {}) {
-  const calls = [];
+/** An answer the host gives outright, or one that depends on the attempt. */
+type HostAnswer<T> = T | ((attempt: number) => T);
+
+interface HostOptions {
+  login?: HostAnswer<string | null>;
+  state?: HostAnswer<object | string | number | undefined>;
+  sw?: Record<string, string> | null | 'throw';
+}
+
+function host({
+  login = null,
+  state = undefined,
+  sw = GOOD_SW_HEADERS,
+}: HostOptions = {}) {
+  const calls: string[] = [];
   const attempts = { login: 0, state: 0 };
-  const refused = () => {
+  const refused: () => never = () => {
     throw new Error('connect ECONNREFUSED');
   };
-  const fetcher = async (url) => {
+  const fetcher: Fetcher = async (url) => {
     const path = new URL(url).pathname;
     calls.push(path);
     if (path === '/login') {
@@ -128,10 +148,10 @@ function host({ login = null, state = undefined, sw = GOOD_SW_HEADERS } = {}) {
 
 /** A sleep that returns at once and records how long it was asked to wait. */
 function noSleep() {
-  const waits = [];
+  const waits: number[] = [];
   return {
     waits,
-    sleep: async (ms) => {
+    sleep: async (ms: number) => {
       waits.push(ms);
     },
   };
@@ -142,7 +162,7 @@ function fakeClock() {
   let t = 0;
   return {
     now: () => t,
-    sleep: async (ms) => {
+    sleep: async (ms: number) => {
       t += ms;
     },
   };
@@ -250,7 +270,7 @@ test('parseDeployState rejects anything this module did not write', () => {
 
 // === Reading the host: three outcomes that must not be confused ===
 
-const stateFor = (sha) => ({
+const stateFor = (sha: string) => ({
   sha,
   depsHash: HASH_1,
   installedDepsHash: HASH_1,
@@ -604,7 +624,7 @@ test('a wrong header value is never repeated in the problem', () => {
 });
 
 test('service worker headers are compared exactly, but for spacing and case', () => {
-  const problems = (headers) =>
+  const problems = (headers: Record<string, string>) =>
     findServiceWorkerHeaderProblems(new Headers(headers));
 
   assert.deepEqual(problems(GOOD_SW_HEADERS), []);
@@ -642,7 +662,7 @@ test('service worker headers are compared exactly, but for spacing and case', ()
 
 test('next.config.js sets exactly the expected service worker headers', () => {
   const config = readRepo('apps/web/next.config.js');
-  const valueOf = (key) =>
+  const valueOf = (key: string) =>
     config.match(
       new RegExp(`key: '${key}',\\s*value:\\s*(?:'([^']*)'|"([^"]*)")`),
     );
@@ -723,7 +743,12 @@ test('the root layout stays force-dynamic, so /login comes from the running proc
 
 // === Latest backend upload ===
 
-const job = (name, conclusion, headSha, completedAt) => ({
+const job = (
+  name: string,
+  conclusion: string | null,
+  headSha: string | null,
+  completedAt: string,
+) => ({
   name,
   conclusion,
   headSha,
@@ -773,7 +798,7 @@ test('no uploads at all yields no commit', () => {
 
 // === Schedule ===
 
-const schedule = (input) =>
+const schedule = (input: Partial<ScheduleFacts>) =>
   decideSchedule({
     greenSha: SHA_B,
     buildsNamedBundle: true,
@@ -930,7 +955,7 @@ test('every schedule decision has an outcome; only proceed deploys; the fail- on
     SCHEDULE_FAIL_UPLOADED_NOT_RUNNING,
     SCHEDULE_FAIL_UNREACHABLE,
     SCHEDULE_FAIL_HEADERS,
-  ];
+  ] as const;
   assert.deepEqual(
     Object.keys(SCHEDULE_OUTCOMES).sort(),
     [...decisions].sort(),
@@ -963,11 +988,25 @@ test('every schedule decision has an outcome; only proceed deploys; the fail- on
  * Everything `planSchedule` reads besides the host, as stubs that record what
  * they were asked. `newer` lists the commits git says descend from the green one.
  */
-function world({ builds = true, backendJobs = [], newer = [] } = {}) {
-  const asked = { builds: [], ancestry: [], backendReads: 0 };
+interface WorldOptions {
+  builds?: boolean;
+  backendJobs?: JobRecord[];
+  newer?: string[];
+}
+
+function world({
+  builds = true,
+  backendJobs = [],
+  newer = [],
+}: WorldOptions = {}) {
+  const asked: {
+    builds: string[];
+    ancestry: [string, string][];
+    backendReads: number;
+  } = { builds: [], ancestry: [], backendReads: 0 };
   return {
     asked,
-    buildsNamedBundle: (sha) => {
+    buildsNamedBundle: (sha: string) => {
       asked.builds.push(sha);
       return builds;
     },
@@ -975,14 +1014,18 @@ function world({ builds = true, backendJobs = [], newer = [] } = {}) {
       asked.backendReads += 1;
       return backendJobs;
     },
-    isStrictAncestor: (ancestor, descendant) => {
+    isStrictAncestor: (ancestor: string, descendant: string) => {
       asked.ancestry.push([ancestor, descendant]);
       return newer.includes(descendant);
     },
   };
 }
 
-const runSchedule = (hostOptions, worldOptions = {}, webOrigin = WEB) => {
+const runSchedule = (
+  hostOptions: HostOptions,
+  worldOptions: WorldOptions = {},
+  webOrigin = WEB,
+) => {
   const site = host(hostOptions);
   const w = world(worldOptions);
   const { asked, ...inputs } = w;
@@ -995,7 +1038,7 @@ const runSchedule = (hostOptions, worldOptions = {}, webOrigin = WEB) => {
   }).then((decision) => ({ decision, asked, calls: site.calls }));
 };
 
-const dispatchedUpload = (sha, completedAt = '2026-10-12T10:00:00Z') =>
+const dispatchedUpload = (sha: string, completedAt = '2026-10-12T10:00:00Z') =>
   job(UPLOAD_JOB, 'success', sha, completedAt);
 
 test('planSchedule: a commit that predates the deploy stops before any read', async () => {

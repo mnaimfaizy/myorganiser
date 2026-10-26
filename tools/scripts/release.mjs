@@ -7,7 +7,7 @@ import {
   AbandonedCutError,
   assertNothingLeftUnstaged,
   runOrAbandonCut,
-} from './lib/release-cut.mjs';
+} from './lib/release-cut.ts';
 import {
   classifyCommit,
   releaseCommitPaths,

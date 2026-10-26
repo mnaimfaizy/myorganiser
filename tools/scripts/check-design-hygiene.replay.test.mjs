@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { scanFactualAssertions } from './lib/design-page-scan.mjs';
+import { scanFactualAssertions } from './lib/design-page-scan.ts';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PAGE = 'docs/deployment/release-pipeline.html';

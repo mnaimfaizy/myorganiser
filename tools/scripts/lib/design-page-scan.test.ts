@@ -11,17 +11,29 @@ import {
   RULE_KINDS,
   scanDesignPage,
   scanFactualAssertions,
-} from './design-page-scan.mjs';
+  type Citation,
+  type CitationResolution,
+  type Finding,
+  type ScanDesignPageInput,
+} from './design-page-scan.ts';
 
 const SCAN_MODULE_SOURCE = join(
   dirname(fileURLToPath(import.meta.url)),
-  'design-page-scan.mjs',
+  'design-page-scan.ts',
 );
 
 const FONT_HASH = 'a'.repeat(64);
 
+/** The four parts of a page a test may swap out. */
+interface PageParts {
+  head?: string;
+  style?: string;
+  body?: string;
+  manifest?: string;
+}
+
 /** A page that satisfies every rule, so each test can break exactly one thing. */
-function goodPage(overrides = {}) {
+function goodPage(overrides: PageParts = {}) {
   const {
     head = [
       '<meta charset="utf-8" />',
@@ -68,7 +80,7 @@ function goodPage(overrides = {}) {
   return [head, style, body, manifest].join('\n');
 }
 
-function scan(source, options = {}) {
+function scan(source: string, options: Partial<ScanDesignPageInput> = {}) {
   return scanDesignPage({
     file: 'docs/example/page.html',
     source,
@@ -81,7 +93,8 @@ function scan(source, options = {}) {
   });
 }
 
-const rules = (findings) => findings.map((f) => f.rule).sort();
+const rules = (findings: readonly Finding[]) =>
+  findings.map((f) => f.rule).sort();
 
 test('a page that follows every house rule produces no findings', () => {
   assert.deepEqual(scan(goodPage()), []);
@@ -782,9 +795,9 @@ test('a relative ADR link that does not resolve is reported', () => {
 });
 
 test('the ADR link is resolved relative to the page directory', () => {
-  const seen = [];
+  const seen: string[] = [];
   scan(goodPage(), {
-    adrLinkExists: (resolved) => {
+    adrLinkExists: (resolved: string) => {
       seen.push(resolved);
       return true;
     },
@@ -793,13 +806,13 @@ test('the ADR link is resolved relative to the page directory', () => {
 });
 
 test('an ADR link carrying a fragment is resolved without the fragment', () => {
-  const seen = [];
+  const seen: string[] = [];
   scan(
     goodPage({
       body: '<a href="../adr/0043-gates-assert-facts.md#decision">ADR</a>',
     }),
     {
-      adrLinkExists: (resolved) => {
+      adrLinkExists: (resolved: string) => {
         seen.push(resolved);
         return true;
       },
@@ -814,9 +827,9 @@ test('an ADR link carrying a fragment is resolved without the fragment', () => {
 // it, so each markup-form test asserts on discovery (via a recording resolver)
 // rather than on the wrapping tag.
 
-function recordingResolver(result = { ok: true }) {
-  const seen = [];
-  const resolveCitation = (citation) => {
+function recordingResolver(result: CitationResolution = { ok: true }) {
+  const seen: Citation[] = [];
+  const resolveCitation = (citation: Citation) => {
     seen.push(citation);
     return result;
   };
@@ -1158,7 +1171,7 @@ test('a citation-shaped token inside a <style> block is not discovered', () => {
 // literals are read, and a name counts there only with a known file extension.
 
 /** A good page whose body is one <script> holding `js`. */
-function scriptPage(js, { type } = {}) {
+function scriptPage(js: string, { type }: { type?: string } = {}) {
   return goodPage({
     body: [
       '<svg viewBox="0 0 10 10" role="img" aria-label="x"></svg>',
@@ -1169,7 +1182,7 @@ function scriptPage(js, { type } = {}) {
   });
 }
 
-const cited = (seen) =>
+const cited = (seen: readonly Citation[]) =>
   seen.map((c) =>
     c.endLine !== c.line
       ? `${c.name}:${c.line}-${c.endLine}`
@@ -1525,7 +1538,10 @@ test('scanFactualAssertions reads script-data citations, so a LEGACY page faces 
 // gate had checked it. Four sandcastle pages carried fourteen of them.
 
 /** A good page whose body is `markup`, plus a citation-anchors block when given. */
-function citedPage(markup, anchors) {
+function citedPage(
+  markup: string,
+  anchors?: Record<string, { file?: string; start?: string; end?: string }>,
+) {
   return goodPage({
     body: [
       '<svg viewBox="0 0 10 10" role="img" aria-label="x"></svg>',
@@ -1600,7 +1616,7 @@ test('an anchor for a citation written only in a script comment is still an orph
 // like a block that was not there: a LEGACY page with a malformed block and no
 // parsed citations passed in silence.
 
-const anchorBlockPage = (blockBody) =>
+const anchorBlockPage = (blockBody: string) =>
   [
     '<p>No sources cited here.</p>',
     '<script type="application/json" id="citation-anchors">',
@@ -1871,7 +1887,7 @@ test('fontBlockHash slices from the first @font-face to the last rule close', ()
     'suffix',
   ].join('\n');
   const hash = fontBlockHash(source);
-  assert.match(hash, /^[0-9a-f]{64}$/);
+  assert.match(hash!, /^[0-9a-f]{64}$/);
   // Prefix and suffix are outside the slice, so changing them cannot move the hash.
   assert.equal(
     fontBlockHash(source.replace('prefix', 'other').replace('suffix', 'end')),

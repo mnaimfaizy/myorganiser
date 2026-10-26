@@ -15,7 +15,7 @@
  * Coverage is file adjacency: `tools/scripts/check-x.mjs` "has a contract
  * suite" iff `tools/scripts/check-x.test.mjs` exists. This is the same
  * convention the rest of the checkers already use for their own tests, and
- * it is what `--test` filters on in `tools/scripts/lib/gate-coverage.mjs`.
+ * it is what `--test` filters on in `tools/scripts/lib/gate-coverage.ts`.
  *
  * A baseline entry is keyed by the checker's own path — one string, one
  * checker — because unlike `nx-declared-targets-baseline.json` there is no
@@ -50,17 +50,30 @@ export const SCHEMA_VERSION = 1;
 // true — and silently report every `.ts` checker as covered.
 export const CHECKER_PATH_PATTERN = /^tools\/scripts\/check-[^/]+\.(mjs|ts)$/;
 
+export interface ContractSuiteOptions {
+  cwd?: string;
+  exists?: (path: string) => boolean;
+}
+
 /** Does `checkerPath` (e.g. `tools/scripts/check-x.mjs` or `check-x.ts`) have a sibling contract suite? */
 export function hasContractSuite(
-  checkerPath,
-  { cwd = process.cwd(), exists = existsSync } = {},
-) {
+  checkerPath: string,
+  { cwd = process.cwd(), exists = existsSync }: ContractSuiteOptions = {},
+): boolean {
   const testPath = checkerPath.replace(/\.(mjs|ts)$/, '.test.$1');
   return exists(join(cwd, testPath));
 }
 
+export interface ClassifiedChecker {
+  checker: string;
+  covered: boolean;
+}
+
 /** Every checker paired with whether it carries a contract suite. */
-export function classifyCheckers(checkers, opts = {}) {
+export function classifyCheckers(
+  checkers: readonly string[],
+  opts: ContractSuiteOptions = {},
+): ClassifiedChecker[] {
   return checkers.map((checker) => ({
     checker,
     covered: hasContractSuite(checker, opts),
@@ -71,18 +84,23 @@ export function classifyCheckers(checkers, opts = {}) {
  * Reads and validates the baseline file, returning the array of checker
  * paths it names. Throws on any error — the caller decides the exit code.
  */
+export interface ReadBaselineOptions {
+  cwd?: string;
+  path?: string;
+}
+
 export function readBaseline({
   cwd = process.cwd(),
   path = BASELINE_PATH,
-} = {}) {
+}: ReadBaselineOptions = {}): string[] {
   const parsed = readBaselineEnvelope({
     cwd,
     path,
     schemaVersion: SCHEMA_VERSION,
   });
 
-  const seen = new Set();
-  const entries = [];
+  const seen = new Set<string>();
+  const entries: string[] = [];
   parsed.baseline.forEach((entry, index) => {
     const at = `${path}[${index}]`;
     const checker = typeof entry === 'string' ? entry.trim() : '';
@@ -114,10 +132,19 @@ export function readBaseline({
  * from the baseline — new, untracked debt. `stale` is a baseline entry that
  * is no longer debt, whether the checker gained a suite or was removed
  * entirely — both report the same way, exactly like
- * `nx-declared-targets.mjs`'s `stale`. The baseline can only shrink: nothing
+ * `nx-declared-targets.ts`'s `stale`. The baseline can only shrink: nothing
  * here ever grows it silently.
  */
-export function compareBaseline(baselineCheckers, classified) {
+export interface BaselineComparison {
+  debt: string[];
+  missing: string[];
+  stale: string[];
+}
+
+export function compareBaseline(
+  baselineCheckers: readonly string[],
+  classified: readonly ClassifiedChecker[],
+): BaselineComparison {
   const debt = classified
     .filter((entry) => !entry.covered)
     .map((entry) => entry.checker);

@@ -1,7 +1,7 @@
 /**
  * The two questions Staging's web deploy asks of git (issue #1138, ADR 0128).
  *
- * Kept apart from staging-web-deploy.mjs, which decides and never runs a
+ * Kept apart from staging-web-deploy.ts, which decides and never runs a
  * process, so the decisions stay testable without a repository — and tested
  * here against a real one, because a pair of swapped arguments would pass
  * every test that stubs the answer.

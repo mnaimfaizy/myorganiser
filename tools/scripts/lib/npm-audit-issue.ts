@@ -26,7 +26,12 @@
  * Run the tests with: yarn npm-audit:issue:test
  */
 
-import { findOpenRotIssue, recoveryAction } from './nightly-e2e-rot-issue.ts';
+import {
+  findOpenRotIssue,
+  recoveryAction,
+  type RecoveryAction,
+  type RotIssueCandidate,
+} from './nightly-e2e-rot-issue.ts';
 
 export { recoveryAction };
 
@@ -44,27 +49,33 @@ export const AUDIT_ADVISORY_LIMIT = 50;
 // Anchored to the start of a body: every report opens with its marker, and
 // advisory text further down a report can never be read as one.
 const STATE_MARKER = /^<!-- npm-audit-issue:(failing|recovered) -->/;
-const marker = (state) => `<!-- npm-audit-issue:${state} -->`;
+
+/** Which of the two states a report on the issue recorded. */
+export type ReportedState = 'failing' | 'recovered';
+
+const marker = (state: ReportedState) => `<!-- npm-audit-issue:${state} -->`;
 
 /**
  * The open issue this automation owns.
- *
- * @param {Array<{ title?: string, state?: string, pull_request?: unknown }>} issues
  */
-export function findOpenAuditIssue(issues) {
+export function findOpenAuditIssue<T extends RotIssueCandidate>(
+  issues: readonly T[],
+): T | undefined {
   return findOpenRotIssue(issues, AUDIT_ISSUE_TITLE);
 }
 
-/**
- * @typedef {object} AuditAdvisory
- * @property {string} package
- * @property {string[]} installed Versions of the package in the tree.
- * @property {string} advisoryId The GHSA id, or the registry's numeric id.
- * @property {string} url
- * @property {string} severity
- * @property {string} vulnerableRange
- * @property {string} title
- */
+/** One advisory `yarn npm audit --json` reported against the tree. */
+export interface AuditAdvisory {
+  package: string;
+  /** Versions of the package in the tree. */
+  installed: string[];
+  /** The GHSA id, or the registry's numeric id. */
+  advisoryId: string;
+  url: string;
+  severity: string;
+  vulnerableRange: string;
+  title: string;
+}
 
 /**
  * Reads `yarn npm audit --json`: one JSON object per line, each
@@ -75,18 +86,20 @@ export function findOpenAuditIssue(issues) {
  *
  * Yarn reports the vulnerable range and not a patched one, so that is what
  * this carries; the first version outside it is the fix.
- *
- * @param {string | null | undefined} ndjson
- * @returns {AuditAdvisory[]}
  */
-export function parseAuditAdvisories(ndjson) {
-  const text = (value) => (value == null ? '' : String(value));
-  const advisories = [];
+export function parseAuditAdvisories(
+  ndjson: string | null | undefined,
+): AuditAdvisory[] {
+  const text = (value: unknown) => (value == null ? '' : String(value));
+  const advisories: AuditAdvisory[] = [];
 
   for (const line of (ndjson ?? '').split(/\r?\n/)) {
-    let entry;
+    // One audit line is third-party JSON of no declared shape: every field is
+    // read through a guard below rather than trusted, so `unknown` is what it
+    // honestly is.
+    let entry: { value?: unknown; children?: Record<string, unknown> };
     try {
-      entry = JSON.parse(line);
+      entry = JSON.parse(line) as typeof entry;
     } catch {
       continue;
     }
@@ -99,7 +112,7 @@ export function parseAuditAdvisories(ndjson) {
     const ghsa = url.match(/GHSA(?:-[0-9a-z]{4}){3}/i);
     const versions = detail['Tree Versions'];
     advisories.push({
-      package: entry.value,
+      package: entry.value as string,
       installed: Array.isArray(versions) ? versions.map(text) : [],
       advisoryId: ghsa ? ghsa[0] : text(detail.ID),
       url,
@@ -120,19 +133,31 @@ export function parseAuditAdvisories(ndjson) {
 // must not end the cell, and as prose it must not open an HTML comment or tag
 // or mention anyone. A code span is inert, so a range keeps its `<` and `>`.
 const ZERO_WIDTH_SPACE = String.fromCharCode(0x200b);
-const inCell = (value) => value.replace(/\|/g, '\\|').replace(/\s+/g, ' ');
-const cell = (value) =>
+const inCell = (value: string) =>
+  value.replace(/\|/g, '\\|').replace(/\s+/g, ' ');
+const cell = (value: string) =>
   inCell(value.replace(/[<>]/g, '').replace(/@/g, `@${ZERO_WIDTH_SPACE}`));
-const code = (value) =>
+const code = (value: string) =>
   value ? `\`${inCell(value.replace(/`/g, "'"))}\`` : '';
 const ADVISORY_URL = /^https:\/\/[^\s()<>]+$/;
 
+/** What a failure report names: the run, when, which commit, and what it found. */
+export interface FailureReportInput {
+  runUrl: string;
+  date: string;
+  sha: string;
+  advisories: readonly AuditAdvisory[];
+}
+
 /**
  * Issue body on creation, comment body afterwards.
- *
- * @param {{ runUrl: string, date: string, sha: string, advisories: AuditAdvisory[] }} input
  */
-export function failureReport({ runUrl, date, sha, advisories }) {
+export function failureReport({
+  runUrl,
+  date,
+  sha,
+  advisories,
+}: FailureReportInput): string {
   const shown = advisories.slice(0, AUDIT_ADVISORY_LIMIT);
   const hidden = advisories.length - shown.length;
 
@@ -185,12 +210,26 @@ export function failureReport({ runUrl, date, sha, advisories }) {
 }
 
 /**
+ * What a recovery comment names: what it does with the issue, the run, when,
+ * and which commit was green.
+ */
+export interface RecoveryCommentInput {
+  action: RecoveryAction;
+  runUrl: string;
+  date: string;
+  sha: string;
+}
+
+/**
  * Comment body for the first green push after a failure. Both outcomes name
  * the run; only `close` is followed by an issues.update in the workflow.
- *
- * @param {{ action: 'close' | 'comment', runUrl: string, date: string, sha: string }} input
  */
-export function recoveryComment({ action, runUrl, date, sha }) {
+export function recoveryComment({
+  action,
+  runUrl,
+  date,
+  sha,
+}: RecoveryCommentInput): string {
   const outcome =
     action === 'close'
       ? 'This issue had no triage state label, so this recovery closes it.'
@@ -210,13 +249,18 @@ export function recoveryComment({ action, runUrl, date, sha }) {
  * then the comments in the order the API returns them (oldest first). An
  * issue with no report at all — opened by hand under the title — is
  * `failing`: it is open and waiting to hear that the audit passed.
- *
- * @param {{ body?: string | null, comments?: Array<{ body?: string | null }> | null }} issue
- * @returns {'failing' | 'recovered'}
  */
-export function lastReportedState({ body, comments }) {
+export interface ReportedStateInput {
+  body?: string | null;
+  comments?: readonly { body?: string | null }[] | null;
+}
+
+export function lastReportedState({
+  body,
+  comments,
+}: ReportedStateInput): ReportedState {
   const states = [body, ...(comments ?? []).map((comment) => comment?.body)]
     .map((text) => (text ?? '').match(STATE_MARKER)?.[1])
-    .filter(Boolean);
+    .filter((state): state is ReportedState => Boolean(state));
   return states.at(-1) ?? 'failing';
 }

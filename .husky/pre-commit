@@ -83,7 +83,7 @@ if ! git diff --cached --quiet --diff-filter=ACMRTD -- \
  tools/scripts/lib/sandcastle-resume.ts \
  tools/scripts/lib/sandcastle-subagent-trace.ts \
  tools/scripts/lib/sandcastle-slice-selection.ts \
- tools/scripts/lib/sandcastle-outcome.mjs \
+ tools/scripts/lib/sandcastle-outcome.ts \
  tools/config/agent-model-policy.json \
  package.json \
  .github/workflows/ci.yml \

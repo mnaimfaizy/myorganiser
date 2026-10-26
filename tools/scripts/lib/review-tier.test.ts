@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import {
   REVIEW_TIER_LABELS,
+  type ReviewTier,
+  type ReviewTierResult,
+  type SignalKind,
   ReviewTierConfigError,
   classifyReviewTier,
   errorResult,
@@ -12,13 +15,17 @@ import {
   parseNumstat,
   planRelabel,
   renderReviewTierSummary,
-} from './review-tier.mjs';
+} from './review-tier.ts';
 
-const node = (name, root, tier) => ({
+const node = (name: string, root: string, tier?: ReviewTier) => ({
   name,
   data: { root, tags: tier ? [`tier:${tier}`] : [] },
 });
-const edge = (source, target) => ({ source, target, type: 'static' });
+const edge = (source: string, target: string) => ({
+  source,
+  target,
+  type: 'static',
+});
 
 /** web-app → web-pages-tasks → core; vault-ui (human) → core; untagged → core. */
 const graph = {
@@ -68,14 +75,21 @@ const pathMap = {
   authors: { trusted: ['owner'] },
 };
 
-const f = (path, additions = 1, deletions = 0) => ({
+const f = (path: string, additions = 1, deletions = 0) => ({
   path,
   additions,
   deletions,
 });
-const classify = (files, overrides = {}) =>
+const classify = (
+  files: { path: string; additions?: number; deletions?: number }[],
+  overrides: Record<string, unknown> = {},
+) =>
   classifyReviewTier({ files, graph, pathMap, author: 'owner', ...overrides });
-const signal = (result, kind) => result.signals.find((s) => s.kind === kind);
+// `!`: every test below names a signal the classifier always emits for its
+// fixture, so a miss should read as the property access failing, exactly as it
+// did before this file carried types.
+const signal = (result: ReviewTierResult, kind: SignalKind) =>
+  result.signals.find((s) => s.kind === kind)!;
 
 test('a classifier error is human, not a missing tier', () => {
   const result = errorResult('nx graph failed', 'owner');
@@ -223,7 +237,7 @@ test('an untagged project, whether changed or reached, is human', () => {
 test('a path outside every project and every rule is human', () => {
   const result = classify([f('random.config.js')]);
   assert.equal(result.tier, 'human');
-  assert.equal(signal(result, 'unmatched').files[0], 'random.config.js');
+  assert.equal(signal(result, 'unmatched').files![0], 'random.config.js');
 });
 
 test('an empty diff is human', () => {
@@ -303,19 +317,19 @@ test('the committed path map loads and keeps human rules ahead of auto rules', (
   assert.ok(lastHuman < firstAuto, 'a human rule follows an auto rule');
   // The map protects itself and the tags the classifier reads (ADR 0070 item 3).
   const gates = map.rules.find((r) => r.id === 'gates-and-their-config');
-  assert.ok(gates.patterns.includes('tools/config/**'));
-  assert.ok(gates.patterns.includes('**/project.json'));
+  assert.ok(gates!.patterns.includes('tools/config/**'));
+  assert.ok(gates!.patterns.includes('**/project.json'));
   // The lockfile is human and package.json alone is not: a dependency change
   // always moves yarn.lock under an immutable install.
   assert.equal(
-    map.rules.find((r) => r.id === 'dependency-lockfiles').tier,
+    map.rules.find((r) => r.id === 'dependency-lockfiles')!.tier,
     'human',
   );
   assert.equal(
-    map.rules.find((r) => r.id === 'package-manifests').tier,
+    map.rules.find((r) => r.id === 'package-manifests')!.tier,
     'agent',
   );
-  assert.ok(map.reach.exclude.includes('**/*.stories.tsx'));
+  assert.ok(map.reach!.exclude!.includes('**/*.stories.tsx'));
 });
 
 test('numstat parsing handles binaries and renames', () => {

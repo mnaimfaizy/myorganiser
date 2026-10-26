@@ -56,6 +56,6 @@ export const DESIGN_EXPORTS_DIR = 'docs/design/';
 /**
  * The page every sibling splices its @font-face block from. Named here rather than
  * pinned as a literal hash so the comparison stays a fact about two files, and so
- * the slicing convention has exactly one implementation (design-page-scan.mjs).
+ * the slicing convention has exactly one implementation (design-page-scan.ts).
  */
 export const CANONICAL_FONT_PAGE = 'docs/vault/lifecycle.html';

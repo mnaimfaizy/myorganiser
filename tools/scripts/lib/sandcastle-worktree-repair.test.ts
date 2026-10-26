@@ -9,20 +9,20 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
-import { COMPLETION_PROMISE } from './sandcastle-outcome.mjs';
+import { COMPLETION_PROMISE } from './sandcastle-outcome.ts';
 import {
   gitEnvironment,
   inspectWorktree,
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
   WORKTREE_STATES,
-} from './sandcastle-worktree-repair.mjs';
+} from './sandcastle-worktree-repair.ts';
 
 const BRANCH = 'slice/1-demo';
 
-const git = (cwd, ...args) => {
+const git = (cwd: string, ...args: string[]) => {
   // gitEnvironment: under a pre-commit hook the inherited GIT_INDEX_FILE would
   // send every call in the scratch repo to the hook's own index.
   const result = spawnSync('git', args, {
@@ -35,7 +35,7 @@ const git = (cwd, ...args) => {
 };
 
 /** A repo with one commit and a linked worktree on BRANCH, like a slice run. */
-function sliceRepo(t) {
+function sliceRepo(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), 'worktree-repair-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   git(root, 'init', '-q', '-b', 'main');
@@ -51,7 +51,7 @@ function sliceRepo(t) {
 }
 
 /** What `git worktree prune` does to the slice from inside the sandbox. */
-const orphan = ({ root }) =>
+const orphan = ({ root }: { root: string }) =>
   rmSync(join(root, '.git', 'worktrees', 'slice-1-demo'), {
     recursive: true,
     force: true,
@@ -131,7 +131,7 @@ test('an orphan whose branch is gone is reported, not half-repaired', (t) => {
     branch: 'slice/2-missing',
   });
   assert.equal(result.repaired, false);
-  assert.match(result.error, /does not exist/);
+  assert.match(result.error!, /does not exist/);
   assert.equal(inspectWorktree(repo.worktreePath), WORKTREE_STATES.orphaned);
 });
 
@@ -148,7 +148,7 @@ test('an orphan whose pointer leaves .git/worktrees is foreign', (t) => {
 
 const CLEANUP_ERROR =
   "(FiberFailure) WorktreeError: fatal: '/repo/.sandcastle/worktrees/slice-1-demo' is not a working tree";
-const runLog = (...lines) =>
+const runLog = (...lines: string[]) =>
   ['--- Run started: 2026-10-17T07:30:00.000Z ---', ...lines].join('\n');
 
 test('a cleanup failure after the completion promise is a finished run', () => {

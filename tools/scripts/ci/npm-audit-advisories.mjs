@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 
-import { parseAuditAdvisories } from '../lib/npm-audit-issue.mjs';
+import { parseAuditAdvisories } from '../lib/npm-audit-issue.ts';
 
 process.stdout.write(
   `${JSON.stringify(parseAuditAdvisories(readFileSync(0, 'utf8')))}\n`,

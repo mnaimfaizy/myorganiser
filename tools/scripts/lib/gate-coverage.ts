@@ -59,7 +59,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { GATE_MANIFEST } from './gate-manifest.ts';
+import { GATE_MANIFEST, type GateManifestEntry } from './gate-manifest.ts';
 import { globToRegExp } from './glob.ts';
 
 export const SCRIPTS_DIR = 'tools/scripts';
@@ -82,21 +82,27 @@ export const GLOB_TEST_SCRIPT = 'tools:test';
  * pipelines: they fire for one harness's tool calls, so a gate reachable only
  * from there runs for some contributors and never for a commit or a merge.
  */
-export const PIPELINE_DIRS = [
+export interface PipelineDir {
+  dir: string;
+  matches: (name: string) => boolean;
+}
+
+export const PIPELINE_DIRS: PipelineDir[] = [
   { dir: '.husky', matches: (name) => !name.startsWith('_') },
   { dir: '.github/workflows', matches: (name) => /\.ya?ml$/.test(name) },
 ];
 
-const normalize = (path) => path.replace(/\\/g, '/').replace(/^\.\//, '');
+const normalize = (path: string) =>
+  path.replace(/\\/g, '/').replace(/^\.\//, '');
 
 /**
  * Removes shell and YAML comments. Both use `#`, and both pipeline formats in
  * this repo name gate commands inside comments that must not count as wiring.
  */
-export function stripComments(text) {
+export function stripComments(text: string): string {
   return text
     .split('\n')
-    .map((line) => line.replace(/(^|\s)#.*$/, '$1'))
+    .map((line: string) => line.replace(/(^|\s)#.*$/, '$1'))
     .join('\n');
 }
 
@@ -129,8 +135,14 @@ export function stripComments(text) {
  * invoking shell never pathname-expands `**` itself, and an unstripped quote
  * character would stop that pattern from ever matching a real suite path.
  */
-export function nodeRuns(command) {
-  const unquote = (token) => {
+/** One `node` invocation found in a command or a pipeline file. */
+export interface NodeRun {
+  script: string;
+  isTestRunner: boolean;
+}
+
+export function nodeRuns(command: string): NodeRun[] {
+  const unquote = (token: string) => {
     const quote = token[0];
     if (
       (quote === "'" || quote === '"') &&
@@ -141,7 +153,7 @@ export function nodeRuns(command) {
     }
     return token;
   };
-  const runs = [];
+  const runs: NodeRun[] = [];
   // The captured span stops at a newline as well as at a shell metacharacter:
   // a multi-file `node --test a.mjs b.mjs` invocation is always one
   // package.json string (necessarily one line), while pipeline text is
@@ -154,7 +166,7 @@ export function nodeRuns(command) {
   for (const match of command.matchAll(pattern)) {
     const tokens = match[1].trim().split(/\s+/).filter(Boolean);
     let index = 0;
-    const flags = [];
+    const flags: string[] = [];
     while (index < tokens.length && /^-/.test(tokens[index])) {
       flags.push(tokens[index]);
       index += 1;
@@ -184,9 +196,16 @@ export function nodeRuns(command) {
  * tokens, scripts run directly through `node`, and suite files run directly
  * through `node --test`.
  */
-export function pipelineInvocations(text) {
+/** What one pipeline file invokes, split by how it invokes it. */
+export interface PipelineInvocations {
+  names: Set<string>;
+  nodeScripts: Set<string>;
+  nodeTestScripts: Set<string>;
+}
+
+export function pipelineInvocations(text: string): PipelineInvocations {
   const source = stripComments(text);
-  const names = new Set();
+  const names = new Set<string>();
   const scriptPattern =
     /\b(?:corepack\s+)?(?:yarn|npm|pnpm)\s+(?:run\s+)?([A-Za-z0-9][A-Za-z0-9:@._/-]*)/g;
   for (const [, name] of source.matchAll(scriptPattern)) names.add(name);
@@ -209,10 +228,15 @@ export function pipelineInvocations(text) {
  * actually migrating there, the same way `listSuites` already covers
  * `.test.ts` from slice 1.
  */
+export interface ScanOptions {
+  cwd?: string;
+  scriptsDir?: string;
+}
+
 export function listCheckers({
   cwd = process.cwd(),
   scriptsDir = SCRIPTS_DIR,
-} = {}) {
+}: ScanOptions = {}): string[] {
   const absolute = join(cwd, scriptsDir);
   if (!existsSync(absolute)) return [];
   return readdirSync(absolute, { withFileTypes: true })
@@ -241,11 +265,11 @@ export function listCheckers({
 export function listSuites({
   cwd = process.cwd(),
   scriptsDir = SCRIPTS_DIR,
-} = {}) {
+}: ScanOptions = {}): string[] {
   const absolute = join(cwd, scriptsDir);
   if (!existsSync(absolute)) return [];
   return readdirSync(absolute, { recursive: true })
-    .filter((entry) => /\.test\.(mjs|ts)$/.test(entry))
+    .filter((entry): entry is string => /\.test\.(mjs|ts)$/.test(String(entry)))
     .map((entry) => normalize(`${scriptsDir}/${entry}`))
     .sort();
 }
@@ -255,19 +279,49 @@ export function listSuites({
  * `manifest` defaults to the live aggregate manifest, which is what makes a
  * checker reached only through `yarn gates:run` count as wired.
  */
+/** One pipeline file, as `assertGateCoverage` reads it. */
+export interface PipelineFile {
+  path: string;
+  text: string;
+}
+
+/** The aggregate runner and the checkers its manifest reaches. */
+export interface AggregateInput {
+  script: string;
+  manifest: readonly GateManifestEntry[];
+}
+
+/** Everything `assertGateCoverage` decides from, all passed in. */
+export interface GateCoverageInput {
+  checkers?: readonly string[];
+  suites?: readonly string[];
+  pkgScripts?: Record<string, unknown>;
+  pipelines?: readonly PipelineFile[];
+  optOut?: string | OptOutFile | null;
+  optOutPath?: string;
+  aggregate?: AggregateInput;
+  readSource?: (path: string) => string | null;
+}
+
+export interface GatherOptions {
+  cwd?: string;
+  manifest?: readonly GateManifestEntry[];
+}
+
 export function gatherFromDisk({
   cwd = process.cwd(),
   manifest = GATE_MANIFEST,
-} = {}) {
+}: GatherOptions = {}): Required<GateCoverageInput> {
   const scriptsDir = SCRIPTS_DIR;
   const optOutPath = OPT_OUT_PATH;
   const aggregateScript = AGGREGATE_SCRIPT;
   const pkgPath = join(cwd, 'package.json');
-  const pkgScripts = existsSync(pkgPath)
-    ? (JSON.parse(readFileSync(pkgPath, 'utf8')).scripts ?? {})
+  const pkgScripts: Record<string, unknown> = existsSync(pkgPath)
+    ? (((JSON.parse(readFileSync(pkgPath, 'utf8')) as { scripts?: unknown })
+        .scripts as Record<string, unknown>) ?? {})
     : {};
 
-  const pipelines = [];
+  const pipelines: PipelineFile[] = [];
   for (const { dir, matches } of PIPELINE_DIRS) {
     const absolute = join(cwd, dir);
     if (!existsSync(absolute)) continue;
@@ -293,14 +347,29 @@ export function gatherFromDisk({
     optOut,
     optOutPath,
     aggregate: { script: normalize(aggregateScript), manifest },
-    readSource: (path) => {
+    readSource: (path: string) => {
       const absolute = join(cwd, path);
       return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
     },
   };
 }
 
-function parseOptOut(raw, optOutPath) {
+/** One deliberate exemption: what it names, and why. */
+export interface OptOutEntry {
+  check: string;
+  reason: string;
+}
+
+/** The opt-out list as the JSON file holds it, before validation. */
+export interface OptOutFile {
+  schemaVersion?: unknown;
+  optOut?: unknown;
+}
+
+function parseOptOut(
+  raw: string | OptOutFile | null | undefined,
+  optOutPath: string,
+): { entries: OptOutEntry[]; errors: string[] } {
   if (raw === null || raw === undefined) {
     return {
       entries: [],
@@ -313,13 +382,14 @@ function parseOptOut(raw, optOutPath) {
     };
   }
 
-  let parsed;
+  let parsed: OptOutFile;
   try {
-    parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    parsed = typeof raw === 'string' ? (JSON.parse(raw) as OptOutFile) : raw;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       entries: [],
-      errors: [`${optOutPath} is not valid JSON: ${error.message}`],
+      errors: [`${optOutPath} is not valid JSON: ${message}`],
     };
   }
 
@@ -343,13 +413,14 @@ function parseOptOut(raw, optOutPath) {
     };
   }
 
-  const errors = [];
-  const entries = [];
-  const seen = new Set();
-  list.forEach((entry, index) => {
+  const errors: string[] = [];
+  const entries: OptOutEntry[] = [];
+  const seen = new Set<string>();
+  (list as unknown[]).forEach((item, index) => {
     const at = `${optOutPath}[${index}]`;
-    const check = typeof entry?.check === 'string' ? entry.check.trim() : '';
-    const reason = typeof entry?.reason === 'string' ? entry.reason.trim() : '';
+    const entry = (item ?? {}) as { check?: unknown; reason?: unknown };
+    const check = typeof entry.check === 'string' ? entry.check.trim() : '';
+    const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
     if (!check) {
       errors.push(`${at}: entry names no checker (\`check\` is required)`);
       return;
@@ -378,7 +449,7 @@ function parseOptOut(raw, optOutPath) {
  * nested aggregate avoiding both is treated as a leaf, which fails safe: the
  * checkers behind it report unwired instead of being laundered as reached.
  */
-function isAggregateSource(source) {
+function isAggregateSource(source: string): boolean {
   if (/\brunGateManifest\s*\(/.test(source)) return true;
   return (
     /gate-manifest\.(?:mjs|ts)|GATE_MANIFEST/.test(source) &&
@@ -391,21 +462,39 @@ function isAggregateSource(source) {
  * checkers its manifest reaches. Indirection stops here — a manifest entry
  * that runs a manifest itself is reported as an error rather than followed.
  */
+/** The aggregate runner's own wiring, and what it reaches. */
+interface AggregateState {
+  script: string;
+  wired: boolean;
+  wiredVia: string[];
+  reached: Set<string>;
+  errors: string[];
+  npmScripts: string[];
+}
+
+interface ResolveAggregateInput {
+  aggregate: AggregateInput;
+  npmScriptsRunning: (path: string) => string[];
+  invokedNames: Map<string, string[]>;
+  invokedPaths: Map<string, string[]>;
+  readSource: (path: string) => string | null;
+}
+
 function resolveAggregate({
   aggregate,
   npmScriptsRunning,
   invokedNames,
   invokedPaths,
   readSource,
-}) {
-  const errors = [];
+}: ResolveAggregateInput): AggregateState {
+  const errors: string[] = [];
   const script = normalize(aggregate?.script ?? '');
   const manifest = aggregate?.manifest ?? [];
   const npmScripts = npmScriptsRunning(script);
-  const wiredVia = npmScripts.filter((name) => invokedNames.has(name));
+  const wiredVia = npmScripts.filter((name: string) => invokedNames.has(name));
   const wired = wiredVia.length > 0 || invokedPaths.has(script);
 
-  const reached = new Set();
+  const reached = new Set<string>();
   for (const entry of manifest) {
     const entryScript = normalize(entry.script);
     if (entryScript === script) {
@@ -442,7 +531,52 @@ function resolveAggregate({
  * Mutates `errors` in place with a contradiction when an opted-out target is
  * actually wired, mirroring the checker rule's existing behaviour.
  */
-function classifyTargets({
+/** How one pipeline reaches a target. */
+export interface WiringVia {
+  kind: 'pipeline' | 'direct' | 'aggregate' | 'glob';
+  name: string;
+  files: string[];
+}
+
+/** `tools:test`'s own wiring, and the suites its glob reaches. */
+interface GlobState {
+  script: string;
+  wired: boolean;
+  files: string[];
+  reached: Set<string>;
+}
+
+/** The field a classified record names its target in. */
+type TargetKey = 'checker' | 'suite';
+
+type Keyed<K extends TargetKey> = { [P in K]: string };
+
+export type WiredTarget<K extends TargetKey = TargetKey> = Keyed<K> & {
+  npmScripts: string[];
+  via: WiringVia[];
+};
+
+export type UnwiredTarget<K extends TargetKey = TargetKey> = Keyed<K> & {
+  npmScripts: string[];
+};
+
+export type OptedOutTarget<K extends TargetKey = TargetKey> = Keyed<K> &
+  OptOutEntry;
+
+interface ClassifyTargetsInput<K extends TargetKey> {
+  targets: readonly string[];
+  key: K;
+  npmScriptsRunning: (path: string) => string[];
+  invokedNames: Map<string, string[]>;
+  invokedPaths: Map<string, string[]>;
+  aggregateState: AggregateState;
+  globState?: GlobState;
+  optedOutMap: Map<string, OptOutEntry>;
+  optOutPath: string;
+  errors: string[];
+}
+
+function classifyTargets<K extends TargetKey>({
   targets,
   key,
   npmScriptsRunning,
@@ -453,14 +587,18 @@ function classifyTargets({
   optedOutMap,
   optOutPath,
   errors,
-}) {
-  const wired = [];
-  const unwired = [];
-  const optedOut = [];
+}: ClassifyTargetsInput<K>): {
+  wired: WiredTarget<K>[];
+  unwired: UnwiredTarget<K>[];
+  optedOut: OptedOutTarget<K>[];
+} {
+  const wired: WiredTarget<K>[] = [];
+  const unwired: UnwiredTarget<K>[] = [];
+  const optedOut: OptedOutTarget<K>[] = [];
 
   for (const target of targets) {
     const npmScripts = npmScriptsRunning(target);
-    const via = [];
+    const via: WiringVia[] = [];
 
     for (const name of npmScripts) {
       const files = invokedNames.get(name);
@@ -489,7 +627,9 @@ function classifyTargets({
     // One record per target: reached both directly and through the aggregate
     // is still one wired target, never two findings that disagree.
     if (via.length > 0) {
-      wired.push({ [key]: target, npmScripts, via });
+      // `{ [key]: target }` is a computed key on a generic: the cast is what
+      // tells TypeScript the record names its target in the field `key` holds.
+      wired.push({ [key]: target, npmScripts, via } as WiredTarget<K>);
       // Opted out *and* wired is the list disagreeing with the repository, so
       // it fails here rather than printing a note the aggregate would swallow
       // on a green run. Declared non-gates are exempt from this: `not a gate`
@@ -509,11 +649,11 @@ function classifyTargets({
 
     const entry = optedOutMap.get(target);
     if (entry) {
-      optedOut.push({ [key]: target, ...entry });
+      optedOut.push({ [key]: target, ...entry } as OptedOutTarget<K>);
       continue;
     }
 
-    unwired.push({ [key]: target, npmScripts });
+    unwired.push({ [key]: target, npmScripts } as UnwiredTarget<K>);
   }
 
   return { wired, unwired, optedOut };
@@ -530,6 +670,27 @@ function classifyTargets({
  * could not run: a missing, malformed, or self-contradicting opt-out list, or
  * a nested aggregate.
  */
+/** What `assertGateCoverage` concluded about the whole tree. */
+export interface GateCoverageResult {
+  ok: boolean;
+  exitCode: 0 | 1 | 2;
+  errors: string[];
+  unwired: UnwiredTarget<'checker'>[];
+  wired: WiredTarget<'checker'>[];
+  optedOut: OptedOutTarget<'checker'>[];
+  unwiredSuites: UnwiredTarget<'suite'>[];
+  wiredSuites: WiredTarget<'suite'>[];
+  optedOutSuites: OptedOutTarget<'suite'>[];
+  declaredNonGates: OptOutEntry[];
+  aggregate: {
+    script: string;
+    wired: boolean;
+    npmScripts: string[];
+    reached: string[];
+  };
+  globTest: { script: string; wired: boolean; reached: string[] };
+}
+
 export function assertGateCoverage({
   checkers = [],
   suites = [],
@@ -539,23 +700,23 @@ export function assertGateCoverage({
   optOutPath = OPT_OUT_PATH,
   aggregate = { script: AGGREGATE_SCRIPT, manifest: [] },
   readSource = () => null,
-}) {
-  const invokedNames = new Map();
-  const invokedPaths = new Map();
-  const invokedTestPaths = new Map();
+}: GateCoverageInput): GateCoverageResult {
+  const invokedNames = new Map<string, string[]>();
+  const invokedPaths = new Map<string, string[]>();
+  const invokedTestPaths = new Map<string, string[]>();
   for (const { path, text } of pipelines) {
     const { names, nodeScripts, nodeTestScripts } = pipelineInvocations(text);
     for (const name of names) {
       if (!invokedNames.has(name)) invokedNames.set(name, []);
-      invokedNames.get(name).push(path);
+      invokedNames.get(name)!.push(path);
     }
     for (const script of nodeScripts) {
       if (!invokedPaths.has(script)) invokedPaths.set(script, []);
-      invokedPaths.get(script).push(path);
+      invokedPaths.get(script)!.push(path);
     }
     for (const script of nodeTestScripts) {
       if (!invokedTestPaths.has(script)) invokedTestPaths.set(script, []);
-      invokedTestPaths.get(script).push(path);
+      invokedTestPaths.get(script)!.push(path);
     }
   }
 
@@ -578,11 +739,11 @@ export function assertGateCoverage({
         .map((run) => run.script),
     ]),
   );
-  const npmScriptsRunningChecker = (path) =>
+  const npmScriptsRunningChecker = (path: string) =>
     [...runsByNpmScript]
       .filter(([, scripts]) => scripts.includes(path))
       .map(([name]) => name);
-  const npmScriptsRunningSuite = (path) =>
+  const npmScriptsRunningSuite = (path: string) =>
     [...testRunsByNpmScript]
       .filter(([, scripts]) => scripts.includes(path))
       .map(([name]) => name);
@@ -604,7 +765,7 @@ export function assertGateCoverage({
   const globPatterns = (testRunsByNpmScript.get(GLOB_TEST_SCRIPT) ?? []).map(
     globToRegExp,
   );
-  const globState = {
+  const globState: GlobState = {
     script: GLOB_TEST_SCRIPT,
     wired: invokedNames.has(GLOB_TEST_SCRIPT),
     files: invokedNames.get(GLOB_TEST_SCRIPT) ?? [],
@@ -625,9 +786,9 @@ export function assertGateCoverage({
   // which is why a script name is a legal key: the list records deliberate
   // non-gates, and an entry naming nothing at all is stale config, not an
   // exemption.
-  const optedOutCheckers = new Map();
-  const optedOutSuites = new Map();
-  const declaredNonGates = [];
+  const optedOutCheckers = new Map<string, OptOutEntry>();
+  const optedOutSuites = new Map<string, OptOutEntry>();
+  const declaredNonGates: OptOutEntry[] = [];
   for (const entry of optOutEntries) {
     const hasSlash = entry.check.includes('/');
     const asPath = normalize(
@@ -650,7 +811,7 @@ export function assertGateCoverage({
         suite.endsWith(`/${entry.check}`),
       );
       if (nestedMatches.length === 1) {
-        optedOutSuites.set(nestedMatches[0], entry);
+        optedOutSuites.set(nestedMatches[0]!, entry);
         continue;
       }
       if (nestedMatches.length > 1) {

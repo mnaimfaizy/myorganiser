@@ -45,7 +45,7 @@ import {
   classifyDeclaredTargets,
   compareBaseline,
   readBaseline,
-} from './lib/nx-declared-targets.mjs';
+} from './lib/nx-declared-targets.ts';
 
 const cwd = process.cwd();
 const printOnly = process.argv.includes('--print');

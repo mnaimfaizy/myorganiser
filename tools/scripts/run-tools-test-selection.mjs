@@ -18,7 +18,7 @@
 // selected suite failed.
 import { execFileSync, spawnSync } from 'node:child_process';
 
-import { listSuites } from './lib/gate-coverage.mjs';
+import { listSuites } from './lib/gate-coverage.ts';
 import { selectStagedSuites } from './lib/tools-test-selection.ts';
 
 /**

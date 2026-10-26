@@ -28,13 +28,24 @@ import { createHash } from 'node:crypto';
 
 import { blockAfter, citableLines, lineOf } from './source-scan.ts';
 
-const blank = (match) => match.replace(/[^\n]/g, ' ');
+/** One rule's complaint about one line of one page. */
+export interface Finding {
+  rule: RuleName;
+  line: number;
+  message: string;
+}
+
+const blank = (match: string) => match.replace(/[^\n]/g, ' ');
 
 /** Rewrites the body of every `<script>` and `<style>`, leaving markup untouched. */
-function mapEmbeddedCode(source, transform) {
+function mapEmbeddedCode(
+  source: string,
+  transform: (body: string) => string,
+): string {
   return source.replace(
     /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi,
-    (_, open, __, body, close) => `${open}${transform(body)}${close}`,
+    (_: string, open: string, __: string, body: string, close: string) =>
+      `${open}${transform(body)}${close}`,
   );
 }
 
@@ -42,7 +53,7 @@ function mapEmbeddedCode(source, transform) {
  * Masks `/* … *\/` and `//` comments. Scoped to code, because in prose those byte
  * pairs are not comments at all.
  */
-function maskCodeComments(code) {
+function maskCodeComments(code: string): string {
   return (
     code
       .replace(/\/\*[\s\S]*?\*\//g, blank)
@@ -50,7 +61,7 @@ function maskCodeComments(code) {
       // Without this pass a commented-out `localStorage.` reported as unguarded.
       .replace(
         /(^|[^:])(\/\/[^\n]*)/g,
-        (_, before, comment) => before + blank(comment),
+        (_: string, before: string, comment: string) => before + blank(comment),
       )
   );
 }
@@ -87,7 +98,7 @@ function maskCodeComments(code) {
  * would be answering a rule with text the page only quotes. That is a fail-open in
  * the same family as the document-wide one above, bought to fix a parse.
  */
-export function maskHtmlComments(source) {
+export function maskHtmlComments(source: string): string {
   return mapEmbeddedCode(
     source.replace(/<!--[\s\S]*?-->/g, blank),
     maskCodeComments,
@@ -100,7 +111,7 @@ export function maskHtmlComments(source) {
  * mentions `<svg>` in a string or builds markup by concatenation moves the tag
  * scanner's depth counter and every later `<title>` looks nested.
  */
-function maskEmbeddedCode(source) {
+function maskEmbeddedCode(source: string): string {
   return mapEmbeddedCode(source, blank);
 }
 
@@ -113,7 +124,7 @@ function maskEmbeddedCode(source) {
  * named a hash without naming the slice. Nobody agrees on a literal: pages are
  * compared, and spliced, through this one implementation.
  */
-export function fontBlock(source) {
+export function fontBlock(source: string): string | null {
   // Comments are masked before the ends are located, so an `@font-face` named in
   // prose cannot move either one. Masking preserves offsets, so the slice is taken
   // from the raw source and the caller still gets bytes it can splice verbatim.
@@ -133,7 +144,7 @@ export function fontBlock(source) {
 }
 
 /** SHA-256 of `fontBlock(source)`, or null when the page carries no block. */
-export function fontBlockHash(source) {
+export function fontBlockHash(source: string): string | null {
   const block = fontBlock(source);
   return block === null
     ? null
@@ -152,7 +163,7 @@ export function fontBlockHash(source) {
  * Scans tags in document order with an `<svg>` depth counter, so the document
  * `<title>` (depth 0) is fine and a nested `<svg>` is still caught.
  */
-function checkSvgTitles(code, findings) {
+function checkSvgTitles(code: string, findings: Finding[]): void {
   const tags = code.matchAll(/<(\/?)(svg|title)\b([^>]*)>/gi);
   let depth = 0;
   for (const tag of tags) {
@@ -182,12 +193,12 @@ function checkSvgTitles(code, findings) {
  * fact. An orphan in either direction is a shape that opens an empty popover or a
  * note no reader can reach.
  */
-function checkTipNoteBijection(code, findings) {
-  const tips = new Map();
+function checkTipNoteBijection(code: string, findings: Finding[]): void {
+  const tips = new Map<string, number>();
   for (const m of code.matchAll(/data-tip="([^"]+)"/g)) {
     if (!tips.has(m[1])) tips.set(m[1], lineOf(code, m.index));
   }
-  const notes = new Map();
+  const notes = new Map<string, number>();
   for (const m of code.matchAll(/id="note-([^"]+)"/g)) {
     if (!notes.has(m[1])) notes.set(m[1], lineOf(code, m.index));
   }
@@ -226,12 +237,12 @@ function checkTipNoteBijection(code, findings) {
  * navigation, and an explainer page citing the spec it explains is doing its job.
  * A bare URL sitting in prose is still reported — it should have been an anchor.
  */
-function checkExternalResources(code, findings) {
+function checkExternalResources(code: string, findings: Finding[]): void {
   // A `<link href="https://…">` is one defect with one fix. Reporting it as both
   // a <link> and a remote href would double the count and make the total lie about
   // how much is wrong, so the tags are blanked before the URL scan runs.
   let rest = code;
-  const erase = (at, text) =>
+  const erase = (at: number, text: string) =>
     (rest = rest.slice(0, at) + blank(text) + rest.slice(at + text.length));
 
   for (const m of code.matchAll(/<link\b[^>]*>/gi)) {
@@ -269,8 +280,8 @@ function checkExternalResources(code, findings) {
  * dark only under `@media` loses the toggle; defining it only under `[data-theme]`
  * loses the system default; an unguarded `@media` block beats an explicit light pin.
  */
-function checkThemeTokens(code, findings) {
-  const missing = [];
+function checkThemeTokens(code: string, findings: Finding[]): void {
+  const missing: string[] = [];
   if (!/(^|[\s{}]):root\s*\{/m.test(code)) {
     missing.push(
       'a bare `:root { … }` block — the light palette every other state overrides',
@@ -287,7 +298,8 @@ function checkThemeTokens(code, findings) {
     // The block's real extent, not a fixed window. A guessed character count both
     // missed a guard sitting past a long comment and accepted one that belonged to
     // a later, unrelated at-rule.
-    const body = blockAfter(code, media.index);
+    // `match` without `g` always reports an index for a match it found.
+    const body = blockAfter(code, media.index!);
     if (!/:root:not\(\[data-theme=['"]light['"]\]\)/.test(body)) {
       missing.push(
         "a `:root:not([data-theme='light'])` guard on the prefers-color-scheme block — without it the system setting overrides an explicit light pin",
@@ -315,7 +327,7 @@ function checkThemeTokens(code, findings) {
  * exactly those. An uncaught throw in the pre-paint theme block kills the rest of
  * it and the page loads unstyled.
  */
-function checkStorageGuards(code, findings) {
+function checkStorageGuards(code: string, findings: Finding[]): void {
   for (const m of code.matchAll(/\blocalStorage\s*\./g)) {
     if (!insideTry(code, m.index)) {
       findings.push({
@@ -335,7 +347,7 @@ function checkStorageGuards(code, findings) {
  * one. The theme toggle's real shape is `try { if (pin) { … } else { … } } catch`,
  * so checking only the immediately enclosing block called a correct guard unguarded.
  */
-function insideTry(code, index) {
+function insideTry(code: string, index: number): boolean {
   let depth = 0;
   for (let i = index; i >= 0; i--) {
     const ch = code[i];
@@ -358,7 +370,11 @@ function insideTry(code, index) {
  * the source constants later. Without one the page starts rotting the day it lands
  * and nobody finds out (design-brief/SKILL.md, step 6).
  */
-function checkManifest(code, source, findings) {
+function checkManifest(
+  code: string,
+  source: string,
+  findings: Finding[],
+): void {
   // Attribute order is not fixed by anything, so matching `type` before `id` made a
   // perfectly good manifest report as missing. Every JSON block is parsed, not just
   // the first — a page carrying two and breaking the second would have passed.
@@ -387,7 +403,7 @@ function checkManifest(code, source, findings) {
       findings.push({
         rule: 'manifest-invalid',
         line: lineOf(code, m.index),
-        message: `#${id} is not valid JSON: ${err.message}`,
+        message: `#${id} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
   }
@@ -406,7 +422,11 @@ function checkManifest(code, source, findings) {
  * inline SVG. Prettier reflows them, so an unlisted page is rewritten on the next
  * commit that touches anything.
  */
-function checkPrettierIgnored(file, prettierIgnored, findings) {
+function checkPrettierIgnored(
+  file: string,
+  prettierIgnored: boolean,
+  findings: Finding[],
+): void {
   if (prettierIgnored) return;
   findings.push({
     rule: 'prettier-ignore-missing',
@@ -420,7 +440,12 @@ function checkPrettierIgnored(file, prettierIgnored, findings) {
  * get renumbered before they merge (ADR 0042), which is exactly when these links
  * break.
  */
-function checkAdrLinks(file, code, adrLinkExists, findings) {
+function checkAdrLinks(
+  file: string,
+  code: string,
+  adrLinkExists: (resolved: string) => boolean,
+  findings: Finding[],
+): void {
   const dir = file.split('/').slice(0, -1).join('/');
   for (const m of code.matchAll(/(?:href|src)="([^"]*adr\/[^"]+)"/g)) {
     const raw = m[1];
@@ -437,11 +462,11 @@ function checkAdrLinks(file, code, adrLinkExists, findings) {
   }
 }
 
-function resolveRelative(dir, target) {
+function resolveRelative(dir: string, target: string): string {
   const segments = target.startsWith('/')
     ? target.slice(1).split('/')
     : [...dir.split('/').filter(Boolean), ...target.split('/')];
-  const out = [];
+  const out: string[] = [];
   for (const segment of segments) {
     if (segment === '.' || segment === '') continue;
     if (segment === '..') out.pop();
@@ -452,7 +477,7 @@ function resolveRelative(dir, target) {
 
 /** Replaces every `<tag …>`, attributes included, with spaces — what is left is
  * the page's visible text in document order, whatever element carried it. */
-function blankTags(code) {
+function blankTags(code: string): string {
   return code.replace(/<[^>]*>/g, blank);
 }
 
@@ -494,8 +519,11 @@ const TOKEN_RE = new RegExp(
  * of them as naming a file misattributes the citation after it. A `class="src"`
  * caption is short and deliberate; nothing here has ever named the wrong file.
  */
-function srcRanges(code) {
-  const ranges = [];
+/** A half-open `[start, end)` span of page offsets. */
+type Range = [number, number];
+
+function srcRanges(code: string): Range[] {
+  const ranges: Range[] = [];
   for (const m of code.matchAll(
     /<(span|text)\b[^>]*\bclass="src"[^>]*>([\s\S]*?)<\/\1\s*>/gi,
   )) {
@@ -505,7 +533,7 @@ function srcRanges(code) {
   return ranges;
 }
 
-function within(ranges, index) {
+function within(ranges: readonly Range[], index: number): boolean {
   return ranges.some(([start, end]) => index >= start && index < end);
 }
 
@@ -533,7 +561,7 @@ const KNOWN_EXTENSIONS = new Set([
   'py',
 ]);
 
-function knownExtension(name) {
+function knownExtension(name: string): boolean {
   const ext = /\.([A-Za-z0-9]+)$/.exec(name)?.[1];
   return ext !== undefined && KNOWN_EXTENSIONS.has(ext.toLowerCase());
 }
@@ -568,7 +596,47 @@ function knownExtension(name) {
  * Followed by the citations a page renders from script data (#982), which obey
  * the narrower grammar `locateScriptCitations` describes.
  */
-export function findCitations(source) {
+/** One `file:line` claim a page makes, and where on the page it is written. */
+export interface Citation {
+  name: string;
+  line: number;
+  endLine: number;
+  sourceLine: number;
+  raw: string;
+}
+
+/**
+ * A stretch of page text a citation was read from: `text` aligned with the page
+ * offset for offset, and whether a span of it is one unbroken stretch of prose.
+ */
+interface TextRun {
+  text: string;
+  unbroken: (from: number, to: number) => boolean;
+}
+
+/** A citation with the offset it ends at and the run it came from. */
+interface LocatedCitation {
+  citation: Citation;
+  end: number;
+  run: TextRun;
+}
+
+/**
+ * `TOKEN_RE`'s named groups. Its two alternatives mean a group that did not
+ * participate is genuinely absent, which an index signature would hide.
+ */
+interface TokenGroups {
+  name?: string;
+  start?: string;
+  end?: string;
+  bareStart?: string;
+  bareEnd?: string;
+}
+
+const groupsOf = (m: RegExpExecArray): TokenGroups =>
+  (m.groups ?? {}) as TokenGroups;
+
+export function findCitations(source: string): Citation[] {
   return locateCitations(source).map(({ citation }) => citation);
 }
 
@@ -578,14 +646,20 @@ export function findCitations(source) {
  * read what follows it. A run is `text`, aligned with the page offset for
  * offset, and `unbroken(from, to)`: whether that span is one stretch of prose.
  */
-function locateCitations(source) {
+function locateCitations(source: string): LocatedCitation[] {
   return [...locateMarkupCitations(source), ...locateScriptCitations(source)];
 }
 
 /** One located citation: the match `m`, found at `index` of `run.text`. */
-function citationAt(run, index, m, name) {
-  const start = m.groups.start ?? m.groups.bareStart;
-  const end = m.groups.end ?? m.groups.bareEnd;
+function citationAt(
+  run: TextRun,
+  index: number,
+  m: RegExpExecArray,
+  name: string,
+): LocatedCitation {
+  const groups = groupsOf(m);
+  const start = groups.start ?? groups.bareStart;
+  const end = groups.end ?? groups.bareEnd;
   return {
     citation: {
       name,
@@ -610,21 +684,32 @@ function citationAt(run, index, m, name) {
  *   - `inCaption(index)`: whether a bare mention at `index` names a file by
  *     sitting where the page puts file names.
  */
-function readCitations(run, from, to, { isFile, inCaption }) {
+interface CitationGrammar {
+  isFile: (name: string) => boolean;
+  inCaption: (index: number) => boolean;
+}
+
+function readCitations(
+  run: TextRun,
+  from: number,
+  to: number,
+  { isFile, inCaption }: CitationGrammar,
+): LocatedCitation[] {
   const text = run.text.slice(from, to);
   const matches = [...text.matchAll(TOKEN_RE)];
-  const located = [];
-  let lastName = null;
+  const located: LocatedCitation[] = [];
+  let lastName: string | null = null;
   for (let i = 0; i < matches.length; i += 1) {
     const m = matches[i];
-    const { name } = m.groups;
-    const start = m.groups.start ?? m.groups.bareStart;
+    const groups = groupsOf(m);
+    const { name } = groups;
+    const start = groups.start ?? groups.bareStart;
 
     if (name && start === undefined) {
       const next = matches[i + 1];
       const adjacentBareCitation =
         next &&
-        next.groups.name === undefined &&
+        groupsOf(next).name === undefined &&
         !/\w/.test(text.slice(m.index + m[0].length, next.index));
       if (
         inCaption(from + m.index) ||
@@ -642,13 +727,13 @@ function readCitations(run, from, to, { isFile, inCaption }) {
   return located;
 }
 
-function locateMarkupCitations(source) {
+function locateMarkupCitations(source: string): LocatedCitation[] {
   const code = maskEmbeddedCode(maskHtmlComments(source));
   const ranges = srcRanges(code);
   const flat = blankTags(code);
   // `flat` is `code` with every tag blanked, so the two differ over a span
   // exactly when a tag sits inside it — the next table cell, the next list item.
-  const run = {
+  const run: TextRun = {
     text: flat,
     unbroken: (from, to) => code.slice(from, to) === flat.slice(from, to),
   };
@@ -672,7 +757,7 @@ function locateMarkupCitations(source) {
  * its line unclosed is an apostrophe in a comment-less corner the lexer
  * misread, and reading on to the next quote below would swallow real strings.
  */
-function closingQuote(js, open) {
+function closingQuote(js: string, open: number): number {
   const quote = js[open];
   for (let i = open + 1; i < js.length; i += 1) {
     const ch = js[i];
@@ -692,7 +777,7 @@ const REGEX_PRECEDING_KEYWORD =
  * operator, an opening bracket or a keyword a value is expected, so it is a
  * regex; after an identifier, a number or a closing `)` or `]` it divides.
  */
-function opensRegex(js, at) {
+function opensRegex(js: string, at: number): boolean {
   let i = at - 1;
   while (i >= 0 && /\s/.test(js[i])) i -= 1;
   if (i < 0) return true;
@@ -701,7 +786,7 @@ function opensRegex(js, at) {
 }
 
 /** The offset just past the regex literal opened at `open`, or -1 if it never closes on its line. */
-function regexLiteralEnd(js, open) {
+function regexLiteralEnd(js: string, open: number): number {
   let inClass = false;
   for (let i = open + 1; i < js.length; i += 1) {
     const ch = js[i];
@@ -726,8 +811,8 @@ const MAX_TEMPLATE_NESTING = 32;
  * not to close is remembered, so the lexer never walks to the end of the script
  * from the same backtick twice.
  */
-function stringLiteralRanges(js) {
-  const unclosed = new Set();
+function stringLiteralRanges(js: string): Range[] {
+  const unclosed = new Set<number>();
   let nesting = 0;
 
   /**
@@ -735,7 +820,11 @@ function stringLiteralRanges(js) {
    * stopped: the end of the script, or, inside a template's `${ … }`, just past
    * the brace that closes it (-1 if none does).
    */
-  function lexCode(from, ranges, inTemplateExpression) {
+  function lexCode(
+    from: number,
+    ranges: Range[],
+    inTemplateExpression: boolean,
+  ): number {
     let depth = 0;
     let i = from;
     while (i < js.length) {
@@ -775,9 +864,9 @@ function stringLiteralRanges(js) {
    * inside one is found too. Returns the offset past the closing backtick, or
    * -1 — committing nothing to `ranges` — when the template never closes.
    */
-  function lexTemplate(from, ranges) {
+  function lexTemplate(from: number, ranges: Range[]): number {
     if (unclosed.has(from) || nesting >= MAX_TEMPLATE_NESTING) return -1;
-    const found = [];
+    const found: Range[] = [];
     let chunk = from;
     let i = from;
     nesting += 1;
@@ -807,7 +896,7 @@ function stringLiteralRanges(js) {
     }
   }
 
-  const ranges = [];
+  const ranges: Range[] = [];
   lexCode(0, ranges, false);
   return ranges;
 }
@@ -831,7 +920,7 @@ const ANCHOR_BLOCK_ID_RE = /(?<![\w-])id\s*=\s*["']?citation-anchors(?![\w-])/i;
  * make every entry the citation it is checked against — an orphan vouching for
  * itself.
  */
-function isDataBlock(attrs) {
+function isDataBlock(attrs: string): boolean {
   const type = SCRIPT_TYPE_RE.exec(attrs);
   return (
     /json/i.test(type?.[1] ?? type?.[2] ?? type?.[3] ?? '') ||
@@ -870,9 +959,9 @@ function isDataBlock(attrs) {
  * the rest of the line after a `//` inside a code sample. `<style>` is matched
  * alongside so that a `<script>` named in a stylesheet comment starts nothing.
  */
-function locateScriptCitations(source) {
+function locateScriptCitations(source: string): LocatedCitation[] {
   const html = source.replace(/<!--[\s\S]*?-->/g, blank);
-  const literals = [];
+  const literals: Range[] = [];
   for (const m of html.matchAll(
     /<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi,
   )) {
@@ -886,7 +975,7 @@ function locateScriptCitations(source) {
 
   // The page with everything blanked but the contents of those literals, so an
   // offset here is an offset in the page and `lineOf` needs no translation.
-  const pieces = [];
+  const pieces: string[] = [];
   let at = 0;
   for (const [start, end] of literals) {
     pieces.push(blank(html.slice(at, start)));
@@ -899,7 +988,7 @@ function locateScriptCitations(source) {
   return literals.flatMap(([start, end]) =>
     // A continuation stays inside the literal its citation is in: the comma in
     // `['ci.yml:12,', '3 jobs']` does not join two array entries into one list.
-    readCitations({ text, unbroken: (from, to) => to <= end }, start, end, {
+    readCitations({ text, unbroken: (_from, to) => to <= end }, start, end, {
       isFile: knownExtension,
       inCaption: () => false,
     }),
@@ -936,8 +1025,17 @@ const CONTINUATION_RE = /\s*,\s*(?<range>\d+(?:-\d+)?)(?![\w%:/-]|\.\w)/y;
  *     not a list of lines; so does the end of a script string. A continuation
  *     split across elements, or across strings, is missed.
  */
-function findUnparsedContinuations(located) {
-  const continuations = [];
+/** A bare number written after a citation as though it continued it. */
+interface UnparsedContinuation {
+  name: string;
+  range: string;
+  sourceLine: number;
+}
+
+function findUnparsedContinuations(
+  located: readonly LocatedCitation[],
+): UnparsedContinuation[] {
+  const continuations: UnparsedContinuation[] = [];
   for (const { citation, end, run } of located) {
     CONTINUATION_RE.lastIndex = end;
     for (
@@ -946,7 +1044,8 @@ function findUnparsedContinuations(located) {
       m = CONTINUATION_RE.exec(run.text)
     ) {
       if (!run.unbroken(m.index, m.index + m[0].length)) break;
-      const { range } = m.groups;
+      // `range` is this pattern's only group, so a match always carries it.
+      const { range } = m.groups!;
       continuations.push({
         name: citation.name,
         range,
@@ -958,7 +1057,7 @@ function findUnparsedContinuations(located) {
 }
 
 /** The key a citation is anchored under: `name:line` or `name:start-end`. */
-function citationKey(citation) {
+function citationKey(citation: Citation): string {
   return citation.endLine !== citation.line
     ? `${citation.name}:${citation.line}-${citation.endLine}`
     : `${citation.name}:${citation.line}`;
@@ -971,7 +1070,7 @@ function citationKey(citation) {
  * - Unescaping HTML entities
  * - Removing trailing newlines
  */
-function normalizeAnchorText(text) {
+function normalizeAnchorText(text: string): string {
   return text
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
@@ -979,7 +1078,7 @@ function normalizeAnchorText(text) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .map((line: string) => line.replace(/\s+/g, ' ').trim())
     .join('\n')
     .trim();
 }
@@ -994,33 +1093,65 @@ function normalizeAnchorText(text) {
  * read comes back as `{ invalid, line }` with an empty map — it must not be
  * mistaken for an absent one, because it is a block that asserts nothing.
  */
-function extractAnchorBlock(source) {
+/**
+ * One entry of the `citation-anchors` block: the text a citation claims.
+ *
+ * `start` is required because that is how the block is read — an entry with
+ * no expected text asserts nothing, and comparing against a substitute would
+ * pass it against a blank cited line. The block is untrusted JSON, so a
+ * malformed entry still fails here at run time, as it always has.
+ */
+interface Anchor {
+  file?: string;
+  /** The text the page claims is at the citation's first line. */
+  start: string;
+  /** The text at the last line of a range; absent for a single line. */
+  end?: string;
+}
+
+/**
+ * The page's `citation-anchors` block. `invalid` and `line` are set only for a
+ * block that is present and cannot be read — which keys nothing, and so
+ * carries no `lineOfKey`; a readable block is the other way round.
+ */
+interface AnchorBlock {
+  anchors: Record<string, Anchor>;
+  invalid?: string;
+  line?: number;
+  lineOfKey?: (key: string) => number;
+}
+
+function extractAnchorBlock(source: string): AnchorBlock | null {
   const match = source.match(
     /<script\b[^>]*\bid="citation-anchors"[^>]*>([\s\S]*?)<\/script>/i,
   );
   if (!match) return null;
 
   const body = match[1];
-  const bodyStart = match.index + match[0].indexOf('>') + 1;
-  const unreadable = (invalid) => ({
+  // `match` without `g` always reports an index for a match it found.
+  const blockAt = match.index!;
+  const bodyStart = blockAt + match[0].indexOf('>') + 1;
+  const unreadable = (invalid: string): AnchorBlock => ({
     anchors: {},
     invalid,
-    line: lineOf(source, match.index),
+    line: lineOf(source, blockAt),
   });
 
-  let json;
+  let json: { anchors?: unknown };
   try {
-    json = JSON.parse(body);
+    json = JSON.parse(body) as { anchors?: unknown };
   } catch (err) {
-    return unreadable(`is not valid JSON (${err.message})`);
+    return unreadable(
+      `is not valid JSON (${err instanceof Error ? err.message : String(err)})`,
+    );
   }
   const anchors = json?.anchors;
   if (!anchors || typeof anchors !== 'object' || Array.isArray(anchors)) {
     return unreadable('has no "anchors" object keyed by citation');
   }
   return {
-    anchors,
-    lineOfKey(key) {
+    anchors: anchors as Record<string, Anchor>,
+    lineOfKey(key: string) {
       // The quoted key where a colon follows it — the same string can also
       // sit in a value, such as the block's own note.
       const quoted = JSON.stringify(key);
@@ -1083,13 +1214,24 @@ function extractAnchorBlock(source) {
  * JSON is reported by `manifest-invalid` as well; a `LEGACY` page never runs
  * that rule, so this one cannot lean on it.
  */
+/**
+ * What `resolveCitation` answers: whether the claim is possible, and from
+ * where. A refusal always says why — that reason is what the finding prints.
+ */
+export type CitationResolution =
+  | { ok: true; filePath?: string }
+  | { ok: false; reason: string; filePath?: string };
+
+export type ResolveCitation = (citation: Citation) => CitationResolution;
+export type GetFileContent = (filePath: string) => string | null;
+
 function checkCitations(
-  source,
-  findings,
-  resolveCitation,
-  getFileContent,
+  source: string,
+  findings: Finding[],
+  resolveCitation: ResolveCitation,
+  getFileContent: GetFileContent | undefined,
   requireAnchors = true,
-) {
+): void {
   const anchorBlock = extractAnchorBlock(source);
   const anchors = anchorBlock?.anchors ?? {};
   const located = locateCitations(source);
@@ -1098,7 +1240,8 @@ function checkCitations(
   if (anchorBlock?.invalid) {
     findings.push({
       rule: 'citation-anchor-block-invalid',
-      line: anchorBlock.line,
+      // An unreadable block always reports its own line alongside `invalid`.
+      line: anchorBlock.line!,
       message: `The citation-anchors block ${anchorBlock.invalid}, so it asserts nothing about any citation on this page.`,
     });
   }
@@ -1108,7 +1251,9 @@ function checkCitations(
     if (cited.has(key)) continue;
     findings.push({
       rule: 'citation-anchor-orphan',
-      line: anchorBlock.lineOfKey(key),
+      // An unreadable block keys nothing, so a key here came from a block that
+      // located its own entries.
+      line: anchorBlock!.lineOfKey!(key),
       message: `Anchor ${key} keys no citation this gate reads on the page, so nothing ever compares it — it asserts nothing while reading as though it did. Remove it, or write the citation it is for where the gate reads it: a continuation line needs its colon (", :205"), and in a <script> only a string that names the file is read — never a comment, and never a bare line on its own.`,
     });
   }
@@ -1217,6 +1362,12 @@ function checkCitations(
  * still describes the tree, and no styling exemption is a reason to stop checking
  * that: these run over `ROSTER` and `LEGACY` pages alike.
  */
+/**
+ * Whether a rule is about how a page is built or about whether it still
+ * describes the tree.
+ */
+export type RuleKind = 'mechanical-hygiene' | 'factual-assertion';
+
 export const RULE_KINDS = {
   'svg-title-tooltip': 'mechanical-hygiene',
   'tip-note-bijection': 'mechanical-hygiene',
@@ -1235,26 +1386,32 @@ export const RULE_KINDS = {
   'citation-anchor-orphan': 'factual-assertion',
   'citation-continuation-unparsed': 'factual-assertion',
   'citation-anchor-block-invalid': 'factual-assertion',
-};
+} as const satisfies Record<string, RuleKind>;
+
+/** Every rule this module can report. */
+export type RuleName = keyof typeof RULE_KINDS;
 
 /**
  * Runs only the factual-assertion rules — every rule `checkCitations` carries,
  * which `RULE_KINDS` lists — over a page the `LEGACY` exemption otherwise skips
  * entirely (ADR 0085).
- *
- * @param {object} input
- * @param {string} input.source raw page text
- * @param {(citation: {name: string, line: number, endLine: number}) => {ok: boolean, reason?: string, filePath?: string}} input.resolveCitation
- * @param {(filePath: string) => string | null} input.getFileContent function to read file content by path
- * @returns {Array<{rule: string, line: number, message: string}>}
  */
+export interface ScanFactualAssertionsInput {
+  /** Raw page text. */
+  source: string;
+  resolveCitation: ResolveCitation;
+  /** Reads a file's content by path. Omitted, no anchor is compared. */
+  getFileContent?: GetFileContent;
+  requireAnchors?: boolean;
+}
+
 export function scanFactualAssertions({
   source,
   resolveCitation,
   getFileContent,
   requireAnchors = true,
-}) {
-  const findings = [];
+}: ScanFactualAssertionsInput): Finding[] {
+  const findings: Finding[] = [];
   checkCitations(
     source,
     findings,
@@ -1267,19 +1424,27 @@ export function scanFactualAssertions({
 
 // --- entry point -------------------------------------------------------------
 
+export interface ScanDesignPageInput {
+  /** Repo-relative POSIX path, used in messages and to resolve links. */
+  file: string;
+  /** The page's raw text. */
+  source: string;
+  /** `fontBlockHash` of the canonical page. */
+  canonicalFontHash: string;
+  /** `fontBlockHash` of this page. */
+  pageFontHash: string | null;
+  /** Whether `.prettierignore` covers this file. */
+  prettierIgnored: boolean;
+  adrLinkExists: (resolved: string) => boolean;
+  resolveCitation: ResolveCitation;
+  /** Reads a file's content by path. Omitted, no anchor is compared. */
+  getFileContent?: GetFileContent;
+  requireAnchors?: boolean;
+}
+
 /**
- * Runs every rule over one House Explainer Page.
- *
- * @param {object} input
- * @param {string} input.file              repo-relative POSIX path, used in messages and to resolve links
- * @param {string} input.source            the page's raw text
- * @param {string} input.canonicalFontHash `fontBlockHash` of the canonical page
- * @param {string|null} input.pageFontHash `fontBlockHash` of this page
- * @param {boolean} input.prettierIgnored  whether .prettierignore covers this file
- * @param {(resolved: string) => boolean} input.adrLinkExists
- * @param {(citation: {name: string, line: number, endLine: number}) => {ok: boolean, reason?: string, filePath?: string}} input.resolveCitation
- * @param {(filePath: string) => string | null} input.getFileContent function to read file content by path
- * @returns {Array<{rule: string, line: number, message: string}>} findings, in file order
+ * Runs every rule over one House Explainer Page. Findings come back in file
+ * order.
  */
 export function scanDesignPage({
   file,
@@ -1291,9 +1456,9 @@ export function scanDesignPage({
   resolveCitation,
   getFileContent,
   requireAnchors = true,
-}) {
+}: ScanDesignPageInput): Finding[] {
   const code = maskHtmlComments(source);
-  const findings = [];
+  const findings: Finding[] = [];
 
   checkSvgTitles(maskEmbeddedCode(code), findings);
   checkTipNoteBijection(code, findings);

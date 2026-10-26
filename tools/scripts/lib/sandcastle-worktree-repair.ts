@@ -30,7 +30,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
-import { lastIterationOutput } from './sandcastle-outcome.mjs';
+import { lastIterationOutput } from './sandcastle-outcome.ts';
 
 /**
  * - `absent`   — no directory; nothing to repair.
@@ -44,10 +44,13 @@ export const WORKTREE_STATES = Object.freeze({
   healthy: 'healthy',
   orphaned: 'orphaned',
   foreign: 'foreign',
-});
+} as const);
+
+export type WorktreeState =
+  (typeof WORKTREE_STATES)[keyof typeof WORKTREE_STATES];
 
 /** The admin directory a worktree's `.git` file names, or null. */
-export function readWorktreePointer(worktreePath) {
+export function readWorktreePointer(worktreePath: string): string | null {
   const dotGit = join(worktreePath, '.git');
   if (!existsSync(dotGit) || !statSync(dotGit).isFile()) return null;
   const match = readFileSync(dotGit, 'utf8')
@@ -56,7 +59,7 @@ export function readWorktreePointer(worktreePath) {
   return match ? resolve(worktreePath, match[1].trim()) : null;
 }
 
-export function inspectWorktree(worktreePath) {
+export function inspectWorktree(worktreePath: string): WorktreeState {
   if (!existsSync(worktreePath)) return WORKTREE_STATES.absent;
   const adminDir = readWorktreePointer(worktreePath);
   if (!adminDir || basename(dirname(adminDir)) !== 'worktrees') {
@@ -73,12 +76,12 @@ export function inspectWorktree(worktreePath) {
  * call here targets a worktree found from `cwd`, and an inherited index path
  * would point it at the wrong one.
  */
-export const gitEnvironment = () =>
+export const gitEnvironment = (): NodeJS.ProcessEnv =>
   Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
   );
 
-const git = (cwd, args) =>
+const git = (cwd: string, args: readonly string[]) =>
   spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
@@ -93,11 +96,27 @@ const git = (cwd, args) =>
  * rebuilt the admin directory and git then recognised the worktree on `branch`.
  * A failed repair removes what it wrote, leaving the directory as it found it.
  */
-export function repairOrphanedWorktree({ worktreePath, branch }) {
+export interface OrphanedWorktree {
+  worktreePath: string;
+  branch: string;
+}
+
+export interface WorktreeRepairResult {
+  state: WorktreeState;
+  repaired: boolean;
+  error?: string;
+}
+
+export function repairOrphanedWorktree({
+  worktreePath,
+  branch,
+}: OrphanedWorktree): WorktreeRepairResult {
   const state = inspectWorktree(worktreePath);
   if (state !== WORKTREE_STATES.orphaned) return { state, repaired: false };
 
-  const adminDir = readWorktreePointer(worktreePath);
+  // `orphaned` is only reached through a `.git` file that named an admin
+  // directory, so this second read of the same pointer cannot be null.
+  const adminDir = readWorktreePointer(worktreePath)!;
   const commonDir = dirname(dirname(adminDir));
   if (!existsSync(join(commonDir, 'HEAD'))) {
     return {
@@ -149,14 +168,20 @@ export function repairOrphanedWorktree({ worktreePath, branch }) {
  * iteration in the log carries the completion promise, the work is finished:
  * the orchestrator repairs the worktree and finalizes it like any completed run
  * instead of reporting a crash.
- *
- * @param {{ errorText: string, logText: string, completionPromise: string }} input
  */
+export interface CleanupFailureInput {
+  /** The thrown error, already stringified by the caller. */
+  errorText: string;
+  /** The whole slice log. */
+  logText: string;
+  completionPromise: string;
+}
+
 export function isCleanupOnlyFailure({
   errorText,
   logText,
   completionPromise,
-}) {
+}: CleanupFailureInput): boolean {
   return (
     /is not a working tree/.test(String(errorText ?? '')) &&
     lastIterationOutput(logText).includes(completionPromise)

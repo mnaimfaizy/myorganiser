@@ -46,7 +46,7 @@ jobs:
   # or still-running newest commit is not an error, it is simply not chosen.
   # It then moves Staging forward only, and once per commit, looking at both
   # halves: the web host, and the latest backend upload among recent runs of
-  # this workflow (`decideSchedule` in tools/scripts/lib/staging-web-deploy.mjs).
+  # this workflow (`decideSchedule` in tools/scripts/lib/staging-web-deploy.ts).
   # In order:
   #
   #   - that commit predates the Staging web deploy and cannot name its own

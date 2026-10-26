@@ -32,7 +32,7 @@
  */
 import { createHash } from 'node:crypto';
 
-import { UPLOAD_JOB } from './staging-host-apply-guard.ts';
+import { UPLOAD_JOB, type JobRecord } from './staging-host-apply-guard.ts';
 
 /** A page the Node process renders, so its HTML carries the running build id. */
 export const RUNNING_BUILD_PATH = '/login';
@@ -63,12 +63,46 @@ export const SCHEDULE_FAIL_UPLOADED_NOT_RUNNING = 'fail-uploaded-not-running';
 export const SCHEDULE_FAIL_UNREACHABLE = 'fail-unreachable';
 export const SCHEDULE_FAIL_HEADERS = 'fail-headers';
 
+/** What a scheduled run decided to do with the newest green commit. */
+export type ScheduleDecision =
+  | typeof SCHEDULE_PROCEED
+  | typeof SCHEDULE_SKIP_SERVING
+  | typeof SCHEDULE_SKIP_NEWER
+  | typeof SCHEDULE_SKIP_PREDATES
+  | typeof SCHEDULE_FAIL_UPLOADED_NOT_RUNNING
+  | typeof SCHEDULE_FAIL_UNREACHABLE
+  | typeof SCHEDULE_FAIL_HEADERS;
+
 /** What a read of `/deploy-state.json` settled on. */
 export const STATE_PRESENT = 'present';
 /** 404: nothing was ever uploaded by this deploy. The first deploy. */
 export const STATE_NONE = 'none';
 /** No answer, a server error, or a body that is not a state file: unknown. */
 export const STATE_UNREADABLE = 'unreadable';
+
+/** What a read of `/deploy-state.json` settled on. */
+export type StateStatus =
+  | typeof STATE_PRESENT
+  | typeof STATE_NONE
+  | typeof STATE_UNREADABLE;
+
+/**
+ * The host as this module reads it: a `fetch`-shaped call, and only the three
+ * parts of a response the decisions here turn on.
+ */
+export interface FetchedResponse {
+  status: number;
+  text: () => Promise<string>;
+  headers: { get: (name: string) => string | null };
+}
+
+export type Fetcher = (
+  url: URL,
+  init: { headers: Record<string, string> },
+) => Promise<FetchedResponse>;
+
+/** A sleep, injected so a test never waits. */
+export type Sleep = (ms: number) => Promise<unknown>;
 
 /** The file a commit must carry to produce a build named after it. */
 export const BUILD_ID_CONFIG = 'apps/web/next.config.js';
@@ -79,7 +113,7 @@ const HASH = /^[0-9a-f]{64}$/;
 
 /** Refusal raised by a guard in this module. Never carries an origin. */
 export class StagingWebDeployRefusal extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'StagingWebDeployRefusal';
   }
@@ -94,8 +128,8 @@ export class StagingWebDeployRefusal extends Error {
  * different projects read as one site. It is right for the case it guards — a
  * web app and an API on subdomains of one domain the operator owns.
  */
-export function siteOf(origin, label = 'origin') {
-  let hostname;
+export function siteOf(origin: string, label = 'origin'): string {
+  let hostname: string;
   try {
     hostname = new URL(origin).hostname.toLowerCase();
   } catch {
@@ -108,7 +142,7 @@ export function siteOf(origin, label = 'origin') {
   return labels.slice(-2).join('.');
 }
 
-export function isSameSite(webOrigin, apiOrigin) {
+export function isSameSite(webOrigin: string, apiOrigin: string): boolean {
   return (
     siteOf(webOrigin, 'the web origin') === siteOf(apiOrigin, 'the API origin')
   );
@@ -123,7 +157,9 @@ export function isSameSite(webOrigin, apiOrigin) {
  * latest upload was a scheduled one — which the schedule may follow freely,
  * since it only ever uploads the newest green commit.
  */
-export function latestBackendUploadSha(jobs) {
+export function latestBackendUploadSha(
+  jobs: readonly JobRecord[],
+): string | null {
   const latest = jobs
     .filter((job) => job.name === UPLOAD_JOB && job.conclusion === 'success')
     .sort((a, b) => Date.parse(a.completedAt) - Date.parse(b.completedAt))
@@ -156,19 +192,19 @@ export function latestBackendUploadSha(jobs) {
  *
  * The two ancestry inputs are git's answers, and false when git does not know
  * the other commit: an unknown commit is not evidence of a newer one.
- *
- * @param {{
- *   greenSha: string,
- *   buildsNamedBundle: boolean,
- *   stateStatus: typeof STATE_PRESENT | typeof STATE_NONE | typeof STATE_UNREADABLE,
- *   runningServesGreen: boolean,
- *   serviceWorkerHeadersOk: boolean,
- *   uploadedSha: string | null,
- *   backendSha: string | null,
- *   greenIsStrictAncestorOfUploaded: boolean,
- *   greenIsStrictAncestorOfBackend: boolean,
- * }} input
  */
+export interface ScheduleFacts {
+  greenSha: string;
+  buildsNamedBundle: boolean;
+  stateStatus: StateStatus;
+  runningServesGreen: boolean;
+  serviceWorkerHeadersOk: boolean;
+  uploadedSha: string | null;
+  backendSha: string | null;
+  greenIsStrictAncestorOfUploaded: boolean;
+  greenIsStrictAncestorOfBackend: boolean;
+}
+
 export function decideSchedule({
   greenSha,
   buildsNamedBundle,
@@ -179,7 +215,7 @@ export function decideSchedule({
   backendSha,
   greenIsStrictAncestorOfUploaded,
   greenIsStrictAncestorOfBackend,
-}) {
+}: ScheduleFacts): ScheduleDecision {
   if (!buildsNamedBundle) return SCHEDULE_SKIP_PREDATES;
   if (stateStatus === STATE_UNREADABLE) return SCHEDULE_FAIL_UNREACHABLE;
   if (runningServesGreen) {
@@ -200,6 +236,12 @@ export function decideSchedule({
 }
 
 /** Whether a decision lets the later jobs run, and what the run's summary says. */
+export interface ScheduleOutcome {
+  proceed: boolean;
+  failed: boolean;
+  summary: string | null;
+}
+
 export const SCHEDULE_OUTCOMES = Object.freeze({
   [SCHEDULE_PROCEED]: { proceed: true, failed: false, summary: null },
   [SCHEDULE_SKIP_SERVING]: {
@@ -239,7 +281,7 @@ export const SCHEDULE_OUTCOMES = Object.freeze({
       'Staging serves that commit, but `/sw.js` does not carry its two headers. ' +
       "Append the block from `apps/web/deploy/sw-headers.htaccess` to the host's `.htaccess`. Nothing was uploaded.",
   },
-});
+} as const satisfies Record<ScheduleDecision, ScheduleOutcome>);
 
 /**
  * Gathers what `decideSchedule` needs, asking only for what the decision can
@@ -253,6 +295,19 @@ export const SCHEDULE_OUTCOMES = Object.freeze({
  * An address that is unset or malformed is unreadable, like one that does
  * not answer.
  */
+export interface PlanScheduleInput {
+  fetcher: Fetcher;
+  webOrigin: string;
+  greenSha: string;
+  /** Whether that commit's Next.js config reads the build-id variable. */
+  buildsNamedBundle: (sha: string) => boolean | Promise<boolean>;
+  /** Normalized jobs of recent `Deploy Staging` runs. */
+  readBackendJobs: () => JobRecord[] | Promise<JobRecord[]>;
+  /** git's answer, false for an unknown commit. */
+  isStrictAncestor: (a: string, b: string) => boolean | Promise<boolean>;
+  sleep?: Sleep;
+}
+
 export async function planSchedule({
   fetcher,
   webOrigin,
@@ -261,12 +316,12 @@ export async function planSchedule({
   readBackendJobs,
   isStrictAncestor,
   sleep = realSleep,
-}) {
+}: PlanScheduleInput): Promise<ScheduleDecision> {
   if (!COMMIT.test(greenSha)) {
     throw new StagingWebDeployRefusal('the commit is not a 40-character SHA');
   }
 
-  const facts = {
+  const facts: ScheduleFacts = {
     greenSha,
     buildsNamedBundle: Boolean(await buildsNamedBundle(greenSha)),
     stateStatus: STATE_UNREADABLE,
@@ -301,7 +356,7 @@ export async function planSchedule({
   }
 
   facts.backendSha = latestBackendUploadSha(await readBackendJobs());
-  const newerThanGreen = async (sha) =>
+  const newerThanGreen = async (sha: string | null) =>
     sha !== null && sha !== greenSha
       ? Boolean(await isStrictAncestor(greenSha, sha))
       : false;
@@ -325,7 +380,9 @@ export const BUNDLE_HTACCESS = 'public/.htaccess';
  * one takes the app down. `bundleFiles` is the bundle's file list, relative
  * to its root, however the caller gathered it.
  */
-export function assertBundleKeepsHostHtaccess(bundleFiles) {
+export function assertBundleKeepsHostHtaccess(
+  bundleFiles: readonly string[],
+): void {
   const normalized = bundleFiles.map((file) => file.replaceAll('\\', '/'));
   if (normalized.includes(BUNDLE_HTACCESS)) {
     throw new StagingWebDeployRefusal(
@@ -336,7 +393,9 @@ export function assertBundleKeepsHostHtaccess(bundleFiles) {
 }
 
 /** sha256 over the bundle's `dependencies`, keys sorted so order never matters. */
-export function hashDependencies(packageJson) {
+export function hashDependencies(packageJson: {
+  dependencies?: Record<string, unknown>;
+}): string {
   const dependencies = packageJson?.dependencies ?? {};
   const sorted = Object.keys(dependencies)
     .sort()
@@ -344,9 +403,22 @@ export function hashDependencies(packageJson) {
   return createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
 }
 
+/** The state file this module writes to the bundle's `public/`. */
+export interface DeployState {
+  sha: string;
+  depsHash: string;
+  installedDepsHash: string | null;
+}
+
 /** A state file this module wrote, or null for anything else. */
-export function parseDeployState(value) {
-  if (value === null || typeof value !== 'object') return null;
+export function parseDeployState(parsed: unknown): DeployState | null {
+  if (parsed === null || typeof parsed !== 'object') return null;
+  // The body comes off the host: every field is read through its own guard.
+  const value = parsed as {
+    sha?: unknown;
+    depsHash?: unknown;
+    installedDepsHash?: unknown;
+  };
   if (typeof value.sha !== 'string' || !COMMIT.test(value.sha)) return null;
   if (typeof value.depsHash !== 'string' || !HASH.test(value.depsHash)) {
     return null;
@@ -372,16 +444,27 @@ export function parseDeployState(value) {
  * serves an older build, the last list an earlier run inferred is carried
  * forward unchanged. With no state at all, nothing is known and an install is
  * owed — which is the first deploy.
- *
- * @param {{
- *   sha: string,
- *   depsHash: string,
- *   runningHtml: string | null,
- *   uploadedState: ReturnType<typeof parseDeployState>,
- * }} input
  */
-export function decidePlan({ sha, depsHash, runningHtml, uploadedState }) {
-  let installed = null;
+export interface DecidePlanInput {
+  sha: string;
+  depsHash: string;
+  runningHtml: string | null;
+  uploadedState: DeployState | null;
+}
+
+/** Whether this upload may restart the app, and the state to write with it. */
+export interface DeployPlan {
+  action: typeof PLAN_RESTART | typeof PLAN_INSTALL_OWED;
+  state: DeployState;
+}
+
+export function decidePlan({
+  sha,
+  depsHash,
+  runningHtml,
+  uploadedState,
+}: DecidePlanInput): DeployPlan {
+  let installed: string | null = null;
   if (uploadedState) {
     installed = (runningHtml ?? '').includes(uploadedState.sha)
       ? uploadedState.depsHash
@@ -396,18 +479,22 @@ export function decidePlan({ sha, depsHash, runningHtml, uploadedState }) {
 
 const NO_CACHE = { 'cache-control': 'no-cache' };
 
-async function get(fetcher, origin, path) {
+async function get(fetcher: Fetcher, origin: string, path: string) {
   return fetcher(new URL(path, origin), { headers: NO_CACHE });
 }
 
-const realSleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const realSleep: Sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 /** Reads settle after this many tries: one slow answer is not an outage. */
 export const READ_ATTEMPTS = 3;
 const READ_BACKOFF_MS = 2000;
 
 /** Runs `read` until it returns something other than `retry`, or tries run out. */
-async function settle(read, retry, { attempts, sleep }) {
+async function settle<T>(
+  read: () => Promise<T>,
+  retry: T,
+  { attempts, sleep }: { attempts: number; sleep: Sleep },
+): Promise<T> {
   let result = retry;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     result = await read();
@@ -422,11 +509,16 @@ async function settle(read, retry, { attempts, sleep }) {
  * Not answering is not an error here: with a readable state file it means
  * "not serving", which is what a stopped or restarting app looks like.
  */
+export interface ReadOptions {
+  attempts?: number;
+  sleep?: Sleep;
+}
+
 export async function readRunningHtml(
-  fetcher,
-  webOrigin,
-  { attempts = READ_ATTEMPTS, sleep = realSleep } = {},
-) {
+  fetcher: Fetcher,
+  webOrigin: string,
+  { attempts = READ_ATTEMPTS, sleep = realSleep }: ReadOptions = {},
+): Promise<string | null> {
   return settle(
     async () => {
       try {
@@ -441,21 +533,28 @@ export async function readRunningHtml(
   );
 }
 
-const UNREADABLE = Object.freeze({ status: STATE_UNREADABLE, state: null });
+/** One read of `/deploy-state.json`: which of the three outcomes, and what it held. */
+export interface UploadedState {
+  status: StateStatus;
+  state: DeployState | null;
+}
+
+const UNREADABLE: UploadedState = Object.freeze({
+  status: STATE_UNREADABLE,
+  state: null,
+});
 
 /**
  * The last uploaded state, as one of three outcomes that must not be
  * confused: present, none (404 — the first deploy), or unreadable (no
  * answer, a timeout, a server error, or a 200 whose body is not a state
  * file). Only unreadable is retried.
- *
- * @returns {Promise<{ status: string, state: ReturnType<typeof parseDeployState> }>}
  */
 export async function readUploadedState(
-  fetcher,
-  webOrigin,
-  { attempts = READ_ATTEMPTS, sleep = realSleep } = {},
-) {
+  fetcher: Fetcher,
+  webOrigin: string,
+  { attempts = READ_ATTEMPTS, sleep = realSleep }: ReadOptions = {},
+): Promise<UploadedState> {
   return settle(
     async () => {
       try {
@@ -474,7 +573,7 @@ export async function readUploadedState(
 }
 
 /** Refuses before any request, so a bad input never reads as "host is down". */
-function assertDeployInputs(webOrigin, sha) {
+function assertDeployInputs(webOrigin: string, sha: string): void {
   siteOf(webOrigin, 'the web origin');
   if (!COMMIT.test(sha)) {
     throw new StagingWebDeployRefusal('the commit is not a 40-character SHA');
@@ -486,13 +585,21 @@ function assertDeployInputs(webOrigin, sha) {
  * read: writing a fresh state over an unknown one would forget which
  * dependency list is installed, and restart or withhold on a guess.
  */
+export interface PlanDeployInput {
+  fetcher: Fetcher;
+  webOrigin: string;
+  sha: string;
+  packageJson: { dependencies?: Record<string, unknown> };
+  sleep?: Sleep;
+}
+
 export async function planDeploy({
   fetcher,
   webOrigin,
   sha,
   packageJson,
   sleep = realSleep,
-}) {
+}: PlanDeployInput): Promise<DeployPlan> {
   assertDeployInputs(webOrigin, sha);
   const [runningHtml, uploaded] = await Promise.all([
     readRunningHtml(fetcher, webOrigin, { sleep }),
@@ -521,8 +628,10 @@ export async function planDeploy({
  * with the expected ones, not merely required to be present: a permissive
  * policy is a header too.
  */
-export function findServiceWorkerHeaderProblems(headers) {
-  const problems = [];
+export function findServiceWorkerHeaderProblems(headers: {
+  get: (name: string) => string | null;
+}): string[] {
+  const problems: string[] = [];
   for (const [name, expected] of [
     ['Cache-Control', SERVICE_WORKER_CACHE_CONTROL],
     ['Content-Security-Policy', SERVICE_WORKER_CSP],
@@ -542,7 +651,10 @@ export function findServiceWorkerHeaderProblems(headers) {
 }
 
 /** Fetches `/sw.js` and returns what is wrong with it; empty when nothing is. */
-export async function readServiceWorkerProblems(fetcher, webOrigin) {
+export async function readServiceWorkerProblems(
+  fetcher: Fetcher,
+  webOrigin: string,
+): Promise<string[]> {
   try {
     const response = await get(fetcher, webOrigin, SERVICE_WORKER_PATH);
     if (response.status !== 200) {
@@ -560,16 +672,28 @@ export async function readServiceWorkerProblems(fetcher, webOrigin) {
  * keywords such as 'self' are case-insensitive). An added or missing directive
  * is a different value.
  */
-const normalizeHeader = (value) =>
+const normalizeHeader = (value: string) =>
   value.trim().replace(/\s+/g, ' ').toLowerCase();
 
 /**
  * Waits for the uploaded build to answer, then checks the service worker's
  * headers. Only the running process counts: a static file would say the build
  * is uploaded, which the FTP step already knows.
- *
- * @returns {Promise<{ ok: true, attempts: number } | { ok: false, reason: string }>}
  */
+export interface ProbeDeployInput {
+  fetcher: Fetcher;
+  webOrigin: string;
+  sha: string;
+  timeoutSeconds?: number;
+  intervalSeconds?: number;
+  sleep?: Sleep;
+  now?: () => number;
+}
+
+export type ProbeResult =
+  | { ok: true; attempts: number }
+  | { ok: false; reason: string };
+
 export async function probeDeploy({
   fetcher,
   webOrigin,
@@ -578,7 +702,7 @@ export async function probeDeploy({
   intervalSeconds = 10,
   sleep = realSleep,
   now = Date.now,
-}) {
+}: ProbeDeployInput): Promise<ProbeResult> {
   assertDeployInputs(webOrigin, sha);
 
   const deadline = now() + timeoutSeconds * 1000;

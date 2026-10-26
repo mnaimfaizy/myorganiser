@@ -1,7 +1,7 @@
 // Contracts for check-checker-contracts.mjs's command-line surface, following
 // check-nx-declared-targets.test.mjs's shape: the checker runs as a real
 // subprocess against a fixture workspace, because it reads
-// tools/scripts/check-*.mjs from disk the same way tools/scripts/lib/gate-coverage.mjs
+// tools/scripts/check-*.mjs from disk the same way tools/scripts/lib/gate-coverage.ts
 // does. Unlike the Declared Target ratchet this checker never shells out to
 // git, so the fixture is a plain temp directory rather than a git repository.
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * Tests for release-cut.mjs against a real scratch git repository: the
+ * Tests for release-cut.ts against a real scratch git repository: the
  * `git status` read, the leftover check, and the failure wrapping that
  * `release:cut` relies on once the release branch exists.
  *
@@ -10,22 +10,22 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import {
   AbandonedCutError,
   assertNothingLeftUnstaged,
   readUnstagedPaths,
   runOrAbandonCut,
-} from './release-cut.mjs';
+} from './release-cut.ts';
 
 const RELEASE_BRANCH = 'release/v1.2.3';
 
-function scratchRepo(t) {
+function scratchRepo(t: TestContext) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'release-cut-'));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
 
-  const git = (args) =>
+  const git = (args: string) =>
     execSync(`git ${args}`, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init -q');
   git('config user.email release-cut@test.invalid');

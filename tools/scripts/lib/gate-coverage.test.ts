@@ -14,7 +14,8 @@ import {
   nodeRuns,
   pipelineInvocations,
   stripComments,
-} from './gate-coverage.mjs';
+} from './gate-coverage.ts';
+import type { GateManifestEntry } from './gate-manifest.ts';
 
 const REPO_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -25,12 +26,25 @@ const REPO_ROOT = join(
 
 const AGGREGATE = 'tools/scripts/run-assertion-gates.mjs';
 
+/**
+ * An opt-out entry as a fixture writes it: `reason` is optional here on
+ * purpose, because several cases below assert that a reasonless entry is
+ * rejected rather than honoured.
+ */
+interface OptOutFixture {
+  check: string;
+  reason?: string;
+}
+
 /** A wired aggregate: the hook invokes `gates:run`, which runs the runner. */
-const aggregateOf = (manifest) => ({ script: AGGREGATE, manifest });
+const aggregateOf = (manifest: GateManifestEntry[]) => ({
+  script: AGGREGATE,
+  manifest,
+});
 
-const hook = (text) => [{ path: '.husky/pre-commit', text }];
+const hook = (text: string) => [{ path: '.husky/pre-commit', text }];
 
-const optOutList = (entries) =>
+const optOutList = (entries: OptOutFixture[]) =>
   JSON.stringify({ schemaVersion: OPT_OUT_SCHEMA_VERSION, optOut: entries });
 
 test('pipelineInvocations matches a script name exactly, never as a substring', () => {

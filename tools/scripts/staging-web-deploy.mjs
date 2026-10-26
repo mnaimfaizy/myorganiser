@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs the decisions of Staging's web deploy for deploy-staging.yml (issue
-// #1138, ADR 0128). The logic lives in lib/staging-web-deploy.mjs; this file
+// #1138, ADR 0128). The logic lives in lib/staging-web-deploy.ts; this file
 // only reads arguments, the bundle, the network, git and the Actions API, and
 // reports.
 //
@@ -55,7 +55,7 @@ import {
   planDeploy,
   planSchedule,
   probeDeploy,
-} from './lib/staging-web-deploy.mjs';
+} from './lib/staging-web-deploy.ts';
 
 const NAME = 'staging-web-deploy';
 const REQUEST_TIMEOUT_MS = 20_000;

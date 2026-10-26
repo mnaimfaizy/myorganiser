@@ -40,7 +40,7 @@ The on-demand command catalogue for the root [Agent Guide](../../AGENTS.md#comma
 - Review pipeline page check: `yarn review:pages:check` (asserts `docs/review/finding-lifecycle.html` against the finding contract in `tools/scripts/review/schema.mjs`, the CI job names, and the gate tier labels). See [ADR 0046](../adr/0046-house-explainer-pages-have-a-designer-and-a-gate.md).
 - Workflow runner image check: `yarn runner-image:check` (asserts every job under `.github/workflows` sets `runs-on` to `ubuntu-24.04`, naming the file and job when one does not; reached by `yarn gates:run`; `yarn runner-image:test` covers it). See [CI/CD and release process](../deployment/CI_CD_AND_RELEASE_PROCESS.md#runner-image).
 - Release pipeline page check: `yarn deploy:pages:check` (asserts `docs/deployment/release-pipeline.html` against `.github/workflows/*.yml`, `package.json`, and `tools/scripts/release.mjs`; `--print` shows what each extractor resolved). See [ADR 0046](../adr/0046-house-explainer-pages-have-a-designer-and-a-gate.md).
-- Staging web deploy tests: `yarn staging-web:test` (two test files: the decisions in `tools/scripts/lib/staging-web-deploy.mjs` — same-site comparison, the scheduled run's outcome, the `restart` / `install-owed` plan, the probe — with every network read injected, and the `tools/scripts/staging-web-deploy.mjs` command that `deploy-staging.yml` runs; CI runs it). See [ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md).
+- Staging web deploy tests: `yarn staging-web:test` (two test files: the decisions in `tools/scripts/lib/staging-web-deploy.ts` — same-site comparison, the scheduled run's outcome, the `restart` / `install-owed` plan, the probe — with every network read injected, and the `tools/scripts/staging-web-deploy.mjs` command that `deploy-staging.yml` runs; CI runs it). See [ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md).
 
 ## Documentation
 
@@ -99,7 +99,7 @@ The on-demand command catalogue for the root [Agent Guide](../../AGENTS.md#comma
 
 ## Dependencies
 
-- npm audit on `main`: CI audits a pull request only when it changes dependencies, and audits every push to `main`. A red `Secure Install Review` on `main` is how a new advisory surfaces: find the open issue titled `[automation] npm audit is failing on main`, bump the listed packages, and run the `dep-sync` Skill. Do not make the audit run on every pull request. `yarn npm-audit:issue:test` covers the issue logic in `tools/scripts/lib/npm-audit-issue.mjs`. See [ADR 0124](../adr/0124-the-npm-audit-runs-on-main-and-a-failure-there-is-one-tracked-issue.md) and [the supply chain plan](../SECURITY/Dependency-Supply-Chain-Security-Plan.md).
+- npm audit on `main`: CI audits a pull request only when it changes dependencies, and audits every push to `main`. A red `Secure Install Review` on `main` is how a new advisory surfaces: find the open issue titled `[automation] npm audit is failing on main`, bump the listed packages, and run the `dep-sync` Skill. Do not make the audit run on every pull request. `yarn npm-audit:issue:test` covers the issue logic in `tools/scripts/lib/npm-audit-issue.ts`. See [ADR 0124](../adr/0124-the-npm-audit-runs-on-main-and-a-failure-there-is-one-tracked-issue.md) and [the supply chain plan](../SECURITY/Dependency-Supply-Chain-Security-Plan.md).
 
 ## Gate infrastructure
 

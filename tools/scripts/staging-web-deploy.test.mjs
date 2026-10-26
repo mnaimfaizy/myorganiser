@@ -4,7 +4,7 @@
  * command-line program run as the workflow runs it.
  *
  * The decisions themselves are tested with stubs in
- * lib/staging-web-deploy.test.mjs. A stub cannot notice swapped arguments, a
+ * lib/staging-web-deploy.test.ts. A stub cannot notice swapped arguments, a
  * missing output line or a wrong exit code, so nothing here is stubbed inside
  * the program: git is a throwaway repository, the host is a `node:http` server
  * on 127.0.0.1, and `gh` is a script on PATH that answers from a fixture.
@@ -38,7 +38,7 @@ import {
   SERVICE_WORKER_CACHE_CONTROL,
   SERVICE_WORKER_CSP,
   hashDependencies,
-} from './lib/staging-web-deploy.mjs';
+} from './lib/staging-web-deploy.ts';
 
 const CLI = join(
   dirname(fileURLToPath(import.meta.url)),

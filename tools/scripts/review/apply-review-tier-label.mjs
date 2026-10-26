@@ -13,7 +13,7 @@
 // job output still stands). Exit 2 = the script could not run (missing args).
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { REVIEW_TIER_LABELS, planRelabel } from '../lib/review-tier.mjs';
+import { REVIEW_TIER_LABELS, planRelabel } from '../lib/review-tier.ts';
 import { cannotRun, firstLine, gh, ghJson, isMain, parseArgs } from './cli.mjs';
 
 export const DEFAULT_ATTEMPTS = 3;

@@ -7,9 +7,9 @@ import {
   judgeRunOutcome,
   lastIterationOutput,
   NEEDS_HUMAN_LABEL,
-} from './sandcastle-outcome.mjs';
+} from './sandcastle-outcome.ts';
 
-const run = (...lines) =>
+const run = (...lines: string[]) =>
   ['--- Run started: 2026-09-29T01:23:27.947Z ---', ...lines].join('\n');
 
 test('a run that completed with nothing outstanding and a passing review is clean', () => {

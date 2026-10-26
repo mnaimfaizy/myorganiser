@@ -5,7 +5,7 @@
  * HTML artifacts the Designer sub-agent produces (`.github/agents/designer.agent.md`).
  *
  * Companion to check-test-hygiene.mjs and check-component-hygiene.mjs. The rules
- * live in tools/scripts/lib/design-page-scan.mjs, which is pure; this file reads
+ * live in tools/scripts/lib/design-page-scan.ts, which is pure; this file reads
  * the filesystem facts those rules compare against and decides what is in scope.
  *
  * Scope is an explicit roster, not a glob. `docs/**` holds three lineages of HTML
@@ -65,7 +65,7 @@ import {
   fontBlockHash,
   scanDesignPage,
   scanFactualAssertions,
-} from './lib/design-page-scan.mjs';
+} from './lib/design-page-scan.ts';
 // The roster is its own module so it has one definition. A CLI cannot export a
 // const without running its main body on import, so keeping it here forced the
 // contract suite to hand-copy the list, and the copy rotted the first time the
@@ -205,7 +205,7 @@ function lineCount(file) {
 
 /**
  * Builds the `resolveCitation` callback `scanDesignPage`/`scanFactualAssertions`
- * ask for each citation. See `checkCitations` in design-page-scan.mjs for what
+ * ask for each citation. See `checkCitations` in design-page-scan.ts for what
  * "resolves" deliberately does and does not prove.
  *
  * A citation's name is matched by path *suffix* against the basename index, not

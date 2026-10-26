@@ -40,9 +40,38 @@ export const BASELINE_PATH = join(
 export const SCHEMA_VERSION = 1;
 export const NX_EXECUTOR_PREFIX = '@nx/';
 
+/** One `@nx/*` Declared Target, as a baseline entry names it. */
+export interface DeclaredTarget {
+  project: string;
+  target: string;
+  executor: string;
+}
+
+/** A Declared Target found on the tree, with the `project.json` that declares it. */
+export interface ClassifiedTarget extends DeclaredTarget {
+  path: string;
+}
+
+/** An `@nx/*` executor Nx still ships as its own answer, with why. */
+export interface NotDebtExecutor {
+  executor: string;
+  reason: string;
+  source: string;
+}
+
 /** The composite key a baseline entry and a classified target are compared by. */
-export const keyOf = (entry) =>
+export const keyOf = (entry: DeclaredTarget): string =>
   `${entry.project}::${entry.target}::${entry.executor}`;
+
+export interface ReadBaselineOptions {
+  cwd?: string;
+  path?: string;
+}
+
+export interface DeclaredTargetBaseline {
+  baseline: DeclaredTarget[];
+  notDebt: NotDebtExecutor[];
+}
 
 /**
  * Reads and validates the baseline file, returning `{ baseline, notDebt }`.
@@ -52,22 +81,25 @@ export const keyOf = (entry) =>
 export function readBaseline({
   cwd = process.cwd(),
   path = BASELINE_PATH,
-} = {}) {
+}: ReadBaselineOptions = {}): DeclaredTargetBaseline {
   const parsed = readBaselineEnvelope({
     cwd,
     path,
     schemaVersion: SCHEMA_VERSION,
   });
 
-  const seen = new Set();
-  const entries = [];
-  parsed.baseline.forEach((entry, index) => {
+  const seen = new Set<string>();
+  const entries: DeclaredTarget[] = [];
+  parsed.baseline.forEach((raw, index) => {
     const at = `${path}[${index}]`;
+    // A baseline entry is whatever the JSON file holds: every field is read
+    // through its own `typeof` guard below rather than trusted.
+    const entry = (raw ?? {}) as Record<string, unknown>;
     const project =
-      typeof entry?.project === 'string' ? entry.project.trim() : '';
-    const target = typeof entry?.target === 'string' ? entry.target.trim() : '';
+      typeof entry.project === 'string' ? entry.project.trim() : '';
+    const target = typeof entry.target === 'string' ? entry.target.trim() : '';
     const executor =
-      typeof entry?.executor === 'string' ? entry.executor.trim() : '';
+      typeof entry.executor === 'string' ? entry.executor.trim() : '';
     if (!project || !target || !executor) {
       throw new Error(
         `${at}: entry requires non-empty "project", "target", and "executor"`,
@@ -100,17 +132,20 @@ export function readBaseline({
   return { baseline: entries, notDebt };
 }
 
-function readNotDebt(raw, path) {
+function readNotDebt(raw: unknown, path: string): NotDebtExecutor[] {
   if (!Array.isArray(raw)) {
     throw new Error(`${path}: expected "notDebt" to be an array`);
   }
-  const seen = new Set();
-  return raw.map((entry, index) => {
+  const seen = new Set<string>();
+  return (raw as unknown[]).map((item, index) => {
     const at = `${path} notDebt[${index}]`;
+    const entry = (item ?? {}) as Record<string, unknown>;
     const [executor, reason, source] = ['executor', 'reason', 'source'].map(
-      (field) =>
-        typeof entry?.[field] === 'string' ? entry[field].trim() : '',
-    );
+      (field) => {
+        const value = entry[field];
+        return typeof value === 'string' ? value.trim() : '';
+      },
+    ) as [string, string, string];
     if (!executor || !reason || !source) {
       throw new Error(
         `${at}: entry requires non-empty "executor", "reason", and "source"`,
@@ -134,13 +169,23 @@ function readNotDebt(raw, path) {
  * `projects` is `{ name, path, targets }[]`, `targets` being the raw
  * `project.json` `targets` object.
  */
-export function classifyDeclaredTargets(projects) {
-  const entries = [];
+export interface ProjectTargets {
+  name: string;
+  path: string;
+  /** The raw `project.json` `targets` object. */
+  targets?: Record<string, unknown> | null;
+}
+
+export function classifyDeclaredTargets(
+  projects: readonly ProjectTargets[],
+): ClassifiedTarget[] {
+  const entries: ClassifiedTarget[] = [];
   for (const project of projects) {
     const targets = project.targets ?? {};
-    for (const [target, config] of Object.entries(targets)) {
+    for (const [target, raw] of Object.entries(targets)) {
+      const config = (raw ?? {}) as Record<string, unknown>;
       const executor =
-        typeof config?.executor === 'string' ? config.executor : undefined;
+        typeof config.executor === 'string' ? config.executor : undefined;
       if (!executor || !executor.startsWith(NX_EXECUTOR_PREFIX)) continue;
       entries.push({
         project: project.name,
@@ -162,7 +207,19 @@ export function classifyDeclaredTargets(projects) {
  * baseline claiming a target that is no longer there. The baseline can only
  * shrink: an entry can leave it, but nothing here ever grows it silently.
  */
-export function compareBaseline(baseline, actual, notDebt = []) {
+export interface DeclaredTargetComparison {
+  debt: ClassifiedTarget[];
+  covered: ClassifiedTarget[];
+  missing: ClassifiedTarget[];
+  stale: DeclaredTarget[];
+  staleNotDebt: NotDebtExecutor[];
+}
+
+export function compareBaseline(
+  baseline: readonly DeclaredTarget[],
+  actual: readonly ClassifiedTarget[],
+  notDebt: readonly NotDebtExecutor[] = [],
+): DeclaredTargetComparison {
   const notDebtExecutors = new Set(notDebt.map((entry) => entry.executor));
   const covered = actual.filter((entry) =>
     notDebtExecutors.has(entry.executor),

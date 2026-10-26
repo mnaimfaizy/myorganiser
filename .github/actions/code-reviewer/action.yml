@@ -206,7 +206,7 @@ runs:
         # before this action runs, and Publish Review refuses a cross-repository
         # Pull Request (same_repo). Here, release-pr.yml is the only workflow
         # that opens a Pull Request, on a push to release/v* — asserted by
-        # tools/scripts/lib/review-tier-workflow.test.mjs.
+        # tools/scripts/lib/review-tier-workflow.test.ts.
         allowed_bots: cursor,github-actions
         prompt: |
           /code-review

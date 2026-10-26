@@ -140,7 +140,7 @@ commit. A dispatch always proceeds, at the commit it was dispatched at. A
 scheduled run takes the newest `main` commit whose CI is green, or stops green
 when there is none, and then checks these in order, looking at both the web
 host and the latest backend upload (`decideSchedule` in
-`tools/scripts/lib/staging-web-deploy.mjs`):
+`tools/scripts/lib/staging-web-deploy.ts`):
 
 | What the run finds, in order                                                                           | Outcome                                                                        |
 | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |

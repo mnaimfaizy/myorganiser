@@ -21,7 +21,7 @@ import { cleanGitEnv } from './testing/git-fixture-env.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-design-hygiene.mjs');
-const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-scan.mjs');
+const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-scan.ts');
 const SHARED_SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.ts');
 const ROSTER_SOURCE = join(SCRIPT_DIR, 'lib', 'design-page-roster.ts');
 const BASELINE_LIB_SOURCE = join(SCRIPT_DIR, 'lib', 'baseline-file.ts');
@@ -81,7 +81,7 @@ function createWorkspace(t) {
   );
   write(
     workspace,
-    'tools/scripts/lib/design-page-scan.mjs',
+    'tools/scripts/lib/design-page-scan.ts',
     readFileSync(SCAN_SOURCE, 'utf8'),
   );
   write(

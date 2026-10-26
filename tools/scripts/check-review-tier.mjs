@@ -34,7 +34,7 @@ import {
   loadPathMap,
   parseNumstat,
   renderReviewTierSummary,
-} from './lib/review-tier.mjs';
+} from './lib/review-tier.ts';
 
 const args = process.argv.slice(2);
 const opt = (flag) => {
