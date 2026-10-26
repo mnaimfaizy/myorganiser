@@ -24,10 +24,14 @@
 // what the compiler does, with none of the false-positive risk a bare
 // substring match on an import specifier has in `check-mobile-platform.mjs`.
 //
+// `copilot-hooks/__tests__` is excluded, mirroring `tools/scripts/tsconfig.json`:
+// those specs are still Jest, not yet subject to ADR 0135's strict-TypeScript
+// convention this rule enforces, until their own later migration slice.
+//
 // Exit 0 = zero violations. Exit 1 = a forbidden suppression comment was
 // found, naming the file and line. Exit 2 = the check could not run.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 
 const args = process.argv.slice(2);
 const printOnly = args.includes('--print');
@@ -35,16 +39,23 @@ const SCRIPTS_DIR = resolve(
   args.find((a) => !a.startsWith('--')) ?? 'tools/scripts',
 );
 
+const EXCLUDED_PREFIX = ['copilot-hooks', '__tests__'].join(sep) + sep;
+
 const fail = (msg) => {
   console.error(`ts-suppressions: ${msg}`);
   process.exit(2);
 };
 
-/** Every `.ts` file under `dir`, recursively. Returns `[]` for a missing dir. */
+/** Every `.ts` file under `dir`, recursively, excluding the still-Jest copilot-hooks specs. Returns `[]` for a missing dir. */
 function listTsFiles(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith('.ts'))
+    .filter(
+      (entry) =>
+        typeof entry === 'string' &&
+        entry.endsWith('.ts') &&
+        !entry.startsWith(EXCLUDED_PREFIX),
+    )
     .sort();
 }
 

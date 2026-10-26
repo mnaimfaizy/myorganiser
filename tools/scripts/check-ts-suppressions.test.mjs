@@ -127,3 +127,19 @@ test('names every violation across nested directories, not just the first', (t) 
   assert.match(result.stderr, /check-top\.ts:1/);
   assert.match(result.stderr, /lib[\\/]check-nested\.ts:1/);
 });
+
+// copilot-hooks/__tests__ is still Jest (ADR 0135), typechecked today by
+// tools/tsconfig.spec.json's jest types, not yet this rule's convention.
+test('excludes copilot-hooks/__tests__, the still-Jest specs', (t) => {
+  const scriptsDir = createScriptsDir(t);
+  writeTsFile(
+    scriptsDir,
+    join('copilot-hooks', '__tests__', 'a.spec.ts'),
+    '// @ts-nocheck\ndescribe("x", () => {});\n',
+  );
+
+  const result = runChecker(scriptsDir);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /0 \.ts file\(s\) scanned/);
+});

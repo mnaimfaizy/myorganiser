@@ -43,14 +43,19 @@ export const BASELINE_PATH = join(
   'checker-contract-baseline.json',
 );
 export const SCHEMA_VERSION = 1;
-export const CHECKER_PATH_PATTERN = /^tools\/scripts\/check-[^/]+\.mjs$/;
+// `.ts` from ADR 0135's expand step, ahead of any checker actually migrating
+// there: a `.replace(/\.mjs$/, '.test.mjs')` on a `check-x.ts` path matches
+// nothing and returns the checker's own path unchanged, so `hasContractSuite`
+// would test whether the checker itself exists rather than its suite — always
+// true — and silently report every `.ts` checker as covered.
+export const CHECKER_PATH_PATTERN = /^tools\/scripts\/check-[^/]+\.(mjs|ts)$/;
 
-/** Does `checkerPath` (e.g. `tools/scripts/check-x.mjs`) have a sibling contract suite? */
+/** Does `checkerPath` (e.g. `tools/scripts/check-x.mjs` or `check-x.ts`) have a sibling contract suite? */
 export function hasContractSuite(
   checkerPath,
   { cwd = process.cwd(), exists = existsSync } = {},
 ) {
-  const testPath = checkerPath.replace(/\.mjs$/, '.test.mjs');
+  const testPath = checkerPath.replace(/\.(mjs|ts)$/, '.test.$1');
   return exists(join(cwd, testPath));
 }
 
@@ -84,9 +89,12 @@ export function readBaseline({
     if (!checker) {
       throw new Error(`${at}: entry must be a non-empty checker path`);
     }
-    if (checker.endsWith('.test.mjs') || !CHECKER_PATH_PATTERN.test(checker)) {
+    if (
+      /\.test\.(mjs|ts)$/.test(checker) ||
+      !CHECKER_PATH_PATTERN.test(checker)
+    ) {
       throw new Error(
-        `${at}: "${checker}" is not a tools/scripts/check-*.mjs path`,
+        `${at}: "${checker}" is not a tools/scripts/check-*.{mjs,ts} path`,
       );
     }
     if (seen.has(checker)) {

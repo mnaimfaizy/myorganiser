@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Ratchets contract-suite coverage for tools/scripts/check-*.mjs checkers
+// Ratchets contract-suite coverage for tools/scripts/check-*.{mjs,ts} checkers
 // against a shrink-only baseline, so the count of untested checkers can only
 // go down (ADR 0085).
 //
@@ -58,7 +58,7 @@ try {
 }
 
 const checkers = listCheckers({ cwd });
-if (checkers.length === 0) fail('no check-*.mjs checkers found');
+if (checkers.length === 0) fail('no check-*.{mjs,ts} checkers found');
 
 const classified = classifyCheckers(checkers, { cwd });
 const { debt, missing, stale } = compareBaseline(baseline, classified);
@@ -79,7 +79,7 @@ if (printOnly) {
 const findings = [];
 for (const checker of missing) {
   findings.push(
-    `${checker}: no contract suite (expected ${checker.replace(/\.mjs$/, '.test.mjs')}) ` +
+    `${checker}: no contract suite (expected ${checker.replace(/\.(mjs|ts)$/, '.test.$1')}) ` +
       `and no entry in ${BASELINE_PATH}. A checker with no suite proving it fails on the ` +
       'drift its header claims to catch is an unasserted claim (ADR 0085) — add the ' +
       'suite, or add the checker to the baseline as recorded debt.',
