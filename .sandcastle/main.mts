@@ -161,18 +161,25 @@ type SandboxClaudeCode = { version: string; mode: 'auto' | 'manual' };
  * Auto mode asks the release channel for the current version on every
  * dispatch. Offline, it keeps an existing image as it is, and builds a missing
  * one with the installer's own `latest`.
+ *
+ * With no policy — a Cursor or Copilot dispatch, where Claude Code never runs
+ * — the image is only built when missing, and no version is returned to log.
  */
 async function ensureSandboxImage(
-  policy: ReturnType<typeof claudeCodePolicy>,
-): Promise<SandboxClaudeCode> {
+  policy: ReturnType<typeof claudeCodePolicy> | null,
+): Promise<SandboxClaudeCode | null> {
   const image = spawnSync('docker', ['image', 'inspect', SANDBOX_IMAGE], {
     encoding: 'utf8',
     windowsHide: true,
   });
-  const installed = image.status === 0 ? imageClaudeCodeVersion() : null;
+  if (!policy && image.status === 0) return null;
+  const installed =
+    policy && image.status === 0 ? imageClaudeCodeVersion() : null;
 
   let wanted: string | null;
-  if (policy.mode === 'manual') {
+  if (!policy) {
+    wanted = null;
+  } else if (policy.mode === 'manual') {
     wanted = policy.version;
   } else {
     wanted = await latestClaudeCodeRelease();
@@ -187,11 +194,11 @@ async function ensureSandboxImage(
     }
   }
 
-  if (installed && installed === wanted) {
+  if (policy && installed && installed === wanted) {
     return { version: installed, mode: policy.mode };
   }
   console.log(
-    image.status === 0
+    policy && image.status === 0
       ? `Sandbox image ${SANDBOX_IMAGE} carries Claude Code ${installed ?? '(none found)'}, ` +
           `but ${describeClaudeCodeMode(policy.mode)} wants ${wanted}; rebuilding it before dispatch...`
       : `Sandbox image ${SANDBOX_IMAGE} is missing; building it before dispatch...`,
@@ -240,6 +247,7 @@ async function ensureSandboxImage(
       `Docker image ${SANDBOX_IMAGE} was reported built but is not available.`,
     );
   }
+  if (!policy) return null;
   const built = imageClaudeCodeVersion();
   if (!built || (wanted && built !== wanted)) {
     fail(
@@ -699,9 +707,13 @@ try {
 } catch (error) {
   fail((error as Error).message);
 }
+// Only a Claude dispatch runs Claude Code, so only it checks or rebuilds for the
+// CLI version, and only its slice logs name one.
 const sandboxClaudeCode = dryRun
   ? null
-  : await ensureSandboxImage(claudeCodeUpdatePolicy);
+  : await ensureSandboxImage(
+      agentKind === 'claude' ? claudeCodeUpdatePolicy : null,
+    );
 if (sandboxClaudeCode) {
   console.log(
     `Sandbox image ${SANDBOX_IMAGE}: Claude Code ${sandboxClaudeCode.version} ` +

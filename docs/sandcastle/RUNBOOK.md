@@ -57,8 +57,9 @@ pipeline.
    - `SANDCASTLE_CLAUDE_CODE_UPDATE=manual` with `SANDCASTLE_CLAUDE_CODE_VERSION=<x.y.z>`
      stays on that version. A version set on its own also means manual.
 
-   Each dispatch rebuilds the image when its `claude --version` differs from what the
-   policy asks for, then prints the version. Every slice log names it too, as
+   Each Claude dispatch rebuilds the image when its `claude --version` differs from what the
+   policy asks for, then prints the version. A Cursor or Copilot dispatch skips the check,
+   since Claude Code never runs in it. Every Claude slice log names the version too, as
    `[#<issue>] Claude Code <version> (auto: latest release, sandcastle:myorganiser)`. The
    CLI's own auto-updater is off inside the image, so updates happen only at dispatch and the
    logged version is the one the agent ran. Offline, auto mode keeps the existing image.
@@ -627,8 +628,8 @@ To reproduce the sandbox behavior locally: `MYORGANISER_SANDBOX=1 yarn nx test t
 - **Retire the old cache:** delete `.sandcastle/node_modules_linux_cache/` if present — it's no
   longer used (the seed step and lockfile-hash invalidation were removed).
 - **Rebuild the sandbox image after any `.sandcastle/Dockerfile` change:**
-  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing or its
-  Claude Code differs from the version the `SANDCASTLE_CLAUDE_CODE_*` policy asks for, so any
+  `ensureSandboxImage()` only builds `sandcastle:myorganiser` when the image is missing or, on a
+  Claude dispatch, its Claude Code differs from what the `SANDCASTLE_CLAUDE_CODE_*` policy asks for, so any
   other change leaves an existing image silently on the old contents. Force a rebuild with
   `docker image rm sandcastle:myorganiser` before the next dispatch. See `docs/graphify.md` for
   why this matters for the mounted graphify graph.
