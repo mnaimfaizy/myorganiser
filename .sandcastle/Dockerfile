@@ -103,7 +103,7 @@ RUN curl https://cursor.com/install -fsS | bash
 # Bump the pin here only: the orchestrator rebuilds an image whose
 # `claude --version` differs from it, and writes the version into each slice's
 # log. See tools/scripts/lib/sandcastle-cli-version.mjs.
-ARG CLAUDE_CODE_VERSION=2.1.292
+ARG CLAUDE_CODE_VERSION=2.1.310
 ENV DISABLE_AUTOUPDATER=1
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
 
