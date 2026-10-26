@@ -85,6 +85,7 @@ function ConnectedDashboard() {
 
   const syncBusy = isRunLive(syncStatus.status);
   const isCooldownActive = !!syncStatus.isCooldownActive;
+  const hasEnabledChannel = subs.subscriptions.some((s) => s.enabled);
 
   const refreshSync = syncStatus.refresh;
   const triggerUploadSync = syncStatus.triggerUploadSync;
@@ -147,7 +148,7 @@ function ConnectedDashboard() {
   );
 
   const handleSync = useCallback(() => {
-    if (isCooldownActive || syncBusy) return;
+    if (isCooldownActive || syncBusy || !hasEnabledChannel) return;
 
     if (syncStatusValue?.retryAt) {
       const retryTime = Date.parse(syncStatusValue.retryAt);
@@ -160,6 +161,7 @@ function ConnectedDashboard() {
   }, [
     isCooldownActive,
     syncBusy,
+    hasEnabledChannel,
     triggerUploadSync,
     syncStatusValue,
     runUserSync,
@@ -170,7 +172,12 @@ function ConnectedDashboard() {
   }, [carouselData]);
 
   const uploadSyncDisabled =
-    carouselData.loading || syncStatus.loading || syncBusy || isCooldownActive;
+    carouselData.loading ||
+    syncStatus.loading ||
+    syncBusy ||
+    isCooldownActive ||
+    subs.loading ||
+    !hasEnabledChannel;
 
   const syncSpinning = carouselData.loading || syncStatus.loading || syncBusy;
 
@@ -181,13 +188,19 @@ function ConnectedDashboard() {
 
   const syncButtonLabel = retryLabel
     ? `Sync uploads disabled until ${retryLabel}`
-    : 'Sync uploads';
+    : !subs.loading && !hasEnabledChannel
+      ? 'Sync uploads disabled until a channel is turned on'
+      : 'Sync uploads';
 
   const showNoChannelsNote = !subs.loading && subs.subscriptions.length === 0;
+
+  const showNoEnabledChannelsNote =
+    !subs.loading && subs.subscriptions.length > 0 && !hasEnabledChannel;
 
   const showNeverSyncedNote =
     !subs.loading &&
     subs.subscriptions.length > 0 &&
+    hasEnabledChannel &&
     syncStatus.status?.status === 'never';
 
   const newUploadCount = library.filter((video) => !video.watched).length;
@@ -260,6 +273,17 @@ function ConnectedDashboard() {
             className="font-semibold text-brand-text underline"
           >
             Refresh channels
+          </Link>
+        </div>
+      )}
+      {showNoEnabledChannelsNote && (
+        <div role="status" className="text-body-sm text-muted-foreground">
+          No channels are turned on.{' '}
+          <Link
+            href="/dashboard/youtube/channels"
+            className="font-semibold text-brand-text underline"
+          >
+            Choose channels
           </Link>
         </div>
       )}

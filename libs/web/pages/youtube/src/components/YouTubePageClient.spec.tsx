@@ -154,8 +154,20 @@ describe('YouTubePageClient', () => {
     disconnect: jest.fn(),
   };
 
+  // Sync uploads is gated on at least one enabled channel, so the default
+  // fixture carries one. Tests that need zero or disabled channels override it.
+  const enabledSubscription = {
+    id: 'sub-1',
+    channelId: 'ch-1',
+    channelTitle: 'Alpha Channel',
+    channelThumbnail: null,
+    uploadsPlaylistId: 'UU1',
+    enabled: true,
+    lastSyncedAt: null,
+  };
+
   const defaultSubs = {
-    subscriptions: [],
+    subscriptions: [enabledSubscription],
     loading: false,
     sync: jest.fn(),
     toggle: jest.fn(),
@@ -1573,6 +1585,135 @@ describe('YouTubePageClient', () => {
         name: /Sync uploads disabled until/i,
       });
       expect(button).toBeDisabled();
+    });
+  });
+
+  describe('sync gated on enabled channels', () => {
+    const disabledSubscription = {
+      id: 'sub-2',
+      channelId: 'ch-2',
+      channelTitle: 'Beta Channel',
+      channelThumbnail: null,
+      uploadsPlaylistId: 'UU2',
+      enabled: false,
+      lastSyncedAt: null,
+    };
+
+    beforeEach(() => {
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: true,
+        status: 'connected',
+        refresh: jest.fn(),
+      });
+    });
+
+    it('disables sync uploads and explains why when every followed channel is off', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [disabledSubscription],
+        loading: false,
+      });
+      mockUseYouTubeSyncStatus.mockReturnValue({
+        status: statusOf({ status: 'never' }),
+        loading: false,
+        triggerUploadSync: jest.fn(),
+        isCooldownActive: false,
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      const button = screen.getByRole('button', {
+        name: 'Sync uploads disabled until a channel is turned on',
+      });
+      expect(button).toBeDisabled();
+
+      const note = screen.getByText('No channels are turned on.');
+      expect(note).toHaveAttribute('role', 'status');
+      expect(
+        within(note).getByRole('link', { name: 'Choose channels' }),
+      ).toHaveAttribute('href', '/dashboard/youtube/channels');
+      expect(
+        screen.queryByText(/Uploads have not been synced yet\./),
+      ).not.toBeInTheDocument();
+    });
+
+    it('enables sync uploads under its plain name when a channel is turned on', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [enabledSubscription, disabledSubscription],
+        loading: false,
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('button', { name: 'Sync uploads' }),
+      ).toBeEnabled();
+      expect(
+        screen.queryByText('No channels are turned on.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('disables sync uploads while subscriptions are loading', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [enabledSubscription],
+        loading: true,
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('button', { name: 'Sync uploads' }),
+      ).toBeDisabled();
+    });
+
+    it('keeps the cooldown label when a cooldown is active and no channel is turned on', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [disabledSubscription],
+        loading: false,
+      });
+      const future = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+      mockUseYouTubeSyncStatus.mockReturnValue({
+        status: { retryAt: future, channelStatus: 'never' },
+        loading: false,
+        triggerUploadSync: jest.fn(),
+        isCooldownActive: true,
+        refresh: jest.fn(),
+      });
+
+      render(<YouTubePageClient />);
+
+      const button = screen.getByRole('button', {
+        name: /Sync uploads disabled until/i,
+      });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute(
+        'title',
+        expect.not.stringContaining('turned on'),
+      );
+      expect(
+        screen.queryByRole('button', {
+          name: 'Sync uploads disabled until a channel is turned on',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the empty-channels note and not the turned-on note when no channels are followed', () => {
+      mockUseYouTubeSubscriptions.mockReturnValue({
+        ...defaultSubs,
+        subscriptions: [],
+        loading: false,
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(screen.getByText('No channels yet.')).toBeInTheDocument();
+      expect(
+        screen.queryByText('No channels are turned on.'),
+      ).not.toBeInTheDocument();
     });
   });
 
