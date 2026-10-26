@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-enum-fanout.mjs');
 
@@ -17,7 +19,11 @@ const CHECKER = join(HERE, 'check-enum-fanout.mjs');
 function createRepo(t) {
   const workspace = mkdtempSync(join(tmpdir(), 'enum-fanout-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
-  execFileSync('git', ['init', '-q'], { cwd: workspace, stdio: 'ignore' });
+  execFileSync('git', ['init', '-q'], {
+    cwd: workspace,
+    stdio: 'ignore',
+    env: cleanGitEnv(),
+  });
   return workspace;
 }
 
@@ -28,7 +34,11 @@ function write(workspace, relative, contents) {
 }
 
 function commitAll(workspace) {
-  execFileSync('git', ['add', '-A'], { cwd: workspace, stdio: 'ignore' });
+  execFileSync('git', ['add', '-A'], {
+    cwd: workspace,
+    stdio: 'ignore',
+    env: cleanGitEnv(),
+  });
 }
 
 const run = (workspace, ...args) =>

@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-doc-commands.mjs');
 
@@ -14,20 +16,6 @@ const CHECKER = join(HERE, 'check-doc-commands.mjs');
  * throwaway git repo with the files committed — `git ls-files` returns nothing otherwise, and the
  * checker would pass by seeing no corpus at all.
  */
-// Strips GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE / GIT_COMMON_DIR so a `git`
-// call scoped to a fixture workspace cannot inherit them from the real
-// repository and resolve there instead — fatal under Husky, which sets them
-// for its own hook process tree. `cwd` alone does not override an inherited
-// GIT_DIR.
-function cleanGitEnv() {
-  const env = { ...process.env };
-  delete env.GIT_DIR;
-  delete env.GIT_WORK_TREE;
-  delete env.GIT_INDEX_FILE;
-  delete env.GIT_COMMON_DIR;
-  return env;
-}
-
 function createRepo(t) {
   const workspace = mkdtempSync(join(tmpdir(), 'doc-commands-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));

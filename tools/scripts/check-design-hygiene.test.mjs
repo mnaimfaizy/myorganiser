@@ -17,6 +17,7 @@ import {
   LEGACY,
   ROSTER,
 } from './lib/design-page-roster.ts';
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-design-hygiene.mjs');
@@ -65,18 +66,8 @@ const FIXTURE_PAGES = [
   ...new Set([...ROSTER_PAGES, ...LEGACY_PAGES, CANONICAL_FONT_PAGE]),
 ];
 
-// Strips GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE / GIT_COMMON_DIR so a `git`
-// call scoped to the fixture `workspace` cannot inherit them from the real
-// repository and resolve there instead — fatal under Husky, which sets them
-// for its own hook process tree. Node's `cwd` option alone does not override
-// an inherited `GIT_DIR`; git prefers the environment variable.
 function gitInWorkspace(workspace, args) {
-  const env = { ...process.env };
-  delete env.GIT_DIR;
-  delete env.GIT_WORK_TREE;
-  delete env.GIT_INDEX_FILE;
-  delete env.GIT_COMMON_DIR;
-  spawnSync('git', args, { cwd: workspace, env });
+  spawnSync('git', args, { cwd: workspace, env: cleanGitEnv() });
 }
 
 function createWorkspace(t) {

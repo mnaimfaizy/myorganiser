@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
 import {
   FORBIDDEN_EXTENSIONS,
   PUBLIC_DEBUG_KEYSTORE_BLOB,
@@ -47,7 +48,11 @@ const serviceAccountJson = JSON.stringify(
 );
 
 const git = (cwd, args) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: cleanGitEnv(),
+  });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };

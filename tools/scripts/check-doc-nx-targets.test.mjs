@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-doc-nx-targets.mjs');
 const EXEMPTIONS = 'tools/config/doc-nx-targets-exemptions.json';
@@ -57,20 +59,11 @@ function createRepo(t, { exemptions = [], nodes = NODES } = {}) {
   const graph = join(graphDir, 'graph.json');
   writeFileSync(graph, JSON.stringify({ graph: { nodes } }));
 
-  // Strips GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE / GIT_COMMON_DIR so this
-  // call cannot inherit them from the real repository and resolve there
-  // instead — fatal under Husky, which sets them for its own hook process
-  // tree. `cwd` alone does not override an inherited GIT_DIR.
-  const gitEnv = { ...process.env };
-  delete gitEnv.GIT_DIR;
-  delete gitEnv.GIT_WORK_TREE;
-  delete gitEnv.GIT_INDEX_FILE;
-  delete gitEnv.GIT_COMMON_DIR;
   const git = (...args) =>
     execFileSync('git', args, {
       cwd: workspace,
       stdio: 'ignore',
-      env: gitEnv,
+      env: cleanGitEnv(),
     });
   git('init', '-q');
   git('config', 'user.email', 'test@example.com');

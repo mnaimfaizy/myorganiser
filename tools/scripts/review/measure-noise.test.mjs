@@ -17,6 +17,7 @@ import test from 'node:test';
 
 import { commitsBetween, pushesFromRuns } from './measure-noise.mjs';
 import { acknowledgementsIn } from './noise.mjs';
+import { cleanGitEnv } from '../testing/git-fixture-env.mjs';
 
 const run = (databaseId, headSha, createdAt) => ({
   databaseId,
@@ -75,7 +76,11 @@ test('a range git cannot serve reads as null, not as no commits', () => {
 const repoWithCommits = (messages) => {
   const dir = mkdtempSync(join(tmpdir(), 'noise-commits-'));
   const run = (...args) =>
-    execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    execFileSync('git', args, {
+      cwd: dir,
+      encoding: 'utf8',
+      env: cleanGitEnv(),
+    });
   run('init', '--quiet', '--initial-branch=main');
   run('config', 'user.email', 'test@example.com');
   run('config', 'user.name', 'Test');

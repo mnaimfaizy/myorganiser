@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..');
 const CHECKER = join(HERE, 'check-nx-declared-targets.mjs');
@@ -18,7 +20,11 @@ const CHECKER = join(HERE, 'check-nx-declared-targets.mjs');
 function createRepo(t) {
   const workspace = mkdtempSync(join(tmpdir(), 'nx-declared-targets-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
-  execFileSync('git', ['init', '-q'], { cwd: workspace, stdio: 'ignore' });
+  execFileSync('git', ['init', '-q'], {
+    cwd: workspace,
+    stdio: 'ignore',
+    env: cleanGitEnv(),
+  });
   return workspace;
 }
 
@@ -41,7 +47,11 @@ function writeBaseline(workspace, baseline, overrides = {}) {
 }
 
 function commitAll(workspace) {
-  execFileSync('git', ['add', '-A'], { cwd: workspace, stdio: 'ignore' });
+  execFileSync('git', ['add', '-A'], {
+    cwd: workspace,
+    stdio: 'ignore',
+    env: cleanGitEnv(),
+  });
 }
 
 const run = (workspace, ...args) =>

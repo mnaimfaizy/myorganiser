@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 // Each fixture repository is built and checked in isolation. The old spelling is assembled
 // from parts so that this file does not match the check it tests.
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -33,7 +35,11 @@ function createRepo(
     writeFileSync(path, contents);
   };
   const git = (...args) =>
-    execFileSync('git', args, { cwd: workspace, stdio: 'ignore' });
+    execFileSync('git', args, {
+      cwd: workspace,
+      stdio: 'ignore',
+      env: cleanGitEnv(),
+    });
 
   git('init', '-q');
   for (const [relative, contents] of Object.entries(files)) {

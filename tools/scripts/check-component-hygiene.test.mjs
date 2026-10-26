@@ -12,6 +12,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const CHECKER_SOURCE = join(SCRIPT_DIR, 'check-component-hygiene.mjs');
 const SCAN_SOURCE = join(SCRIPT_DIR, 'lib', 'source-scan.ts');
@@ -81,7 +83,11 @@ function runChecker(workspace, ...args) {
 }
 
 function git(workspace, ...args) {
-  return execFileSync('git', args, { cwd: workspace, encoding: 'utf8' });
+  return execFileSync('git', args, {
+    cwd: workspace,
+    encoding: 'utf8',
+    env: cleanGitEnv(),
+  });
 }
 
 function initializeRepository(workspace) {

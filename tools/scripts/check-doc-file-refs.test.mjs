@@ -12,6 +12,7 @@ import {
   isModuleIdentifier,
   isRepoPath,
 } from './check-doc-file-refs.mjs';
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHECKER = join(HERE, 'check-doc-file-refs.mjs');
@@ -19,20 +20,11 @@ const CHECKER = join(HERE, 'check-doc-file-refs.mjs');
 function createRepo(t) {
   const workspace = mkdtempSync(join(tmpdir(), 'doc-file-refs-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
-  // Strips GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE / GIT_COMMON_DIR so this
-  // call cannot inherit them from the real repository and resolve there
-  // instead — fatal under Husky, which sets them for its own hook process
-  // tree. `cwd` alone does not override an inherited GIT_DIR.
-  const gitEnv = { ...process.env };
-  delete gitEnv.GIT_DIR;
-  delete gitEnv.GIT_WORK_TREE;
-  delete gitEnv.GIT_INDEX_FILE;
-  delete gitEnv.GIT_COMMON_DIR;
   const git = (...args) =>
     execFileSync('git', args, {
       cwd: workspace,
       stdio: 'ignore',
-      env: gitEnv,
+      env: cleanGitEnv(),
     });
   git('init', '-q');
   git('config', 'user.email', 'test@example.com');
@@ -51,11 +43,15 @@ function emptyExemptions() {
 }
 
 function commitAll({ workspace }) {
-  execFileSync('git', ['add', '-A'], { cwd: workspace, stdio: 'ignore' });
+  execFileSync('git', ['add', '-A'], {
+    cwd: workspace,
+    stdio: 'ignore',
+    env: cleanGitEnv(),
+  });
   execFileSync('git', ['commit', '-q', '-m', 'fixture'], {
     cwd: workspace,
     stdio: 'ignore',
-    env: { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_COMMITTER_NAME: 'T' },
+    env: { ...cleanGitEnv(), GIT_AUTHOR_NAME: 'T', GIT_COMMITTER_NAME: 'T' },
   });
 }
 

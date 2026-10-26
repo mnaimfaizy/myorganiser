@@ -20,6 +20,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { cleanGitEnv } from './testing/git-fixture-env.mjs';
+
 const SCRIPT = fileURLToPath(
   new URL('./git-assert-clean.mjs', import.meta.url),
 );
@@ -28,7 +30,11 @@ const SCRIPT = fileURLToPath(
 const repo = () => {
   const dir = mkdtempSync(join(tmpdir(), 'git-assert-clean-'));
   const git = (...args) =>
-    execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', args, {
+      cwd: dir,
+      stdio: 'ignore',
+      env: cleanGitEnv(),
+    });
   git('init', '--quiet');
   // Identity and signing are set locally: a contributor's global config must not
   // decide whether this suite can commit.
