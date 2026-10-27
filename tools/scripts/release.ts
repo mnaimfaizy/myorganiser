@@ -15,7 +15,6 @@ import {
   resolveNotesPlan,
   upsertChangelogSection,
 } from './lib/release-notes.ts';
-import { spawnFailure } from './lib/spawn-failure.ts';
 import {
   type ApiJob,
   type ApiRun,
@@ -285,10 +284,11 @@ function ghApi(endpoint: string): unknown {
         `Refusing to Cut: \`gh api ${endpoint}\` did not return JSON:\n${error.stdout.slice(0, 500)}`,
       );
     }
+    const stderr = (error as { stderr?: unknown } | null)?.stderr;
     die(
       `Refusing to Cut: could not read Staging deploy runs with \`gh api ${endpoint}\`. ` +
         'Install and authenticate the GitHub CLI (`gh auth login`).\n' +
-        (spawnFailure(error).stderr.trim() || errorMessage(error)),
+        (typeof stderr === 'string' ? stderr.trim() : errorMessage(error)),
     );
   }
 }

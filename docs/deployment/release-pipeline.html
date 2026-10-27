@@ -2143,7 +2143,7 @@
             <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>.
             The repo floor is <code>&gt;=22.18.0</code>
             (<code>package.json:7</code>). <code>release.ts</code> refuses a
-            major below 22 (<code>release.ts:26-34</code>). Three scopes, one
+            major below 22 (<code>release.ts:25-33</code>). Three scopes, one
             floor &mdash; not a single pinned number.
           </p>
         </div>
@@ -2228,7 +2228,7 @@
             <code>^v[0-9]+\.[0-9]+\.[0-9]+$</code>
             (<code>publish-github-release.yml:37</code>); and
             <code>/^v?(\d+)\.(\d+)\.(\d+)$/</code>
-            (<code>release.ts:170</code>), which rejects prerelease input
+            (<code>release.ts:169</code>), which rejects prerelease input
             outright.
           </p>
         </div>
@@ -2893,8 +2893,8 @@
       "release-pr.yml:6-8": { "file": ".github/workflows/release-pr.yml", "start": "push:", "end": "- 'release/v*'" },
       "release-pr.yml:36": { "file": ".github/workflows/release-pr.yml", "start": "if (!/^release\\/v\\d+\\.\\d+\\.\\d+$/.test(releaseBranch)) {" },
       "release-pr.yml:105-117": { "file": ".github/workflows/release-pr.yml", "start": "const mutation = `", "end": "core.info(`Enabled auto-merge for PR #${pr.number}`);" },
-      "release.ts:26-34": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
-      "release.ts:170": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
+      "release.ts:25-33": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
+      "release.ts:169": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
       "release.ts:668": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
       "release.ts:696-705": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
       "release.ts:813-820": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },

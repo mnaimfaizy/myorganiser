@@ -65,7 +65,7 @@ revert them.
 So a change here is an edit to the page, briefed through
 [`design-brief`](../../.agents/skills/design-brief/SKILL.md) and executed by the `Designer`
 sub-agent, exactly as [ADR 0046](../adr/0046-house-explainer-pages-have-a-designer-and-a-gate.md)
-describes for every House Explainer Page. `build-agent-map.mjs` remains the importer for a _new_
+describes for every House Explainer Page. `build-agent-map.ts` remains the importer for a _new_
 canvas export; it is not a rebuild path for these two.
 
 Both are in `.prettierignore`, so an edit is not reformatted out from under you by the pre-commit
