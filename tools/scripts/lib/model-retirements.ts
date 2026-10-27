@@ -1,7 +1,7 @@
 /**
  * Retirement-table reading for the agent model audit (ADR 0013).
  *
- * `audit-agent-model-catalog.mjs` asks whether a pinned model term still
+ * `audit-agent-model-catalog.ts` asks whether a pinned model term still
  * appears anywhere in a first-party catalog page. For Copilot that question
  * cannot see a retirement: a retired model leaves the supported-models table
  * but stays on the same page under "Model retirement history", so the term is

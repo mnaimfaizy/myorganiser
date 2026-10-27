@@ -65,7 +65,7 @@ import { globToRegExp } from './glob.ts';
 export const SCRIPTS_DIR = 'tools/scripts';
 export const OPT_OUT_PATH = 'tools/config/gate-coverage-optout.json';
 export const OPT_OUT_SCHEMA_VERSION = 1;
-export const AGGREGATE_SCRIPT = 'tools/scripts/run-assertion-gates.mjs';
+export const AGGREGATE_SCRIPT = 'tools/scripts/run-assertion-gates.ts';
 /**
  * The glob runner (ADR 0135 slice 2): a plain npm script, not a file, so it
  * is matched by exact script name rather than by path like the aggregate.

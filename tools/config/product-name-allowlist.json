@@ -25,11 +25,11 @@
     },
     {
       "path": "tools/config/qa-accounts.json",
-      "reason": "Holds the QA Account emails on the old-spelling `.test` domain. Kept with qa-accounts.mjs so QA credentials do not change (ADR 0122)."
+      "reason": "Holds the QA Account emails on the old-spelling `.test` domain. Kept with qa-accounts.ts so QA credentials do not change (ADR 0122)."
     },
     {
       "path": "tools/scripts/lib/qa-accounts.test.ts",
-      "reason": "Pins the QA Account email suffix that qa-accounts.mjs still uses. Changes only together with it."
+      "reason": "Pins the QA Account email suffix that qa-accounts.ts still uses. Changes only together with it."
     }
   ]
 }

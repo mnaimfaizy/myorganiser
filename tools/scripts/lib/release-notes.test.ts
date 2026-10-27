@@ -297,7 +297,7 @@ test('unstaged paths are empty for a fully staged or clean tree', () => {
 
 test('unstaged paths read the first line only if it keeps its status column', () => {
   // `run()` trims its output; a trimmed ' M x' reads as staged 'M x'. This is
-  // why release.mjs passes the raw `git status --porcelain` output.
+  // why release.ts passes the raw `git status --porcelain` output.
   assert.deepEqual(unstagedPaths(' M apps/backend/src/routes/routes.ts'), [
     'apps/backend/src/routes/routes.ts',
   ]);

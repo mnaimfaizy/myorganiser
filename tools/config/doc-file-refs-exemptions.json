@@ -41,6 +41,11 @@
       "file": "docs/adr/0120-a-mobile-program-gets-node-types-only-if-it-runs-on-node.md",
       "claim": "libs/mobile/native-globals.d.ts",
       "reason": "Names where a future declaration goes, not a file that exists. ADR 0120 decides the file is created with its first entry, in the same change as the first mobile consumer of a Hermes global the types lack; no such consumer exists yet. The entry goes stale, and is removed, when that file lands."
+    },
+    {
+      "file": "docs/adr/0052-a-built-explainer-page-is-its-own-source.md",
+      "claim": "tools/scripts/build-agent-map.mjs",
+      "reason": "Names the script by the path it had in August 2026, when it first recorded the discovery this ADR's Context section narrates. ADR 0135 moved the script to tools/scripts/build-agent-map.ts; the sentence is a dated historical record of what the script found and when, not a pointer for a reader to follow today."
     }
   ]
 }

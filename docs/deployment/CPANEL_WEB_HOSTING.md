@@ -44,7 +44,7 @@ yarn package:web
 Produces `dist/deploy/web/`:
 
 1. Next.js built with `output: 'standalone'` through the Nx `web:package`
-   target (`tools/scripts/package-web.mjs`).
+   target (`tools/scripts/package-web.ts`).
 2. A deploy-only `package.json` generated from `.next/standalone/node_modules`.
 3. `.next/` and `public/` copied alongside.
 4. A Linux-safe root `server.js` (avoids Windows path issues), and
@@ -155,7 +155,7 @@ The run also fails if it cannot read the recent `Deploy Staging` runs from the
 Actions API. Nothing is uploaded on any stop or failure.
 
 Then the `deploy-frontend` job does this without a shell
-(`tools/scripts/staging-web-deploy.mjs`). The bundle is built from the selected
+(`tools/scripts/staging-web-deploy.ts`). The bundle is built from the selected
 commit, while the job runs that script from a separate checkout of the tip
 (`.deploy-tools`), so the workflow's steps and the script they call always
 match ([ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md)). It has its own concurrency group and

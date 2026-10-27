@@ -36,7 +36,7 @@
         "parallel": false,
         "commands": [
           "yarn nx run web:build",
-          "node tools/scripts/package-web.mjs"
+          "node tools/scripts/package-web.ts"
         ]
       }
     }

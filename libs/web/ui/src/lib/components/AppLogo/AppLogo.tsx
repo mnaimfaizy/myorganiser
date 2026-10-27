@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 // The shield and check mark, in AppLogo's own 32 × 32 viewBox. Exported so a
-// build script (e.g. tools/scripts/generate-web-app-icons.mjs) can read the
+// build script (e.g. tools/scripts/generate-web-app-icons.ts) can read the
 // mark by name instead of pattern-matching this component's JSX.
 export const SHIELD_PATH = 'M4 3 L28 3 L28 19 Q28 30 16 31 Q4 30 4 19 Z';
 export const CHECK_PATH = 'M8 17 L13.5 22.5 L24 11';

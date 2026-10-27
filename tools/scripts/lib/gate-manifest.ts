@@ -1,6 +1,6 @@
 /**
  * The declared set of Assertion Gate checkers the aggregate runner executes
- * (`tools/scripts/run-assertion-gates.mjs`, `yarn gates:run`).
+ * (`tools/scripts/run-assertion-gates.ts`, `yarn gates:run`).
  *
  * ADR 0043 requires the manifest to be a checked artifact, not a convenience:
  * a checker silently dropped from it is a gate that runs nowhere, which is
@@ -152,13 +152,13 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   {
     id: 'agents:sync:check (subagents)',
     npmScript: 'agents:sync:check',
-    script: 'tools/scripts/sync-subagents.mjs',
+    script: 'tools/scripts/sync-subagents.ts',
     args: ['--check'],
   },
   {
     id: 'agents:sync:check (models)',
     npmScript: 'agents:sync:check',
-    script: 'tools/scripts/sync-agent-models.mjs',
+    script: 'tools/scripts/sync-agent-models.ts',
     args: ['--check'],
   },
   {

@@ -32,7 +32,7 @@
  * contents short and self-labeling ("**Claude Code:** ...") so that reads as a
  * reference table rather than as contradictory instructions.
  *
- * Consumers: sync-subagents.mjs
+ * Consumers: sync-subagents.ts
  */
 
 /** Harness names a marker may address. `copilot` is `.github/agents` itself. */

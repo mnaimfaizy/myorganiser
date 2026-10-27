@@ -23,7 +23,7 @@
         "cwd": "{workspaceRoot}",
         "commands": [
           "nx run design-tokens:build-tokens",
-          "node tools/scripts/git-assert-clean.mjs design-tokens-check"
+          "node tools/scripts/git-assert-clean.ts design-tokens-check"
         ],
         "parallel": false
       }

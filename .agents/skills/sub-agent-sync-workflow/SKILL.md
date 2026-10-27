@@ -88,15 +88,15 @@ overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-d
 - Test the harness-section and tool-grant renderers:
   - `yarn agents:sync:test`
 - Keep extra non-canonical files (rare):
-  - `node tools/scripts/sync-subagents.mjs --apply --no-prune`
+  - `node tools/scripts/sync-subagents.ts --apply --no-prune`
 
 ## Source of Truth
 
 - Canonical file body: `.github/agents/<agent>.agent.md`
 - Canonical model assignment: `tools/config/agent-model-policy.json`
 - Canonical tool grants: the `tools:` roles in `.github/agents/<agent>.agent.md`, translated by `tools/config/agent-tool-map.json`
-- Body and grant sync: `tools/scripts/sync-subagents.mjs`
-- Model sync: `tools/scripts/sync-agent-models.mjs`
+- Body and grant sync: `tools/scripts/sync-subagents.ts`
+- Model sync: `tools/scripts/sync-agent-models.ts`
 
 Do not manually copy agent bodies across harnesses unless the script is unavailable.
 

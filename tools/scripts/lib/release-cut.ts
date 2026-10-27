@@ -2,7 +2,7 @@
  * The steps of `release:cut` that run after the release branch exists: the
  * OpenAPI sync, the staging, the leftover check, and the commit.
  *
- * Kept out of `tools/scripts/release.mjs` so they can run against a scratch
+ * Kept out of `tools/scripts/release.ts` so they can run against a scratch
  * repository under test; that script runs top-level and exits the process.
  * These throw `AbandonedCutError` instead, and the script turns it into its
  * usual `die()`. The pure parts they build on live in `release-notes.ts`.

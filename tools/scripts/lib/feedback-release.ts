@@ -4,7 +4,7 @@
  * marks every Planned Feedback Report on them Fixed or Shipped.
  *
  * The parsing here is pure, so the contract suite drives it without git.
- * `tools/scripts/mark-feedback-release.mjs` is the wiring.
+ * `tools/scripts/mark-feedback-release.ts` is the wiring.
  */
 
 const RELEASE_TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;

@@ -143,7 +143,7 @@ commit. `none` is the one answer with nothing to quote, which is the whole
 claim it makes.
 
 Answer `wiredBy` by reading, not running: grep the `.husky` hooks, the
-`.github/workflows` jobs, and `tools/scripts/run-assertion-gates.mjs` at the
+`.github/workflows` jobs, and `tools/scripts/run-assertion-gates.ts` at the
 head commit for `coveringGate`'s script name, per
 [ADR 0074](../adr/0074-a-gate-suppresses-a-finding-only-if-something-runs-it.md).
 That answers the obligation this entry exists for on its own, and it costs no

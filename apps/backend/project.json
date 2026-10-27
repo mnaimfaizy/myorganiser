@@ -15,7 +15,7 @@
         "parallel": false,
         "commands": [
           "yarn nx build backend",
-          "node tools/scripts/package-backend-api.mjs"
+          "node tools/scripts/package-backend-api.ts"
         ]
       }
     },

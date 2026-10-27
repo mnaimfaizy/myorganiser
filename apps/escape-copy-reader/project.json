@@ -10,7 +10,7 @@
       "options": {
         "cwd": "{workspaceRoot}",
         "parallel": false,
-        "commands": ["node tools/scripts/build-escape-copy-reader.mjs"]
+        "commands": ["node tools/scripts/build-escape-copy-reader.ts"]
       }
     }
   }

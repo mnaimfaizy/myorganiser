@@ -5,7 +5,7 @@
  *
  * Every effect — reading the APK, `apksigner`, `aapt2`, git, `gh`, the file
  * system — is handed in, so the contract suite drives every refusal with the
- * GitHub call mocked. `tools/scripts/publish-mobile-release.mjs` is the wiring.
+ * GitHub call mocked. `tools/scripts/publish-mobile-release.ts` is the wiring.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

@@ -26,7 +26,7 @@ import {
   READER_FILENAME,
   composeReaderHtml,
   sha256,
-} from './build-escape-copy-reader.mjs';
+} from './build-escape-copy-reader.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..');

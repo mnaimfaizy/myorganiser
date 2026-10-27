@@ -42,7 +42,7 @@ would report itself as production while testing something else. If a production 
 `http://localhost:4200 is already used`, that is this guard: stop the server holding the port and
 re-run, rather than setting `reuseExistingServer: true`.
 
-`E2E_LIVE_BACKEND=1` also starts the built API (`tools/scripts/e2e-live-backend.mjs`)
+`E2E_LIVE_BACKEND=1` also starts the built API (`tools/scripts/e2e-live-backend.ts`)
 on port 3000, migrates, and seeds one verified user so `auth-logout-live.spec.ts`
 can call `POST /auth/logout` instead of the stub in `multiUserVault.ts`. The
 three Chromium shards leave the flag unset, so they stay stubbed; the separate

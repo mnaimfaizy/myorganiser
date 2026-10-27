@@ -48,7 +48,7 @@ function readManifest(html: string, path: string): AgentMapManifest {
   );
   if (!raw)
     fail(
-      `no #agent-map-manifest block in ${path} — edit the page in place via design-brief → Designer (ADR 0046); build-agent-map.mjs is not a rebuild path`,
+      `no #agent-map-manifest block in ${path} — edit the page in place via design-brief → Designer (ADR 0046); build-agent-map.ts is not a rebuild path`,
     );
   try {
     return JSON.parse(raw[1]) as AgentMapManifest;

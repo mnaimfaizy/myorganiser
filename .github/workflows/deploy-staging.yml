@@ -137,7 +137,7 @@ jobs:
           # the commit and reads recent runs of this workflow with `gh api`.
           # It writes `proceed`, `decision` and the summary line, and exits 1
           # on every `fail-` outcome.
-          node tools/scripts/staging-web-deploy.mjs schedule \
+          node tools/scripts/staging-web-deploy.ts schedule \
             --sha "$sha" \
             --web-origin "$WEB_ORIGIN"
 
@@ -308,7 +308,7 @@ jobs:
           COUNTERPART_APP_ROOT: ${{ secrets.COUNTERPART_APP_ROOT }}
           NODEVENV_ACTIVATE: ${{ secrets.NODEVENV_ACTIVATE }}
           SELECTOR_APP_KEY: ${{ secrets.SELECTOR_APP_KEY }}
-        run: node tools/scripts/run-host-apply.mjs staging > "$RUNNER_TEMP/host-apply.sh"
+        run: node tools/scripts/run-host-apply.ts staging > "$RUNNER_TEMP/host-apply.sh"
 
       - name: Apply on host over SSH
         env:
@@ -362,7 +362,7 @@ jobs:
 
       - name: Host Apply output (redaction-checked)
         if: always()
-        run: node tools/scripts/scrub-host-apply-log.mjs "$RUNNER_TEMP/host-apply.log"
+        run: node tools/scripts/scrub-host-apply-log.ts "$RUNNER_TEMP/host-apply.log"
 
       - name: Fail on a red Host Apply
         if: always()
@@ -393,7 +393,7 @@ jobs:
             -H 'X-Cron-Secret: host-apply-verification-wrong-secret' \
             -d '{}' \
             "$API_ORIGIN/api/v1/youtube/cron/sync")"
-          node tools/scripts/verify-host-apply.mjs "$docs_status" "$cron_status"
+          node tools/scripts/verify-host-apply.ts "$docs_status" "$cron_status"
 
   deploy-frontend:
     if: ${{ needs.select.outputs.proceed == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.apply_only)) }}
@@ -497,7 +497,7 @@ jobs:
         env:
           WEB_ORIGIN: ${{ secrets.WEB_ORIGIN }}
           API_ORIGIN: ${{ secrets.API_ORIGIN }}
-        run: node .deploy-tools/tools/scripts/staging-web-deploy.mjs same-site "$WEB_ORIGIN" "$API_ORIGIN"
+        run: node .deploy-tools/tools/scripts/staging-web-deploy.ts same-site "$WEB_ORIGIN" "$API_ORIGIN"
 
       - name: Package web app (cPanel)
         env:
@@ -522,7 +522,7 @@ jobs:
           HEAD_SHA: ${{ needs.select.outputs.sha }}
         run: |
           set -euo pipefail
-          node .deploy-tools/tools/scripts/staging-web-deploy.mjs plan \
+          node .deploy-tools/tools/scripts/staging-web-deploy.ts plan \
             --web-origin "$WEB_ORIGIN" \
             --sha "$HEAD_SHA" \
             --bundle dist/deploy/web
@@ -590,7 +590,7 @@ jobs:
           WEB_ORIGIN: ${{ secrets.WEB_ORIGIN }}
           HEAD_SHA: ${{ needs.select.outputs.sha }}
         run: |
-          node .deploy-tools/tools/scripts/staging-web-deploy.mjs probe \
+          node .deploy-tools/tools/scripts/staging-web-deploy.ts probe \
             --web-origin "$WEB_ORIGIN" \
             --sha "$HEAD_SHA" \
             --timeout-seconds 300

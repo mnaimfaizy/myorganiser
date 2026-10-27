@@ -618,8 +618,8 @@ test('findHostApplyLogLeaks detects DATABASE_URL assignment on the correct line'
 
 // === Area 6: Packager contract ===
 
-test('findMissingPackagerPrismaScripts returns empty array for real package-backend-api.mjs', () => {
-  const packagerPath = join(REPO, 'tools/scripts/package-backend-api.mjs');
+test('findMissingPackagerPrismaScripts returns empty array for real package-backend-api.ts', () => {
+  const packagerPath = join(REPO, 'tools/scripts/package-backend-api.ts');
   const packagerSource = readFileSync(packagerPath, 'utf8');
 
   const missing = findMissingPackagerPrismaScripts(packagerSource);
@@ -774,7 +774,7 @@ test('assertHostApplyProbesHealthy throws when cronStatus is 200', () => {
 const SCRUBBER = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '..',
-  'scrub-host-apply-log.mjs',
+  'scrub-host-apply-log.ts',
 );
 
 function runScrubber(t: TestContext, contents: string) {

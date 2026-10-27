@@ -32,7 +32,7 @@
       "patterns": [
         "tools/scripts/check-*.mjs",
         "tools/scripts/check-*.ts",
-        "tools/scripts/run-assertion-gates.mjs",
+        "tools/scripts/run-assertion-gates.ts",
         "tools/scripts/lib/**",
         "tools/scripts/ai/**",
         "tools/config/**",

@@ -3,7 +3,7 @@
  * release commit.
  *
  * Kept free of `fs` and `git` so the assembly rules are unit-testable.
- * `tools/scripts/release.mjs` owns all side effects.
+ * `tools/scripts/release.ts` owns all side effects.
  */
 
 export const CHANGELOG_TITLE = '# Changelog';

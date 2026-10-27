@@ -75,7 +75,7 @@ import {
   READER_SHELL,
   buildEscapeCopyReader,
   sha256,
-} from './build-escape-copy-reader.mjs';
+} from './build-escape-copy-reader.ts';
 import {
   capabilityFindings,
   checksumFindings,

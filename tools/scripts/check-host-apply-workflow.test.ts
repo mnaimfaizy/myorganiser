@@ -604,7 +604,7 @@ test('fails when the captured output never reaches the scrubber', (t) => {
   edit(
     workspace,
     PRODUCTION,
-    'run: node tools/scripts/scrub-host-apply-log.mjs "$RUNNER_TEMP/host-apply.log"',
+    'run: node tools/scripts/scrub-host-apply-log.ts "$RUNNER_TEMP/host-apply.log"',
     'run: cat "$RUNNER_TEMP/host-apply.log"',
   );
 
@@ -613,7 +613,7 @@ test('fails when the captured output never reaches the scrubber', (t) => {
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /never runs scrub-host-apply-log\.mjs over the captured output/,
+    /never runs scrub-host-apply-log\.ts over the captured output/,
   );
 });
 
@@ -771,14 +771,14 @@ test('fails when mark-feedback-release does not run the marking script', (t) => 
   edit(
     workspace,
     PRODUCTION,
-    'run: node tools/scripts/mark-feedback-release.mjs',
+    'run: node tools/scripts/mark-feedback-release.ts',
     'run: echo skip',
   );
 
   const result = runChecker(workspace);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /mark-feedback-release\.mjs/);
+  assert.match(result.stderr, /mark-feedback-release\.ts/);
 });
 
 test('fails when the production workflow has no mark-feedback-release job', (t) => {

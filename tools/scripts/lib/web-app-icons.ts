@@ -1,7 +1,7 @@
 /**
  * Renders the web app's installable icons from the AppLogo shield and the
  * design-token build. Shared by the generator
- * (tools/scripts/generate-web-app-icons.mjs), which writes them, and the
+ * (tools/scripts/generate-web-app-icons.ts), which writes them, and the
  * check (tools/scripts/check-web-app-icons.ts), which compares them with the
  * committed files — so the check renders exactly what the generator would.
  *
@@ -24,7 +24,7 @@
  * Rasterising goes through `sharp`, not a browser: every icon here is a flat
  * shape plus a linear gradient, which `sharp`'s SVG rasteriser renders
  * exactly, so there is no reason to pay for Chromium as
- * generate-mobile-app-icon.mjs and generate-og-image.mjs do.
+ * generate-mobile-app-icon.ts and generate-og-image.ts do.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

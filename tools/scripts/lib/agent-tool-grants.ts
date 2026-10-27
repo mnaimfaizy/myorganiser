@@ -4,7 +4,7 @@
  * Canonical bodies (.github/agents/*.agent.md) declare capabilities by role —
  * `tools: [read, search, execute]`. tools/config/agent-tool-map.json translates
  * each role into a harness's grant. This module is the translation and nothing
- * else: it never reads the filesystem, so sync-subagents.mjs owns I/O and the
+ * else: it never reads the filesystem, so sync-subagents.ts owns I/O and the
  * rules here stay testable. See ADR 0081.
  *
  * A grant is one of two shapes, chosen by the harness's `grant` key in the map:
@@ -263,7 +263,7 @@ export function formatGrant(harness: string, grant: Grant): string {
 /**
  * Returns `frontmatter` with only its grant replaced. Every other key keeps
  * its exact text and position, so a hand-written description or a model pin
- * owned by sync-agent-models.mjs is never touched.
+ * owned by sync-agent-models.ts is never touched.
  */
 export function writeGrant(
   frontmatter: string,

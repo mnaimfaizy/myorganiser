@@ -2,7 +2,7 @@
 
 [`docs/agents/agent-journey.html`](../../../docs/agents/agent-journey.html) is an interactive
 page: it binds `{{ }}` templates, `<sc-for>` and `<sc-if>`, so it needs the design tool's runtime
-to render at all. `tools/scripts/build-agent-map.mjs` inlines these three files ahead of the
+to render at all. `tools/scripts/build-agent-map.ts` inlines these three files ahead of the
 page's markup. [`orchestration-map.html`](../../../docs/agents/orchestration-map.html) binds
 nothing and is plain DOM, so it gets none of this — the builder decides per page.
 

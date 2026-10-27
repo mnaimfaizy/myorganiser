@@ -75,7 +75,7 @@ function liveBackendWebServers(
 
   return [
     {
-      command: 'node tools/scripts/e2e-live-backend.mjs',
+      command: 'node tools/scripts/e2e-live-backend.ts',
       url: 'http://localhost:3000/docs',
       reuseExistingServer: false,
       cwd: workspaceRoot,

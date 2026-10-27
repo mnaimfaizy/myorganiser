@@ -307,7 +307,7 @@ Conventional commit signals:
 Classify on the commit **type**, never on the word "deps". `chore(deps):` and `ci: bump …` never
 reach the deployed app; `fix(deps):` does.
 
-MyOrganiser does not use pre-release versions. `release.mjs` rejects anything that is not `vX.Y.Z` —
+MyOrganiser does not use pre-release versions. `release.ts` rejects anything that is not `vX.Y.Z` —
 staging is the pre-release channel.
 
 ---
@@ -332,7 +332,7 @@ staging is the pre-release channel.
 - `.github/workflows/dispatch-production-deploy.yml` — finds the newest release branch and dispatches the production deploy
 - `.github/workflows/release-pr.yml` — auto release PR creator
 - `.github/workflows/publish-github-release.yml` — GitHub Release publisher (on tag push)
-- `tools/scripts/release.mjs` — release script (`cut` + `tag` commands)
+- `tools/scripts/release.ts` — release script (`cut` + `tag` commands)
 - `package.json` — `release:cut`, `release:tag` script aliases
 - `.github/agents/release-notes.agent.md` — ReleaseNotes agent
 - `.github/agents/version-bump.agent.md` — VersionBump agent

@@ -342,9 +342,9 @@ function checkLogIsScrubbedBeforePrinting(path: string): void {
       `${path}: host-apply's ssh step streams its output instead of capturing it to host-apply.log`,
     );
   }
-  if (!/scrub-host-apply-log\.mjs/.test(block)) {
+  if (!/scrub-host-apply-log\.ts/.test(block)) {
     findings.push(
-      `${path}: host-apply never runs scrub-host-apply-log.mjs over the captured output`,
+      `${path}: host-apply never runs scrub-host-apply-log.ts over the captured output`,
     );
   }
 }
@@ -419,12 +419,12 @@ function checkReleaseMarkJob(path: string): void {
     );
   }
   if (
-    !/^\s*run:\s*node tools\/scripts\/mark-feedback-release\.mjs\s*$/m.test(
+    !/^\s*run:\s*node tools\/scripts\/mark-feedback-release\.ts\s*$/m.test(
       block,
     )
   ) {
     findings.push(
-      `${path}: ${job} does not run node tools/scripts/mark-feedback-release.mjs`,
+      `${path}: ${job} does not run node tools/scripts/mark-feedback-release.ts`,
     );
   }
 }

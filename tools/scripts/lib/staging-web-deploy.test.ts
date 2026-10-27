@@ -55,7 +55,7 @@ import type { JobRecord } from './staging-host-apply-guard.ts';
 const CLI = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
-  'staging-web-deploy.mjs',
+  'staging-web-deploy.ts',
 );
 
 const WEB = 'https://staging.example.test';

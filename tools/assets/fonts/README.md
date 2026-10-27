@@ -3,7 +3,7 @@
 The two typefaces used by [`docs/agents/orchestration-map.html`](../../../docs/agents/orchestration-map.html).
 They are embedded as base64 data URIs in that page's `@font-face` block so it renders
 identically from disk, offline, and inside a sandbox that blocks external hosts. Nothing at
-render time touches the network. `tools/scripts/build-agent-map.mjs` inlined them on first
+render time touches the network. `tools/scripts/build-agent-map.ts` inlined them on first
 import; that page is no longer reproducible from the importer (ADR 0052).
 
 | File                          | Family    | Weights           | Subset |
@@ -37,6 +37,6 @@ curl -sS -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML
 
 Download the URLs under the `/* latin */` blocks, replace the files above, then re-embed them
 into `docs/agents/orchestration-map.html`'s `@font-face` block — edit the page in place via
-design-brief → Designer (ADR 0046). Do not rebuild with `build-agent-map.mjs`.
+design-brief → Designer (ADR 0046). Do not rebuild with `build-agent-map.ts`.
 Verify each download starts with the `wOF2` magic bytes (`774f4632`) before committing — an
 error page saved as `.woff2` fails silently at render time.

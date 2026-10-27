@@ -432,7 +432,7 @@ export function assertHostApplyProbesHealthy({
 /**
  * The `npm run` scripts the deploy bundle must keep exposing so this engine's
  * `prisma-migrate-deploy` / `prisma-generate` / `migrate-status` steps have
- * something to call (produced by `tools/scripts/package-backend-api.mjs`).
+ * something to call (produced by `tools/scripts/package-backend-api.ts`).
  * `prisma:migrate:deploy` and `prisma:generate` are issue #566's named
  * acceptance criterion; `prisma:migrate:status` is included too because
  * `HOST_APPLY_STEP_ORDER`'s last step depends on it existing just as much —

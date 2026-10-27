@@ -36,7 +36,7 @@ const FIXTURE_FILES = [
   '.github/workflows/dispatch-production-deploy.yml',
   '.github/workflows/publish-github-release.yml',
   'package.json',
-  'tools/scripts/release.mjs',
+  'tools/scripts/release.ts',
   'tools/scripts/lib/staging-host-apply-guard.ts',
 ];
 
@@ -175,7 +175,7 @@ test('fails when the staging same-site assertion is removed', (t) => {
   edit(
     workspace,
     STAGING,
-    'run: node .deploy-tools/tools/scripts/staging-web-deploy.mjs same-site "$WEB_ORIGIN" "$API_ORIGIN"',
+    'run: node .deploy-tools/tools/scripts/staging-web-deploy.ts same-site "$WEB_ORIGIN" "$API_ORIGIN"',
     "run: echo 'skipped'",
   );
 

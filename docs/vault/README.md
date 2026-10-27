@@ -54,7 +54,7 @@ bring them under the check, export them and add them to `SOURCES` in
 
 **These two files are the source.** There is nothing to regenerate them from.
 
-Both pages began as dc-runtime design exports, which `tools/scripts/build-agent-map.mjs` imported
+Both pages began as dc-runtime design exports, which `tools/scripts/build-agent-map.ts` imported
 once in August 2026 — inlining the design-system stylesheet, embedding both typefaces as woff2
 data URIs, and deciding how much runtime to carry from the page itself (`lifecycle.html` binds
 templates so it carries React; `trust-boundary.html` does not and ships as plain DOM at roughly a

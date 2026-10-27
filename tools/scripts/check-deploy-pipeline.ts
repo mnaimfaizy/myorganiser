@@ -8,7 +8,7 @@
 // The page is a hand-designed diagram, so its prose cannot be generated. What can
 // be checked is the set of constants it asserts: the embedded
 // #release-pipeline-manifest must agree with .github/workflows/*.yml, package.json
-// and tools/scripts/release.mjs. A Staging schedule that moves, an approval gate
+// and tools/scripts/release.ts. A Staging schedule that moves, an approval gate
 // removed from a deploy job, or a frontend that stops going to cPanel then fails
 // here instead of leaving a confidently wrong deployment reference in docs/.
 //
@@ -48,7 +48,7 @@ const PRODUCTION = join(WORKFLOWS, 'deploy-production.yml');
 const DISPATCHER = join(WORKFLOWS, 'dispatch-production-deploy.yml');
 const PUBLISH = join(WORKFLOWS, 'publish-github-release.yml');
 const PACKAGE_JSON = 'package.json';
-const RELEASE_SCRIPT = join('tools', 'scripts', 'release.mjs');
+const RELEASE_SCRIPT = join('tools', 'scripts', 'release.ts');
 const STAGING_HOST_APPLY_GUARD = join(
   'tools',
   'scripts',
@@ -234,7 +234,7 @@ const jobCancelInProgress = (path: string, jobId: string): boolean => {
 // map is also the list of claims the page is allowed to make.
 const EXTRACTORS = {
   // Node: three scopes, one floor. The runners pin an exact major, the repo
-  // declares a range, and release.mjs refuses to run below one. Collapsing them
+  // declares a range, and release.ts refuses to run below one. Collapsing them
   // into a single "node version" is the mistake the manifest's key names prevent.
   ciRunnerNodeMajor: () =>
     theOnly(
@@ -251,7 +251,7 @@ const EXTRACTORS = {
       capture(
         RELEASE_SCRIPT,
         /major\s*<\s*(\d+)/,
-        'the minimum Node major release.mjs enforces',
+        'the minimum Node major release.ts enforces',
       ),
     ),
 
@@ -273,7 +273,7 @@ const EXTRACTORS = {
   // the frontend job still runs it: a deleted step leaves every other line of
   // the workflow reading exactly as before.
   stagingAssertsSameSite: () =>
-    /^\s*run:.*\bstaging-web-deploy\.mjs same-site\b/m.test(
+    /^\s*run:.*\bstaging-web-deploy\.ts same-site\b/m.test(
       jobBlock(STAGING, 'deploy-frontend'),
     ),
 
@@ -382,7 +382,7 @@ const EXTRACTORS = {
   productionFrontendArtifactDir: () =>
     artifactDir(PRODUCTION, 'deploy-frontend'),
 
-  // The publish workflow reads the notes from the tagged commit; release.mjs
+  // The publish workflow reads the notes from the tagged commit; release.ts
   // writes them at cut. Two scopes, and the release breaks if they disagree.
   releaseNotesFileName: () =>
     theOnly(
@@ -395,10 +395,10 @@ const EXTRACTORS = {
         capture(
           RELEASE_SCRIPT,
           /notesFile\s*=\s*'([^']+)'/,
-          'the release-notes filename release.mjs writes',
+          'the release-notes filename release.ts writes',
         ),
       ],
-      'release-notes filename across the publish workflow and release.mjs',
+      'release-notes filename across the publish workflow and release.ts',
     ),
 
   // `release:cut` refuses a commit Staging has not both uploaded and Host
