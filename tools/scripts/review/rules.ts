@@ -218,5 +218,4 @@ export const ruleById = (id: string): Rule | undefined =>
   ruleCatalogue().rules.find((r) => r.id === id) ?? undefined;
 
 /** Every id, in catalogue order. */
-export const ruleIds = (): string[] =>
-  ruleCatalogue().rules.map((r) => r.id);
+export const ruleIds = (): string[] => ruleCatalogue().rules.map((r) => r.id);

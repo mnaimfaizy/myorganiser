@@ -39,21 +39,20 @@ const SPEC_LINE = `- spec: <ref>, text in ${SPEC_FILE}`;
 export const RETRY_LINE =
   '- retry: your first reply was rejected; the reasons are in tmp/code-review/<axis>.rejected.txt';
 
-export const DISPATCH_TEMPLATES: Readonly<
-  Record<string, readonly string[]>
-> = Object.freeze({
-  standards: Object.freeze([
-    FIRST_LINE(BRIEFS.standards),
-    DIFF_LINE,
-    HEAD_LINE,
-  ]),
-  spec: Object.freeze([
-    FIRST_LINE(BRIEFS.spec),
-    DIFF_LINE,
-    HEAD_LINE,
-    SPEC_LINE,
-  ]),
-});
+export const DISPATCH_TEMPLATES: Readonly<Record<string, readonly string[]>> =
+  Object.freeze({
+    standards: Object.freeze([
+      FIRST_LINE(BRIEFS.standards),
+      DIFF_LINE,
+      HEAD_LINE,
+    ]),
+    spec: Object.freeze([
+      FIRST_LINE(BRIEFS.spec),
+      DIFF_LINE,
+      HEAD_LINE,
+      SPEC_LINE,
+    ]),
+  });
 
 const escapeRegExp = (text: string): string =>
   text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

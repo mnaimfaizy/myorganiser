@@ -184,7 +184,10 @@ const read = (
 };
 
 /** Whether `part` is found in `whole`, adjacent and in order. */
-const isRunOf = (part: readonly string[], whole: readonly string[]): boolean => {
+const isRunOf = (
+  part: readonly string[],
+  whole: readonly string[],
+): boolean => {
   for (let start = 0; start + part.length <= whole.length; start += 1)
     if (part.every((ran, i) => whole[start + i] === ran)) return true;
   return false;
@@ -215,8 +218,7 @@ export const matchExecutedEvidence = (
     found = true;
     const { exitCode } = execution;
     const comparable = whole && exitCode !== null;
-    if (!comparable || exitCode === evidence.exitCode)
-      return { status: 'ran' };
+    if (!comparable || exitCode === evidence.exitCode) return { status: 'ran' };
     differing.add(exitCode);
   }
   return found

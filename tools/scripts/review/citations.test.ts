@@ -153,8 +153,8 @@ test('the trailing newline is not a line anybody can cite', () => {
     withNewline,
   );
   assert.equal(v.ok, false);
-  assert.equal('reason' in v && v.reason, 'line-out-of-range');
-  assert.equal('lineCount' in v && v.lineCount, 2);
+  assert.equal(v.reason, 'line-out-of-range');
+  assert.equal(v.lineCount, 2);
   // And the last real line still verifies.
   assert.deepEqual(
     verifyCitation(

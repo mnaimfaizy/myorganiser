@@ -32,10 +32,7 @@ import type {
   RunFacts,
   SpecKind,
 } from './schema.ts';
-import type {
-  RunFailureReason,
-  TighteningFact,
-} from './run-ladder-terms.ts';
+import type { RunFailureReason, TighteningFact } from './run-ladder-terms.ts';
 import { RUN_FAILURES, TIGHTENING_FACTS } from './run-ladder-terms.ts';
 
 export { RUN_FAILURES, TIGHTENING_FACTS };
@@ -160,9 +157,7 @@ export const isObligationFinding = (
       (file === undefined ||
         Number(entry.truncated) > 0 ||
         (Array.isArray(entry.sites) &&
-          (entry.sites as WorklistSite[]).some(
-            (site) => site?.file === file,
-          ))),
+          (entry.sites as WorklistSite[]).some((site) => site?.file === file))),
   );
 };
 
