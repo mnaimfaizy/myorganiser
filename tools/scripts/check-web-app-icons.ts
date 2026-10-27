@@ -29,6 +29,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
+import { errorMessage } from './lib/error-message.ts';
 import { renderWebAppIcons } from './lib/web-app-icons.ts';
 
 const root = process.cwd();
@@ -38,7 +39,7 @@ try {
   rendered = await renderWebAppIcons({ root });
 } catch (error) {
   console.error(
-    `web-app-icons: the check could not run\n  - ${error instanceof Error ? error.message : String(error)}`,
+    `web-app-icons: the check could not run\n  - ${errorMessage(error)}`,
   );
   process.exit(2);
 }

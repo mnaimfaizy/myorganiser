@@ -50,6 +50,8 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const require = createRequire(import.meta.url);
 const cwd = process.cwd();
 const printOnly = process.argv.includes('--print');
@@ -93,7 +95,7 @@ try {
   ({ compile } = await import('tailwindcss'));
 } catch (err) {
   fail(
-    `could not load Tailwind. Is the workspace installed?\n  ${err instanceof Error ? err.message : String(err)}`,
+    `could not load Tailwind. Is the workspace installed?\n  ${errorMessage(err)}`,
   );
 }
 
@@ -126,9 +128,7 @@ try {
     loadModule,
   });
 } catch (err) {
-  fail(
-    `could not compile ${ENTRY}:\n  ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`could not compile ${ENTRY}:\n  ${errorMessage(err)}`);
 }
 
 const scanner = new Scanner({

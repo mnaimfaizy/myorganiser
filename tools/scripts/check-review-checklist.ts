@@ -22,6 +22,7 @@
 // Exit 0 = sound. Exit 1 = findings. Exit 2 = could not run.
 import { readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
 import { isMain } from './review/cli.mjs';
 import { loadGoldenSet } from './review/golden.mjs';
 import {
@@ -101,16 +102,14 @@ const main = () => {
   try {
     md = readFileSync(CHECKLIST, 'utf8');
   } catch (err) {
-    die(
-      `cannot read ${CHECKLIST}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    die(`cannot read ${CHECKLIST}: ${errorMessage(err)}`);
   }
 
   let catalogue;
   try {
     catalogue = loadObligationCatalogue();
   } catch (err) {
-    die(err instanceof Error ? err.message : String(err));
+    die(errorMessage(err));
   }
 
   const entries = parseChecklist(md);
@@ -153,9 +152,7 @@ const main = () => {
       ...(set.parked ?? []).map((c: { id: string }) => c.id),
     ]);
   } catch (err) {
-    die(
-      `cannot read the golden set: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    die(`cannot read the golden set: ${errorMessage(err)}`);
   }
   for (const o of catalogue.obligations)
     if (!known.has(o.goldenCase))

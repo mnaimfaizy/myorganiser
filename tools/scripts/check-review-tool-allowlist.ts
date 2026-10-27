@@ -134,6 +134,7 @@
 // matches nothing.
 import { readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
 import { tokenize } from './lib/shell-command.ts';
 import { isMain } from './review/cli.mjs';
 
@@ -557,18 +558,35 @@ const isScriptGlob = (token: string) =>
  */
 /**
  * One instruction site: the command a line asks for, and the token lists that
- * would satisfy it. `shape` marks a script shape (`*:check`), which stands for
- * a class of commands rather than one, and `names` are the scripts it names.
+ * would satisfy it.
  */
-export interface InstructionSite {
+interface InstructionSiteCommon {
   file?: string;
   line?: number;
   sectionId?: string | null;
   command: string;
   alternatives: string[][];
-  shape?: boolean;
-  names?: string[];
 }
+
+/** A site naming one command, whose single spelling is `command`. */
+export interface NamedInstructionSite extends InstructionSiteCommon {
+  shape?: false;
+  names?: undefined;
+}
+
+/**
+ * A site naming a script shape (`*:check`), which stands for a class of
+ * commands rather than one. `names` are the scripts it matched, and the two
+ * travel together: `commandsFrom` drops a shape that matched nothing, so a
+ * shape always carries at least one name and a reader is never shown a count
+ * of `undefined`.
+ */
+export interface ShapeInstructionSite extends InstructionSiteCommon {
+  shape: true;
+  names: string[];
+}
+
+export type InstructionSite = NamedInstructionSite | ShapeInstructionSite;
 
 export function commandsFrom(
   text: string,
@@ -763,19 +781,22 @@ export function assertToolAllowlist({
     // site whose every spelling is intercepted is refused however generously
     // `--allowedTools` is written; a site with one clear spelling left is not
     // a finding, since the reviewer has a way through.
-    const clear = site.alternatives.filter(
-      (alternative) =>
-        !interposed.some((rule) =>
-          matchesEntry(rule, alternative, { unfixedMatches: false }),
-        ),
-    );
-    if (clear.length === 0) {
+    //
+    // One pass collects both answers the branch below needs: the spellings
+    // nothing catches, and the first rule that caught one. Reporting an
+    // interception needs a rule to name, so it is read here rather than
+    // looked up again afterwards against a type that cannot promise one.
+    const clear: string[][] = [];
+    let caughtBy: ToolEntry | undefined;
+    for (const alternative of site.alternatives) {
       const rule = interposed.find((candidate) =>
-        matchesEntry(candidate, site.alternatives[0], {
-          unfixedMatches: false,
-        }),
+        matchesEntry(candidate, alternative, { unfixedMatches: false }),
       );
-      intercepted.push({ site, rule });
+      if (rule) caughtBy ??= rule;
+      else clear.push(alternative);
+    }
+    if (clear.length === 0 && caughtBy) {
+      intercepted.push({ site, rule: caughtBy });
       continue;
     }
 
@@ -827,8 +848,8 @@ const siteLocation = (site: InstructionSite) =>
 /** One site whose every spelling an interposed rule catches. */
 export interface Interception {
   site: InstructionSite;
-  /** The rule that caught it — `clear` is empty, so one always did. */
-  rule: ToolEntry | undefined;
+  /** The rule that caught it, read at the point the interception was found. */
+  rule: ToolEntry;
 }
 
 /** One refused site, with the entry that comes closest to permitting it. */
@@ -842,14 +863,14 @@ export function formatInterception({ site, rule }: Interception) {
   return [
     `  - ${siteLocation(site)}`,
     `      instructed:  ${site.command}`,
-    `      intercepted: ${rule?.raw} in ${SETTINGS} (permissions.${rule?.list})`,
+    `      intercepted: ${rule.raw} in ${SETTINGS} (permissions.${rule.list})`,
   ].join('\n');
 }
 
 /** One finding, as the lines a reader needs to act on it. */
 export function formatFinding({ site, nearest }: Finding) {
   const shape = site.shape
-    ? ` (a shape: ${site.names?.length} script(s) match it, none permitted)`
+    ? ` (a shape: ${site.names.length} script(s) match it, none permitted)`
     : '';
   const lines = [
     `  - ${siteLocation(site)}`,
@@ -1071,9 +1092,7 @@ const main = () => {
   try {
     action = readFileSync(ACTION, 'utf8');
   } catch (err) {
-    die(
-      `cannot read ${ACTION}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    die(`cannot read ${ACTION}: ${errorMessage(err)}`);
   }
 
   const entries = parseAllowedTools(action);
@@ -1103,9 +1122,7 @@ const main = () => {
     // state rather than a broken one. A file that is there but unreadable is
     // not: it would silence direction 2 while the gate reported OK.
     if ((err as { code?: string }).code !== 'ENOENT')
-      die(
-        `cannot read ${SETTINGS}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      die(`cannot read ${SETTINGS}: ${errorMessage(err)}`);
   }
 
   let scripts: Set<string>;
@@ -1116,9 +1133,7 @@ const main = () => {
       ),
     );
   } catch (err) {
-    die(
-      `cannot read package.json: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    die(`cannot read package.json: ${errorMessage(err)}`);
   }
 
   const sites: InstructionSite[] = [];
@@ -1127,9 +1142,7 @@ const main = () => {
     try {
       text = readFileSync(file, 'utf8');
     } catch (err) {
-      die(
-        `cannot read ${file}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      die(`cannot read ${file}: ${errorMessage(err)}`);
     }
     const found = extractInstructions(text, { file, scripts });
     // A parser that reads nothing passes everything, and both documents have

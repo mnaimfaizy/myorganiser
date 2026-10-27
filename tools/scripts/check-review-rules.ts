@@ -51,6 +51,7 @@
 // Exit 0 = in sync. Exit 1 = drift. Exit 2 = the check could not run.
 import { existsSync, readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
 import {
   familyOf,
   loadRuleCatalogue,
@@ -303,7 +304,7 @@ export const main = (argv = process.argv.slice(2)) => {
   try {
     catalogue = loadRuleCatalogue();
   } catch (err) {
-    bail(err instanceof Error ? err.message : String(err));
+    bail(errorMessage(err));
   }
   const obligations = JSON.parse(readFileSync(OBLIGATIONS, 'utf8')).obligations;
   const skill = readFileSync(SKILL, 'utf8');

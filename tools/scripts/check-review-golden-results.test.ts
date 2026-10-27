@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { spawnFailure } from './lib/spawn-failure.ts';
+
 const CHECKER = 'tools/scripts/check-review-golden-results.ts';
 
 const CAUGHT_LINE = JSON.stringify({
@@ -141,10 +143,10 @@ const runOn = ({
     );
     return { code: 0, out: stdout, dir, read };
   } catch (err) {
-    const e = err as { status?: number; stdout?: string; stderr?: string };
+    const e = spawnFailure(err);
     return {
       code: e.status,
-      out: `${e.stdout ?? ''}${e.stderr ?? ''}`,
+      out: `${e.stdout}${e.stderr}`,
       dir,
       read,
     };

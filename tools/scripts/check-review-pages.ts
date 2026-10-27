@@ -15,6 +15,7 @@
 // check could not run.
 import { existsSync, readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
 import { RULE_FAMILIES } from './review/rules.mjs';
 import {
   FINDING_AXES,
@@ -87,9 +88,7 @@ let manifest;
 try {
   manifest = JSON.parse(raw[1]);
 } catch (err) {
-  fail(
-    `#${MANIFEST_ID} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`#${MANIFEST_ID} is not valid JSON: ${errorMessage(err)}`);
 }
 
 const jobNames = (workflow: string) =>

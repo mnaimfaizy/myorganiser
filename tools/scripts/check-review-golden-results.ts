@@ -42,6 +42,7 @@ import {
   STANDING_START,
   renderStandingTable,
 } from './review/golden-standing.mjs';
+import { errorMessage } from './lib/error-message.ts';
 import { GOLDEN_SET_PATH } from './review/golden-tiers.mjs';
 
 const RECORD = 'docs/review/golden-replay-results.jsonl';
@@ -72,9 +73,7 @@ let set;
 try {
   set = JSON.parse(readFileSync(GOLDEN_SET_PATH, 'utf8'));
 } catch (err) {
-  fail(
-    `cannot read ${GOLDEN_SET_PATH}: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`cannot read ${GOLDEN_SET_PATH}: ${errorMessage(err)}`);
 }
 
 const unformatted = (body: string) =>

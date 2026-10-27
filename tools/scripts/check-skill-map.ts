@@ -24,6 +24,8 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const PAGE = 'docs/agents/skill-atlas.html';
 const SKILLS_DIR = '.agents/skills';
 const AGENTS_DIR = '.github/agents';
@@ -62,9 +64,7 @@ let manifest: Record<string, unknown>;
 try {
   manifest = JSON.parse(manifestRaw[1]);
 } catch (err) {
-  fail(
-    `#skill-atlas-manifest is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`#skill-atlas-manifest is not valid JSON: ${errorMessage(err)}`);
 }
 
 // ── Frontmatter ─────────────────────────────────────────────────────────────
@@ -502,9 +502,7 @@ if (!fmBlock) {
   try {
     embedded = JSON.parse(fmBlock[1]);
   } catch (err) {
-    note(
-      `SKILL_FM is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    note(`SKILL_FM is not valid JSON: ${errorMessage(err)}`);
     embedded = null;
   }
   if (embedded) {

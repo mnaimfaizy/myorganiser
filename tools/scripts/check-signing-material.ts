@@ -42,6 +42,8 @@
 // and its path is named. Exit 2 = could not read the index.
 import { execFileSync } from 'node:child_process';
 
+import { spawnFailure } from './lib/spawn-failure.ts';
+
 // `git hash-object` of the keystore `@nx/react-native` generates into every
 // app (node_modules/@nx/react-native/src/generators/application/files/app/
 // android/app/debug.keystore). Its password is `android` and it is published,
@@ -137,7 +139,7 @@ function serviceAccountPaths(cwd: string): string[] {
       SERVICE_ACCOUNT_PATTERN,
     ]);
   } catch (error) {
-    if ((error as { status?: number }).status === 1) return []; // git grep: no match
+    if (spawnFailure(error).status === 1) return []; // git grep: no match
     throw error;
   }
   return candidates

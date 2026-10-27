@@ -36,6 +36,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
 import {
   GoldenSetError,
   REVIEW_GOLDEN_SET_PATH,
@@ -69,9 +70,7 @@ try {
     console.error(`review-golden-set: ${err.message}`);
     process.exit(1);
   }
-  fail(
-    `cannot load ${REVIEW_GOLDEN_SET_PATH}: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`cannot load ${REVIEW_GOLDEN_SET_PATH}: ${errorMessage(err)}`);
 }
 if (!existsSync(REPLAY_WORKFLOW)) fail(`${REPLAY_WORKFLOW} not found`);
 
@@ -109,9 +108,7 @@ let records;
 try {
   records = loadGoldenRecords();
 } catch (err) {
-  fail(
-    `cannot read the results record: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`cannot read the results record: ${errorMessage(err)}`);
 }
 for (const f of replayRepetitionFindings(workflow, set, records))
   findings.push(`${REPLAY_WORKFLOW}: ${f}`);

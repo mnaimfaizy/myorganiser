@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
+import { errorMessage } from './lib/error-message.ts';
 import {
   NX_PROJECT_TAGS_CONFIG_PATH,
   assertProjectTags,
@@ -32,9 +33,7 @@ let vocabulary: TagVocabulary;
 try {
   vocabulary = loadTagVocabulary();
 } catch (err) {
-  fail(
-    `cannot load ${NX_PROJECT_TAGS_CONFIG_PATH}: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`cannot load ${NX_PROJECT_TAGS_CONFIG_PATH}: ${errorMessage(err)}`);
 }
 
 let files: string[];
@@ -45,9 +44,7 @@ try {
     .split('\n')
     .filter((f: string) => f.endsWith('project.json'));
 } catch (err) {
-  fail(
-    `git ls-files failed: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`git ls-files failed: ${errorMessage(err)}`);
 }
 if (files.length === 0) fail('no project.json files found');
 
@@ -56,7 +53,7 @@ const projects: NxProjectTagInput[] = files.map((path) => {
   try {
     json = JSON.parse(readFileSync(path, 'utf8'));
   } catch (err) {
-    fail(`${path}: ${err instanceof Error ? err.message : String(err)}`);
+    fail(`${path}: ${errorMessage(err)}`);
   }
   return { name: json.name ?? path, path, tags: json.tags };
 });

@@ -62,6 +62,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { ZodError } from 'zod';
 
+import { errorMessage } from './lib/error-message.ts';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './review/cli.mjs';
 import {
   AnswerSheetSchema,
@@ -223,7 +224,7 @@ export const main = (
       findings,
     });
   } catch (err) {
-    bail(err instanceof Error ? err.message : String(err));
+    bail(errorMessage(err));
   }
   const summary =
     report.expected === 0

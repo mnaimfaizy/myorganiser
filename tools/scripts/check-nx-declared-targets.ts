@@ -40,6 +40,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
 import {
   BASELINE_PATH,
   classifyDeclaredTargets,
@@ -63,7 +64,7 @@ let notDebt: NotDebtExecutor[];
 try {
   ({ baseline, notDebt } = readBaseline({ cwd }));
 } catch (error) {
-  fail(error instanceof Error ? error.message : String(error));
+  fail(errorMessage(error));
 }
 
 let files: string[];
@@ -75,9 +76,7 @@ try {
     .split('\n')
     .filter((f: string) => f.endsWith('project.json'));
 } catch (error) {
-  fail(
-    `git ls-files failed: ${error instanceof Error ? error.message : String(error)}`,
-  );
+  fail(`git ls-files failed: ${errorMessage(error)}`);
 }
 if (files.length === 0) fail('no project.json files found');
 
@@ -86,7 +85,7 @@ const projects: ProjectTargets[] = files.map((path) => {
   try {
     json = JSON.parse(readFileSync(join(cwd, path), 'utf8'));
   } catch (error) {
-    fail(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`${path}: ${errorMessage(error)}`);
   }
   return { name: json.name ?? path, path, targets: json.targets ?? {} };
 });

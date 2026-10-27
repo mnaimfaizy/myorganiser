@@ -31,6 +31,8 @@
 // Exit 0 = the two agree. Exit 1 = they have drifted. Exit 2 = could not run.
 import { readFileSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const WORKFLOW = '.github/workflows/code-review.yml';
 const printOnly = process.argv.includes('--print');
 
@@ -43,9 +45,7 @@ let source: string;
 try {
   source = readFileSync(WORKFLOW, 'utf8');
 } catch (err) {
-  fail(
-    `cannot read ${WORKFLOW}: ${err instanceof Error ? err.message : String(err)}`,
-  );
+  fail(`cannot read ${WORKFLOW}: ${errorMessage(err)}`);
 }
 
 /**

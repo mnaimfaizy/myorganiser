@@ -45,6 +45,8 @@
 // Exit 0 = in sync. Exit 1 = drift (fix the page, or the source moved). Exit 2 = could not run.
 import { readFileSync, existsSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const RESUME = 'tools/scripts/lib/sandcastle-resume.ts';
 const TRACE = 'tools/scripts/lib/sandcastle-subagent-trace.ts';
 const OUTCOME = 'tools/scripts/lib/sandcastle-outcome.ts';
@@ -727,10 +729,7 @@ for (const [pagePath, manifestId] of PAGES) {
   try {
     manifest = JSON.parse(raw[1]);
   } catch (err) {
-    add(
-      name,
-      `#${manifestId} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    add(name, `#${manifestId} is not valid JSON: ${errorMessage(err)}`);
     continue;
   }
 
@@ -775,10 +774,7 @@ for (const [pagePath, manifestId] of PAGES) {
     try {
       actual = resolver();
     } catch (err) {
-      add(
-        name,
-        `${key}: resolver threw — ${err instanceof Error ? err.message : String(err)}`,
-      );
+      add(name, `${key}: resolver threw — ${errorMessage(err)}`);
       continue;
     }
     if (actual === undefined) {

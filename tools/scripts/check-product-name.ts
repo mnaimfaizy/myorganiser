@@ -30,6 +30,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const ALLOWLIST_PATH = 'tools/config/product-name-allowlist.json';
 const OLD_SPELLING = new RegExp(['myorgani', 'zer'].join(''), 'i');
 
@@ -73,9 +75,7 @@ function readAllowlist(cwd: string): AllowlistEntry[] {
   try {
     parsed = JSON.parse(readFileSync(absolute, 'utf8'));
   } catch (error) {
-    fail(
-      `${ALLOWLIST_PATH} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    fail(`${ALLOWLIST_PATH} is not valid JSON: ${errorMessage(error)}`);
   }
   if (!Array.isArray(parsed.allowlist)) {
     fail(`${ALLOWLIST_PATH} has no "allowlist" array`);
@@ -97,7 +97,7 @@ function readAllowlist(cwd: string): AllowlistEntry[] {
         frozenFrom = new RegExp(entry.frozenFrom);
       } catch (error) {
         fail(
-          `${where} (${entry.path}) has an invalid "frozenFrom": ${error instanceof Error ? error.message : String(error)}`,
+          `${where} (${entry.path}) has an invalid "frozenFrom": ${errorMessage(error)}`,
         );
       }
     }

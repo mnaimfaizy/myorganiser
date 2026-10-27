@@ -73,6 +73,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
 import { validateDeclinedOpportunities } from '../../.agents/skills/upstream-brief/ledger.mjs';
 import { recheckUpstreamReport } from '../../.agents/skills/upstream-brief/report.mjs';
 // The adapter schema belongs to the skill (ADAPTER.md), so where briefs live,
@@ -232,9 +233,7 @@ export function checkUpstreamBriefs({
     try {
       raw = JSON.parse(text);
     } catch (error) {
-      lines.push(
-        `${LABEL}: ${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      lines.push(`${LABEL}: ${path} is not valid JSON: ${errorMessage(error)}`);
       worst(1);
       continue;
     }

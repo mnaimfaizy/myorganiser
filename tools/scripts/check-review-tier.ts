@@ -26,6 +26,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 
+import { errorMessage } from './lib/error-message.ts';
 import { gh } from './lib/gh.ts';
 import { loadProjectGraph } from './lib/nx-graph.ts';
 import {
@@ -116,5 +117,5 @@ try {
   const pathMap = loadPathMap();
   finish(classifyReviewTier({ files, graph, pathMap, author }), 0);
 } catch (err) {
-  cannotRun(err instanceof Error ? err.message : String(err));
+  cannotRun(errorMessage(err));
 }

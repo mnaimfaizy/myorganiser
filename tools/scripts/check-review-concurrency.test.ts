@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { spawnFailure } from './lib/spawn-failure.ts';
+
 const CHECKER = 'tools/scripts/check-review-concurrency.ts';
 const WORKFLOW = '.github/workflows/code-review.yml';
 
@@ -31,8 +33,8 @@ const runOn = (mutate: (source: string) => string = (s) => s) => {
     );
     return { code: 0, out: stdout };
   } catch (err) {
-    const e = err as { status?: number; stdout?: string; stderr?: string };
-    return { code: e.status, out: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+    const e = spawnFailure(err);
+    return { code: e.status, out: `${e.stdout}${e.stderr}` };
   }
 };
 

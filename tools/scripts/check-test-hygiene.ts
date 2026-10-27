@@ -20,6 +20,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+import { errorMessage } from './lib/error-message.ts';
+
 import {
   blockAfter,
   signatureBodyAfter,
@@ -532,7 +534,7 @@ async function main() {
             level: 'error',
             rule: 'unreadable',
             line: 1,
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage(error),
           },
         ],
       });
@@ -560,6 +562,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(errorMessage(error));
   process.exitCode = 1;
 });

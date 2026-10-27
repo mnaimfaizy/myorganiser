@@ -13,6 +13,8 @@
 // Exit 0 = in sync. Exit 1 = drift (edit the page in place). Exit 2 = the check could not run.
 import { readFileSync, existsSync } from 'node:fs';
 
+import { errorMessage } from './lib/error-message.ts';
+
 const PAGES = [
   ['docs/vault/trust-boundary.html', 'vault-map-manifest'],
   ['docs/vault/lifecycle.html', 'vault-lifecycle-manifest'],
@@ -167,9 +169,7 @@ for (const [page, manifestId] of PAGES) {
   try {
     manifest = JSON.parse(block[1]);
   } catch (err) {
-    fail(
-      `#${manifestId} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    fail(`#${manifestId} is not valid JSON: ${errorMessage(err)}`);
   }
 
   let declared = 0;
