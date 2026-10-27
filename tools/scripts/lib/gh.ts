@@ -9,7 +9,7 @@
  * script refuses a Cut, the review measurements record an unreadable lookup.
  *
  * Scripts that branch on the exit status without throwing (`spawnSync`, as
- * in `ai/create-pr.mjs`) are a different contract and do not use this.
+ * in `ai/create-pr.ts`) are a different contract and do not use this.
  */
 import { execFileSync } from 'node:child_process';
 
