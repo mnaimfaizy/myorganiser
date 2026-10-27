@@ -425,7 +425,7 @@ const axisFacts = (overrides = {}) => ({
   ...overrides,
 });
 
-const normalizedWith = (runFacts) => ({
+const normalizedWith = (runFacts: Record<string, unknown>) => ({
   runFactsFrom: 'transcript',
   runFacts: {
     shape: 'readable',

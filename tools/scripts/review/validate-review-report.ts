@@ -47,7 +47,9 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { ZodError } from 'zod';
 
+import type { Bail } from './cli.ts';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './cli.ts';
+import type { NormalizedReport, RunFacts } from './schema.ts';
 import {
   formatIssues,
   isComparableReport,
@@ -59,8 +61,8 @@ import {
 const USAGE =
   'usage: validate-review-report.ts <report.json> [--out <path>] [--tier <review:label>] [--previous <normalized.json>] [--facts <run-facts.json>] [--worklist <obligations.json>]';
 
-export const main = (argv) => {
-  const bail = cannotRun('review-validate');
+export const main = (argv: string[]): void => {
+  const bail: Bail = cannotRun('review-validate');
   const { positional, flags } = parseArgs(argv);
   const [inputPath] = positional;
   if (!inputPath) bail(USAGE);
@@ -71,14 +73,15 @@ export const main = (argv) => {
   // wrote into the envelope (ADR 0070 item 3). The schema still checks it.
   if ('tier' in flags) {
     if (!flags.tier) bail('--tier needs a review:* label');
-    if (raw && typeof raw === 'object') raw.tier = flags.tier;
+    if (raw && typeof raw === 'object')
+      (raw as { tier?: string }).tier = flags.tier;
   }
 
   // Ids are carried out of this file, so it is held to the contract it was
   // written under: a comparable report that does not parse is somebody else's
   // file under the artifact's name, and lending ids from it would mint
   // identities nothing can trace.
-  let previous = null;
+  let previous: unknown = null;
   if ('previous' in flags) {
     if (!flags.previous) bail('--previous needs a path');
     previous = readJsonOr(flags.previous, bail);
@@ -95,10 +98,10 @@ export const main = (argv) => {
   // the reviewer's (ADR 0123). A facts file that is missing or malformed
   // cannot run: falling back to what the reviewer wrote is the silent state
   // this flag exists to remove.
-  let facts = null;
+  let facts: RunFacts | null = null;
   if ('facts' in flags) {
     if (!flags.facts) bail('--facts needs a path');
-    facts = readJsonOr(flags.facts, bail);
+    facts = readJsonOr(flags.facts, bail) as RunFacts;
     const parsed = RunFactsSchema.safeParse(facts);
     if (!parsed.success)
       bail(
@@ -106,13 +109,13 @@ export const main = (argv) => {
       );
   }
 
-  let worklist = null;
+  let worklist: unknown = null;
   if ('worklist' in flags) {
     if (!flags.worklist) bail('--worklist needs a path');
     if (existsSync(flags.worklist)) worklist = readJsonOr(flags.worklist, bail);
   }
 
-  let normalized;
+  let normalized: NormalizedReport;
   try {
     normalized = normalizeReport(raw, { previous, facts, worklist });
   } catch (err) {

@@ -41,8 +41,8 @@ measurement turns it around and walks the repository's own fix history.
 yarn review:escaped:measure --days 60
 ```
 
-`tools/scripts/review/measure-escaped-defects.mjs` gathers; the classification
-and the arithmetic are pure, in `tools/scripts/review/escaped-defects.mjs`,
+`tools/scripts/review/measure-escaped-defects.ts` gathers; the classification
+and the arithmetic are pure, in `tools/scripts/review/escaped-defects.ts`,
 and covered by `yarn review:test`.
 
 - **The population** is every merged fix Pull Request in the window: a `fix/`

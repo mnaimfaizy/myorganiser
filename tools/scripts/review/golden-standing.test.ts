@@ -12,14 +12,14 @@ import {
 
 // One record per character, oldest first: c = caught, m = missed, v = void,
 // p = clean-pass, f = clean-fail.
-const OUTCOME = {
+const OUTCOME: Record<string, string> = {
   c: 'caught',
   m: 'missed',
   v: 'void',
   p: 'clean-pass',
   f: 'clean-fail',
 };
-const runs = (id, history) =>
+const runs = (id: string, history: string) =>
   [...history].map((ch) => ({ case: id, outcome: OUTCOME[ch] }));
 
 test('the thresholds are the ones ADR 0116 decides', () => {

@@ -10,16 +10,22 @@ import {
   main,
   refusedOutputPath,
 } from './classify-reviewer-run.ts';
+import type { ReviewerRunClassification } from './classify-reviewer-run.ts';
 
 const FIXTURES = new URL('./fixtures/reviewer-runs/', import.meta.url);
-const fixture = (name) => readFileSync(new URL(name, FIXTURES), 'utf8');
-const classify = (events) => classifyReviewerRun(JSON.stringify(events));
-const errors = ({ annotations }) =>
+const fixture = (name: string) => readFileSync(new URL(name, FIXTURES), 'utf8');
+const classify = (events: unknown) =>
+  classifyReviewerRun(JSON.stringify(events));
+const errors = ({ annotations }: ReviewerRunClassification) =>
   annotations.filter((a) => a.level === 'error').map((a) => a.message);
 
 const WORKSPACE = '/home/runner/work/myorganiser/myorganiser';
-const result = (fields) => ({ type: 'result', subtype: 'success', ...fields });
-const denied = (tool_name, file_path) => ({
+const result = (fields: Record<string, unknown>) => ({
+  type: 'result',
+  subtype: 'success',
+  ...fields,
+});
+const denied = (tool_name: string, file_path: string) => ({
   tool_name,
   tool_input: { file_path },
 });
@@ -175,8 +181,8 @@ test('accounting that is not a number is left empty rather than passed through',
 test('main appends the outputs to GITHUB_OUTPUT and escapes a refused path in its annotation', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'classify-reviewer-run-'));
   const out = join(dir, 'github-output');
-  const logged = [];
-  t.mock.method(console, 'log', (line) => logged.push(line));
+  const logged: string[] = [];
+  t.mock.method(console, 'log', (line: string) => logged.push(line));
 
   const file = new URL('success-write-denied-absolute.json', FIXTURES).pathname;
   main([file], { GITHUB_OUTPUT: out });
@@ -193,8 +199,8 @@ test('main appends the outputs to GITHUB_OUTPUT and escapes a refused path in it
 test('a newline in a refused path cannot start a second workflow command', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'classify-reviewer-run-'));
   const file = join(dir, 'run.json');
-  const logged = [];
-  t.mock.method(console, 'log', (line) => logged.push(line));
+  const logged: string[] = [];
+  t.mock.method(console, 'log', (line: string) => logged.push(line));
   const path = `x\n::warning::injected\n/tmp/code-review/report.json`;
   const text = JSON.stringify([
     result({ permission_denials: [denied('Write', path)] }),

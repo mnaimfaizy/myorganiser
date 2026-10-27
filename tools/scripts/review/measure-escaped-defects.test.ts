@@ -15,14 +15,29 @@ import {
   pullRequestType,
 } from './measure-escaped-defects.ts';
 import { attributeFix } from './escaped-defects.ts';
+import type { RootCauseRef } from './escaped-defects.ts';
+import type { Gathered } from './measure-escaped-defects.ts';
+
+/** One `git log` record, as `parsePullRequestLog` reads the stream. */
+interface LogEntry {
+  sha: string;
+  parents?: string;
+  mergedAt?: string;
+  subject: string;
+  body?: string;
+}
+
+/** The Pull Request number a reference names, when it names one. */
+const refNumber = (ref?: RootCauseRef | null) =>
+  ref?.kind === 'pull-request' ? ref.number : undefined;
 
 const FIELD = '\u0000';
 const RECORD = '\u001e';
 
-const entry = ({ sha, parents, mergedAt, subject, body = '' }) =>
+const entry = ({ sha, parents, mergedAt, subject, body = '' }: LogEntry) =>
   [sha, parents, mergedAt, subject, body].join(FIELD) + RECORD;
 
-const log = (...entries) => entries.join('\n');
+const log = (...entries: string[]) => entries.join('\n');
 
 test('a merge commit yields the Pull Request number, the branch, and the title', () => {
   const [pr] = parsePullRequestLog(
@@ -73,7 +88,7 @@ test("a squash merge's commit text is its whole message, where the attribution s
   );
   const text = commitTextOf(pr);
   assert.match(text, /Introduced in #650/);
-  assert.equal(attributeFix({ commits: text }).ref.number, 650);
+  assert.equal(refNumber(attributeFix({ commits: text })!.ref), 650);
 });
 
 test('a commit that is neither shape is not a Pull Request', () => {
@@ -151,7 +166,7 @@ test('the population is the fix Pull Requests', () => {
 // measure, over a recorded gather
 // ---------------------------------------------------------------------------
 
-const gathered = {
+const gathered: Gathered = {
   window: { since: '2026-09-01', until: '2026-09-30' },
   base: 'main',
   reviewerSince: '2026-09-01',
@@ -216,6 +231,6 @@ test('a recorded gather measures without touching the network', () => {
 test('the root cause carries the verdict, not only the outcome', () => {
   const [escaped] = measure(gathered, { base: 'main' }).fixes;
   assert.equal(escaped.class, 'escaped');
-  assert.equal(escaped.rootCause.outcome, 'passed');
-  assert.equal(escaped.rootCause.verdict, 'comment');
+  assert.equal(escaped.rootCause!.outcome, 'passed');
+  assert.equal(escaped.rootCause!.verdict, 'comment');
 });

@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import type { AnswerSheet } from './obligations.ts';
 import {
   ObligationError,
   assertObligationCatalogue,
@@ -27,7 +28,7 @@ import {
 const CHECKER = 'tools/scripts/check-review-obligation-answers.ts';
 const FIXTURES = join('tools', 'scripts', 'review', 'fixtures', '2026-09-10');
 
-const obligation = (over = {}) => ({
+const obligation = (over: Record<string, unknown> = {}) => ({
   id: 'an-obligation',
   title: 'An obligation',
   question: 'Answer this.',
@@ -47,12 +48,12 @@ const catalogue = (obligations = [obligation()]) => ({
 
 // One file, three lines. Enough to be quoted rightly, quoted wrongly, and
 // quoted past the end.
-const SOURCE = {
+const SOURCE: Record<string, string> = {
   'libs/a.ts': ['const x = 1;', '  const y = 2;', 'const z = 3;'].join('\n'),
 };
-const readSource = (file) => SOURCE[file] ?? null;
+const readSource = (file: string) => SOURCE[file] ?? null;
 
-const worklist = (over = {}) => ({
+const worklist = (over: Record<string, unknown> = {}) => ({
   head: 'abc',
   selected: [
     {
@@ -67,7 +68,13 @@ const worklist = (over = {}) => ({
   ],
 });
 
-const sheet = (citations, answer = { a: 'x', b: 'y' }) => ({
+/** One answer's citations, keyed by the field each one backs. */
+type Citations = NonNullable<AnswerSheet['answers'][number]['citations']>;
+
+const sheet = (
+  citations: Citations | undefined,
+  answer: Record<string, unknown> = { a: 'x', b: 'y' },
+) => ({
   head: 'abc',
   answers: [
     {
@@ -139,14 +146,15 @@ test('the trailing newline is not a line anybody can cite', () => {
   // `split('\n')` on a file ending in a newline yields a trailing empty
   // element. Counting it reports one more line than the file has, in the one
   // message whose whole job is to say how many there are.
-  const withNewline = (file) =>
+  const withNewline = (file: string) =>
     file === 'libs/n.ts' ? 'const x = 1;\nconst y = 2;\n' : null;
   const v = verifyCitation(
     { file: 'libs/n.ts', line: 3, text: 'const z = 3;' },
     withNewline,
   );
-  assert.equal(v.reason, 'line-out-of-range');
-  assert.equal(v.lineCount, 2);
+  assert.equal(v.ok, false);
+  assert.equal('reason' in v && v.reason, 'line-out-of-range');
+  assert.equal('lineCount' in v && v.lineCount, 2);
   // And the last real line still verifies.
   assert.deepEqual(
     verifyCitation(
@@ -301,7 +309,7 @@ test('both spellings of a cited field normalize to one shape', () => {
 // The replay. Run 45's two answer sheets, through the checker as CI runs it,
 // against the commits the golden set pins for those two cases.
 
-const replay = (worklistFile, answersFile) =>
+const replay = (worklistFile: string, answersFile: string) =>
   spawnSync(
     process.execPath,
     [CHECKER, join(FIXTURES, worklistFile), join(FIXTURES, answersFile)],
@@ -379,7 +387,7 @@ test('run 45: the import-confirm sheet answers its own defect and raises nothing
 const defectWorklist = () =>
   worklist({ defectWhen: { field: 'a', equals: false } });
 
-const defectSheet = (raisedFindingIds) => ({
+const defectSheet = (raisedFindingIds?: string[]) => ({
   head: 'abc',
   answers: [
     {
@@ -549,7 +557,7 @@ test('run 35833576958: the same quotation holds at the pull request head it was 
   const sheet = JSON.parse(
     readFileSync(join(FIXTURES_0923, 'release-bump.answers.json'), 'utf8'),
   );
-  const at = (head) => (file) => {
+  const at = (head: string) => (file: string) => {
     const r = spawnSync('git', ['show', `${head}:${file}`], {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,

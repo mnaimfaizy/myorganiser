@@ -15,7 +15,7 @@ name: Golden Replay
 #
 #   - schedule: weekly on main, and only when a reviewer input moved — the
 #     frontier tier when one moved that week, every case in the first week of
-#     a month in which one moved (golden-tiers.mjs --scheduled decides). Each
+#     a month in which one moved (golden-tiers.ts --scheduled decides). Each
 #     frontier case runs three times, so one run's randomness decides nothing
 #     (ADR 0116); a guard runs once.
 #   - the `golden-replay` Request Label on a Pull Request: measures that
@@ -89,7 +89,7 @@ jobs:
       # run one at a time (max-parallel: 1) and a `tier: all` dispatch can
       # span hours, so one date per job would let two records sharing one
       # run_id disagree if the run crossed UTC midnight — which
-      # golden-results.mjs's groupRuns() reads as a corrupted file, not a
+      # golden-results.ts's groupRuns() reads as a corrupted file, not a
       # slow run (issue #932).
       date: ${{ steps.list.outputs.date }}
     steps:
@@ -101,7 +101,7 @@ jobs:
 
       # Which tiers this run replays (ADR 0072, ADR 0109).
       #
-      # By hand: the tier asked for. On the schedule: golden-tiers.mjs reads
+      # By hand: the tier asked for. On the schedule: golden-tiers.ts reads
       # the reviewer inputs' history and names a tier, or none when the
       # reviewer did not move. On the Request Label: a guard case is one the
       # reviewer catches reliably, so it runs only when the Pull Request
@@ -122,7 +122,7 @@ jobs:
             exit 0
           fi
           if [ "$EVENT" = 'schedule' ]; then
-            TIER="$(node tools/scripts/review/golden-tiers.mjs --scheduled)"
+            TIER="$(node tools/scripts/review/golden-tiers.ts --scheduled)"
             echo "tiers=${TIER:-none}" >> "$GITHUB_OUTPUT"
             echo "scheduled: ${TIER:-no reviewer input moved, nothing to measure}"
             exit 0
@@ -135,7 +135,7 @@ jobs:
           # catalogue does not carry is rejected exactly as a bad severity is,
           # so narrowing an axis or retiring an id can turn a guard's catch
           # into a rejected report.
-          if grep -qE '^(\.agents/skills/code-review/|\.github/actions/code-reviewer/|tools/config/review-rules\.json$|tools/scripts/review/(schema|rules|validate-review-report)\.mjs$)' <<<"$CHANGED"; then
+          if grep -qE '^(\.agents/skills/code-review/|\.github/actions/code-reviewer/|tools/config/review-rules\.json$|tools/scripts/review/(schema|rules|validate-review-report)\.ts$)' <<<"$CHANGED"; then
             echo 'tiers=all' >> "$GITHUB_OUTPUT"
             echo 'the brief or the finding contract changed: guards run too'
           else
@@ -173,8 +173,8 @@ jobs:
             skip 'No reviewer input changed since the last scheduled window, so there is nothing new to measure (ADR 0109).'
           fi
 
-          # golden-tiers.mjs, not the scorer: this job installs nothing, and
-          # the scorer reaches schema.mjs, which imports zod. That script is
+          # golden-tiers.ts, not the scorer: this job installs nothing, and
+          # the scorer reaches schema.ts, which imports zod. That script is
           # dependency-free for exactly this reason, and it is the only
           # implementation of the tier filter — the scorer's `--list --tier`
           # calls the same function, so the two cannot drift apart.
@@ -183,7 +183,7 @@ jobs:
           # three per frontier case on the schedule, one otherwise (ADR 0116).
           # The event is passed rather than read by the script, so the number
           # of sessions a run buys is visible in the line that asks for them.
-          MATRIX="$(node tools/scripts/review/golden-tiers.mjs --matrix --tier "$TIERS" --event "$EVENT" --cases "$CASES")"
+          MATRIX="$(node tools/scripts/review/golden-tiers.ts --matrix --tier "$TIERS" --event "$EVENT" --cases "$CASES")"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "tier $TIERS: $MATRIX"
 
@@ -239,7 +239,7 @@ jobs:
       max-parallel: 1
       matrix:
         # One {case, repetition} entry per reviewer session, from
-        # golden-tiers.mjs --matrix.
+        # golden-tiers.ts --matrix.
         include: ${{ fromJSON(needs.cases.outputs.matrix) }}
     env:
       # Required for Prisma v7 config loading if a reviewer runs backend tests.
@@ -279,7 +279,7 @@ jobs:
       - name: Load the case
         id: case
         run: |
-          CASE="$(node tools/scripts/review/score-golden-case.mjs --show '${{ matrix.case }}')"
+          CASE="$(node tools/scripts/review/score-golden-case.ts --show '${{ matrix.case }}')"
           echo "base=$(jq -r .base <<<"$CASE")" >> "$GITHUB_OUTPUT"
           echo "head=$(jq -r .head <<<"$CASE")" >> "$GITHUB_OUTPUT"
           mkdir -p tmp/code-review
@@ -355,7 +355,7 @@ jobs:
           facts: |
             - this is a replay of a historical range, and the working tree IS its head (detached): read, grep, and run gates in it directly, and `git worktree add tmp/code-review/worktree HEAD` for a throwaway reproduction as the skill says, leaving it in place — this runner is ephemeral, while removing it is refused (ADR 0099). The standards sources are this tree's, as of the head: a document the head does not contain is not a standard this range could have broken, so do not go looking for later ones.
             - these paths on disk are the reviewing pull request's, not the head's: ${{ steps.tree.outputs.overlay }}. They are your harness, not the subject. If the diff touches one, read it with `git show <head>:<path>`.
-            - run the validator as `node ${{ steps.tree.outputs.tooling }}/tools/scripts/review/validate-review-report.mjs tmp/code-review/report.json --out tmp/code-review/normalized.json` instead of `corepack yarn review:validate`: this head's package.json predates the `review:*` scripts. That directory is tooling, not the tree under review; do not read it for anything else.
+            - run the validator as `node ${{ steps.tree.outputs.tooling }}/tools/scripts/review/validate-review-report.ts tmp/code-review/report.json --out tmp/code-review/normalized.json` instead of `corepack yarn review:validate`: this head's package.json predates the `review:*` scripts. That directory is tooling, not the tree under review; do not read it for anything else.
             - tier is null: write `"tier": null` in the envelope
           model: ${{ env.MODEL }}
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -444,7 +444,7 @@ jobs:
           # to decide whether a self-contradiction raised its finding.
           set +e
           CR="$PWD/tmp/code-review"
-          node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" check-review-obligation-answers.ts \
+          node "$TOOLING/tools/scripts/review/run-from-tooling.ts" check-review-obligation-answers.ts \
             "$CR/obligations.json" \
             "$CR/obligations.answers.json" \
             --report "$CR/report.json" \
@@ -494,7 +494,7 @@ jobs:
         id: score
         working-directory: ${{ steps.tree.outputs.tooling }}
         run: |
-          node tools/scripts/review/score-golden-case.mjs --case '${{ matrix.case }}' \
+          node tools/scripts/review/score-golden-case.ts --case '${{ matrix.case }}' \
             --normalized "$GITHUB_WORKSPACE/tmp/code-review/normalized.json" \
             --out "$GITHUB_WORKSPACE/tmp/code-review/score.json"
 
@@ -506,7 +506,7 @@ jobs:
       # "Require a validated report" already used to write its own message.
       #
       # Branches on whether score.json exists, never on steps.score.outcome:
-      # score-golden-case.mjs writes score.json before it exits, but it
+      # score-golden-case.ts writes score.json before it exits, but it
       # exits 1 on an ordinary miss (recall below minimum, or a Blocking
       # finding on a clean case) same as on an inability to score, so the
       # step's own outcome is `failure` on a miss too — reading that as void
@@ -538,7 +538,7 @@ jobs:
             # A clean case (issue #933) carries its own outcome field —
             # clean-pass or clean-fail — and no .recall: it is scored on
             # whether a Blocking finding appeared, not a match count, and
-            # record-golden-result.mjs refuses a recall on either outcome.
+            # record-golden-result.ts refuses a recall on either outcome.
             # score.json for a pattern case has no .outcome field at all, so
             # this is empty there and the branch below still runs.
             CLEAN_OUTCOME="$(jq -r '.outcome // empty' "$SCORE_FILE")"
@@ -556,7 +556,7 @@ jobs:
             elif [ -n "${RUN_FAILURE:-}" ]; then
               # brief-not-read, finding-not-returned, or
               # evidence-not-executed, as the validator named it;
-              # record-golden-result.mjs refuses any other word.
+              # record-golden-result.ts refuses any other word.
               ARGS+=(--void-reason "$RUN_FAILURE")
             elif [ "$PREVENTED" = 'true' ]; then
               ARGS+=(--void-reason prevented)
@@ -574,7 +574,7 @@ jobs:
           # line that has a validated report to read them from, voids
           # included; a case with no report records them as null.
           ARGS+=(--normalized "$GITHUB_WORKSPACE/tmp/code-review/normalized.json")
-          node tools/scripts/review/record-golden-result.mjs "${ARGS[@]}"
+          node tools/scripts/review/record-golden-result.ts "${ARGS[@]}"
 
       # The obligation files ride along with the report. Run 45 asked whether a
       # miss on a case whose obligation fired was answered-and-wrong or never

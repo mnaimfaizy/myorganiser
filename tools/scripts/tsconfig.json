@@ -11,12 +11,13 @@
   // them to `node --test` in its own later slice; until then they stay on
   // the Jest program rather than failing here for missing jest types.
   //
-  // `allowJs`/`checkJs: false` let a migrated `.ts` file import a sibling
-  // that has not moved yet (e.g. `sandcastle-spec-anchor.ts` ->
-  // `review/resolve-spec.mjs`) without TS7016: the import resolves and the
-  // unmigrated `.mjs` file is not itself type-checked. ADR 0135 promises
-  // `.ts` and `.mjs` import each other in both directions under type
-  // stripping; this is what makes that true for the type checker too.
+  // `allowJs`/`checkJs: false` let a migrated `.ts` file import a module
+  // that is not TypeScript (e.g. `check-upstream-briefs.ts` ->
+  // `.agents/skills/upstream-brief/report.mjs`, which ADR 0135 leaves out of
+  // the migration) without TS7016: the import resolves and the `.mjs` file is
+  // not itself type-checked. ADR 0135 promises `.ts` and `.mjs` import each
+  // other in both directions under type stripping; this is what makes that
+  // true for the type checker too.
   "compilerOptions": {
     "target": "es2023",
     "lib": ["es2023"],

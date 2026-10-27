@@ -3,7 +3,7 @@
 //
 // `/code-review` resolves its spec source in a fixed order — branch name, then
 // an issue reference in a commit, then nothing (tools/scripts/review/
-// resolve-spec.mjs). A sandcastle PRD integration branch is `feat/<prd-slug>`:
+// resolve-spec.ts). A sandcastle PRD integration branch is `feat/<prd-slug>`:
 // the slug is the PRD's title, not its number, so the branch-name step cannot
 // match and the pull request opened from it reaches the reviewer with no spec.
 // That drops the effective tier one level on exactly the work a human most
@@ -11,7 +11,7 @@
 //
 // The fix stays inside the existing discovery order: the orchestrator writes an
 // empty first commit on the branch it creates, carrying a closing reference the
-// commit step already reads. Nothing about resolve-spec.mjs changes. See
+// commit step already reads. Nothing about resolve-spec.ts changes. See
 // ADR 0076.
 //
 // A pull request body is deliberately NOT a spec source, so this cannot be
@@ -19,7 +19,7 @@
 
 import { discoverSpec } from '../review/resolve-spec.ts';
 
-/** The reference keywords `resolve-spec.mjs` matches; `Closes` is one of them. */
+/** The reference keywords `resolve-spec.ts` matches; `Closes` is one of them. */
 const CLOSING_KEYWORD = 'Closes';
 
 export interface SpecAnchorInput {

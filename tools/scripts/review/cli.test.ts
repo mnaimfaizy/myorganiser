@@ -6,12 +6,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { firstLine, parseArgs } from './cli.ts';
+import type { NormalizedReport, ReportInput } from './schema.ts';
 
 const VALIDATE = 'tools/scripts/review/validate-review-report.ts';
 const RENDER = 'tools/scripts/review/render-review-report.ts';
 const FIXTURE = 'tools/scripts/review/fixtures/sample-report.json';
 
-const run = (script, args) =>
+const run = (script: string, args: readonly string[]) =>
   spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
 
 test('parseArgs separates positionals from flags and tolerates a bare flag', () => {
@@ -77,24 +78,27 @@ test('validator: --previous carries an id across runs, and refuses a file that i
   const dir = mkdtempSync(join(tmpdir(), 'review-'));
   const first = join(dir, 'first.json');
   assert.equal(run(VALIDATE, [FIXTURE, '--out', first]).status, 0);
-  const before = JSON.parse(readFileSync(first, 'utf8'));
+  const before: NormalizedReport = JSON.parse(readFileSync(first, 'utf8'));
 
   // The next run anchors a multi-line finding one line further in, as a
   // reviewer does. Alone, that mints a different id; handed the previous
   // report, the finding is recognised as the one already raised.
-  const report = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+  const report: ReportInput = JSON.parse(readFileSync(FIXTURE, 'utf8'));
   for (const f of report.findings)
-    if (f.location?.endLine > f.location?.startLine) f.location.startLine += 1;
+    if ((f.location?.endLine ?? 0) > (f.location?.startLine ?? 0))
+      f.location!.startLine += 1;
   const moved = join(dir, 'moved.json');
   writeFileSync(moved, JSON.stringify(report));
-  const ids = (args) => {
+  const ids = (args: readonly string[]) => {
     const out = join(dir, 'out.json');
     const result = run(VALIDATE, [moved, ...args, '--out', out]);
     assert.equal(result.status, 0, result.stderr);
-    return JSON.parse(readFileSync(out, 'utf8')).findings.map((f) => f.id);
+    return (
+      JSON.parse(readFileSync(out, 'utf8')) as NormalizedReport
+    ).findings.map((f) => f.id);
   };
   const located = report.findings.filter(
-    (f) => f.location?.endLine > f.location?.startLine,
+    (f) => (f.location?.endLine ?? 0) > (f.location?.startLine ?? 0),
   ).length;
   assert.ok(located > 0, 'the fixture must carry a multi-line finding');
   assert.deepEqual(

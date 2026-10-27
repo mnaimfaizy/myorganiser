@@ -43,6 +43,7 @@ import {
   shiftDays,
   writeFile,
 } from './cli.ts';
+import type { BranchPushes, Push, PushCommit, ReportRead } from './noise.ts';
 import {
   NOISE_BUDGET,
   renderNoiseMeasurement,
@@ -50,6 +51,40 @@ import {
 } from './noise.ts';
 
 const bail = cannotRun('review-noise');
+
+/** One run of the review workflow, as `gh run list` returns it. */
+interface WorkflowRun {
+  databaseId: number;
+  headBranch: string;
+  headSha: string;
+  createdAt: string;
+  conclusion?: string | null;
+  event?: string;
+}
+
+/** One push in the gather: the run that reviewed it, and what answered it. */
+interface GatheredPush extends Push {
+  runId: number;
+  createdAt: string;
+  commitsRead?: boolean;
+}
+
+/** One branch's pushes in the gather, oldest first. */
+interface GatheredBranch extends BranchPushes {
+  branch: string;
+  pushes: GatheredPush[];
+}
+
+/**
+ * Everything the pure measurement needs. Worth saving: the artifacts expire
+ * after 30 days, so a saved gather is the only durable record of a window.
+ */
+export interface NoiseGather {
+  window: { since: string; until: string };
+  workflow: string;
+  evidence: Record<string, string>;
+  branches: GatheredBranch[];
+}
 
 export const REVIEW_WORKFLOW = 'code-review.yml';
 export const REPORT_ARTIFACT = 'code-review-normalized';
@@ -71,22 +106,24 @@ const FIELD = '\u0000';
  * it as ignored. The newest run at a head wins, because that is the report
  * the next push was answering.
  *
- * @param {Array<{ databaseId: number, headSha: string, createdAt: string }>} runs
  */
-export const pushesFromRuns = (runs = []) => {
-  const byHead = new Map();
-  for (const run of [...runs].sort(
-    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-  ))
-    byHead.set(run.headSha, run);
-  return [...byHead.values()].sort(
-    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-  );
+export const pushesFromRuns = (runs: WorkflowRun[] = []): WorkflowRun[] => {
+  const byHead = new Map<string, WorkflowRun>();
+  const oldestFirst = (a: WorkflowRun, b: WorkflowRun) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  for (const run of [...runs].sort(oldestFirst)) byHead.set(run.headSha, run);
+  return [...byHead.values()].sort(oldestFirst);
 };
 
 /** Every run of the review workflow `gh` will name, newest first. */
-const listRuns = ({ workflow, limit }) =>
-  ghJsonOrNull([
+const listRuns = ({
+  workflow,
+  limit,
+}: {
+  workflow: string;
+  limit: number;
+}): WorkflowRun[] =>
+  (ghJsonOrNull([
     'run',
     'list',
     '--workflow',
@@ -95,10 +132,10 @@ const listRuns = ({ workflow, limit }) =>
     'databaseId,headBranch,headSha,createdAt,conclusion,event',
     '--limit',
     String(limit),
-  ]) ?? [];
+  ]) as WorkflowRun[] | null) ?? [];
 
 /** The normalized report a run stored, or null when nothing can be read. */
-const downloadReport = (runId) => {
+const downloadReport = (runId: number): ReportRead | null => {
   const dir = mkdtempSync(join(tmpdir(), 'review-noise-'));
   try {
     gh([
@@ -110,7 +147,9 @@ const downloadReport = (runId) => {
       '--dir',
       dir,
     ]);
-    return JSON.parse(readFileSync(join(dir, 'normalized.json'), 'utf8'));
+    return JSON.parse(
+      readFileSync(join(dir, 'normalized.json'), 'utf8'),
+    ) as ReportRead;
   } catch {
     return null;
   }
@@ -123,7 +162,11 @@ const downloadReport = (runId) => {
  * explicitly by the test, which builds a repository whose commits it wrote
  * rather than asserting against whatever history it happens to be run in.
  */
-export const commitsBetween = (from, to, cwd) => {
+export const commitsBetween = (
+  from?: string | null,
+  to?: string | null,
+  cwd?: string,
+): PushCommit[] | null => {
   if (!from || !to) return null;
   try {
     return git(['log', `${from}..${to}`, `--format=%H%x00%B%x1e`], { cwd })
@@ -154,7 +197,14 @@ export const gather = ({
   branch,
   limit,
   useGithub,
-}) => {
+}: {
+  workflow: string;
+  since: string;
+  until: string;
+  branch: string | null;
+  limit: number;
+  useGithub: boolean;
+}): NoiseGather => {
   const runs = useGithub ? listRuns({ workflow, limit }) : [];
   const inWindow = runs.filter(
     (r) =>
@@ -163,17 +213,17 @@ export const gather = ({
       (!branch || r.headBranch === branch),
   );
 
-  const byBranch = new Map();
+  const byBranch = new Map<string, WorkflowRun[]>();
   for (const run of inWindow) {
     if (!byBranch.has(run.headBranch)) byBranch.set(run.headBranch, []);
-    byBranch.get(run.headBranch).push(run);
+    byBranch.get(run.headBranch)!.push(run);
   }
 
   let withoutReport = 0;
   let withoutCommits = 0;
   const branches = [...byBranch.entries()]
-    .map(([name, runsOnBranch]) => {
-      const pushes = pushesFromRuns(runsOnBranch).map((run) => {
+    .map(([name, runsOnBranch]): GatheredBranch => {
+      const pushes = pushesFromRuns(runsOnBranch).map((run): GatheredPush => {
         const report = downloadReport(run.databaseId);
         if (!report) withoutReport += 1;
         return {
@@ -229,14 +279,16 @@ export const gather = ({
   return { window: { since, until }, workflow, evidence, branches };
 };
 
-export const main = (argv) => {
+export const main = (argv: string[]): number => {
   const { flags } = parseArgs(argv);
   const until = flags.until ?? new Date().toISOString().slice(0, 10);
   const since = flags.since ?? shiftDays(until, Number(flags.days ?? 30));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until))
     bail(`--since and --until must be YYYY-MM-DD (got ${since}, ${until})`);
 
-  const replayed = flags.gathered ? readJsonOr(flags.gathered, bail) : null;
+  const replayed = flags.gathered
+    ? (readJsonOr(flags.gathered, bail) as NoiseGather)
+    : null;
   const gathered =
     replayed ??
     gather({

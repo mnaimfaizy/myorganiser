@@ -39,6 +39,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { errorMessage } from '../lib/error-message.ts';
+import type { CaseTier, ReplayMatrixEntry, ReplaySet } from './golden-tiers.ts';
 import {
   CASE_TIERS,
   GOLDEN_SET_PATH,
@@ -46,8 +48,161 @@ import {
   SCHEDULE_EVENT,
   replayMatrix,
 } from './golden-tiers.ts';
+import type { StandingRecord } from './golden-standing.ts';
 import { RULES_DISPLAY_PATH, ruleById } from './rules.ts';
+import type { FindingAxis, FindingSeverity } from './schema.ts';
 import { FINDING_AXES, FINDING_SEVERITIES } from './schema.ts';
+
+/** Where a case came from (ADR 0130 item 1). */
+export type CaseOrigin = (typeof ORIGINS)[number];
+
+/**
+ * One expected finding: the axis, the patterns the reviewer's own wording is
+ * matched against, and the files at which the defect is fairly located.
+ */
+export interface ExpectedFinding {
+  id: string;
+  axis: FindingAxis | FindingAxis[];
+  source: string;
+  rule: string;
+  ruleId?: string;
+  files: string[];
+  minSeverity?: FindingSeverity;
+  why: string;
+}
+
+/** What every case carries, clean or pattern. */
+interface GoldenCaseBase {
+  id: string;
+  title: string;
+  incident: string;
+  tier: CaseTier;
+  tierEvidence?: string;
+  base: string;
+  head: string;
+  origin: CaseOrigin;
+  tag?: string;
+  /**
+   * `foundBy` is the reviewer's own envelope field, carried through from the
+   * set so a replay hands the Spec axis the same shape production does. The
+   * assertions below read `kind` and `ref` and nothing else.
+   */
+  spec:
+    | { kind: 'none'; foundBy?: string }
+    | { kind: 'issue'; ref: string; foundBy?: string };
+  specSnapshot?: string;
+  /** The pinned snapshot's title and body, read by `caseForReplay`. */
+  specText?: { title: string; body: string };
+}
+
+/**
+ * A clean-diff case (issue #933): it measures false alarms, so it carries no
+ * expectation and no `minRecall` — there is nothing to recall when nothing
+ * should have been found — and says instead why this merged pull request was
+ * a clean choice.
+ */
+export interface CleanGoldenCase extends GoldenCaseBase {
+  expectsNoBlocking: true;
+  why: string;
+}
+
+/** A pattern case: the findings a reviewer should have raised, and the floor. */
+export interface PatternGoldenCase extends GoldenCaseBase {
+  expectsNoBlocking?: false;
+  expected: ExpectedFinding[];
+  minRecall: number;
+}
+
+export type GoldenCase = CleanGoldenCase | PatternGoldenCase;
+
+/**
+ * A case that left `cases` for a reserved bucket: `retired` with a `reason`
+ * it cannot be won, `parked` with the `reentryCondition` that returns it.
+ */
+export interface ReservedEntry {
+  id: string;
+  title: string;
+  incident: string;
+  base?: string;
+  head?: string;
+  reason?: string;
+  reentryCondition?: string;
+}
+
+export interface GoldenSet {
+  schemaVersion: number;
+  cases: GoldenCase[];
+  parked?: ReservedEntry[];
+  retired?: ReservedEntry[];
+}
+
+/**
+ * A case, an expectation, or a reserved entry as it arrives from the file:
+ * every field still unchecked. The assertions below are what turn one into
+ * the validated shape above.
+ */
+type Candidate<T> = { [K in keyof T]?: unknown };
+// Written out rather than mapped over `GoldenCase`: the two halves of that
+// union disagree about `expectsNoBlocking`, so intersecting them to collect
+// their keys collapses to `never` and every field read would then typecheck
+// against nothing at all.
+type GoldenCaseCandidate = {
+  id?: unknown;
+  title?: unknown;
+  incident?: unknown;
+  tier?: unknown;
+  tierEvidence?: unknown;
+  base?: unknown;
+  head?: unknown;
+  origin?: unknown;
+  tag?: unknown;
+  spec?: { kind?: unknown; ref?: unknown };
+  specSnapshot?: unknown;
+  expectsNoBlocking?: unknown;
+  why?: unknown;
+  expected?: unknown;
+  minRecall?: unknown;
+};
+type ExpectedCandidate = Candidate<ExpectedFinding>;
+type ReservedCandidate = Candidate<ReservedEntry>;
+
+/** A normalized report, as a score reads it. */
+export interface ScoredFinding {
+  id: string;
+  axis: string;
+  source: string;
+  rule: string;
+  ruleId?: string;
+  severity: string;
+  location?: { file?: string } | null;
+}
+export interface ScoredReport {
+  findings?: ScoredFinding[];
+}
+
+/** A clean case's result: a pass or a fail, never a recall number. */
+export interface CleanScore {
+  case: string;
+  clean: true;
+  blocking: string[];
+  pass: boolean;
+  outcome: 'clean-pass' | 'clean-fail';
+}
+
+/** A pattern case's result: recall over its expectations. */
+export interface PatternScore {
+  case: string;
+  clean?: undefined;
+  expected: number;
+  matched: { expected: string; finding: string; strict: boolean }[];
+  missed: string[];
+  unexpected: number;
+  recall: number;
+  minRecall: number;
+  pass: boolean;
+}
+
+export type CaseScore = CleanScore | PatternScore;
 
 // The tier vocabulary and the set's location are declared once, in the
 // dependency-free module the no-install replay job runs. This file may import
@@ -79,26 +234,26 @@ const SHA = /^[0-9a-f]{40}$/;
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 
 export class GoldenSetError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'GoldenSetError';
   }
 }
 
-export const loadGoldenSet = (path = REVIEW_GOLDEN_SET_PATH) =>
+export const loadGoldenSet = (path: string = REVIEW_GOLDEN_SET_PATH) =>
   assertGoldenSet(JSON.parse(readFileSync(path, 'utf8')), path);
 
-const compile = (pattern, where) => {
+const compile = (pattern: string, where?: string) => {
   try {
     return new RegExp(pattern, 'i');
   } catch (err) {
     throw new GoldenSetError(
-      `${where}: bad pattern ${pattern}: ${err.message}`,
+      `${where}: bad pattern ${pattern}: ${errorMessage(err)}`,
     );
   }
 };
 
-const ORIGINS = ['attributed', 'seeded'];
+const ORIGINS = ['attributed', 'seeded'] as const;
 const SEEDED_TAG = /^golden\/seeded-\d+-[a-z0-9][a-z0-9-]*$/;
 const ISSUE_REF = /^#\d+$/;
 
@@ -107,8 +262,12 @@ const ISSUE_REF = /^#\d+$/;
  * reachable from main. A Seeded Case plants one defect on top of a real commit,
  * and a `golden/seeded-*` tag keeps that commit alive (ADR 0130 item 1).
  */
-const assertCaseOrigin = (c, where, fail) => {
-  if (!ORIGINS.includes(c.origin))
+const assertCaseOrigin = (
+  c: GoldenCaseCandidate,
+  where: string,
+  fail: (msg: string) => never,
+) => {
+  if (!(ORIGINS as readonly unknown[]).includes(c.origin))
     fail(`${where}: origin must be attributed or seeded`);
   if (
     c.origin === 'seeded' &&
@@ -128,7 +287,12 @@ const assertCaseOrigin = (c, where, fail) => {
  * it, from a committed snapshot, never a live fetch: a later edit can hand the
  * reviewer the answer (ADR 0130 item 5).
  */
-const assertCaseSpec = (c, where, fail, exists) => {
+const assertCaseSpec = (
+  c: GoldenCaseCandidate,
+  where: string,
+  fail: (msg: string) => never,
+  exists: (path: string) => boolean,
+) => {
   const kind = c.spec?.kind;
   if (kind !== 'none' && kind !== 'issue')
     fail(`${where}: spec.kind must be none or issue`);
@@ -137,7 +301,7 @@ const assertCaseSpec = (c, where, fail, exists) => {
       fail(`${where}: a case with no spec carries no specSnapshot`);
     return;
   }
-  if (typeof c.spec.ref !== 'string' || !ISSUE_REF.test(c.spec.ref))
+  if (typeof c.spec?.ref !== 'string' || !ISSUE_REF.test(c.spec.ref))
     fail(`${where}: spec.ref must be an issue reference like #123`);
   if (typeof c.specSnapshot !== 'string' || !c.specSnapshot)
     fail(`${where}: a case with an issue spec must pin specSnapshot`);
@@ -146,19 +310,26 @@ const assertCaseSpec = (c, where, fail, exists) => {
 };
 
 export function assertGoldenSet(
-  set,
+  set: unknown,
   source = 'golden set',
-  { exists = existsSync } = {},
-) {
-  const fail = (msg) => {
+  { exists = existsSync }: { exists?: (path: string) => boolean } = {},
+): GoldenSet {
+  function fail(msg: string): never {
     throw new GoldenSetError(`${source}: ${msg}`);
+  }
+  const candidate = (set ?? {}) as {
+    schemaVersion?: unknown;
+    cases?: unknown;
+    parked?: unknown;
+    retired?: unknown;
   };
-  if (set?.schemaVersion !== GOLDEN_SET_SCHEMA_VERSION)
-    fail(`unsupported schemaVersion ${set?.schemaVersion}`);
-  if (!Array.isArray(set.cases) || set.cases.length === 0)
+  if (candidate.schemaVersion !== GOLDEN_SET_SCHEMA_VERSION)
+    fail(`unsupported schemaVersion ${candidate.schemaVersion}`);
+  if (!Array.isArray(candidate.cases) || candidate.cases.length === 0)
     fail('cases must be a non-empty array');
-  const ids = new Set();
-  for (const c of set.cases) {
+  const cases = candidate.cases as GoldenCaseCandidate[];
+  const ids = new Set<unknown>();
+  for (const c of cases) {
     const where = `case ${c.id ?? '(no id)'}`;
     if (typeof c.id !== 'string' || !ID.test(c.id))
       fail(`${where}: id must be a lowercase slug`);
@@ -167,7 +338,7 @@ export function assertGoldenSet(
     if (typeof c.title !== 'string' || !c.title) fail(`${where}: no title`);
     if (typeof c.incident !== 'string' || !c.incident)
       fail(`${where}: incident must cite the ADR or issue it comes from`);
-    if (!GOLDEN_CASE_TIERS.includes(c.tier))
+    if (!(GOLDEN_CASE_TIERS as readonly unknown[]).includes(c.tier))
       fail(`${where}: tier must be one of ${GOLDEN_CASE_TIERS.join(', ')}`);
     // A guard runs on a narrower trigger than a frontier case, so the claim
     // that the reviewer catches it reliably has to be auditable from here.
@@ -176,7 +347,7 @@ export function assertGoldenSet(
       (typeof c.tierEvidence !== 'string' || !c.tierEvidence)
     )
       fail(`${where}: a guard must cite the runs that promoted it`);
-    if (!SHA.test(c.base) || !SHA.test(c.head))
+    if (!SHA.test(String(c.base)) || !SHA.test(String(c.head)))
       fail(`${where}: base and head must be full 40-hex SHAs`);
     if (c.base === c.head) fail(`${where}: base equals head`);
     assertCaseOrigin(c, where, fail);
@@ -205,8 +376,8 @@ export function assertGoldenSet(
         );
       if (!Array.isArray(c.expected) || c.expected.length === 0)
         fail(`${where}: expected must be a non-empty array`);
-      const expectedIds = new Set();
-      for (const e of c.expected) {
+      const expectedIds = new Set<unknown>();
+      for (const e of c.expected as ExpectedCandidate[]) {
         const w = `${where}, expected ${e.id ?? '(no id)'}`;
         if (typeof e.id !== 'string' || !ID.test(e.id))
           fail(`${w}: id must be a lowercase slug`);
@@ -214,8 +385,11 @@ export function assertGoldenSet(
         expectedIds.add(e.id);
         // One axis, or several when either axis may raise the defect and the
         // one-axis drop decides which copy survives (ADR 0131 item 3).
-        const axes = Array.isArray(e.axis) ? e.axis : [e.axis];
-        if (axes.length === 0 || !axes.every((a) => FINDING_AXES.includes(a)))
+        const axes: unknown[] = Array.isArray(e.axis) ? e.axis : [e.axis];
+        if (
+          axes.length === 0 ||
+          !axes.every((a) => (FINDING_AXES as readonly unknown[]).includes(a))
+        )
           fail(`${w}: axis ${e.axis}`);
         if (typeof e.source !== 'string') fail(`${w}: source pattern missing`);
         compile(e.source, w);
@@ -232,7 +406,10 @@ export function assertGoldenSet(
         }
         if (!Array.isArray(e.files) || e.files.length === 0)
           fail(`${w}: files must name at least one path`);
-        if (e.minSeverity && !FINDING_SEVERITIES.includes(e.minSeverity))
+        if (
+          e.minSeverity &&
+          !(FINDING_SEVERITIES as readonly unknown[]).includes(e.minSeverity)
+        )
           fail(`${w}: minSeverity ${e.minSeverity}`);
         if (typeof e.why !== 'string' || !e.why)
           fail(`${w}: why must say what went wrong in the incident`);
@@ -250,7 +427,7 @@ export function assertGoldenSet(
   // guard disables the arm it belongs to. Declare it alongside a replacement,
   // never before one exists. Promotion by the record is held to the same rule
   // in golden-standing.ts (ADR 0116).
-  if (set.cases.length > 0 && !set.cases.some((c) => c.tier === 'frontier'))
+  if (cases.length > 0 && !cases.some((c) => c.tier === 'frontier'))
     fail(
       'the set has no frontier case: an empty frontier replays nothing on an ' +
         'ordinary review-tooling change (ADR 0072). Promote the last frontier ' +
@@ -267,10 +444,10 @@ export function assertGoldenSet(
   // buckets share is asserted by one helper so a field added to one cannot
   // drift from the other.
   const assertReservedEntry = (
-    entry,
-    bucket,
-    narrativeField,
-    narrativeMustSay,
+    entry: ReservedCandidate,
+    bucket: string,
+    narrativeField: 'reason' | 'reentryCondition',
+    narrativeMustSay: string,
   ) => {
     const where = `${bucket} ${entry.id ?? '(no id)'}`;
     if (typeof entry.id !== 'string' || !ID.test(entry.id))
@@ -284,14 +461,14 @@ export function assertGoldenSet(
       fail(`${where}: incident must cite the ADR or issue it comes from`);
     if (typeof entry[narrativeField] !== 'string' || !entry[narrativeField])
       fail(`${where}: ${narrativeField} must ${narrativeMustSay}`);
-    if (entry.base !== undefined && !SHA.test(entry.base))
+    if (entry.base !== undefined && !SHA.test(String(entry.base)))
       fail(`${where}: base must be a full 40-hex SHA`);
-    if (entry.head !== undefined && !SHA.test(entry.head))
+    if (entry.head !== undefined && !SHA.test(String(entry.head)))
       fail(`${where}: head must be a full 40-hex SHA`);
   };
-  if (set.parked !== undefined) {
-    if (!Array.isArray(set.parked)) fail('parked must be an array');
-    for (const p of set.parked)
+  if (candidate.parked !== undefined) {
+    if (!Array.isArray(candidate.parked)) fail('parked must be an array');
+    for (const p of candidate.parked as ReservedCandidate[])
       assertReservedEntry(
         p,
         'parked',
@@ -299,9 +476,9 @@ export function assertGoldenSet(
         'say what returns this case to cases',
       );
   }
-  if (set.retired !== undefined) {
-    if (!Array.isArray(set.retired)) fail('retired must be an array');
-    for (const r of set.retired)
+  if (candidate.retired !== undefined) {
+    if (!Array.isArray(candidate.retired)) fail('retired must be an array');
+    for (const r of candidate.retired as ReservedCandidate[])
       assertReservedEntry(
         r,
         'retired',
@@ -309,12 +486,13 @@ export function assertGoldenSet(
         'say why the case cannot be won',
       );
   }
-  return set;
+  return candidate as GoldenSet;
 }
 
-const severityRank = (s) => FINDING_SEVERITIES.indexOf(s);
+const severityRank = (s: string) =>
+  (FINDING_SEVERITIES as readonly string[]).indexOf(s);
 /** blocking (0) is the most severe, so "at least should-fix" means rank ≤ 1. */
-const atLeast = (severity, min) =>
+const atLeast = (severity: string, min?: FindingSeverity) =>
   !min || severityRank(severity) <= severityRank(min);
 
 /**
@@ -338,16 +516,16 @@ const atLeast = (severity, min) =>
  * requires the id, so an expectation can still be matched loosely and annotated
  * not-strict, which is the distinction the annotation exists to report.
  */
-const namesTheRule = (expected, finding) =>
+const namesTheRule = (expected: ExpectedFinding, finding: ScoredFinding) =>
   (expected.ruleId !== undefined && finding.ruleId === expected.ruleId) ||
   (compile(expected.source).test(finding.source) &&
     compile(expected.rule).test(finding.rule));
 
-const axesOf = (expected) =>
+const axesOf = (expected: ExpectedFinding): FindingAxis[] =>
   Array.isArray(expected.axis) ? expected.axis : [expected.axis];
 
-const matches = (expected, finding) =>
-  axesOf(expected).includes(finding.axis) &&
+const matches = (expected: ExpectedFinding, finding: ScoredFinding) =>
+  (axesOf(expected) as string[]).includes(finding.axis) &&
   namesTheRule(expected, finding) &&
   expected.files.includes(finding.location?.file ?? '') &&
   atLeast(finding.severity, expected.minSeverity);
@@ -358,10 +536,13 @@ const matches = (expected, finding) =>
  * result is a pass/fail, reported as `clean-pass` or `clean-fail` and never
  * folded into a recall number the way a pattern case's match count is.
  *
- * @param {object} goldenCase a clean case (`expectsNoBlocking: true`)
- * @param {{ findings: object[] }} normalized the validator's output for that range
+ * @param goldenCase a clean case (`expectsNoBlocking: true`)
+ * @param normalized the validator's output for that range
  */
-const scoreCleanCase = (goldenCase, normalized) => {
+const scoreCleanCase = (
+  goldenCase: GoldenCase,
+  normalized: ScoredReport,
+): CleanScore => {
   const findings = normalized.findings ?? [];
   const blocking = findings.filter((f) => f.severity === 'blocking');
   const pass = blocking.length === 0;
@@ -375,16 +556,36 @@ const scoreCleanCase = (goldenCase, normalized) => {
 };
 
 /**
- * @param {object} goldenCase one entry of `cases`
- * @param {{ findings: object[] }} normalized the validator's output for that range
+ * The two shapes are paired in the signature, because they are paired in
+ * fact: a clean case has no recall to report and a pattern case always has
+ * one, and a caller that knows which kind it holds should not have to ask
+ * the result which it got.
+ *
+ * @param goldenCase one entry of `cases`
+ * @param normalized the validator's output for that range
  */
-export const scoreCase = (goldenCase, normalized) => {
+export function scoreCase(
+  goldenCase: CleanGoldenCase,
+  normalized: ScoredReport,
+): CleanScore;
+export function scoreCase(
+  goldenCase: PatternGoldenCase,
+  normalized: ScoredReport,
+): PatternScore;
+export function scoreCase(
+  goldenCase: GoldenCase,
+  normalized: ScoredReport,
+): CaseScore;
+export function scoreCase(
+  goldenCase: GoldenCase,
+  normalized: ScoredReport,
+): CaseScore {
   if (goldenCase.expectsNoBlocking)
     return scoreCleanCase(goldenCase, normalized);
   const findings = normalized.findings ?? [];
-  const used = new Set();
-  const matched = [];
-  const missed = [];
+  const used = new Set<string>();
+  const matched: PatternScore['matched'] = [];
+  const missed: string[] = [];
   for (const expected of goldenCase.expected) {
     const hit = findings.find((f) => !used.has(f.id) && matches(expected, f));
     if (!hit) {
@@ -414,9 +615,9 @@ export const scoreCase = (goldenCase, normalized) => {
     minRecall: goldenCase.minRecall,
     pass: recall >= goldenCase.minRecall,
   };
-};
+}
 
-const renderCleanScore = (goldenCase, score) => {
+const renderCleanScore = (goldenCase: GoldenCase, score: CleanScore) => {
   const lines = [
     `## Golden replay — ${goldenCase.id}: ${score.outcome}`,
     '',
@@ -431,8 +632,11 @@ const renderCleanScore = (goldenCase, score) => {
   return `${lines.join('\n')}\n`;
 };
 
-export const renderScore = (goldenCase, score) => {
+export const renderScore = (goldenCase: GoldenCase, score: CaseScore) => {
   if (score.clean) return renderCleanScore(goldenCase, score);
+  // A pattern score belongs to a pattern case: `scoreCase` returns the clean
+  // shape for a clean one, so the branch above has already taken it.
+  const expectations = goldenCase.expectsNoBlocking ? [] : goldenCase.expected;
   const lines = [
     `## Golden replay — ${goldenCase.id}: ${score.pass ? 'pass' : 'FAIL'}`,
     '',
@@ -446,7 +650,7 @@ export const renderScore = (goldenCase, score) => {
       `- matched \`${m.expected}\` by finding \`${m.finding}\`${m.strict ? ' (exact tuple)' : ''}`,
     );
   for (const id of score.missed) {
-    const e = goldenCase.expected.find((x) => x.id === id);
+    const e = expectations.find((x) => x.id === id)!;
     lines.push(`- **missed** \`${id}\`: ${e.why}`);
   }
   return `${lines.join('\n')}\n`;
@@ -486,15 +690,15 @@ export const REPLAY_SCORE = 'review:golden:score';
 // directly or through run-from-tooling.ts, which the replay uses so it reads
 // the workspace's repository from the tooling copy.
 const REPLAY_OBLIGATION_CHECK_RUN =
-  /\bnode\s+(?:\S*run-from-tooling\.mjs"?\s+)?\S*check-review-obligation-answers\.ts\b/;
-const REPLAY_SCORE_RUN = /\bnode\s+\S*score-golden-case\.mjs\s+--case\b/;
+  /\bnode\s+(?:\S*run-from-tooling\.ts"?\s+)?\S*check-review-obligation-answers\.ts\b/;
+const REPLAY_SCORE_RUN = /\bnode\s+\S*score-golden-case\.ts\s+--case\b/;
 
-const runs = (body, script, invocation) =>
+const runs = (body: string, script: string, invocation: RegExp) =>
   body.includes(script) || invocation.test(body);
 
-const workflowSteps = (text) => {
+const workflowSteps = (text: string) => {
   const lines = text.split('\n');
-  const steps = [];
+  const steps: { name: string; body: string }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const m = /^(\s*)- name: (.+)$/.exec(lines[i]);
     if (!m) continue;
@@ -510,7 +714,9 @@ const workflowSteps = (text) => {
   return steps;
 };
 
-export const replayObligationCheckFindings = (workflowText) => {
+export const replayObligationCheckFindings = (
+  workflowText: string,
+): string[] => {
   const steps = workflowSteps(workflowText);
   const check = steps.findIndex((s) =>
     runs(s.body, REPLAY_OBLIGATION_CHECK, REPLAY_OBLIGATION_CHECK_RUN),
@@ -518,7 +724,7 @@ export const replayObligationCheckFindings = (workflowText) => {
   const score = steps.findIndex((s) =>
     runs(s.body, REPLAY_SCORE, REPLAY_SCORE_RUN),
   );
-  const findings = [];
+  const findings: string[] = [];
   if (check === -1)
     return [
       `no step runs ${REPLAY_OBLIGATION_CHECK}, so an answer sheet production would fail is scored as a result (ADR 0101)`,
@@ -559,20 +765,18 @@ export const replayObligationCheckFindings = (workflowText) => {
  * result hands the normalized report to the recorder, which is where the
  * line's CLI version and tightening facts come from.
  *
- * @param {string} workflowText
- * @returns {string[]}
  */
 const REPLAY_RUN_FAILURES_READ = /\.runFacts\.failures\b/;
-const REPLAY_RECORD_RUN = /\bnode\s+\S*record-golden-result\.mjs\b/;
+const REPLAY_RECORD_RUN = /\bnode\s+\S*record-golden-result\.ts\b/;
 
-export const replayRunFactsFindings = (workflowText) => {
+export const replayRunFactsFindings = (workflowText: string): string[] => {
   const steps = workflowSteps(workflowText);
   const check = steps.findIndex((s) => REPLAY_RUN_FAILURES_READ.test(s.body));
   const score = steps.findIndex((s) =>
     runs(s.body, REPLAY_SCORE, REPLAY_SCORE_RUN),
   );
   const record = steps.find((s) => REPLAY_RECORD_RUN.test(s.body));
-  const findings = [];
+  const findings: string[] = [];
   if (check === -1)
     findings.push(
       'no step reads .runFacts.failures from the normalized report, so a review that did not run as built is scored as a result (ADR 0123 item 7)',
@@ -600,7 +804,7 @@ export const replayRunFactsFindings = (workflowText) => {
 export const REPLAY_REQUEST_LABEL = 'golden-replay';
 
 // A top-level YAML block: from `key:` to the next line that starts in column 0.
-const topLevelBlock = (text, key) => {
+const topLevelBlock = (text: string, key: string) => {
   const m = new RegExp(
     String.raw`^${key}:[^\n]*\n((?:[ \t#][^\n]*\n|\n)*)`,
     'm',
@@ -611,7 +815,7 @@ const topLevelBlock = (text, key) => {
 // A key two spaces in, inside the on: block, to the next key at that depth.
 // A comment line at any indentation belongs to the block it sits in, as YAML
 // reads it, so a comment between two keys cannot hide the second from it.
-const triggerBlock = (onBlock, key) => {
+const triggerBlock = (onBlock: string, key: string) => {
   const m = new RegExp(
     String.raw`^  ${key}:[^\n]*\n((?:(?: {3,}|[ \t]*#)[^\n]*\n|\n)*)`,
     'm',
@@ -626,13 +830,13 @@ const triggerBlock = (onBlock, key) => {
  * Request. Text-based like replayObligationCheckFindings; the workflow is
  * this repository's own and its shape is known.
  *
- * @param {string} workflowText
- * @returns {string[]} one line per violation; empty when sound
+ * @param workflowText
+ * @returns one line per violation; empty when sound
  */
-export const replayTriggerFindings = (workflowText) => {
+export const replayTriggerFindings = (workflowText: string): string[] => {
   const on = topLevelBlock(workflowText, 'on');
   if (on === null) return ['no top-level on: block'];
-  const findings = [];
+  const findings: string[] = [];
   const pr = triggerBlock(on, 'pull_request');
   if (pr !== null) {
     if (/^\s*paths(-ignore)?:/m.test(pr))
@@ -671,7 +875,7 @@ export const replayTriggerFindings = (workflowText) => {
     findings.push(
       'no workflow_dispatch trigger, so a tier cannot be replayed on demand (ADR 0072 item 4)',
     );
-  if (!/golden-tiers\.mjs --scheduled\b/.test(workflowText))
+  if (!/golden-tiers\.ts --scheduled\b/.test(workflowText))
     findings.push(
       'the schedule never runs golden-tiers.ts --scheduled, so it replays an untouched reviewer every week (ADR 0109)',
     );
@@ -686,14 +890,19 @@ export const replayTriggerFindings = (workflowText) => {
  * the workflow that has to ask for that matrix, hand it the event, and keep
  * each repetition's result apart.
  *
- * @param {string} workflowText
- * @param {{cases: {id: string, tier: string}[]}} set
- * @param {{case: string, outcome: string}[]} [records] the results record
- * @returns {string[]} one line per violation; empty when sound
+ * @param workflowText
+ * @param set
+ * @param records the results record
+ * @returns one line per violation; empty when sound
  */
-export const replayRepetitionFindings = (workflowText, set, records = []) => {
-  const findings = [];
-  const count = (matrix, id) => matrix.filter((m) => m.case === id).length;
+export const replayRepetitionFindings = (
+  workflowText: string,
+  set: ReplaySet,
+  records: StandingRecord[] = [],
+): string[] => {
+  const findings: string[] = [];
+  const count = (matrix: ReplayMatrixEntry[], id: string) =>
+    matrix.filter((m) => m.case === id).length;
   const scheduled = replayMatrix(set, undefined, {
     records,
     event: SCHEDULE_EVENT,
@@ -719,7 +928,7 @@ export const replayRepetitionFindings = (workflowText, set, records = []) => {
   }
 
   if (
-    !/golden-tiers\.mjs --matrix\b[^\n]*--event "\$EVENT"/.test(workflowText) ||
+    !/golden-tiers\.ts --matrix\b[^\n]*--event "\$EVENT"/.test(workflowText) ||
     !/^\s*EVENT: \$\{\{ github\.event_name \}\}/m.test(workflowText)
   )
     findings.push(
@@ -733,13 +942,14 @@ export const replayRepetitionFindings = (workflowText, set, records = []) => {
     findings.push(
       'the replay job does not take its matrix entries from the cases job, so a repetition never becomes a reviewer session',
     );
-  for (const [what, pattern] of [
+  const artifacts: [string, RegExp][] = [
     ['result artifact', /^\s*name: golden-\$\{\{ matrix\.case \}\}(.*)$/m],
     [
       'transcript artifact',
       /^\s*transcript-artifact: golden-transcript-\$\{\{ matrix\.case \}\}(.*)$/m,
     ],
-  ]) {
+  ];
+  for (const [what, pattern] of artifacts) {
     const m = pattern.exec(workflowText);
     if (!m || !m[1].includes('matrix.repetition'))
       findings.push(
@@ -757,14 +967,18 @@ export const replayRepetitionFindings = (workflowText, set, records = []) => {
  * `golden/seeded-*` tag instead, and a tag missing from the clone is a finding,
  * because the commit it keeps alive is reachable from nothing else (ADR 0130).
  */
-export const caseRangeFindings = (cases, { git, mainRef }) => {
-  const findings = [];
-  const has = (sha) => git(['cat-file', '-e', `${sha}^{commit}`]);
+export const caseRangeFindings = (
+  cases: GoldenCase[],
+  { git, mainRef }: { git: (args: string[]) => boolean; mainRef: string },
+): string[] => {
+  const findings: string[] = [];
+  const has = (sha: string) => git(['cat-file', '-e', `${sha}^{commit}`]);
   for (const c of cases) {
-    for (const [end, sha] of [
+    const ends: [string, string][] = [
       ['base', c.base],
       ['head', c.head],
-    ]) {
+    ];
+    for (const [end, sha] of ends) {
       if (!has(sha))
         findings.push(
           `${c.id}: ${end} ${sha.slice(0, 7)} is not in this clone`,
@@ -810,12 +1024,12 @@ const SPEC_FILE = 'tmp/code-review/spec.json';
  * before issue #1140 ran. And the checkout that job starts from must keep full
  * history, or a seeded case's golden tag may not be in the clone.
  */
-export const replaySpecSnapshotFindings = (workflowText) => {
+export const replaySpecSnapshotFindings = (workflowText: string): string[] => {
   const steps = workflowSteps(workflowText);
   const load = steps.findIndex((s) => s.body.includes(SPEC_FILE));
   if (load === -1)
     return [`no step writes ${SPEC_FILE}, so no case reaches the Spec axis`];
-  const findings = [];
+  const findings: string[] = [];
   const { name, body } = steps[load];
   if (!body.includes('specText'))
     findings.push(
@@ -837,14 +1051,18 @@ export const replaySpecSnapshotFindings = (workflowText) => {
  * place a snapshot is read, so `--show` and the replay's spec.json cannot
  * disagree about what the reviewer was handed (ADR 0130 item 5).
  *
- * @param {object} goldenCase one entry of `cases`
- * @param {{ read?: (path: string) => string }} [io]
+ * @param goldenCase one entry of `cases`
  */
 export const caseForReplay = (
-  goldenCase,
-  { read = (path) => readFileSync(path, 'utf8') } = {},
-) => {
+  goldenCase: GoldenCase,
+  {
+    read = (path: string) => readFileSync(path, 'utf8'),
+  }: { read?: (path: string) => string } = {},
+): GoldenCase => {
   if (!goldenCase.specSnapshot) return goldenCase;
-  const { title, body } = JSON.parse(read(goldenCase.specSnapshot));
+  const { title, body } = JSON.parse(read(goldenCase.specSnapshot)) as {
+    title: string;
+    body: string;
+  };
   return { ...goldenCase, specText: { title, body } };
 };

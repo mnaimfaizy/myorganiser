@@ -35,7 +35,27 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import type { Bail } from './cli.ts';
 import { cannotRun, ghJson, isMain, parseArgs } from './cli.ts';
+import { errorMessage } from '../lib/error-message.ts';
+
+/** The spec source a review was handed, as `spec.json` records it. */
+export type DiscoveredSpec =
+  | { kind: 'none'; foundBy: 'none' }
+  | {
+      kind: 'issue';
+      ref: string;
+      foundBy: 'branch' | 'commits';
+      also?: string[];
+    };
+
+/** One issue as `gh issue view` returns the fields this script asks for. */
+interface IssueView {
+  title?: string;
+  body?: string | null;
+  state?: string;
+  url?: string;
+}
 
 const BRANCH_ISSUE = /^[a-z]+\/(\d+)-/;
 // A commit reference is a keyword and a number, the shapes GitHub links
@@ -52,7 +72,13 @@ const COMMIT_CLOSES =
   /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b/gi;
 
 /** The one issue the order above finds first, or `none`. */
-const discoverPrimary = ({ headRef, commits }) => {
+const discoverPrimary = ({
+  headRef,
+  commits,
+}: {
+  headRef?: string | null;
+  commits: string[];
+}): DiscoveredSpec => {
   const fromBranch = headRef?.match(BRANCH_ISSUE);
   if (fromBranch)
     return { kind: 'issue', ref: `#${fromBranch[1]}`, foundBy: 'branch' };
@@ -74,12 +100,17 @@ const discoverPrimary = ({ headRef, commits }) => {
  * one issue resolves exactly as it did before. A branch with no issue at all
  * has no `also` either: the first closing reference is then the issue found.
  *
- * @param {{ headRef?: string, commits?: string[] }} input
  */
-export const discoverSpec = ({ headRef, commits = [] }) => {
+export const discoverSpec = ({
+  headRef,
+  commits = [],
+}: {
+  headRef?: string | null;
+  commits?: string[];
+}): DiscoveredSpec => {
   const spec = discoverPrimary({ headRef, commits });
   if (spec.kind === 'none') return spec;
-  const also = [];
+  const also: string[] = [];
   for (const message of commits) {
     for (const hit of message.matchAll(COMMIT_CLOSES)) {
       const ref = `#${hit[1]}`;
@@ -94,11 +125,11 @@ export const discoverSpec = ({ headRef, commits = [] }) => {
  * pull request number too, and a pull request's body is its author's summary
  * of the diff — not a spec source (ADR 0076 item 7).
  */
-export const isPullRequest = (issue) =>
+export const isPullRequest = (issue?: IssueView | null) =>
   /\/pull\/\d+$/.test(String(issue?.url ?? ''));
 
-export const main = (argv) => {
-  const bail = cannotRun('review-spec');
+export const main = (argv: string[]): void => {
+  const bail: Bail = cannotRun('review-spec');
   const { flags } = parseArgs(argv);
   const out = flags.out;
   if (!out) bail('--out <spec.json> is required');
@@ -114,7 +145,7 @@ export const main = (argv) => {
 
   const found = discoverSpec({ headRef: flags['head-ref'], commits });
   const repoArgs = flags.repo ? ['--repo', flags.repo] : [];
-  const fetchIssue = (ref) => {
+  const fetchIssue = (ref: string): IssueView => {
     try {
       return ghJson([
         'issue',
@@ -123,24 +154,36 @@ export const main = (argv) => {
         ...repoArgs,
         '--json',
         'title,body,state,url',
-      ]);
+      ]) as IssueView;
     } catch (err) {
-      return bail(`cannot fetch ${ref}: ${err.message}`);
+      return bail(`cannot fetch ${ref}: ${errorMessage(err)}`);
     }
   };
-  const textOf = (issue) => ({
+  const textOf = (issue: IssueView) => ({
     title: issue.title,
     body: issue.body ?? '',
     state: issue.state,
   });
 
-  const { also: alsoRefs = [], ...primary } = found;
-  let result = { spec: primary };
+  const { also: alsoRefs = [], ...primary } =
+    found.kind === 'issue' ? found : { ...found, also: undefined };
+  let result: {
+    spec: DiscoveredSpec;
+    title?: string;
+    body?: string;
+    state?: string;
+    also?: { ref: string; title?: string; body: string; state?: string }[];
+  } = { spec: primary };
   if (primary.kind === 'issue') {
     Object.assign(result, textOf(fetchIssue(primary.ref)));
     // A closing reference to a pull request is dropped, not fetched as spec:
     // the envelope names only what the Spec axis was actually handed.
-    const also = [];
+    const also: {
+      ref: string;
+      title?: string;
+      body: string;
+      state?: string;
+    }[] = [];
     for (const ref of alsoRefs) {
       const issue = fetchIssue(ref);
       if (isPullRequest(issue)) {
@@ -161,7 +204,7 @@ export const main = (argv) => {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
   const { spec } = result;
-  const named =
+  const named: string =
     spec.kind === 'issue'
       ? `${spec.ref} (found by ${spec.foundBy})${
           spec.also ? `, also ${spec.also.join(', ')}` : ''

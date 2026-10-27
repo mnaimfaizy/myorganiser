@@ -19,17 +19,25 @@ import test from 'node:test';
 
 const WORKFLOWS = '.github/workflows';
 
+/** One job of a workflow: its key, and the lines under it. */
+interface Job {
+  name: string;
+  lines: string[];
+}
+
 /** Each job of a workflow: its key and its text. */
-export const jobsIn = (workflowText) => {
+export const jobsIn = (
+  workflowText: string,
+): { name: string; body: string }[] => {
   const lines = workflowText.split('\n');
   const start = lines.findIndex((line) => /^jobs:\s*$/.test(line));
   if (start === -1) return [];
-  const jobs = [];
+  const jobs: Job[] = [];
   for (let i = start + 1; i < lines.length; i += 1) {
     if (/^\S/.test(lines[i])) break;
     const key = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(lines[i]);
     if (key) jobs.push({ name: key[1], lines: [] });
-    else if (jobs.length) jobs.at(-1).lines.push(lines[i]);
+    else if (jobs.length) jobs.at(-1)!.lines.push(lines[i]);
   }
   return jobs.map(({ name, lines: body }) => ({
     name,
@@ -37,12 +45,20 @@ export const jobsIn = (workflowText) => {
   }));
 };
 
-/** The repository scripts a job's text runs with `node`. */
-export const scriptsRunBy = (jobBody) => [
+/**
+ * The repository scripts a job's text runs with `node`.
+ *
+ * Both extensions, for as long as the migration runs: ADR 0135 moves
+ * `tools/scripts` to TypeScript in batches, so a job before an install may
+ * name a `.ts` script that imports an `.mjs` sibling, or the reverse. Reading
+ * only one extension would quietly stop checking the job this suite was
+ * written for.
+ */
+export const scriptsRunBy = (jobBody: string): string[] => [
   ...new Set(
-    [...jobBody.matchAll(/\bnode\s+(tools\/scripts\/[\w./-]+\.mjs)\b/g)].map(
-      (m) => m[1],
-    ),
+    [
+      ...jobBody.matchAll(/\bnode\s+(tools\/scripts\/[\w./-]+\.(?:mjs|ts))\b/g),
+    ].map((m) => m[1]),
   ),
 ];
 
@@ -52,15 +68,14 @@ const IMPORT =
 /**
  * Every package a script imports, directly or through the files it imports.
  *
- * @returns {{ specifier: string, from: string }[]}
  */
 export const packagesReachedFrom = (
-  entry,
-  read = (p) => readFileSync(p, 'utf8'),
-) => {
-  const seen = new Set();
-  const packages = [];
-  const visit = (file) => {
+  entry: string,
+  read: (path: string) => string = (p) => readFileSync(p, 'utf8'),
+): { specifier: string; from: string }[] => {
+  const seen = new Set<string>();
+  const packages: { specifier: string; from: string }[] = [];
+  const visit = (file: string) => {
     if (seen.has(file)) return;
     seen.add(file);
     for (const m of read(file).matchAll(IMPORT)) {
@@ -101,7 +116,7 @@ test('a job is split out with its own text, and its scripts are found', () => {
 });
 
 test('a package reached through a chain of files is found, with the file that imports it', () => {
-  const files = {
+  const files: Record<string, string> = {
     'a/entry.mjs': "import fs from 'node:fs';\nimport { x } from './mid.mjs';",
     'a/mid.mjs': "export { y } from '../b/leaf.mjs';",
     'b/leaf.mjs': "import { z } from 'zod';\nexport const y = z;",
@@ -113,7 +128,7 @@ test('a package reached through a chain of files is found, with the file that im
 });
 
 test('no script run before an install imports a package', () => {
-  const checked = [];
+  const checked: string[] = [];
   for (const name of readdirSync(WORKFLOWS).filter((n) => n.endsWith('.yml'))) {
     const file = join(WORKFLOWS, name);
     for (const job of jobsIn(readFileSync(file, 'utf8'))) {

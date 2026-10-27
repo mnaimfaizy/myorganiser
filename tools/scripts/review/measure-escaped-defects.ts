@@ -35,6 +35,13 @@ import {
   shiftDays,
   writeFile,
 } from './cli.ts';
+import type {
+  ClassifiedFix,
+  EscapedDefectSummary,
+  MeasurementWindow,
+  ReviewOutcome,
+  RootCauseRef,
+} from './escaped-defects.ts';
 import {
   attributeFix,
   classifyFix,
@@ -42,8 +49,64 @@ import {
   renderMeasurement,
   summarize,
 } from './escaped-defects.ts';
+import type { Verdict } from './schema.ts';
 
 const bail = cannotRun('escaped-defects');
+
+/** A Pull Request as git records its landing on `base`. */
+export interface LoggedPullRequest {
+  number: number;
+  sha: string;
+  parents: string[];
+  mergedAt: string;
+  branch: string | null;
+  title: string;
+  message: string | null;
+  type: string | null;
+}
+
+/** A fix's attribution text, per source, as the gather records it. */
+interface FixSources {
+  commits: string;
+  body?: string | null;
+  issue?: string | null;
+}
+
+/** One fix in the gather. */
+interface GatheredFix {
+  number: number;
+  mergedAt: string;
+  title: string;
+  sources: FixSources;
+}
+
+/** One Pull Request's review outcome, indexed by number. */
+interface OutcomeRow {
+  number: number;
+  mergedAt: string;
+  outcome: ReviewOutcome | null;
+  verdict: Verdict | null;
+}
+
+/** A Pull Request as the gather keeps it, for resolving a reference. */
+interface GatheredPullRequest {
+  number: number;
+  sha: string;
+  mergedAt: string;
+  branch: string | null;
+  type: string | null;
+}
+
+/** Everything the pure pipeline needs: saved once, replayable offline. */
+export interface Gathered {
+  window: MeasurementWindow;
+  base: string;
+  reviewerSince: string | null;
+  evidence: Record<string, string>;
+  fixes: GatheredFix[];
+  outcomes: OutcomeRow[];
+  pullRequests: GatheredPullRequest[];
+}
 
 // ASCII record and field separators: a commit body contains newlines and
 // anything else a friendlier delimiter would collide with. git emits them
@@ -55,7 +118,7 @@ const FIELD = '\u0000';
 const RECORD_FORMAT = '%x1e';
 const FIELD_FORMAT = '%x00';
 
-const gitLines = (args) =>
+const gitLines = (args: readonly string[]) =>
   git(args)
     .split('\n')
     .map((l) => l.trim())
@@ -76,12 +139,19 @@ const CONVENTIONAL = /^(\w+)(?:\([^)]*\))?!?:/;
  * population — not into `unattributed`, where it would be counted, but out of
  * the measurement altogether, which is the silent drop this exists to avoid.
  */
-const BRANCH_TYPES = ['fix', 'feat', 'docs', 'chore', 'ci'];
+const BRANCH_TYPES = ['fix', 'feat', 'docs', 'chore', 'ci'] as const;
 
 /** A Pull Request's type: its branch prefix when that names one, else its title's. */
-export const pullRequestType = ({ branch, title }) => {
+export const pullRequestType = ({
+  branch,
+  title,
+}: {
+  branch?: string | null;
+  title?: string | null;
+}): string | null => {
   const prefix = branch?.includes('/') ? branch.split('/')[0] : null;
-  if (prefix && BRANCH_TYPES.includes(prefix)) return prefix;
+  if (prefix && (BRANCH_TYPES as readonly string[]).includes(prefix))
+    return prefix;
   const fromTitle = CONVENTIONAL.exec(title ?? '')?.[1] ?? null;
   return fromTitle ?? prefix ?? null;
 };
@@ -97,16 +167,17 @@ export const pullRequestType = ({ branch, title }) => {
  * Split from the git call so the parsing — which is where every shape
  * question lives — is testable without a repository.
  */
-export const parsePullRequestLog = (raw) => {
-  const prs = [];
+export const parsePullRequestLog = (raw: unknown): LoggedPullRequest[] => {
+  const prs: LoggedPullRequest[] = [];
   for (const entry of String(raw).split(RECORD)) {
     const text = entry.replace(/^\n/, '');
     if (!text.trim()) continue;
     const [sha, parents, mergedAt, subject, body = ''] = text.split(FIELD);
     const merge = MERGE_SUBJECT.exec(subject);
     const squash = merge ? null : SQUASH_SUBJECT.exec(subject);
-    if (!merge && !squash) continue;
-    const number = Number((merge ?? squash)[1]);
+    const matched = merge ?? squash;
+    if (!matched) continue;
+    const number = Number(matched[1]);
     const branch = merge ? merge[2] : null;
     // A merge commit's body is the Pull Request title; a squash's title is
     // its own subject.
@@ -129,7 +200,15 @@ export const parsePullRequestLog = (raw) => {
 };
 
 /** Every Pull Request that reached `base`. */
-export const listPullRequests = ({ base, since, until }) => {
+export const listPullRequests = ({
+  base,
+  since,
+  until,
+}: {
+  base: string;
+  since?: string;
+  until?: string;
+}): LoggedPullRequest[] => {
   const range = ['--first-parent', base];
   if (since) range.push(`--since=${since}`);
   if (until) range.push(`--until=${until}`);
@@ -148,7 +227,7 @@ export const listPullRequests = ({ base, since, until }) => {
  * Branch naming maps `bug` and `security` issues onto `fix/` (AGENTS.md), so
  * this is the same population from either side.
  */
-export const isFix = (pr) => pr.type === 'fix';
+export const isFix = (pr: { type?: string | null }) => pr.type === 'fix';
 
 /**
  * The commit messages a Pull Request brought in, as one blob of text.
@@ -157,7 +236,7 @@ export const isFix = (pr) => pr.type === 'fix';
  * and reading only its title would drop the `Introduced in` line the fix gate
  * (ADR 0100) required on the branch.
  */
-export const commitTextOf = (pr) => {
+export const commitTextOf = (pr: LoggedPullRequest): string => {
   if (pr.parents.length < 2) return `${pr.message ?? pr.title}\n`;
   try {
     return git([
@@ -192,7 +271,11 @@ export const commitTextOf = (pr) => {
  *     commits still prints a range, so a reference to something never merged
  *     would resolve to whatever happens to be newest.
  */
-const landingCommit = (sha, base, onBase) => {
+const landingCommit = (
+  sha: string,
+  base: string,
+  onBase: Set<string>,
+): string | null => {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', sha, base], {
       stdio: 'ignore',
@@ -211,16 +294,16 @@ const landingCommit = (sha, base, onBase) => {
 };
 
 /** Every commit on `base`'s first-parent chain, read once per measurement. */
-const firstParentCommits = (base) => {
+const firstParentCommits = (base: string): Set<string> => {
   try {
     return new Set(gitLines(['rev-list', '--first-parent', base]));
   } catch {
-    return new Set();
+    return new Set<string>();
   }
 };
 
 /** The date the reviewer could first have seen anything: when its workflow landed. */
-export const reviewerSinceFromGit = () => {
+export const reviewerSinceFromGit = (): string | null => {
   const added = gitLines([
     'log',
     '--diff-filter=A',
@@ -236,7 +319,19 @@ export const reviewerSinceFromGit = () => {
  * so a gather can be saved and re-measured without touching git or the
  * network.
  */
-export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
+export const gather = ({
+  base,
+  since,
+  until,
+  reviewerSince,
+  useGithub,
+}: {
+  base: string;
+  since: string;
+  until: string;
+  reviewerSince: string | null;
+  useGithub: boolean;
+}): Gathered => {
   // Indexed over all of history, not just the window: a root cause is older
   // than the fix that names it, usually by more than the window is wide.
   const all = listPullRequests({ base });
@@ -254,8 +349,8 @@ export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
     'reviewer live since': reviewerSince ?? 'unknown',
   };
 
-  const gatheredFixes = fixes.map((pr) => {
-    const sources = { commits: commitTextOf(pr) };
+  const gatheredFixes = fixes.map((pr): GatheredFix => {
+    const sources: FixSources = { commits: commitTextOf(pr) };
     if (useGithub) {
       const view = ghJsonOrNull([
         'pr',
@@ -263,18 +358,23 @@ export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
         String(pr.number),
         '--json',
         'body,closingIssuesReferences',
-      ]);
+      ]) as {
+        body?: string | null;
+        closingIssuesReferences?: { number: number }[];
+      } | null;
       sources.body = view?.body ?? null;
       const issueBodies = (view?.closingIssuesReferences ?? [])
         .map(
           (ref) =>
-            ghJsonOrNull([
-              'issue',
-              'view',
-              String(ref.number),
-              '--json',
-              'body',
-            ])?.body ?? '',
+            (
+              ghJsonOrNull([
+                'issue',
+                'view',
+                String(ref.number),
+                '--json',
+                'body',
+              ]) as { body?: string | null } | null
+            )?.body ?? '',
         )
         .filter(Boolean);
       sources.issue = issueBodies.join('\n\n') || null;
@@ -290,10 +390,12 @@ export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
   // Anything merged before the reviewer's workflow landed is `unreviewed` by
   // a fact about the repository rather than by a failed lookup, and costs no
   // network call to establish.
-  const couldHaveBeenReviewed = (pr) =>
-    Boolean(reviewerSince) && dateOnly(pr.mergedAt) >= reviewerSince;
+  const couldHaveBeenReviewed = (pr: LoggedPullRequest) =>
+    Boolean(reviewerSince) && dateOnly(pr.mergedAt) >= reviewerSince!;
 
-  const outcomeOf = (pr) => {
+  const outcomeOf = (
+    pr: LoggedPullRequest,
+  ): { outcome: ReviewOutcome | null; verdict: Verdict | null } => {
     if (!couldHaveBeenReviewed(pr))
       return { outcome: 'unreviewed', verdict: null };
     if (!useGithub) return { outcome: null, verdict: null };
@@ -305,7 +407,9 @@ export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
       'comments',
     ]);
     if (!view) return { outcome: null, verdict: null };
-    return parseReviewOutcome(view.comments ?? []);
+    return parseReviewOutcome(
+      (view as { comments?: { body?: string | null }[] }).comments ?? [],
+    );
   };
 
   // An outcome for every Pull Request up to the end of the window, not only
@@ -344,7 +448,10 @@ export const gather = ({ base, since, until, reviewerSince, useGithub }) => {
  * on a replayed gather too, because a reference git cannot place resolves to
  * nothing and lands in `unresolved`, where it is counted.
  */
-export const measure = (gathered, { base } = {}) => {
+export const measure = (
+  gathered: Gathered,
+  { base }: { base?: string } = {},
+): EscapedDefectSummary => {
   const prByNumber = new Map(
     gathered.pullRequests.map((pr) => [pr.number, pr]),
   );
@@ -357,8 +464,8 @@ export const measure = (gathered, { base } = {}) => {
   // merged Pull Request, not that the replay looked in the wrong place.
   const resolveBase = gathered.base ?? base ?? 'main';
 
-  let onBase = null;
-  const resolve = (ref) => {
+  let onBase: Set<string> | null = null;
+  const resolve = (ref: RootCauseRef): GatheredPullRequest | null => {
     if (ref.kind === 'pull-request') return prByNumber.get(ref.number) ?? null;
     onBase ??= firstParentCommits(resolveBase);
     const landing = landingCommit(ref.sha, resolveBase, onBase);
@@ -368,7 +475,7 @@ export const measure = (gathered, { base } = {}) => {
     return gathered.pullRequests.find((pr) => pr.sha === landing) ?? null;
   };
 
-  const rows = gathered.fixes.map((fix) => {
+  const rows = gathered.fixes.map((fix): ClassifiedFix => {
     const attribution = attributeFix(fix.sources);
     const target = attribution?.ref ? resolve(attribution.ref) : null;
     const review = target ? reviewByNumber.get(target.number) : null;
@@ -416,7 +523,7 @@ export const measure = (gathered, { base } = {}) => {
   });
 };
 
-export const main = (argv) => {
+export const main = (argv: string[]): number => {
   const { flags } = parseArgs(argv);
   const base = flags.base ?? 'main';
   const until = flags.until ?? new Date().toISOString().slice(0, 10);
@@ -424,7 +531,9 @@ export const main = (argv) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until))
     bail(`--since and --until must be YYYY-MM-DD (got ${since}, ${until})`);
 
-  const replayed = flags.gathered ? readJsonOr(flags.gathered, bail) : null;
+  const replayed = flags.gathered
+    ? (readJsonOr(flags.gathered, bail) as Gathered)
+    : null;
   const gathered =
     replayed ??
     gather({

@@ -21,6 +21,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { BRIEFS, RETRY_LINE, axisNamedBy, isOnTemplate } from './briefs.ts';
+import type { FindingAxis } from './schema.ts';
+import type { TranscriptFacts } from './transcript-facts.ts';
 import {
   filesOpenedBy,
   findingsReturnedBy,
@@ -29,7 +31,42 @@ import {
   standardsDocumentTest,
 } from './transcript-facts.ts';
 
-const fixture = (name) =>
+/**
+ * The transcript shapes these fixtures carry. A transcript is JSON the Claude
+ * Code CLI writes, so it is described here rather than imported: nothing in
+ * the tooling owns its schema, and these tests reach only these fields — plus
+ * an index signature, because several of them bend an event into a shape a
+ * future CLI release might have.
+ */
+interface ToolInput {
+  prompt?: string;
+  file_path?: string;
+  command?: string;
+  message?: string;
+  run_in_background?: boolean;
+  [field: string]: unknown;
+}
+interface ContentBlock {
+  type?: string;
+  name?: string;
+  id?: string;
+  tool_use_id?: string;
+  input?: ToolInput;
+  content?: unknown;
+  is_error?: boolean;
+  text?: string;
+}
+interface TranscriptEvent {
+  type?: string;
+  subtype?: string;
+  parent_tool_use_id?: string | null;
+  message?: { id?: string; role?: string; content?: ContentBlock[] };
+  modelUsage?: Record<string, unknown>;
+  permission_denials?: { tool_use_id?: string }[];
+  [field: string]: unknown;
+}
+
+const fixture = (name: string) =>
   readFileSync(
     new URL(`./fixtures/transcripts/${name}.json`, import.meta.url),
     'utf8',
@@ -45,7 +82,8 @@ const INDEX = `
 | [upstream](https://example.com/standards.md) | not ours |
 `;
 
-const facts = (name) => readTranscriptFacts(fixture(name), { index: INDEX });
+const facts = (name: string) =>
+  readTranscriptFacts(fixture(name), { index: INDEX });
 
 // --- the template ----------------------------------------------------------
 
@@ -108,7 +146,8 @@ test('a dispatch names its axis by the brief path it carries', () => {
 // --- what counts as opened --------------------------------------------------
 
 const CWD = '/home/runner/work/repo/repo';
-const opened = (name, input) => filesOpenedBy({ name, input }, CWD);
+const opened = (name: string, input: ToolInput) =>
+  filesOpenedBy({ name, input }, CWD);
 
 test('Read opens a file at any range, and the path is made repo-relative', () => {
   assert.deepEqual(opened('Read', { file_path: `${CWD}/AGENTS.md` }), [
@@ -214,9 +253,9 @@ test('the paraphrased run: nothing on template, no brief, no standards source', 
   // Neither dispatch carried a brief path, so neither axis can be told apart
   // from the transcript: this is what the old skill looked like.
   assert.equal(f.dispatches, 2);
-  assert.equal(f.axes.standards.dispatched, false);
-  assert.equal(f.axes.standards.briefRead, false);
-  assert.equal(f.axes.spec.dispatched, false);
+  assert.equal(f.axes!.standards.dispatched, false);
+  assert.equal(f.axes!.standards.briefRead, false);
+  assert.equal(f.axes!.spec.dispatched, false);
   // The report claimed AGENTS.md, CLAUDE.md and two nested Agent Guides.
   assert.deepEqual(f.standardsSources, []);
   assert.equal(f.indexOpened, false);
@@ -227,12 +266,12 @@ test('the first brief-file run: on template, briefs read, index opened', () => {
   assert.equal(f.shape, 'readable');
   assert.equal(f.cliVersion, '2.1.293');
   for (const axis of ['standards', 'spec']) {
-    assert.equal(f.axes[axis].dispatched, true, axis);
-    assert.equal(f.axes[axis].briefRead, true, axis);
-    assert.equal(f.axes[axis].onTemplate, true, axis);
+    assert.equal(f.axes![axis].dispatched, true, axis);
+    assert.equal(f.axes![axis].briefRead, true, axis);
+    assert.equal(f.axes![axis].onTemplate, true, axis);
   }
-  assert.equal(f.axes.standards.toolCalls, 14);
-  assert.equal(f.axes.spec.toolCalls, 10);
+  assert.equal(f.axes!.standards.toolCalls, 14);
+  assert.equal(f.axes!.spec.toolCalls, 10);
   // The report claimed AGENTS.md and CLAUDE.md as well; neither was opened.
   assert.deepEqual(f.standardsSources, ['CODING_STANDARDS.md']);
   assert.equal(f.indexOpened, true);
@@ -242,22 +281,22 @@ test('the second brief-file run: a spill file outside the workspace is ignored',
   const f = facts('cli-2.1.293-template');
   assert.equal(f.durationMs, 112403);
   assert.deepEqual(f.standardsSources, ['CODING_STANDARDS.md']);
-  assert.equal(f.axes.standards.toolCalls, 14);
-  assert.equal(f.axes.spec.toolCalls, 8);
+  assert.equal(f.axes!.standards.toolCalls, 14);
+  assert.equal(f.axes!.spec.toolCalls, 8);
 });
 
 test('executed is the sub-agents commands, verbatim, and none of the main agents', () => {
   const f = facts('cli-2.1.293-template');
-  assert.ok(f.executed.includes('node tools/scripts/check-review-rules.mjs'));
+  assert.ok(f.executed!.includes('node tools/scripts/check-review-rules.mjs'));
   assert.ok(
-    f.executed.includes(
+    f.executed!.includes(
       'git diff 3c5b6eff9032e43d79d260ae5ce2fd3640826df0...HEAD --stat',
     ),
   );
   // The main agent ran the validator; that is not evidence a reviewer gathered.
-  assert.ok(!f.executed.some((c) => c.includes('review:validate')));
+  assert.ok(!f.executed!.some((c) => c.includes('review:validate')));
   // Both sub-agents ran the --stat diff; it is listed once.
-  assert.equal(new Set(f.executed).size, f.executed.length);
+  assert.equal(new Set(f.executed).size, f.executed!.length);
 });
 
 // --- what a sub-agent returned ---------------------------------------------
@@ -284,19 +323,19 @@ test('a fence, a sentence, or anything that is not an object is not a bare reply
 
 test('the first brief-file run fenced its replies; the second did not', () => {
   const fenced = facts('cli-2.1.293-template-sequential-fenced');
-  assert.equal(fenced.axes.standards.replyIsJson, false);
-  assert.equal(fenced.axes.spec.replyIsJson, false);
+  assert.equal(fenced.axes!.standards.replyIsJson, false);
+  assert.equal(fenced.axes!.spec.replyIsJson, false);
   const bare = facts('cli-2.1.293-template');
-  assert.equal(bare.axes.standards.replyIsJson, true);
-  assert.equal(bare.axes.spec.replyIsJson, true);
+  assert.equal(bare.axes!.standards.replyIsJson, true);
+  assert.equal(bare.axes!.spec.replyIsJson, true);
 });
 
 // --- cannot tell is its own answer ------------------------------------------
 
-const unknown = (text, reason) => {
+const unknown = (text: string, reason: RegExp) => {
   const f = readTranscriptFacts(text, { index: INDEX });
   assert.equal(f.shape, 'unknown');
-  assert.match(f.shapeReason, reason);
+  assert.match(f.shapeReason!, reason);
   // Unknown is never an empty list and never zero.
   assert.equal(f.standardsSources, null);
   assert.equal(f.executed, null);
@@ -312,7 +351,7 @@ test('a transcript that is missing or not JSON is unknown', () => {
 });
 
 test('a transcript with no init or no result event is unknown', () => {
-  const events = JSON.parse(fixture('cli-2.1.293-template'));
+  const events: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.293-template'));
   unknown(
     JSON.stringify(events.filter((e) => e.subtype !== 'init')),
     /no init event/,
@@ -327,7 +366,8 @@ test('dispatches whose sub-agent events cannot be attributed are unknown', () =>
   // What a CLI release that renamed `parent_tool_use_id` would look like:
   // the dispatches are there and nothing hangs off them. Read naively that is
   // "no sub-agent read its brief" on every pull request.
-  const events = JSON.parse(fixture('cli-2.1.293-template')).map((e) => {
+  const read: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.293-template'));
+  const events = read.map((e) => {
     if (!e.parent_tool_use_id) return e;
     const { parent_tool_use_id: _gone, ...rest } = e;
     return { ...rest, parentToolUseId: _gone };
@@ -339,22 +379,23 @@ test('dispatches whose sub-agent events cannot be attributed are unknown', () =>
 });
 
 test('a run that dispatched nothing is readable, and says so', () => {
-  const events = JSON.parse(fixture('cli-2.1.293-template')).filter(
+  const whole: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.293-template'));
+  const events = whole.filter(
     (e) =>
       e.type !== 'assistant' ||
       (!e.parent_tool_use_id &&
-        !e.message.content.some((b) => b.name === 'Agent')),
+        !e.message!.content!.some((b) => b.name === 'Agent')),
   );
   const f = readTranscriptFacts(JSON.stringify(events), { index: INDEX });
   assert.equal(f.shape, 'readable');
   assert.equal(f.dispatches, 0);
-  assert.equal(f.axes.standards.dispatched, false);
+  assert.equal(f.axes!.standards.dispatched, false);
   assert.deepEqual(f.standardsSources, []);
 });
 
 // --- what a reply returned ---------------------------------------------------
 
-const handBack = (body) =>
+const handBack = (body: string) =>
   [
     '[Subagent hand-back] The report follows:',
     ...body.split('\n').map((line) => `  ${line}`),
@@ -391,14 +432,14 @@ test('a reply with no findings list returned nothing this reader can compare', (
 test('every reply in a transcript is read, whichever dispatch it answers', () => {
   const paraphrased = facts('cli-2.1.292-paraphrased-dispatch');
   // Neither dispatch named a brief, so neither is an axis's; both replied.
-  assert.equal(paraphrased.axes.spec.dispatched, false);
+  assert.equal(paraphrased.axes!.spec.dispatched, false);
   assert.equal(paraphrased.repliesParsed, true);
-  assert.equal(paraphrased.returned.length, 1);
+  assert.equal(paraphrased.returned!.length, 1);
 
   const real = facts('cli-2.1.293-template-two-findings');
   assert.equal(real.repliesParsed, true);
   assert.deepEqual(
-    real.returned.map((f) => f.axis),
+    real.returned!.map((f) => f.axis),
     ['standards', 'spec'],
   );
 });
@@ -419,19 +460,19 @@ test('a report handed back by SubagentHandback is read from the call, not the po
   assert.equal(f.shape, 'readable');
   assert.equal(f.cliVersion, '2.1.301');
   assert.equal(f.repliesParsed, true);
-  assert.equal(f.returned.length, 1);
-  assert.equal(f.returned[0].axis, 'spec');
-  assert.equal(f.returned[0].severity, 'should-fix');
-  assert.equal(f.returned[0].summary, SPEC_FINDING_SUMMARY);
-  assert.equal(f.axes.standards.replyIsJson, true);
-  assert.equal(f.axes.spec.replyIsJson, true);
+  assert.equal(f.returned!.length, 1);
+  assert.equal(f.returned![0].axis, 'spec');
+  assert.equal(f.returned![0].severity, 'should-fix');
+  assert.equal(f.returned![0].summary, SPEC_FINDING_SUMMARY);
+  assert.equal(f.axes!.standards.replyIsJson, true);
+  assert.equal(f.axes!.spec.replyIsJson, true);
 });
 
 test('a dispatch whose only tool_result is the pointer, with no hand-back call, is unparseable', () => {
   // Drop every SubagentHandback call and the tool_result that answers it: what
   // is left is each dispatch's pointer, and nothing else in the transcript
   // says what the sub-agent reported.
-  const events = JSON.parse(fixture('cli-2.1.301-handback'));
+  const events: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.301-handback'));
   const handbackIds = new Set(
     events.flatMap((e) =>
       (e.message?.content ?? [])
@@ -449,17 +490,17 @@ test('a dispatch whose only tool_result is the pointer, with no hand-back call, 
   assert.equal(f.shape, 'readable');
   assert.equal(f.repliesParsed, false);
   assert.deepEqual(f.returned, []);
-  assert.equal(f.axes.standards.replyIsJson, false);
-  assert.equal(f.axes.spec.replyIsJson, false);
+  assert.equal(f.axes!.standards.replyIsJson, false);
+  assert.equal(f.axes!.spec.replyIsJson, false);
 });
 
 test('when a dispatch hands back twice, the last report is the one read', () => {
-  const events = JSON.parse(fixture('cli-2.1.301-handback'));
+  const events: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.301-handback'));
   const at = events.findIndex((e) =>
     (e.message?.content ?? []).some(
       (b) =>
         b.name === 'SubagentHandback' &&
-        b.input.message.includes('"axis":"spec"'),
+        b.input!.message!.includes('"axis":"spec"'),
     ),
   );
   const parent = events[at].parent_tool_use_id;
@@ -515,9 +556,9 @@ test('the token figures are summed from the result events model usage', () => {
   });
 });
 
-const withModelUsage = (modelUsage) => {
-  const events = JSON.parse(fixture('cli-2.1.293-template'));
-  events.findLast((e) => e.type === 'result').modelUsage = modelUsage;
+const withModelUsage = (modelUsage: Record<string, unknown>) => {
+  const events: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.293-template'));
+  events.findLast((e) => e.type === 'result')!.modelUsage = modelUsage;
   return readTranscriptFacts(JSON.stringify(events), { index: INDEX });
 };
 
@@ -560,7 +601,8 @@ test('a result event without the figures is unknown, never zero', () => {
 });
 
 test('an unreadable transcript keeps the figures its result event did carry', () => {
-  const events = JSON.parse(fixture('cli-2.1.293-template')).filter(
+  const whole: TranscriptEvent[] = JSON.parse(fixture('cli-2.1.293-template'));
+  const events = whole.filter(
     (e) => !(e.type === 'system' && e.subtype === 'init'),
   );
   const read = readTranscriptFacts(JSON.stringify(events), { index: INDEX });
@@ -585,16 +627,16 @@ const RULES_CHECK = 'node tools/scripts/check-review-rules.mjs';
  * Claude Code CLI gives one: a `user` event under the same dispatch, holding
  * a `tool_result` for the call's id.
  */
-const withResultFor = (command, result) => {
-  const events = JSON.parse(fixture(TWO_FINDINGS));
+const withResultFor = (command: string, result: Record<string, unknown>) => {
+  const events: TranscriptEvent[] = JSON.parse(fixture(TWO_FINDINGS));
   const at = events.findIndex((e) =>
     e.message?.content?.some?.(
       (b) => b.type === 'tool_use' && b.input?.command === command,
     ),
   );
-  const call = events[at].message.content.find(
+  const call = events[at].message!.content!.find(
     (b) => b.input?.command === command,
-  );
+  )!;
   events.splice(at + 1, 0, {
     type: 'user',
     parent_tool_use_id: events[at].parent_tool_use_id,
@@ -605,8 +647,8 @@ const withResultFor = (command, result) => {
   return readTranscriptFacts(JSON.stringify(events), { index: INDEX });
 };
 
-const executionOf = (f, command) =>
-  f.executions.filter((e) => e.command === command);
+const executionOf = (f: TranscriptFacts, command: string) =>
+  f.executions!.filter((e) => e.command === command);
 
 test('executions holds every Bash call, the main agents marked as its own', () => {
   const f = facts(TWO_FINDINGS);
@@ -615,16 +657,16 @@ test('executions holds every Bash call, the main agents marked as its own', () =
   ]);
   // Both sub-agents ran the same `git diff --stat`: two calls, both kept.
   assert.equal(
-    f.executions.filter((e) => e.command.endsWith('...HEAD --stat')).length,
+    f.executions!.filter((e) => e.command.endsWith('...HEAD --stat')).length,
     2,
   );
-  const main = f.executions.filter((e) => e.by === 'main');
+  const main = f.executions!.filter((e) => e.by === 'main');
   assert.equal(main.length, 1);
   assert.match(main[0].command, /review:validate/);
 });
 
 test('a call with no result in the transcript has no exit code, not zero', () => {
-  for (const e of facts(TWO_FINDINGS).executions)
+  for (const e of facts(TWO_FINDINGS).executions!)
     assert.equal(e.exitCode, null);
 });
 
@@ -686,32 +728,34 @@ test('an unreadable transcript states no executions', () => {
 test('a call the harness refused did not run, and is not an execution', () => {
   // Run 37576528356: one sub-agent Bash call is in the result event's
   // permission denials.
-  const events = JSON.parse(fixture('cli-2.1.292-paraphrased-dispatch'));
+  const events: TranscriptEvent[] = JSON.parse(
+    fixture('cli-2.1.292-paraphrased-dispatch'),
+  );
   const [denial] = events.findLast(
     (e) => e.type === 'result',
-  ).permission_denials;
+  )!.permission_denials!;
   const denied = events
     .flatMap((e) => e.message?.content ?? [])
     .find((b) => b.id === denial.tool_use_id);
-  assert.equal(denied.name, 'Bash');
+  assert.equal(denied!.name, 'Bash');
   const f = facts('cli-2.1.292-paraphrased-dispatch');
-  assert.deepEqual(executionOf(f, denied.input.command), []);
-  assert.ok(f.executions.length > 0);
+  assert.deepEqual(executionOf(f, denied!.input!.command!), []);
+  assert.ok(f.executions!.length > 0);
 });
 
 test('a backgrounded call has no exit code to read', () => {
-  const events = JSON.parse(fixture(TWO_FINDINGS));
+  const events: TranscriptEvent[] = JSON.parse(fixture(TWO_FINDINGS));
   const call = events
     .flatMap((e) => e.message?.content ?? [])
     .find((b) => b.input?.command === RULES_CHECK);
-  call.input.run_in_background = true;
-  const at = events.findIndex((e) => e.message?.content?.includes?.(call));
+  call!.input!.run_in_background = true;
+  const at = events.findIndex((e) => e.message?.content?.includes?.(call!));
   events.splice(at + 1, 0, {
     type: 'user',
     parent_tool_use_id: events[at].parent_tool_use_id,
     message: {
       content: [
-        { type: 'tool_result', tool_use_id: call.id, content: 'started' },
+        { type: 'tool_result', tool_use_id: call!.id, content: 'started' },
       ],
     },
   });
@@ -720,14 +764,14 @@ test('a backgrounded call has no exit code to read', () => {
 });
 
 test('a call that ends in & has no exit code to read either', () => {
-  const events = JSON.parse(fixture(TWO_FINDINGS));
+  const events: TranscriptEvent[] = JSON.parse(fixture(TWO_FINDINGS));
   const at = events.findIndex((e) =>
     e.message?.content?.some?.((b) => b.input?.command === RULES_CHECK),
   );
-  const call = events[at].message.content.find(
+  const call = events[at].message!.content!.find(
     (b) => b.input?.command === RULES_CHECK,
-  );
-  call.input.command = `${RULES_CHECK} &`;
+  )!;
+  call.input!.command = `${RULES_CHECK} &`;
   events.splice(at + 1, 0, {
     type: 'user',
     parent_tool_use_id: events[at].parent_tool_use_id,
@@ -742,17 +786,17 @@ test('a call that ends in & has no exit code to read either', () => {
 // --- which changed files each axis opened or diffed (issue #1140) -----------
 
 /** A real transcript with tool calls added to one axis's sub-agent. */
-const withCallsOn = (axis, inputs) => {
-  const events = JSON.parse(fixture(TWO_FINDINGS));
+const withCallsOn = (axis: FindingAxis, inputs: [string, ToolInput][]) => {
+  const events: TranscriptEvent[] = JSON.parse(fixture(TWO_FINDINGS));
   const dispatch = events
     .flatMap((e) => (e.parent_tool_use_id ? [] : (e.message?.content ?? [])))
     .find(
       (b) =>
         b.type === 'tool_use' &&
         typeof b.input?.prompt === 'string' &&
-        b.input.prompt.includes(BRIEFS[axis]),
-    );
-  inputs.forEach(([name, input], i) =>
+        b.input!.prompt!.includes(BRIEFS[axis]),
+    )!;
+  inputs.forEach(([name, input]: [string, ToolInput], i: number) =>
     events.push({
       type: 'assistant',
       parent_tool_use_id: dispatch.id,
@@ -781,11 +825,11 @@ test('each axis records the files it opened and the files it diffed by path', ()
     // A stat names no file's content; it is neither an open nor a diff.
     ['Bash', { command: 'git diff main...HEAD --stat' }],
   ]);
-  assert.ok(f.axes.spec.opened.includes('.github/workflows/deploy.yml'));
+  assert.ok(f.axes!.spec.opened.includes('.github/workflows/deploy.yml'));
   for (const path of ['tools/scripts/deploy.mjs', 'tools/a.sh'])
-    assert.ok(f.axes.spec.diffed.includes(path), path);
-  assert.ok(!f.axes.spec.diffed.includes('main...HEAD'));
+    assert.ok(f.axes!.spec.diffed.includes(path), path);
+  assert.ok(!f.axes!.spec.diffed.includes('main...HEAD'));
   // The other axis is credited with nothing the Spec sub-agent did.
-  assert.ok(!f.axes.standards.opened.includes('.github/workflows/deploy.yml'));
-  assert.ok(!f.axes.standards.diffed.includes('tools/a.sh'));
+  assert.ok(!f.axes!.standards.opened.includes('.github/workflows/deploy.yml'));
+  assert.ok(!f.axes!.standards.diffed.includes('tools/a.sh'));
 });

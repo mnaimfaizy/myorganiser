@@ -12,7 +12,7 @@ nothing from the ticket tracker. The Spec axis reads the originating issue and a
 does what the issue asked for. Without a spec source the Spec sub-agent is skipped and the validator
 drops the effective tier one level, because the spec contributes one step of confidence.
 
-The spec source is discovered in a fixed order (`tools/scripts/review/resolve-spec.mjs`): the branch
+The spec source is discovered in a fixed order (`tools/scripts/review/resolve-spec.ts`): the branch
 name `<type>/<issue>-<slug>`, then a GitHub-style issue reference in a commit, then nothing.
 
 Agent-authored work fails the first step by construction. `yarn dispatch-agents` integrates a PRD's
@@ -72,7 +72,7 @@ identically into the code and into the summary of the code.
 ## Consequences
 
 - An agent-authored pull request reaches the reviewer with a resolved spec, and both axes run, with
-  no new discovery step and no change to `resolve-spec.mjs`.
+  no new discovery step and no change to `resolve-spec.ts`.
 
 - The PRD issue closes when its pull request merges, because the anchor is a closing reference. That
   is the behaviour a PRD branch wants; a branch that should not close its issue must not be anchored
@@ -81,7 +81,7 @@ identically into the code and into the summary of the code.
 - Branches created before this decision have no anchor. They resolve a spec only if one of their
   commits happens to reference an issue, and otherwise review one axis, as they did before.
 
-- `sandcastle-spec-anchor.ts` imports from `tools/scripts/review/resolve-spec.mjs`, so the
+- `sandcastle-spec-anchor.ts` imports from `tools/scripts/review/resolve-spec.ts`, so the
   orchestrator now depends on a review script. That edge is deliberate: it is the only way the two
   cannot disagree, and it is one direction only — the resolver knows nothing about sandcastle.
 

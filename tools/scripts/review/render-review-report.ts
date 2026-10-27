@@ -24,6 +24,13 @@ import { ZodError } from 'zod';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './cli.ts';
 import { evidenceText } from './evidence.ts';
 import { isExecutable } from './run-ladder.ts';
+import type {
+  FindingAxis,
+  FindingLocation,
+  NormalizedFinding,
+  NormalizedReport,
+  RunFactsSummary,
+} from './schema.ts';
 import {
   AXIS_TITLES,
   FINDING_AXES,
@@ -44,9 +51,9 @@ import {
  * anything under a second is `under 1 s`, because the report measures a
  * review session and not a function call.
  *
- * @param {number} ms a non-negative duration in milliseconds
+ * @param ms a non-negative duration in milliseconds
  */
-export const formatDuration = (ms) => {
+export const formatDuration = (ms: number): string => {
   const totalSeconds = Math.round(ms / 1000);
   if (totalSeconds < 1) return 'under 1 s';
   const hours = Math.floor(totalSeconds / 3600);
@@ -65,9 +72,9 @@ export const formatDuration = (ms) => {
  * About three figures, because the count is there to say how big a run was.
  * The exact count stays in the normalized report.
  *
- * @param {number} count a non-negative whole number of tokens
+ * @param count a non-negative whole number of tokens
  */
-export const formatTokens = (count) => {
+export const formatTokens = (count: number): string => {
   if (count < 1000) return String(count);
   if (count < 9950) return `${(count / 1000).toFixed(1)}k`;
   if (count < 999500) return `${Math.round(count / 1000)}k`;
@@ -78,9 +85,12 @@ export const formatTokens = (count) => {
  * A path as inline code. A path here is one a sub-agent chose to open, so a
  * backtick in it is dropped rather than allowed to end the span.
  */
-const codePath = (path) => `\`${path.replaceAll('`', '')}\``;
+const codePath = (path: string) => `\`${path.replaceAll('`', '')}\``;
 
-const AXIS_NAMES = { standards: 'Standards', spec: 'Spec' };
+const AXIS_NAMES = {
+  standards: 'Standards',
+  spec: 'Spec',
+} as const satisfies Record<FindingAxis, string>;
 
 const COVERAGE_ROWS = 25;
 
@@ -90,7 +100,9 @@ const COVERAGE_ROWS = 25;
  * where the Spec brief asks for the whole file and the axis did not open it.
  * With no changed-file list there is no table, rather than an empty one.
  */
-const renderCoverage = (coverage) => {
+const renderCoverage = (
+  coverage?: NonNullable<RunFactsSummary['coverage']> | null,
+): string[] => {
   if (!coverage?.length) return [];
   const rows = coverage
     .slice(0, COVERAGE_ROWS)
@@ -125,10 +137,10 @@ const renderCoverage = (coverage) => {
  * held to, and the harness loads those two into the session without anyone
  * opening them.
  *
- * @param {object} report a normalized report
- * @returns {string[]} Markdown list lines
+ * @param report a normalized report
+ * @returns Markdown list lines
  */
-export const renderRunFacts = (report) => {
+export const renderRunFacts = (report: NormalizedReport): string[] => {
   if (report.runFactsFrom !== 'transcript' || !report.runFacts)
     return [
       '- run facts: self-reported by the reviewer, not read from a transcript',
@@ -139,7 +151,7 @@ export const renderRunFacts = (report) => {
       }`,
     ];
 
-  const facts = report.runFacts;
+  const facts: RunFactsSummary = report.runFacts;
   const cli = facts.cliVersion ?? 'unknown';
   if (facts.shape === 'unknown')
     return [
@@ -148,13 +160,15 @@ export const renderRunFacts = (report) => {
       ...renderRunCost(report),
     ];
 
-  const lines = [
+  const lines: string[] = [
     `- run facts: read from the reviewer transcript (Claude Code CLI ${cli})`,
   ];
-  const { standards, spec } = facts.axes;
+  // `axes` is stated exactly when the shape is readable, and the branch above
+  // returned for every other shape.
+  const { standards, spec } = facts.axes!;
   lines.push(
     `- standards sources opened by the Standards sub-agent: ${
-      report.standardsSources.length
+      report.standardsSources?.length
         ? report.standardsSources.map(codePath).join(', ')
         : '**none**'
     } (root \`AGENTS.md\` and \`CLAUDE.md\` are loaded by the harness and are not listed)`,
@@ -167,10 +181,13 @@ export const renderRunFacts = (report) => {
     }`,
   );
   // An axis that was meant to run: Standards always, Spec when there is one.
-  const expected = { standards: true, spec: report.spec.kind !== 'none' };
-  for (const axis of Object.keys(AXIS_NAMES)) {
+  const expected: Record<FindingAxis, boolean> = {
+    standards: true,
+    spec: report.spec.kind !== 'none',
+  };
+  for (const axis of FINDING_AXES) {
     if (!expected[axis]) continue;
-    const a = facts.axes[axis];
+    const a = facts.axes![axis];
     if (!a.briefRead)
       lines.push(
         `- ${AXIS_NAMES[axis]} brief: **not read** — no sub-agent opened it${a.dispatched ? '' : ', and no dispatch named it'}`,
@@ -188,7 +205,7 @@ export const renderRunFacts = (report) => {
     lines.push(
       '- standards index: **not opened** — the Standards sub-agent read its brief and never opened `CODING_STANDARDS.md`',
     );
-  if (facts.unattributedDispatches > 0)
+  if ((facts.unattributedDispatches ?? 0) > 0)
     lines.push(
       `- extra dispatches: **${facts.unattributedDispatches}** — sub-agent dispatch(es) that read neither brief and named neither, which the skill has no template for`,
     );
@@ -211,8 +228,8 @@ export const renderRunFacts = (report) => {
  * what they did, so a reader does not have to know the ladder to see why a
  * check is red or a tier moved.
  */
-const renderRunCost = (report) => {
-  const { failures = [], tightenedBy = [] } = report.runFacts;
+const renderRunCost = (report: NormalizedReport): string[] => {
+  const { failures = [], tightenedBy = [] } = report.runFacts ?? {};
   const lines = failures.map(
     (failure) =>
       `- **\`Agent Review Ran\` fails** (\`${failure.reason}\`): ${failure.detail.replaceAll('`', '')}`,
@@ -230,7 +247,7 @@ const renderRunCost = (report) => {
 /** Most lines of a hunk shown inline; a finding is a pointer, not a file. */
 export const HUNK_MAX_LINES = 30;
 
-const locationText = (f) =>
+const locationText = (f: NormalizedFinding) =>
   f.location
     ? `\`${f.location.file}:${f.location.startLine}${f.location.endLine ? `-${f.location.endLine}` : ''}\``
     : null;
@@ -240,7 +257,10 @@ const locationText = (f) =>
  * Returns null when git cannot serve them (not a repo, unknown SHA, file
  * absent at that commit); the renderer then says so instead of guessing.
  */
-export const readHunk = (location, cwd = process.cwd()) => {
+export const readHunk = (
+  location: FindingLocation,
+  cwd: string = process.cwd(),
+): string | null => {
   const result = spawnSync(
     'git',
     ['show', `${location.headSha}:${location.file}`],
@@ -262,13 +282,13 @@ export const readHunk = (location, cwd = process.cwd()) => {
     .join('\n');
 };
 
-const fence = (text) => [
+const fence = (text: string) => [
   '  ```',
   ...text.split('\n').map((l) => `  ${l}`),
   '  ```',
 ];
 
-const renderFinding = (f, { hunks }) => {
+const renderFinding = (f: NormalizedFinding, { hunks }: { hunks: boolean }) => {
   const head = [`**${f.severity}**`, f.summary, locationText(f)]
     .filter(Boolean)
     .join(' · ');
@@ -296,7 +316,11 @@ const renderFinding = (f, { hunks }) => {
   return lines.join('\n');
 };
 
-const renderAxis = (axis, findings, opts) => {
+const renderAxis = (
+  axis: FindingAxis,
+  findings: NormalizedFinding[],
+  opts: { hunks: boolean },
+) => {
   const sorted = [...findings].sort(bySeverity);
   const main = sorted.filter((f) => f.severity !== 'nit');
   const nits = sorted.filter((f) => f.severity === 'nit');
@@ -321,13 +345,13 @@ const renderAxis = (axis, findings, opts) => {
   return out.join('\n');
 };
 
-const renderDelta = (current, previous) => {
+const renderDelta = (current: NormalizedReport, previous: NormalizedReport) => {
   const now = new Map(current.findings.map((f) => [f.id, f]));
   const before = new Map(previous.findings.map((f) => [f.id, f]));
   const fresh = [...now.keys()].filter((id) => !before.has(id));
   const persisting = [...now.keys()].filter((id) => before.has(id));
   const resolved = [...before.keys()].filter((id) => !now.has(id));
-  const item = (label, ids) =>
+  const item = (label: string, ids: string[]) =>
     `- ${label}: ${ids.length}${ids.length ? ` (${ids.map((id) => `\`${id}\``).join(', ')})` : ''}`;
   return [
     `Since \`${previous.head.slice(0, 7)}\`:`,
@@ -344,7 +368,7 @@ const renderDelta = (current, previous) => {
  * diff would announce every finding new and every prior one resolved, which is
  * the mass auto-resolve the schema bump exists to prevent (issue #718).
  */
-const renderIncomparable = (previous) => {
+const renderIncomparable = (previous: unknown) => {
   const version = reportSchemaVersionOf(previous);
   return [
     `No comparable previous run: the stored report is report schema \`${version ?? 'unknown'}\`, this run is \`${REPORT_SCHEMA_VERSION}\`.`,
@@ -353,14 +377,18 @@ const renderIncomparable = (previous) => {
   ].join('\n');
 };
 
-const worst = (findings) =>
+const worst = (findings: NormalizedFinding[]) =>
   [...findings].sort(bySeverity)[0]?.severity ?? 'none';
 
 /**
  * Render a normalized report. Throws a ZodError when `report` is not the
  * validator's output; callers that read from disk turn that into exit 2.
  */
-export const renderReport = (raw, previous = null, { hunks = true } = {}) => {
+export const renderReport = (
+  raw: unknown,
+  previous: unknown = null,
+  { hunks = true }: { hunks?: boolean } = {},
+): string => {
   const report = NormalizedReportSchema.parse(raw);
   // A previous report of another vintage is read for its version and nothing
   // else; parsing it against today's schema would reject a file that is not
@@ -418,21 +446,23 @@ export const renderReport = (raw, previous = null, { hunks = true } = {}) => {
 const USAGE =
   'usage: render-review-report.ts <normalized.json> [--previous <path>] [--out <path>] [--no-hunks]';
 
-export const main = (argv) => {
+export const main = (argv: string[]): void => {
   const bail = cannotRun('review-render');
   const { positional, flags } = parseArgs(argv);
   const [inputPath] = positional;
   if (!inputPath) bail(USAGE);
   const report = readJsonOr(inputPath, bail);
   const previous = flags.previous ? readJsonOr(flags.previous, bail) : null;
-  let markdown;
+  let markdown: string;
   try {
     markdown = renderReport(report, previous, {
       hunks: !('no-hunks' in flags),
     });
   } catch (err) {
     if (!(err instanceof ZodError)) throw err;
-    bail(
+    // `bail` exits; returning it says so, so the lines below are reached only
+    // with `markdown` assigned.
+    return bail(
       `${inputPath} is not a normalized report — run review:validate first\n  ${formatIssues(err).join('\n  ')}`,
     );
   }

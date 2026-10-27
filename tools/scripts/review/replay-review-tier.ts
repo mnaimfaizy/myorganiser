@@ -18,18 +18,51 @@ import { dirname } from 'node:path';
 
 import { ghJson } from '../lib/gh.ts';
 import { loadProjectGraph } from '../lib/nx-graph.ts';
+import type {
+  ReviewTier,
+  ReviewTierResult,
+  SignalKind,
+} from '../lib/review-tier.ts';
 import {
   REVIEW_TIERS,
   classifyReviewTier,
   loadPathMap,
 } from '../lib/review-tier.ts';
 
+/** One merged Pull Request, as `gh pr list` returns it. */
+interface MergedPullRequest {
+  number: number;
+  title: string;
+  author?: { login?: string } | null;
+  files: { path: string; additions: number; deletions: number }[];
+  additions: number;
+  deletions: number;
+  mergedAt: string;
+  labels: { name: string }[];
+}
+
+/** One replayed row: the tier today's rules would give that Pull Request. */
+interface ReplayRow {
+  number: number;
+  title: string;
+  author: string | undefined;
+  mergedAt: string;
+  labels: string[];
+  tier: ReviewTier;
+  files: number;
+  lines: number;
+  projects: number;
+  decisive: string[];
+  withoutSize: ReviewTier;
+  withoutBlast: ReviewTier;
+}
+
 const args = process.argv.slice(2);
-const opt = (flag, fallback) => {
+const opt = (flag: string, fallback?: string): string | undefined => {
   const i = args.indexOf(flag);
   return i === -1 ? fallback : args[i + 1];
 };
-const limit = Number(opt('--limit', 200));
+const limit = Number(opt('--limit', '200'));
 
 const prs = ghJson(
   [
@@ -45,12 +78,12 @@ const prs = ghJson(
     'number,title,author,files,additions,deletions,mergedAt,labels',
   ],
   { maxBuffer: 256 * 1024 * 1024 },
-);
+) as MergedPullRequest[];
 
 const graph = loadProjectGraph(opt('--graph'));
 const pathMap = loadPathMap();
 
-const rows = prs.map((pr) => {
+const rows = prs.map((pr): ReplayRow => {
   const files = pr.files.map((f) => ({
     path: f.path,
     additions: f.additions,
@@ -60,7 +93,7 @@ const rows = prs.map((pr) => {
     files,
     graph,
     pathMap,
-    author: pr.author?.login,
+    author: pr.author?.login ?? undefined,
   });
   const decisive = result.signals
     .filter((s) => s.tier === result.tier)
@@ -68,7 +101,7 @@ const rows = prs.map((pr) => {
   return {
     number: pr.number,
     title: pr.title,
-    author: pr.author?.login,
+    author: pr.author?.login ?? undefined,
     mergedAt: pr.mergedAt,
     labels: pr.labels.map((l) => l.name),
     tier: result.tier,
@@ -83,26 +116,29 @@ const rows = prs.map((pr) => {
   };
 });
 
-function maxExcluding(result, kinds) {
+function maxExcluding(
+  result: ReviewTierResult,
+  kinds: readonly SignalKind[],
+): ReviewTier {
   return result.signals
     .filter((s) => !kinds.includes(s.kind))
-    .reduce(
+    .reduce<ReviewTier>(
       (acc, s) =>
         REVIEW_TIERS.indexOf(s.tier) > REVIEW_TIERS.indexOf(acc) ? s.tier : acc,
       'auto',
     );
 }
 
-const count = (key) =>
-  rows.reduce((acc, r) => {
+const count = (key: 'tier' | 'withoutSize' | 'withoutBlast') =>
+  rows.reduce<Record<string, number>>((acc, r) => {
     acc[r[key]] = (acc[r[key]] ?? 0) + 1;
     return acc;
   }, {});
 const distribution = count('tier');
-const decisiveCounts = {};
+const decisiveCounts: Record<string, number> = {};
 for (const r of rows)
   for (const d of r.decisive) decisiveCounts[d] = (decisiveCounts[d] ?? 0) + 1;
-const percent = (n) => `${Math.round((100 * n) / rows.length)}%`;
+const percent = (n: number) => `${Math.round((100 * n) / rows.length)}%`;
 
 const md = [
   `# Review Tier replay (${new Date().toISOString().slice(0, 10)})`,
@@ -139,13 +175,15 @@ const md = [
   '',
 ].join('\n');
 
-const write = (path, text) => {
+const write = (path: string, text: string) => {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, text);
 };
-if (opt('--out')) write(opt('--out'), md);
-if (opt('--json')) write(opt('--json'), `${JSON.stringify(rows, null, 2)}\n`);
-if (!opt('--out')) process.stdout.write(md);
+const outPath = opt('--out');
+const jsonPath = opt('--json');
+if (outPath) write(outPath, md);
+if (jsonPath) write(jsonPath, `${JSON.stringify(rows, null, 2)}\n`);
+if (!outPath) process.stdout.write(md);
 console.error(
   `review-tier replay: ${rows.length} PRs → ${REVIEW_TIERS.map((t) => `${t} ${distribution[t] ?? 0}`).join(', ')}`,
 );

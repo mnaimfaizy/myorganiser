@@ -15,7 +15,10 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
+import { errorMessage } from '../lib/error-message.ts';
 import { cannotRun, isMain, parseArgs } from './cli.ts';
+import type { GuardedEnum } from '../lib/enum-fanout-guarded.ts';
+import type { ObligationCatalogue } from './obligations.ts';
 import {
   enumMemberValues,
   loadObligationCatalogue,
@@ -26,7 +29,16 @@ import {
 const USAGE =
   'usage: select-obligations.ts --base <sha> --head <sha> [--out <path>] [--catalogue <path>]';
 
-export const main = (argv, { run = gitDiff, read = gitShow } = {}) => {
+export const main = (
+  argv: string[],
+  {
+    run = gitDiff,
+    read = gitShow,
+  }: {
+    run?: (base: string, head: string) => string;
+    read?: (head: string, path: string) => string | null;
+  } = {},
+): void => {
   const bail = cannotRun('review-obligations-select');
   const { flags } = parseArgs(argv);
   if (!flags.base || !flags.head) bail(USAGE);
@@ -34,29 +46,32 @@ export const main = (argv, { run = gitDiff, read = gitShow } = {}) => {
 
   // A guarded enum's member values are read at the reviewed head, never from
   // the tooling tree: a replay's head predates members the tooling knows.
-  const membersOf = (guard) =>
-    enumMemberValues(read(flags.head, guard.definedIn), guard.enum);
+  // The guard above exits unless both refs are present.
+  const base = flags.base!;
+  const head = flags.head!;
+  const membersOf = (guard: GuardedEnum) =>
+    enumMemberValues(read(head, guard.definedIn), guard.enum);
 
-  let catalogue;
+  let catalogue: ObligationCatalogue;
   try {
     catalogue = flags.catalogue
       ? loadObligationCatalogue(flags.catalogue, { membersOf })
       : loadObligationCatalogue(undefined, { membersOf });
   } catch (err) {
-    bail(err.message);
+    return bail(errorMessage(err));
   }
 
-  let diff;
+  let diff: string;
   try {
-    diff = run(flags.base, flags.head);
+    diff = run(base, head);
   } catch (err) {
-    bail(`git diff failed: ${err.message}`);
+    return bail(`git diff failed: ${errorMessage(err)}`);
   }
 
   const worklist = selectObligations({
     catalogue,
     addedLines: parseAddedLines(diff),
-    head: flags.head,
+    head,
   });
 
   const text = `${JSON.stringify(worklist, null, 2)}\n`;
@@ -73,7 +88,7 @@ export const main = (argv, { run = gitDiff, read = gitShow } = {}) => {
 
 // Three-dot, matching the skill's diff command, so the worklist covers what the
 // branch changed rather than what the base moved on to.
-const gitDiff = (base, head) =>
+const gitDiff = (base: string, head: string): string =>
   execFileSync('git', ['diff', '-U0', `${base}...${head}`], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
@@ -81,7 +96,7 @@ const gitDiff = (base, head) =>
 
 // A file absent at head is not an error: the enum may postdate the range, and
 // the trigger then falls back to the enum-qualified shapes.
-const gitShow = (head, path) => {
+const gitShow = (head: string, path: string): string | null => {
   try {
     return execFileSync('git', ['show', `${head}:${path}`], {
       encoding: 'utf8',

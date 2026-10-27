@@ -64,6 +64,8 @@ export interface Push {
   headSha: string;
   report: ReportRead | null;
   commits?: PushCommit[];
+  /** When the review ran. Carried through from the gather, never read here. */
+  createdAt?: string;
 }
 
 /** A stored report, read back from an artifact and of any vintage. */
@@ -78,7 +80,14 @@ export interface ObservedFinding {
   ruleId?: string;
   axis?: string;
   severity?: string;
-  location?: { file?: string } | undefined;
+  /**
+   * Only the file is read. The rest of a stored finding's location comes
+   * along with it, and declaring it keeps a caller from having to strip a
+   * report down to what this reads.
+   */
+  location?:
+    | { file?: string; startLine?: number; endLine?: number; headSha?: string }
+    | undefined;
 }
 
 /** One observation: what one finding did between two pushes. */
@@ -436,7 +445,7 @@ export const RULE_STATUSES = [
 ] as const;
 
 export const statusOf = (
-  { observations, rate }: NoiseRate,
+  { observations, rate }: Omit<NoiseRate, 'ignored'>,
   budget: NoiseBudget = NOISE_BUDGET,
 ): RuleStatus => {
   if (observations < budget.minObservations) return 'insufficient-evidence';

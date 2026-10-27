@@ -6,8 +6,41 @@
  * times and missed 19, changed tier four times on what was a coin flip.
  *
  * Nothing here imports anything: golden-tiers.ts calls it from the replay
- * workflow's `cases` job, which installs nothing.
+ * workflow's `cases` job, which installs nothing. The types below are this
+ * module's own, declared structurally rather than imported from golden.ts,
+ * which reaches zod — a type import would be erased at runtime, but
+ * `no-install-imports.test.ts` reads the import graph as text and cannot
+ * tell the two apart, and neither can the next reader.
  */
+
+/** A scored run of a case, as a standing reads the results record. */
+export interface StandingRecord {
+  case: string;
+  outcome: string;
+}
+
+/** A case, as a standing needs it: its id and the tier the set declares. */
+export interface StandingCase {
+  id: string;
+  tier: string;
+}
+
+/** The golden set, as a standing needs it. */
+export interface StandingSet {
+  cases?: StandingCase[];
+}
+
+/** Where one case stands, and the window that put it there. */
+export interface CaseStanding {
+  id: string;
+  declaredTier: string;
+  tier: string;
+  scoredRuns: number;
+  windowRuns: number;
+  caught: number;
+  decided: boolean;
+  heldAtFrontier: boolean;
+}
 
 /** How many scored runs a standing is read over. */
 export const STANDING_WINDOW = 10;
@@ -32,13 +65,17 @@ const MISSES = ['missed', 'clean-fail'];
  * reviewer catches nine times in ten would be demoted in about one window in
  * fourteen. Under ten scored runs nothing moves.
  *
- * @param {{case: string, outcome: string}[]} records the results record
- * @param {string} caseId
- * @param {string} declaredTier the case's `tier` in the golden set
+ * @param records the results record
+ * @param caseId
+ * @param declaredTier the case's `tier` in the golden set
  */
-export function caseStanding(records, caseId, declaredTier) {
+export function caseStanding(
+  records: StandingRecord[],
+  caseId: string,
+  declaredTier: string,
+): CaseStanding {
   let tier = declaredTier;
-  const scored = [];
+  const scored: boolean[] = [];
   for (const r of records) {
     if (r.case !== caseId) continue;
     if (CATCHES.includes(r.outcome)) scored.push(true);
@@ -71,10 +108,13 @@ export function caseStanding(records, caseId, declaredTier) {
  * `frontier`, the promoted case with the fewest catches in its window — the
  * first in set order on a tie — stays there and says so.
  *
- * @param {{cases: {id: string, tier: string}[]}} set
- * @param {{case: string, outcome: string}[]} records
+ * @param set
+ * @param records
  */
-export function caseStandings(set, records) {
+export function caseStandings(
+  set: StandingSet | null | undefined,
+  records: StandingRecord[],
+): CaseStanding[] {
   const standings = (set?.cases ?? []).map((c) =>
     caseStanding(records, c.id, c.tier),
   );
@@ -92,7 +132,7 @@ export function caseStandings(set, records) {
 export const STANDING_START = '<!-- GENERATED:golden-standing:START -->';
 export const STANDING_END = '<!-- GENERATED:golden-standing:END -->';
 
-const standingNote = (s) => {
+const standingNote = (s: CaseStanding) => {
   if (!s.decided)
     return `declared; under ${STANDING_WINDOW} scored runs, so nothing moves`;
   if (s.heldAtFrontier)
@@ -107,7 +147,10 @@ const standingNote = (s) => {
  * Rendered from the set and the record, and asserted against the ledger by
  * check-review-golden-results.ts.
  */
-export function renderStandingTable(set, records) {
+export function renderStandingTable(
+  set: StandingSet | null | undefined,
+  records: StandingRecord[],
+): string {
   const header =
     '| Case | Declared tier | Scored runs | Caught of last ten | Rate | Stands at | Why |\n' +
     '| --- | --- | --- | --- | --- | --- | --- |';

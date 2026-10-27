@@ -9,18 +9,21 @@ import {
 
 const SCRIPT = 'tools/scripts/review/apply-review-tier-label.ts';
 
-const graphqlFlake = () => {
+/** A `gh` failure as the CLI throws one: an Error carrying its stderr. */
+const graphqlFlake = (): Error & { stderr: string } => {
   const err = new Error(
     'GraphQL: Something went wrong while executing your query on 2026-09-15T09:55:23Z.',
-  );
+  ) as Error & { stderr: string };
   err.stderr = err.message;
   return err;
 };
 
-const runApply = (over = {}) => {
-  const calls = [];
-  const sleeps = [];
-  const warnings = [];
+type ApplyOptions = Parameters<typeof applyReviewTierLabel>[0];
+
+const runApply = (over: Partial<ApplyOptions> = {}) => {
+  const calls: string[][] = [];
+  const sleeps: number[] = [];
+  const warnings: string[] = [];
   const resultP = applyReviewTierLabel({
     pr: 789,
     label: 'review:agent',
@@ -31,6 +34,7 @@ const runApply = (over = {}) => {
     },
     ghCall: (args) => {
       calls.push(['gh', ...args]);
+      return '';
     },
     sleep: async (ms) => {
       sleeps.push(ms);
@@ -83,6 +87,7 @@ test('retries a GraphQL flake and succeeds', async () => {
     ghCall: () => {
       edits += 1;
       if (edits < 3) throw graphqlFlake();
+      return '';
     },
   });
   assert.deepEqual(result, { applied: true, reason: 'updated' });

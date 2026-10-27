@@ -43,7 +43,7 @@
 // the validator's own and need no second witness. Catalogue ↔ obligations and
 // catalogue ↔ each brief: both ways. SKILL.md ← catalogue: one way. The skill
 // no longer has to offer any id, so only an id it names that the catalogue
-// lacks is a finding. briefs.mjs → SKILL.md for the template: one way, since
+// lacks is a finding. briefs.ts → SKILL.md for the template: one way, since
 // the skill may say more around the template than the lines themselves. The
 // shared block: compared for identity, and for
 // carrying no rule id, which would offer one axis the other's vocabulary.

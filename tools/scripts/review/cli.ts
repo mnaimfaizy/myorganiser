@@ -45,19 +45,26 @@ export const parseArgs = (argv: readonly string[]): ParsedArgs => {
   return { positional, flags };
 };
 
+/**
+ * What `cannotRun` hands back: a call that prints and exits, so nothing after
+ * it runs. The alias exists so a caller can annotate its own `const` with it —
+ * that annotation is what lets the checker read `if (!x) bail(...)` as the
+ * narrowing it already was, instead of leaving `x` nullable below the guard.
+ */
+export type Bail = (msg: string) => never;
+
 /** Exit 2: the script could not run. Distinct from exit 1, a rejected report. */
 export const cannotRun =
   (prefix: string) =>
   (msg: string): never => {
-  console.error(`${prefix}: ${msg}`);
-  process.exit(2);
-};
+    console.error(`${prefix}: ${msg}`);
+    process.exit(2);
+  };
 
 /** The first non-empty line of a thrown `gh` error, for logs and cannotRun. */
 export const firstLine = (err: unknown): string =>
-  (spawnFailure(err).stderr || errorMessage(err))
-    .split('\n')
-    .find(Boolean) ?? 'unknown error';
+  (spawnFailure(err).stderr || errorMessage(err)).split('\n').find(Boolean) ??
+  'unknown error';
 
 export const readJsonOr = (
   path: string,
@@ -136,7 +143,9 @@ export const git = (
 
 /** The date part of an ISO timestamp, which is the granularity a window has. */
 export function dateOnly(iso: string): string;
-export function dateOnly(iso: string | null | undefined): string | null | undefined;
+export function dateOnly(
+  iso: string | null | undefined,
+): string | null | undefined;
 export function dateOnly(
   iso: string | null | undefined,
 ): string | null | undefined {

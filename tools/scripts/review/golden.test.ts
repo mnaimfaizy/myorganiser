@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import type {
+  CleanGoldenCase,
+  PatternGoldenCase,
+  ScoredFinding,
+} from './golden.ts';
 import {
   GoldenSetError,
   assertGoldenSet,
@@ -16,11 +21,50 @@ import {
   replayTriggerFindings,
   scoreCase,
 } from './golden.ts';
+import type { IdentityFields } from './schema.ts';
 import { findingId } from './schema.ts';
 
-const sha = (c) => c.repeat(40);
+/**
+ * A set, a case, and an expectation as the malformed-set tests bend them:
+ * each mutation makes one field wrong on purpose, so every field is loose.
+ */
+interface ExpectedDraft {
+  id?: unknown;
+  axis?: unknown;
+  source?: unknown;
+  rule?: unknown;
+  ruleId?: unknown;
+  files?: unknown;
+  minSeverity?: unknown;
+  why?: unknown;
+}
+interface CaseDraft {
+  id?: unknown;
+  title?: unknown;
+  incident?: unknown;
+  tier?: unknown;
+  tierEvidence?: unknown;
+  base?: unknown;
+  head?: unknown;
+  origin?: unknown;
+  tag?: unknown;
+  spec?: { kind?: unknown; ref?: unknown };
+  specSnapshot?: unknown;
+  expectsNoBlocking?: unknown;
+  why?: unknown;
+  expected?: ExpectedDraft[];
+  minRecall?: unknown;
+}
+interface SetDraft {
+  schemaVersion?: unknown;
+  cases: CaseDraft[];
+  parked?: unknown;
+  retired?: unknown;
+}
 
-const goldenCase = {
+const sha = (c: string) => c.repeat(40);
+
+const goldenCase: PatternGoldenCase = {
   id: 'enum-fanout',
   title: 'A blob type added without its fan-outs',
   incident: 'ADR 0053, #512',
@@ -44,7 +88,7 @@ const goldenCase = {
 };
 const set = { schemaVersion: 4, cases: [goldenCase] };
 
-const finding = (over = {}) => ({
+const finding = (over: Partial<ScoredFinding> = {}): ScoredFinding => ({
   id: 'abcdefabcdef',
   axis: 'standards',
   severity: 'blocking',
@@ -57,6 +101,18 @@ const finding = (over = {}) => ({
   location: { file: 'libs/web-vault/src/lib/vault/vaultMigration.ts' },
   ...over,
 });
+
+/**
+ * The id the validator would mint for one of these fixtures. Their locations
+ * carry a file and no line, which `findingId` hashes as absent; the cast says
+ * so rather than inventing a line the assertions would then rest on.
+ */
+const idOf = (f: ScoredFinding): string =>
+  findingId({
+    axis: f.axis,
+    ruleId: f.ruleId ?? '',
+    location: f.location as IdentityFields['location'],
+  });
 
 test('a well-formed set passes and the committed set loads', () => {
   assert.equal(assertGoldenSet(set), set);
@@ -78,7 +134,7 @@ test('a well-formed set passes and the committed set loads', () => {
   // A guard runs on a narrower trigger than a frontier case (ADR 0072), so
   // the promotion has to cite the runs that earned it rather than assert it.
   for (const c of committed.cases.filter((x) => x.tier === 'guard'))
-    assert.match(c.tierEvidence, /promoted \d{4}-\d{2}-\d{2}/, c.id);
+    assert.match(c.tierEvidence!, /promoted \d{4}-\d{2}-\d{2}/, c.id);
   // The frontier is the reason to run the replay at all. A set that is all
   // guard measures nothing, and is far more likely a mistake than a triumph.
   assert.ok(
@@ -97,16 +153,16 @@ test('a well-formed set passes and the committed set loads', () => {
   assert.equal(committed.cases.length, 16);
   assert.equal(committed.cases.filter((c) => c.origin === 'seeded').length, 4);
   assert.equal(committed.cases.filter((c) => c.expectsNoBlocking).length, 3);
-  assert.ok(committed.parked?.length >= 1, 'the set has no parked case');
-  for (const p of committed.parked) {
+  assert.ok((committed.parked?.length ?? 0) >= 1, 'the set has no parked case');
+  for (const p of committed.parked!) {
     assert.match(p.incident, /#\d+/, p.id);
     assert.ok(p.reentryCondition, p.id);
   }
 });
 
 test('malformed sets are named precisely', () => {
-  const bad = (mutate) => {
-    const copy = JSON.parse(JSON.stringify(set));
+  const bad = (mutate: (set: SetDraft) => void) => {
+    const copy = JSON.parse(JSON.stringify(set)) as SetDraft;
     mutate(copy);
     return () => assertGoldenSet(copy);
   };
@@ -154,7 +210,7 @@ test('malformed sets are named precisely', () => {
       'tailwind:classes:check is wired and fails on this range, so ADR 0074 suppresses it',
   };
   assert.equal(
-    assertGoldenSet({ ...set, retired: [retired] }).retired.length,
+    assertGoldenSet({ ...set, retired: [retired] }).retired!.length,
     1,
   );
   assert.throws(
@@ -176,7 +232,7 @@ test('malformed sets are named precisely', () => {
     reentryCondition:
       'returns when the deferred checklist candidate becomes a real obligation',
   };
-  assert.equal(assertGoldenSet({ ...set, parked: [parked] }).parked.length, 1);
+  assert.equal(assertGoldenSet({ ...set, parked: [parked] }).parked!.length, 1);
   assert.throws(
     () =>
       assertGoldenSet({
@@ -221,11 +277,11 @@ test('malformed sets are named precisely', () => {
     /equals/,
   );
   assert.throws(
-    bad((s) => (s.cases[0].expected[0].rule = '(')),
+    bad((s) => (s.cases[0].expected![0].rule = '(')),
     /bad pattern/,
   );
   assert.throws(
-    bad((s) => (s.cases[0].expected[0].files = [])),
+    bad((s) => (s.cases[0].expected![0].files = [])),
     /files/,
   );
   assert.throws(
@@ -233,7 +289,7 @@ test('malformed sets are named precisely', () => {
     /minRecall/,
   );
   assert.throws(
-    bad((s) => delete s.cases[0].expected[0].why),
+    bad((s) => delete s.cases[0].expected![0].why),
     /why/,
   );
   assert.throws(
@@ -247,7 +303,7 @@ test('malformed sets are named precisely', () => {
 // passes only when the report carries no Blocking finding. No expected
 // findings, no recall — the opposite shape from every case above.
 
-const cleanGoldenCase = {
+const cleanGoldenCase: CleanGoldenCase = {
   id: 'clean-example',
   title: 'A known-good merged pull request',
   incident:
@@ -268,8 +324,8 @@ test('a well-formed clean case passes and loads', () => {
 
 test('a malformed clean case is named precisely', () => {
   const set2 = { schemaVersion: 4, cases: [cleanGoldenCase] };
-  const bad2 = (mutate) => {
-    const copy = JSON.parse(JSON.stringify(set2));
+  const bad2 = (mutate: (set: SetDraft) => void) => {
+    const copy = JSON.parse(JSON.stringify(set2)) as SetDraft;
     mutate(copy);
     return () => assertGoldenSet(copy);
   };
@@ -297,8 +353,8 @@ test('a malformed clean case is named precisely', () => {
   );
   // A pattern case (the default shape) must not carry `why` — that field
   // belongs to a clean case, and each pattern expectation has its own.
-  const bad = (mutate) => {
-    const copy = JSON.parse(JSON.stringify(set));
+  const bad = (mutate: (set: SetDraft) => void) => {
+    const copy = JSON.parse(JSON.stringify(set)) as SetDraft;
     mutate(copy);
     return () => assertGoldenSet(copy);
   };
@@ -369,7 +425,7 @@ test('a matching finding scores recall 1 and passes', () => {
 });
 
 test('axis, source, rule, file, and minimum severity all have to match', () => {
-  const miss = (over) =>
+  const miss = (over: Partial<ScoredFinding>) =>
     scoreCase(goldenCase, { findings: [finding(over)] }).pass;
   assert.equal(miss({ axis: 'spec' }), false);
   assert.equal(miss({ source: 'docs/ui/GUIDELINES.md' }), false);
@@ -381,7 +437,7 @@ test('axis, source, rule, file, and minimum severity all have to match', () => {
 });
 
 test('one finding satisfies one expectation, and extras are counted', () => {
-  const twice = {
+  const twice: PatternGoldenCase = {
     ...goldenCase,
     expected: [
       goldenCase.expected[0],
@@ -398,7 +454,7 @@ test('one finding satisfies one expectation, and extras are counted', () => {
 });
 
 test('an expectation that pins a rule id is reported as strict', () => {
-  const pinned = {
+  const pinned: PatternGoldenCase = {
     ...goldenCase,
     expected: [
       {
@@ -408,13 +464,13 @@ test('an expectation that pins a rule id is reported as strict', () => {
     ],
   };
   const f = finding();
-  f.id = findingId(f);
+  f.id = idOf(f);
   assert.equal(scoreCase(pinned, { findings: [f] }).matched[0].strict, true);
   // The reviewer named the defect under a different catalogue id: matching
   // still succeeds on the source and rule patterns, but the validator's tuple
   // would not have matched, and the annotation must say so.
   const other = finding({ ruleId: 'standard-missing-focused-test' });
-  other.id = findingId(other);
+  other.id = idOf(other);
   assert.equal(
     scoreCase(pinned, { findings: [other] }).matched[0].strict,
     false,
@@ -428,7 +484,7 @@ test('an expectation that pins a rule id is reported as strict', () => {
 });
 
 test('a pinned rule id matches on its own, so reworded prose is not a miss', () => {
-  const pinned = {
+  const pinned: PatternGoldenCase = {
     ...goldenCase,
     expected: [
       { ...goldenCase.expected[0], ruleId: 'standard-enum-fanout-not-pinned' },
@@ -459,8 +515,8 @@ test('a pinned rule id matches on its own, so reworded prose is not a miss', () 
 });
 
 test('a pinned rule id must exist in the rule catalogue', () => {
-  const copy = JSON.parse(JSON.stringify(set));
-  copy.cases[0].expected[0].ruleId = 'standard-invented-here';
+  const copy = JSON.parse(JSON.stringify(set)) as SetDraft;
+  copy.cases[0].expected![0].ruleId = 'standard-invented-here';
   assert.throws(
     () => assertGoldenSet(copy),
     /ruleId standard-invented-here is not in tools\/config\/review-rules\.json/,
@@ -903,6 +959,11 @@ const runFactsSteps = ({
     '          node tools/scripts/review/record-golden-result.ts "${ARGS[@]}"',
   ],
   order = ['check', 'score', 'record'],
+}: {
+  check?: string[];
+  score?: string[];
+  record?: string[];
+  order?: ('check' | 'score' | 'record')[];
 } = {}) => {
   const blocks = { check, score, record };
   return ['    steps:', ...order.flatMap((name) => blocks[name])].join('\n');
@@ -964,7 +1025,7 @@ test('a recorder that is not handed the normalized report is a finding', () => {
 
 const SNAPSHOT =
   'tools/config/review-golden-specs/1138-at-2026-10-13T06-36-54Z.json';
-const seededCase = {
+const seededCase: PatternGoldenCase = {
   ...goldenCase,
   id: 'seeded-example',
   origin: 'seeded',
@@ -972,9 +1033,9 @@ const seededCase = {
   spec: { kind: 'issue', ref: '#1138', foundBy: 'branch' },
   specSnapshot: SNAPSHOT,
 };
-const onlyThe = (path) => (p) => p === path;
+const onlyThe = (path: string) => (p: string) => p === path;
 const check =
-  (c, exists = onlyThe(SNAPSHOT)) =>
+  (c: unknown, exists: (path: string) => boolean = onlyThe(SNAPSHOT)) =>
   () =>
     assertGoldenSet({ schemaVersion: 4, cases: [c] }, 'golden set', { exists });
 
@@ -1038,12 +1099,20 @@ test('a case on the Spec axis pins a spec snapshot that exists, and a spec-less 
 test('a seeded head is reachable from its golden tag, and a missing tag is a finding', () => {
   // A fake git: the commits that exist, and which commit reaches which.
   const fakeGit =
-    ({ commits, refs = {}, reaches = [] }) =>
-    (args) => {
+    ({
+      commits,
+      refs = {},
+      reaches = [],
+    }: {
+      commits: string[];
+      refs?: Record<string, string>;
+      reaches?: [string, string][];
+    }) =>
+    (args: string[]) => {
       const [cmd, ...rest] = args;
       if (cmd === 'cat-file')
-        return commits.includes(rest[1].replace('^{commit}', ''));
-      if (cmd === 'rev-parse') return rest.at(-1) in refs;
+        return commits.includes(rest[1]!.replace('^{commit}', ''));
+      if (cmd === 'rev-parse') return rest.at(-1)! in refs;
       if (cmd === 'merge-base') {
         const [, from, to] = rest;
         const target = refs[to] ?? to;
@@ -1157,7 +1226,7 @@ test('the real replay workflow writes the pinned spec snapshot', () => {
 test('an expectation may name more than one axis, and either copy of the defect scores', () => {
   // ADR 0131 keeps the Spec copy of an overlapping pair on a tie, so a defect
   // both axes can raise must not score a miss for which copy survived.
-  const either = {
+  const either: PatternGoldenCase = {
     ...goldenCase,
     expected: [{ ...goldenCase.expected[0], axis: ['standards', 'spec'] }],
   };
@@ -1188,7 +1257,7 @@ test('an expectation may name more than one axis, and either copy of the defect 
 });
 
 test('a case shown for replay carries its pinned spec text, and a spec-less case carries none', () => {
-  const read = (path) =>
+  const read = (path: string) =>
     path === SNAPSHOT
       ? JSON.stringify({
           ref: '#1138',

@@ -31,7 +31,81 @@
  */
 
 import { NO_VERDICT_HEADING, SUMMARY_MARKER } from './publish.ts';
+import type { Verdict } from './schema.ts';
 import { VERDICT_VALUES, verdictHeading } from './schema.ts';
+
+/** A reference a fix names as the origin of the defect. */
+export type RootCauseRef =
+  | { kind: 'pull-request'; number: number }
+  | { kind: 'commit'; sha: string };
+
+/** One place a root cause is named, with the words that named it. */
+export interface RootCauseMention {
+  ref: RootCauseRef;
+  marker: string;
+  quote: string;
+}
+
+/** The root cause one piece of text names, and every other it also names. */
+export interface RootCause extends RootCauseMention {
+  others: RootCauseMention[];
+}
+
+/** A fix's attribution: where it was read from, and what it named. */
+export interface FixAttribution {
+  source: AttributionSource;
+  ref: RootCauseRef | null;
+  marker: string;
+  quote: string;
+  others: RootCauseMention[];
+}
+
+/** A merged fix, as the measurement carries it into a row. */
+export interface FixSubject {
+  number: number;
+  mergedAt?: string | null;
+  title?: string;
+}
+
+/** The Pull Request a fix names, once resolved to a merged one. */
+export interface RootCausePullRequest {
+  number: number;
+  mergedAt?: string | null;
+  outcome?: string | null;
+  verdict?: string | null;
+}
+
+/** One fix, in exactly one class. */
+export interface ClassifiedFix extends FixSubject {
+  class: FixClass;
+  attribution: FixAttribution | null;
+  rootCause?: RootCausePullRequest | null;
+}
+
+/** The window a measurement covers. */
+export interface MeasurementWindow {
+  since: string;
+  until: string;
+}
+
+/** The measurement `summarize` returns and `renderMeasurement` writes out. */
+export interface EscapedDefectSummary {
+  window: MeasurementWindow;
+  evidence: Record<string, string> | null;
+  sample: {
+    fixes: number;
+    attributed: number;
+    originUnknown: number;
+    unattributed: number;
+  };
+  classes: Record<string, number>;
+  denominator: number;
+  unreadable: number;
+  escaped: number[];
+  outsideDenominator: number[];
+  rate: number | null;
+  fixes: ClassifiedFix[];
+}
 
 /**
  * What a reviewer summary comment says happened, as far as trust is
@@ -50,17 +124,21 @@ export const REVIEW_OUTCOMES = [
   'unrecognised',
 ] as const;
 
+/** What a reviewer summary comment says happened. */
+export type ReviewOutcome = (typeof REVIEW_OUTCOMES)[number];
+const isReviewOutcome = (v: unknown): v is ReviewOutcome =>
+  (REVIEW_OUTCOMES as readonly unknown[]).includes(v);
+
 /**
  * Pinned fan-out over the verdict enum (AGENTS.md; ADR 0053). A verdict
  * added to the contract without a decision about what it means for trust
  * fails here at module load rather than being read as a pass.
  */
-export const VERDICT_OUTCOMES =
-  /** @type {Record<typeof VERDICT_VALUES[number], typeof REVIEW_OUTCOMES[number]>} */ ({
-    'request-changes': 'blocked',
-    comment: 'passed',
-    approve: 'passed',
-  });
+export const VERDICT_OUTCOMES = {
+  'request-changes': 'blocked',
+  comment: 'passed',
+  approve: 'passed',
+} as const satisfies Record<Verdict, ReviewOutcome>;
 for (const verdict of VERDICT_VALUES) {
   if (!(verdict in VERDICT_OUTCOMES))
     throw new Error(`VERDICT_OUTCOMES is missing "${verdict}"`);
@@ -89,15 +167,16 @@ const HEADING_TO_VERDICT = new Map(
  * format is the only thing that says a review happened at all, and guessing
  * on an unfamiliar one would add fabricated passes to the denominator.
  *
- * @param {Array<{ body?: string }>} comments
- * @returns {{ outcome: typeof REVIEW_OUTCOMES[number], verdict: string | null }}
+ * @param comments every issue comment on the Pull Request, oldest first
  */
-export const parseReviewOutcome = (comments = []) => {
+export const parseReviewOutcome = (
+  comments: { body?: string | null }[] = [],
+): { outcome: ReviewOutcome; verdict: Verdict | null } => {
   const summaries = (comments ?? []).filter((c) =>
     String(c?.body ?? '').includes(SUMMARY_MARKER),
   );
   if (summaries.length === 0) return { outcome: 'unreviewed', verdict: null };
-  const body = String(summaries.at(-1).body ?? '');
+  const body = String(summaries.at(-1)!.body ?? '');
   for (const [heading, verdict] of HEADING_TO_VERDICT) {
     if (body.includes(heading))
       return { outcome: VERDICT_OUTCOMES[verdict], verdict };
@@ -113,7 +192,14 @@ export const parseReviewOutcome = (comments = []) => {
  */
 const refPattern = String.raw`(?:(?:pull request|PR)\s*)?#(?<number>\d+)|(?<sha>\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b)`;
 
-const marker = (id, lead, why) => ({
+/** One phrase a fix uses to name what introduced the defect. */
+export interface RootCauseMarker {
+  id: string;
+  why: string;
+  re: RegExp;
+}
+
+const marker = (id: string, lead: string, why: string): RootCauseMarker => ({
   id,
   why,
   re: new RegExp(String.raw`${lead}\s+(?:${refPattern})`, 'gi'),
@@ -163,18 +249,24 @@ export const ROOT_CAUSE_MARKERS = [
   ),
 ];
 
-const refOf = (groups) =>
+// `refPattern` is an alternation of exactly these two groups, so a match
+// that set neither cannot reach here.
+const refOf = (groups: Record<string, string | undefined>): RootCauseRef =>
   groups.number
     ? { kind: 'pull-request', number: Number(groups.number) }
-    : { kind: 'commit', sha: groups.sha };
+    : { kind: 'commit', sha: groups.sha! };
 
-export const sameRef = (a, b) =>
-  Boolean(a) &&
-  Boolean(b) &&
-  a.kind === b.kind &&
-  (a.kind === 'pull-request'
-    ? a.number === b.number
-    : a.sha.startsWith(b.sha) || b.sha.startsWith(a.sha));
+export const sameRef = (
+  a?: RootCauseRef | null,
+  b?: RootCauseRef | null,
+): boolean => {
+  if (!a || !b) return false;
+  if (a.kind === 'pull-request' && b.kind === 'pull-request')
+    return a.number === b.number;
+  if (a.kind === 'commit' && b.kind === 'commit')
+    return a.sha.startsWith(b.sha) || b.sha.startsWith(a.sha);
+  return false;
+};
 
 /**
  * A negation that denies the marker right after it: "Not a regression from
@@ -196,17 +288,19 @@ const DENIED_BEFORE =
   /\b(?:not|never|no(?![\s*_]+(?:doubt|denying|question|less|more)\b)|\w+n't)(?:[\s*_]+\w+){0,4}[\s*_]*$/i;
 const NEGATION_REACH = 60;
 
-const isDenied = (text, index) => {
+const isDenied = (text: string, index: number) => {
   const before = text
     .slice(Math.max(0, index - NEGATION_REACH), index)
     .replace(/’/g, "'");
-  const paragraph = before.split(/\n[ \t]*\n/).pop();
+  // `split` always yields at least one piece, so the last one is the
+  // paragraph the marker sits in.
+  const paragraph = before.split(/\n[ \t]*\n/).pop()!;
   return DENIED_BEFORE.test(paragraph);
 };
 
 const QUOTE_RADIUS = 60;
 
-const quoteAround = (text, index, length) =>
+const quoteAround = (text: string, index: number, length: number) =>
   text
     .slice(Math.max(0, index - QUOTE_RADIUS), index + length + QUOTE_RADIUS)
     .replace(/\s+/g, ' ')
@@ -220,12 +314,10 @@ const quoteAround = (text, index, length) =>
  * in `others`: a fix that names two origins is still attributed to one, and
  * the row shows the disagreement instead of hiding it.
  *
- * @param {string} text
- * @returns {{ ref: object, marker: string, quote: string, others: object[] } | null}
  */
-export const parseRootCause = (text) => {
+export const parseRootCause = (text?: string | null): RootCause | null => {
   const source = String(text ?? '');
-  const hits = [];
+  const hits: (RootCauseMention & { index: number; rank: number })[] = [];
   ROOT_CAUSE_MARKERS.forEach((m, rank) => {
     // Each marker carries a `g` flag, so its lastIndex must not leak between
     // calls; matchAll on a fresh copy is the cheapest way to stay pure.
@@ -243,7 +335,7 @@ export const parseRootCause = (text) => {
   if (hits.length === 0) return null;
   hits.sort((a, b) => a.index - b.index || a.rank - b.rank);
   const [first, ...rest] = hits;
-  const others = [];
+  const others: RootCauseMention[] = [];
   for (const hit of rest) {
     if (sameRef(hit.ref, first.ref)) continue;
     if (others.some((o) => sameRef(o.ref, hit.ref))) continue;
@@ -278,11 +370,10 @@ export const ORIGIN_UNKNOWN =
  * defect's origin. Order only matters when two sources disagree, and the
  * winning source is named in every row so a disagreement is auditable.
  */
-export const ATTRIBUTION_SOURCES = [
-  'issue',
-  'body',
-  'commits',
-] as const;
+export const ATTRIBUTION_SOURCES = ['issue', 'body', 'commits'] as const;
+
+/** Where a fix's attribution was read from. */
+export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
 /**
  * The root cause a fix names, from the first source that names one.
@@ -292,10 +383,11 @@ export const ATTRIBUTION_SOURCES = [
  * found it is the better evidence. Only when no source names a reference is
  * an `Introduced in unknown` line read, and it comes back with `ref: null`.
  *
- * @param {Record<string, string|null|undefined>} sources text per source id
- * @returns {{ source: string, ref: object | null, marker: string, quote: string, others: object[] } | null}
+ * @param sources text per source id
  */
-export const attributeFix = (sources = {}) => {
+export const attributeFix = (
+  sources: Partial<Record<AttributionSource, string | null>> = {},
+): FixAttribution | null => {
   for (const source of ATTRIBUTION_SOURCES) {
     const found = parseRootCause(sources[source]);
     if (found) return { source, ...found };
@@ -342,20 +434,22 @@ export const FIX_CLASSES = [
   'unattributed',
 ] as const;
 
+/** What one fix says about the reviewer. */
+export type FixClass = (typeof FIX_CLASSES)[number];
+
 /**
  * Pinned fan-out from a review outcome to a fix class (ADR 0053). The two
  * vocabularies are deliberately separate — a fix carries classes no review
  * outcome can produce (`unattributed`, `unresolved`) — so the mapping is
  * written once here and asserted at load.
  */
-const OUTCOME_CLASSES =
-  /** @type {Record<typeof REVIEW_OUTCOMES[number], typeof FIX_CLASSES[number]>} */ ({
-    passed: 'escaped',
-    blocked: 'blocked',
-    'no-verdict': 'no-verdict',
-    unreviewed: 'unreviewed',
-    unrecognised: 'unrecognised',
-  });
+const OUTCOME_CLASSES = {
+  passed: 'escaped',
+  blocked: 'blocked',
+  'no-verdict': 'no-verdict',
+  unreviewed: 'unreviewed',
+  unrecognised: 'unrecognised',
+} as const satisfies Record<ReviewOutcome, FixClass>;
 for (const outcome of REVIEW_OUTCOMES) {
   if (!(outcome in OUTCOME_CLASSES))
     throw new Error(`OUTCOME_CLASSES is missing "${outcome}"`);
@@ -364,13 +458,16 @@ for (const outcome of REVIEW_OUTCOMES) {
 /**
  * Classifies one fix against the Pull Request it names.
  *
- * @param {{
- *   fix: { number: number, mergedAt?: string },
- *   attribution: object | null,
- *   rootCause: { number: number, mergedAt?: string, outcome?: string } | null,
- * }} input
  */
-export const classifyFix = ({ fix, attribution, rootCause }) => {
+export const classifyFix = ({
+  fix,
+  attribution,
+  rootCause,
+}: {
+  fix: FixSubject;
+  attribution: FixAttribution | null;
+  rootCause: RootCausePullRequest | null;
+}): ClassifiedFix => {
   if (!attribution) return { ...fix, class: 'unattributed', attribution: null };
   if (!attribution.ref)
     return { ...fix, class: 'origin-unknown', attribution, rootCause: null };
@@ -388,13 +485,16 @@ export const classifyFix = ({ fix, attribution, rootCause }) => {
   )
     return { ...row, class: 'not-earlier' };
   const outcome = rootCause.outcome;
-  if (!outcome || !REVIEW_OUTCOMES.includes(outcome))
+  if (!outcome || !isReviewOutcome(outcome))
     return { ...row, class: 'unknown' };
   return { ...row, class: OUTCOME_CLASSES[outcome] };
 };
 
-const countBy = (rows, key) => {
-  const counts = {};
+const countBy = (
+  rows: ClassifiedFix[],
+  key: 'class',
+): Record<string, number> => {
+  const counts: Record<string, number> = {};
   for (const row of rows) counts[row[key]] = (counts[row[key]] ?? 0) + 1;
   return counts;
 };
@@ -418,13 +518,6 @@ const countBy = (rows, key) => {
  * is not a pass — but a denominator of 4 means something different when 20
  * more went unread, and a rate that hid that would be the flattering kind.
  *
- * @param {{
- *   window: { since: string, until: string },
- *   fixes: object[],
- *   passed: Array<{ number: number }>,
- *   unreadable?: number,
- *   evidence?: object,
- * }} input
  */
 export const summarize = ({
   window,
@@ -432,7 +525,13 @@ export const summarize = ({
   passed = [],
   unreadable = 0,
   evidence,
-}) => {
+}: {
+  window: MeasurementWindow;
+  fixes?: ClassifiedFix[];
+  passed?: { number: number }[];
+  unreadable?: number;
+  evidence?: Record<string, string>;
+}): EscapedDefectSummary => {
   const classes = countBy(fixes, 'class');
   for (const c of FIX_CLASSES) classes[c] = classes[c] ?? 0;
   const passedNumbers = new Set(passed.map((p) => p.number));
@@ -440,7 +539,7 @@ export const summarize = ({
     fixes
       .filter((f) => f.class === 'escaped')
       .map((f) => f.rootCause?.number)
-      .filter((n) => n !== undefined && n !== null),
+      .filter((n): n is number => n !== undefined && n !== null),
   );
   // The two sides are gathered independently — the numerator walks fix
   // branches, the denominator walks the Pull Requests the reviewer passed
@@ -476,7 +575,7 @@ export const summarize = ({
   };
 };
 
-const percent = (rate) =>
+const percent = (rate: number | null) =>
   rate === null ? 'not yet measurable' : `${(100 * rate).toFixed(1)}%`;
 
 const CLASS_NOTES = {
@@ -492,13 +591,13 @@ const CLASS_NOTES = {
   'origin-unknown':
     'declares it looked for the change that introduced it and found none',
   unattributed: 'names no root cause',
-};
+} as const satisfies Record<FixClass, string>;
 for (const c of FIX_CLASSES) {
   if (!(c in CLASS_NOTES)) throw new Error(`CLASS_NOTES is missing "${c}"`);
 }
 
 /** The measurement as Markdown, for pasting into the running record. */
-export const renderMeasurement = (summary) => {
+export const renderMeasurement = (summary: EscapedDefectSummary): string => {
   const { window: w, sample, classes } = summary;
   const lines = [
     `# Escaped-defect measurement (${w.since} to ${w.until})`,
@@ -530,7 +629,13 @@ export const renderMeasurement = (summary) => {
   for (const c of FIX_CLASSES)
     lines.push(`| \`${c}\` | ${classes[c]} | ${CLASS_NOTES[c]} |`);
   lines.push('');
-  const attributed = summary.fixes.filter((f) => f.attribution?.ref);
+  const attributed = summary.fixes.filter(
+    (
+      f,
+    ): f is ClassifiedFix & {
+      attribution: FixAttribution & { ref: RootCauseRef };
+    } => Boolean(f.attribution?.ref),
+  );
   if (attributed.length > 0) {
     lines.push(
       '## Attributed fixes',

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { ZodError } from 'zod';
 
+import type { SpecSource } from './schema.ts';
 import {
   REPORT_SCHEMA_VERSION,
   computeEffectiveTier,
@@ -16,7 +18,10 @@ import { renderReport } from './render-review-report.ts';
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12';
 const BASE = '1234567890abcdef1234567890abcdef12345678';
 
-const envelope = (overrides = {}) => ({
+/** A report, a finding, or a location as a fixture bends one: fields loose. */
+type Overrides = Record<string, unknown>;
+
+const envelope = (overrides: Overrides = {}) => ({
   schemaVersion: REPORT_SCHEMA_VERSION,
   base: BASE,
   head: HEAD,
@@ -31,7 +36,7 @@ const envelope = (overrides = {}) => ({
   ...overrides,
 });
 
-const cited = (overrides = {}) => ({
+const cited = (overrides: Overrides = {}) => ({
   axis: 'standards',
   severity: 'blocking',
   summary: 'Hand-enumerates VaultBlobType members',
@@ -52,7 +57,7 @@ const cited = (overrides = {}) => ({
   ...overrides,
 });
 
-const inferred = (overrides = {}) => ({
+const inferred = (overrides: Overrides = {}) => ({
   axis: 'standards',
   severity: 'should-fix',
   summary: 'Possible Feature Envy',
@@ -66,11 +71,13 @@ const inferred = (overrides = {}) => ({
   ...overrides,
 });
 
-const rejects = (raw, fragment) => {
+const rejects = (raw: unknown, fragment: RegExp) => {
   assert.throws(
     () => normalizeReport(raw),
     (err) => {
-      const lines = formatIssues(err).join('\n');
+      // `normalizeReport` rejects by throwing the schema's own error, which
+      // is what `formatIssues` reads.
+      const lines = formatIssues(err as ZodError).join('\n');
       assert.match(lines, fragment);
       return true;
     },
@@ -267,7 +274,7 @@ test('verdict is a pure function of severities', () => {
 });
 
 test('no spec drops the effective tier one level; interactive stays null', () => {
-  const none = { kind: 'none', foundBy: 'none' };
+  const none: SpecSource = { kind: 'none', foundBy: 'none' };
   // auto with no spec → agent
   assert.equal(
     computeEffectiveTier({ tier: 'review:auto', spec: none }),
@@ -329,7 +336,7 @@ test('a spec names the further issues the change closes, and the report shows th
 });
 
 test('further issues are issue references, once each, beside an issue spec only', () => {
-  const spec = (over) => ({
+  const spec = (over: Overrides) => ({
     kind: 'issue',
     ref: '#123',
     foundBy: 'branch',
@@ -357,13 +364,13 @@ test('further issues are issue references, once each, beside an issue spec only'
 // each is minted from its own start line rather than numbered against the
 // other — so fixing one no longer moves the survivor onto the vacated id.
 test('two findings of one rule in one file get distinct ids, and neither depends on the other', () => {
-  const at = (startLine, ruleId = 'standard-design-token-bypassed') =>
+  const at = (startLine: number, ruleId = 'standard-design-token-bypassed') =>
     cited({
       severity: 'should-fix',
       ruleId,
       location: { file: 'libs/a.ts', startLine, headSha: HEAD },
     });
-  const ids = (findings) =>
+  const ids = (findings: unknown[]) =>
     normalizeReport(envelope({ findings })).findings.map((f) => f.id);
 
   const [first, second] = ids([at(10), at(50)]);
@@ -418,7 +425,7 @@ test('a rule id outside the catalogue is rejected, and so is one off its axis', 
 });
 
 test('a cited finding must cite its own axis: standards → standard, spec → spec', () => {
-  const cited = (axis, sourceKind) =>
+  const cited = (axis: string, sourceKind: string) =>
     FindingInputSchema.safeParse({
       axis,
       severity: 'should-fix',
@@ -510,7 +517,11 @@ test('a freshly minted id ignores the rule text and the source, and changes with
 // that as a finding nobody acted on, and a `Review-ack` written for the first
 // covered the second. A finding now keeps an earlier id only when the previous
 // report held one of the same axis, rule, and file whose lines overlap its own.
-const sameRuleSameFile = (startLine, endLine, overrides = {}) =>
+const sameRuleSameFile = (
+  startLine: number,
+  endLine?: number,
+  overrides: Overrides = {},
+) =>
   cited({
     severity: 'should-fix',
     ruleId: 'standard-missing-focused-test',
@@ -524,8 +535,11 @@ const sameRuleSameFile = (startLine, endLine, overrides = {}) =>
     ...overrides,
   });
 const NEXT_HEAD = '9999999999999999999999999999999999999999';
-const runOf = (findings, previous = null, head = HEAD) =>
-  normalizeReport(envelope({ head, findings }), { previous });
+const runOf = (
+  findings: unknown[],
+  previous: unknown = null,
+  head: string = HEAD,
+) => normalizeReport(envelope({ head, findings }), { previous });
 
 test('a different defect under the same rule in the same file is a new finding, not the old one persisting', () => {
   const first = runOf([
@@ -592,7 +606,7 @@ test('an earlier id is carried by at most one finding, and the closest claim win
 test('an id is never carried across a file or a rule', () => {
   const first = runOf([sameRuleSameFile(10, 20)]);
   const earlier = first.findings[0].id;
-  const idAfter = (finding) =>
+  const idAfter = (finding: unknown) =>
     runOf([finding], first, NEXT_HEAD).findings[0].id;
   assert.notEqual(
     idAfter(
@@ -658,7 +672,7 @@ test('unlocated findings have no lines to compare, so they carry by axis and rul
   // The residue issue #940 leaves: with no location there is nothing to tell
   // two unlocated findings of one kind apart, so the earlier id is inherited
   // in report order, as it was before.
-  const unlocated = (summary) => ({
+  const unlocated = (summary: string) => ({
     axis: 'spec',
     severity: 'should-fix',
     summary,
@@ -705,7 +719,7 @@ test('a previous report of another schema version lends no ids', () => {
 // reports: every re-run reworded the rule text and so minted a fresh id, which
 // announced live findings as resolved and closed their threads.
 test('rewording the rule keeps the identity, so the finding persists across two runs', () => {
-  const defect = (rule) =>
+  const defect = (rule: string) =>
     cited({
       summary: 'reconcile() drops a blob type the server does not hold',
       rule,

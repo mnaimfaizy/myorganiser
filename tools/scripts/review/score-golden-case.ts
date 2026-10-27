@@ -19,7 +19,10 @@
 // did not. Exit 2 = could not run.
 import { appendFileSync, writeFileSync } from 'node:fs';
 
+import { errorMessage } from '../lib/error-message.ts';
+import type { Bail } from './cli.ts';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './cli.ts';
+import type { ScoredReport } from './golden.ts';
 import {
   caseForReplay,
   loadGoldenSet,
@@ -28,8 +31,8 @@ import {
 } from './golden.ts';
 import { caseIdsInTier, loadGoldenRecords } from './golden-tiers.ts';
 
-export const main = (argv) => {
-  const bail = cannotRun('review-golden');
+export const main = (argv: string[]): void => {
+  const bail: Bail = cannotRun('review-golden');
   const { flags } = parseArgs(argv);
   const set = loadGoldenSet();
 
@@ -46,7 +49,7 @@ export const main = (argv) => {
         `${JSON.stringify(caseIdsInTier(set, tier, loadGoldenRecords()))}\n`,
       );
     } catch (err) {
-      bail(err.message);
+      bail(errorMessage(err));
     }
     return;
   }
@@ -61,7 +64,9 @@ export const main = (argv) => {
   const goldenCase = set.cases.find((c) => c.id === flags.case);
   if (!goldenCase) bail(`no case ${flags.case}`);
 
-  const normalized = readJsonOr(flags.normalized, bail);
+  const normalized = readJsonOr(flags.normalized, bail) as ScoredReport & {
+    verdict?: unknown;
+  };
   if (!Array.isArray(normalized.findings) || !normalized.verdict)
     bail(`${flags.normalized} is not a normalized report`);
 

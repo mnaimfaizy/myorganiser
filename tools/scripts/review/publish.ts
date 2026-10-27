@@ -27,12 +27,7 @@ import type { RelabelPlan } from '../lib/review-tier.ts';
 import { planRelabel } from '../lib/review-tier.ts';
 
 import { evidenceText } from './evidence.ts';
-import type {
-  NormalizedFinding,
-  NormalizedReport,
-  ReviewTierLabel,
-  Verdict,
-} from './schema.ts';
+import type { NormalizedFinding, ReviewTierLabel, Verdict } from './schema.ts';
 import {
   AXIS_TITLES,
   REPORT_SCHEMA_VERSION,
@@ -61,6 +56,18 @@ export interface ExistingComment {
   nodeId: string;
   body?: string;
   minimized?: boolean;
+}
+
+/**
+ * What a plan reads of a normalized report: the verdict it publishes, the
+ * tier it labels from, and the findings it comments on. Narrower than
+ * `NormalizedReport` because nothing else of a report reaches a comment, and
+ * the publisher is handed a report read back off disk.
+ */
+export interface PublishableReport {
+  verdict: Verdict;
+  effectiveTier: ReviewTierLabel | null;
+  findings: readonly NormalizedFinding[];
 }
 
 /** Everything the poster will do, in one object. */
@@ -153,8 +160,7 @@ export const summaryBody = ({
   rendered: string;
   headSha: string;
   runUrl: string;
-}): string =>
-  `${header({ headSha, runUrl })}${rendered.trimEnd()}\n`;
+}): string => `${header({ headSha, runUrl })}${rendered.trimEnd()}\n`;
 
 /**
  * The summary comment when the reviewer produced nothing usable. The Pull
@@ -265,7 +271,7 @@ export const planPublication = ({
   existingComments = [],
   openThreads = [],
 }: {
-  normalized?: NormalizedReport;
+  normalized?: PublishableReport;
   rendered?: string;
   rejectedReason?: string;
   tier?: ReviewTierLabel | null;

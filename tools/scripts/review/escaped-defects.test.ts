@@ -20,14 +20,28 @@ import {
   rejectedBody,
   summaryBody,
 } from './publish.ts';
+import type {
+  FixAttribution,
+  FixSubject,
+  RootCausePullRequest,
+  RootCauseRef,
+} from './escaped-defects.ts';
+import type { Verdict } from './schema.ts';
 import { VERDICT_VALUES, verdictHeading } from './schema.ts';
+
+/**
+ * The Pull Request number a reference names, when it names one. A reference
+ * is a Pull Request or a commit, and only the first carries a number.
+ */
+const refNumber = (ref?: RootCauseRef | null) =>
+  ref?.kind === 'pull-request' ? ref.number : undefined;
 
 // ---------------------------------------------------------------------------
 // The attribution parser
 // ---------------------------------------------------------------------------
 
 test('each marker in the vocabulary names a Pull Request', () => {
-  const cases = {
+  const cases: Record<string, string> = {
     'root-cause': 'Root cause: #590.',
     'introduced-in': 'The behaviour was introduced in #590.',
     'caused-by': 'Caused by PR #590.',
@@ -35,7 +49,7 @@ test('each marker in the vocabulary names a Pull Request', () => {
     'broke-in': 'This broke in #590 and nobody noticed.',
     'dates-to': 'ChangePassphraseCard has had it since #590.',
   };
-  const notAttribution = {
+  const notAttribution: Record<string, string> = {
     // Measured on this repository's own history: the only bare "since #N" in
     // sixty days was a note about where some files used to live.
     'dates-to': 'The answer files have lived beside the report since #590.',
@@ -45,7 +59,7 @@ test('each marker in the vocabulary names a Pull Request', () => {
     assert.ok(text, `no fixture for marker ${marker.id}`);
     const found = parseRootCause(text);
     assert.equal(found?.marker, marker.id, `marker ${marker.id} did not match`);
-    assert.deepEqual(found.ref, { kind: 'pull-request', number: 590 });
+    assert.deepEqual(found!.ref, { kind: 'pull-request', number: 590 });
     const neutral = notAttribution[marker.id];
     if (neutral)
       assert.equal(
@@ -60,7 +74,7 @@ test('each marker in the vocabulary names a Pull Request', () => {
 // measurement with `gh` (2026-09-28) counted #902 as escaping from #745 on
 // "**Not a regression from #745:** The same hole existed before that PR".
 test('a negated marker is not attribution', () => {
-  const denied = {
+  const denied: Record<string, string> = {
     'root-cause': 'The root cause is not #590.',
     'introduced-in': 'This was not introduced in #590.',
     'caused-by': "It wasn't caused by #590.",
@@ -86,10 +100,12 @@ test('a negation does not suppress a later, affirmed marker', () => {
     'Not a regression from #745. The hole was introduced in #590.',
   );
   assert.equal(found?.marker, 'introduced-in');
-  assert.deepEqual(found.ref, { kind: 'pull-request', number: 590 });
+  assert.deepEqual(found!.ref, { kind: 'pull-request', number: 590 });
   assert.equal(
-    parseRootCause('The test did not run in CI; it was introduced in #590.')
-      ?.ref.number,
+    refNumber(
+      parseRootCause('The test did not run in CI; it was introduced in #590.')
+        ?.ref,
+    ),
     590,
   );
 });
@@ -129,8 +145,10 @@ test('any n’t contraction, with either apostrophe, is a negation', () => {
 // hiding a real origin is worse than an aside that counts one.
 test('a negation does not reach across a comma', () => {
   assert.equal(
-    parseRootCause('The test did not run in CI, it was introduced in #590.')
-      ?.ref.number,
+    refNumber(
+      parseRootCause('The test did not run in CI, it was introduced in #590.')
+        ?.ref,
+    ),
     590,
   );
 });
@@ -144,7 +162,7 @@ test('an affirming "no" idiom is not a negation', () => {
     'It is no question it was introduced in #590.',
     'It was no less clearly introduced by #590 than anything else.',
   ])
-    assert.equal(parseRootCause(text)?.ref.number, 590, text);
+    assert.equal(refNumber(parseRootCause(text)?.ref), 590, text);
   assert.equal(parseRootCause('No regression from #590 here.'), null);
 });
 
@@ -153,9 +171,11 @@ test('an affirming "no" idiom is not a negation', () => {
 // at 72 columns, so "was not\nintroduced in #590" is one clause.
 test('a negation stops at a paragraph break but not at a wrapped line', () => {
   assert.equal(
-    parseRootCause(
-      'Not a regression from anything\n\nintroduced in #590 is the cause.',
-    )?.ref.number,
+    refNumber(
+      parseRootCause(
+        'Not a regression from anything\n\nintroduced in #590 is the cause.',
+      )?.ref,
+    ),
     590,
   );
   assert.equal(parseRootCause('This was not\nintroduced in #590.'), null);
@@ -199,25 +219,25 @@ test('the earliest reference wins and the others are carried, not discarded', ()
   const found = parseRootCause(
     'Introduced in #590; the same mistake was caused by #601.',
   );
-  assert.deepEqual(found.ref, { kind: 'pull-request', number: 590 });
-  assert.equal(found.marker, 'introduced-in');
+  assert.deepEqual(found!.ref, { kind: 'pull-request', number: 590 });
+  assert.equal(found!.marker, 'introduced-in');
   assert.deepEqual(
-    found.others.map((o) => o.ref.number),
+    found!.others.map((o) => refNumber(o.ref)),
     [601],
   );
 });
 
 test('the same Pull Request named twice is one reference', () => {
   const found = parseRootCause('Root cause: #590. It broke in #590.');
-  assert.deepEqual(found.others, []);
+  assert.deepEqual(found!.others, []);
 });
 
 test('the quote carries enough text for a human to audit the match', () => {
   const found = parseRootCause(
     'The vault page has had this since #590, and no spec covered it.',
   );
-  assert.equal(found.marker, 'dates-to');
-  assert.match(found.quote, /vault page has had this since #590/);
+  assert.equal(found!.marker, 'dates-to');
+  assert.match(found!.quote, /vault page has had this since #590/);
 });
 
 test('sources are consulted in a fixed order, and the winner says which it was', () => {
@@ -227,16 +247,16 @@ test('sources are consulted in a fixed order, and the winner says which it was',
     body: 'Introduced in #200.',
     commits: 'Broke in #300.',
   });
-  assert.equal(found.source, 'issue');
-  assert.equal(found.ref.number, 100);
+  assert.equal(found!.source, 'issue');
+  assert.equal(refNumber(found!.ref), 100);
 
   const fallback = attributeFix({
     issue: null,
     body: null,
     commits: 'Broke in #300.',
   });
-  assert.equal(fallback.source, 'commits');
-  assert.equal(fallback.ref.number, 300);
+  assert.equal(fallback!.source, 'commits');
+  assert.equal(refNumber(fallback!.ref), 300);
 
   assert.equal(attributeFix({ commits: 'Closes #721' }), null);
   assert.equal(attributeFix({}), null);
@@ -249,10 +269,10 @@ test('an Introduced in unknown line is a declaration with no reference', () => {
     commits:
       'fix(vault): keep the blob\n\nIntroduced in unknown: predates the pull request history.\n',
   });
-  assert.equal(found.marker, 'origin-unknown');
-  assert.equal(found.ref, null);
-  assert.equal(found.source, 'commits');
-  assert.match(found.quote, /^Introduced in unknown: predates/);
+  assert.equal(found!.marker, 'origin-unknown');
+  assert.equal(found!.ref, null);
+  assert.equal(found!.source, 'commits');
+  assert.match(found!.quote, /^Introduced in unknown: predates/);
 });
 
 test('a named reference in any source outranks a declared-unknown origin', () => {
@@ -260,8 +280,8 @@ test('a named reference in any source outranks a declared-unknown origin', () =>
     issue: 'Introduced in unknown: could not find it.',
     commits: 'Introduced in #415',
   });
-  assert.equal(found.marker, 'introduced-in');
-  assert.equal(found.ref.number, 415);
+  assert.equal(found!.marker, 'introduced-in');
+  assert.equal(refNumber(found!.ref), 415);
 });
 
 test('the declaration is read only at the start of a line', () => {
@@ -281,7 +301,7 @@ test('the declaration needs its reason, on the same line', () => {
 // Reading a verdict back out of a published review
 // ---------------------------------------------------------------------------
 
-const summaryFor = (verdict) =>
+const summaryFor = (verdict: Verdict) =>
   summaryBody({
     rendered: `${verdictHeading(verdict)}\n\n- range: \`aaaaaaa...bbbbbbb\`\n`,
     headSha: 'b'.repeat(40),
@@ -358,8 +378,8 @@ test('the parser reads the publisher, not a second copy of its wording', () => {
 // Classification
 // ---------------------------------------------------------------------------
 
-const fix = { number: 800, mergedAt: '2026-09-10T00:00:00Z' };
-const attribution = {
+const fix: FixSubject = { number: 800, mergedAt: '2026-09-10T00:00:00Z' };
+const attribution: FixAttribution = {
   source: 'body',
   ref: { kind: 'pull-request', number: 700 },
   marker: 'introduced-in',
@@ -367,9 +387,9 @@ const attribution = {
   others: [],
 };
 const rootCause = (
-  outcome,
-  verdict = outcome === 'passed' ? 'approve' : null,
-) => ({
+  outcome: string | null | undefined,
+  verdict: string | null = outcome === 'passed' ? 'approve' : null,
+): RootCausePullRequest => ({
   number: 700,
   mergedAt: '2026-09-01T00:00:00Z',
   outcome,

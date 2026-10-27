@@ -22,12 +22,12 @@ const rule = (over = {}) => ({
   ...over,
 });
 
-const catalogue = (rules) => ({
+const catalogue = (rules: unknown) => ({
   schemaVersion: RULE_CATALOGUE_SCHEMA_VERSION,
   rules,
 });
 
-const rejects = (cat, fragment) =>
+const rejects = (cat: unknown, fragment: RegExp) =>
   assert.throws(
     () => assertRuleCatalogue(cat, 'fixture'),
     (err) => {
@@ -112,18 +112,21 @@ test('the shipped catalogue is loadable and every family is represented', () => 
 test('every shipped rule speaks the finding contract vocabulary', () => {
   for (const r of loadRuleCatalogue().rules) {
     for (const axis of r.axes)
-      assert.ok(FINDING_AXES.includes(axis), `${r.id}: unknown axis ${axis}`);
+      assert.ok(
+        (FINDING_AXES as readonly string[]).includes(axis),
+        `${r.id}: unknown axis ${axis}`,
+      );
     if (r.maxSeverity)
       assert.ok(
-        FINDING_SEVERITIES.includes(r.maxSeverity),
+        (FINDING_SEVERITIES as readonly string[]).includes(r.maxSeverity),
         `${r.id}: unknown severity ${r.maxSeverity}`,
       );
   }
 });
 
 test('ruleById resolves a shipped id and nothing else', () => {
-  assert.equal(ruleById('smell-mysterious-name').family, 'smell');
-  assert.equal(ruleById('spec-requirement-missing').axes.join(), 'spec');
-  assert.equal(ruleById('standard-other').fallback, true);
+  assert.equal(ruleById('smell-mysterious-name')!.family, 'smell');
+  assert.equal(ruleById('spec-requirement-missing')!.axes.join(), 'spec');
+  assert.equal(ruleById('standard-other')!.fallback, true);
   assert.equal(ruleById('no-such-rule'), undefined);
 });

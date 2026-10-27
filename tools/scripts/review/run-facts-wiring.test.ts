@@ -34,10 +34,16 @@ const WORKFLOW_FILES = [
 const VALIDATION =
   /(?:node "\$VALIDATOR"|corepack yarn review:validate) tmp\/code-review\/report\.json/;
 
+/** One validation: the line it starts at, and the whole command. */
+export interface Validation {
+  line: number;
+  command: string;
+}
+
 /** Each validation as one command: its line and every continuation of it. */
-export const validationsIn = (text) => {
+export const validationsIn = (text: string): Validation[] => {
   const lines = text.split('\n');
-  const commands = [];
+  const commands: Validation[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     if (!VALIDATION.test(lines[i])) continue;
     let command = lines[i];
@@ -99,7 +105,7 @@ test('every CI validation of the report passes --facts and --worklist', () => {
 // read is asserted by `replayRunFactsFindings`; without this, deleting the
 // production branch would leave every suite green while the validator went
 // on recording failures nobody acts on.
-const stepNamed = (text, name) => {
+const stepNamed = (text: string, name: string): string | null => {
   const lines = text.split('\n');
   const start = lines.findIndex((line) =>
     new RegExp(`^\\s*- name: ${name}\\s*$`).test(line),
@@ -115,7 +121,7 @@ const stepNamed = (text, name) => {
   return lines.slice(start, end).join('\n');
 };
 
-export const runFailureBranchFindings = (workflowText) => {
+export const runFailureBranchFindings = (workflowText: string): string[] => {
   const step = stepNamed(workflowText, 'Agent review ran');
   if (!step) return ['no "Agent review ran" step'];
   // The validated branch: from its test to the `fi` at the same indent.
@@ -154,7 +160,9 @@ test('the assertion fails when the branch, the read, or the exit is gone', () =>
     )[0],
     /does not read \.runFacts\.failures/,
   );
-  const step = stepNamed(workflow, 'Agent review ran');
+  // The workflow in the tree carries the step; the assertions above would
+  // have failed first if it did not.
+  const step = stepNamed(workflow, 'Agent review ran')!;
   const read = step.indexOf('.runFacts.failures');
   const exit = step.indexOf('exit 1', read);
   assert.match(

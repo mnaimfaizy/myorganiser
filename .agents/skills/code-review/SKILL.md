@@ -21,7 +21,7 @@ commands. You, the main agent, do not paste, summarise, or restate any of that.
 
 The main agent assembles the report envelope, runs the validator, and prints the rendered Markdown.
 The main agent changes no finding a sub-agent returned and writes no verdict: the verdict is
-computed from the findings by `tools/scripts/review/schema.mjs`, and a report that fails validation
+computed from the findings by `tools/scripts/review/schema.ts`, and a report that fails validation
 is rejected whole. The only findings the main agent writes itself are the ones an obligation answer
 exposes (step 4).
 

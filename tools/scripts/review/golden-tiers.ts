@@ -35,22 +35,57 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import { errorMessage } from '../lib/error-message.ts';
+import type { GoldenResultRecord } from './golden-results.ts';
 import { parseResultsFile } from './golden-results.ts';
+import type {
+  CaseStanding,
+  StandingCase,
+  StandingRecord,
+  StandingSet,
+} from './golden-standing.ts';
 import { caseStandings } from './golden-standing.ts';
 
 export const GOLDEN_SET_PATH = 'tools/config/review-golden-set.json';
 export const GOLDEN_RESULTS_PATH = 'docs/review/golden-replay-results.jsonl';
 
 /** The results record, or no records when nothing has been recorded yet. */
-export const loadGoldenRecords = (path = GOLDEN_RESULTS_PATH) =>
+export const loadGoldenRecords = (
+  path: string = GOLDEN_RESULTS_PATH,
+): GoldenResultRecord[] =>
   existsSync(path) ? parseResultsFile(readFileSync(path, 'utf8')) : [];
 
 /** The tiers a case may declare, plus the pseudo-tier meaning "every case". */
-export const CASE_TIERS = ['guard', 'frontier'];
+export const CASE_TIERS = ['guard', 'frontier'] as const;
 export const ALL_TIERS = 'all';
 
-const standingsInTier = (set, tier, records) => {
-  if (tier && tier !== ALL_TIERS && !CASE_TIERS.includes(tier))
+/** The tier a case declares, or stands at. */
+export type CaseTier = (typeof CASE_TIERS)[number];
+/** One reviewer session the replay workflow's matrix asks for. */
+export interface ReplayMatrixEntry {
+  case: string;
+  repetition: number;
+}
+/**
+ * A set the matrix is built from. `cases` is required, unlike the standing's
+ * own reading of a set: `replayMatrix` checks the ids a dispatch named
+ * against it, and a set carrying none is a file that failed validation long
+ * before this is called.
+ */
+export interface ReplaySet extends StandingSet {
+  cases: StandingCase[];
+}
+
+const standingsInTier = (
+  set: StandingSet | null | undefined,
+  tier: string | undefined,
+  records: StandingRecord[],
+): CaseStanding[] => {
+  if (
+    tier &&
+    tier !== ALL_TIERS &&
+    !(CASE_TIERS as readonly string[]).includes(tier)
+  )
     throw new Error(
       `tier must be one of ${[...CASE_TIERS, ALL_TIERS].join(', ')}, got ${tier}`,
     );
@@ -60,15 +95,18 @@ const standingsInTier = (set, tier, records) => {
 };
 
 /**
- * @param {{cases: {id: string, tier: string}[]}} set
- * @param {string} [tier] one of CASE_TIERS, or ALL_TIERS / undefined for every case
- * @param {{case: string, outcome: string}[]} [records] the results record;
- *   a case stands where its last ten scored runs put it (ADR 0116), and at
- *   its declared tier when the record holds fewer
- * @returns {string[]} case ids, in the set's own order
+ * @param set
+ * @param tier one of CASE_TIERS, or ALL_TIERS / undefined for every case
+ * @param records the results record; a case stands where its last ten scored
+ *   runs put it (ADR 0116), and at its declared tier when the record holds
+ *   fewer
+ * @returns case ids, in the set's own order
  */
-export const caseIdsInTier = (set, tier, records = []) =>
-  standingsInTier(set, tier, records).map((s) => s.id);
+export const caseIdsInTier = (
+  set: StandingSet | null | undefined,
+  tier?: string,
+  records: StandingRecord[] = [],
+): string[] => standingsInTier(set, tier, records).map((s) => s.id);
 
 /**
  * How many times the weekly scheduled replay runs each frontier case
@@ -88,14 +126,21 @@ export const SCHEDULE_EVENT = 'schedule';
  * set's order (issue #1140). It never buys repetitions; a dispatch stays one
  * repetition per case (ADR 0072 item 8, ADR 0116).
  *
- * @param {string[]} [options.cases] case ids to replay instead of a tier
- * @returns {{case: string, repetition: number}[]}
+ * @param options.cases case ids to replay instead of a tier
  */
 export const replayMatrix = (
-  set,
-  tier,
-  { records = [], event, cases = [] } = {},
-) => {
+  set: ReplaySet,
+  tier?: string,
+  {
+    records = [],
+    event,
+    cases = [],
+  }: {
+    records?: StandingRecord[];
+    event?: string;
+    cases?: string[];
+  } = {},
+): ReplayMatrixEntry[] => {
   const ids = new Set(set.cases.map((c) => c.id));
   for (const id of cases)
     if (!ids.has(id)) throw new Error(`no golden case "${id}"`);
@@ -142,7 +187,7 @@ export const REPLAY_INPUT_PATHS = [
 export const FRONTIER_LOOKBACK_DAYS = 7;
 export const GUARD_LOOKBACK_DAYS = 31;
 
-export const isFirstWeekOfMonth = (date) => date.getUTCDate() <= 7;
+export const isFirstWeekOfMonth = (date: Date) => date.getUTCDate() <= 7;
 
 /**
  * The tier a weekly scheduled replay runs, or null for none (ADR 0109).
@@ -154,13 +199,17 @@ export const scheduledTier = ({
   changedInWeek,
   changedInMonth,
   firstWeekOfMonth,
-}) => {
+}: {
+  changedInWeek: boolean;
+  changedInMonth: boolean;
+  firstWeekOfMonth: boolean;
+}): typeof ALL_TIERS | CaseTier | null => {
   if (firstWeekOfMonth && changedInMonth) return ALL_TIERS;
   if (changedInWeek) return 'frontier';
   return null;
 };
 
-const inputsChangedSince = (days, now) => {
+const inputsChangedSince = (days: number, now: Date) => {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
   const out = execFileSync(
     'git',
@@ -177,7 +226,7 @@ const inputsChangedSince = (days, now) => {
   return out.trim() !== '';
 };
 
-const scheduledMain = (now) => {
+const scheduledMain = (now: Date) => {
   const tier = scheduledTier({
     changedInWeek: inputsChangedSince(FRONTIER_LOOKBACK_DAYS, now),
     changedInMonth: inputsChangedSince(GUARD_LOOKBACK_DAYS, now),
@@ -186,17 +235,17 @@ const scheduledMain = (now) => {
   process.stdout.write(`${tier ?? ''}\n`);
 };
 
-const main = (argv) => {
+const main = (argv: string[]) => {
   if (argv.includes('--scheduled')) {
     try {
       scheduledMain(new Date());
     } catch (err) {
-      process.stderr.write(`golden-tiers: ${err.message}\n`);
+      process.stderr.write(`golden-tiers: ${errorMessage(err)}\n`);
       process.exit(2);
     }
     return;
   }
-  const value = (flag) => {
+  const value = (flag: string) => {
     const i = argv.indexOf(flag);
     return i === -1 ? undefined : argv[i + 1];
   };
@@ -216,7 +265,7 @@ const main = (argv) => {
       : caseIdsInTier(set, tier, records);
     process.stdout.write(`${JSON.stringify(out)}\n`);
   } catch (err) {
-    process.stderr.write(`golden-tiers: ${err.message}\n`);
+    process.stderr.write(`golden-tiers: ${errorMessage(err)}\n`);
     process.exit(2);
   }
 };

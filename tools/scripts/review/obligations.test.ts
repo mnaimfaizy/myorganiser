@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import type {
+  ObligationCandidate,
+  ObligationCatalogue,
+  Worklist,
+} from './obligations.ts';
+
 import {
   MAX_SITES_PER_OBLIGATION,
   ObligationError,
@@ -28,12 +34,21 @@ const obligation = (over = {}) => ({
   ...over,
 });
 
-const catalogue = (obligations = [obligation()]) => ({
+const catalogue = (obligations: ObligationCandidate[] = [obligation()]) => ({
   schemaVersion: 1,
   obligations,
 });
 
-const diff = (...lines) => lines.join('\n');
+/**
+ * The same catalogue, as the selector's validated input. The entries above
+ * are written loose because half the tests below bend one out of shape on
+ * purpose; a caller that reaches the selector is handing it entries that do
+ * load, which is what this says.
+ */
+const loadable = (obligations?: ObligationCandidate[]) =>
+  catalogue(obligations) as ObligationCatalogue;
+
+const diff = (...lines: string[]) => lines.join('\n');
 
 test('a well-formed catalogue is accepted', () => {
   assert.equal(assertObligationCatalogue(catalogue()).obligations.length, 1);
@@ -194,7 +209,7 @@ test('a path-only trigger fires on the file at its first changed line', () => {
     diff('--- a/x', '+++ b/libs/a.ts', '@@ -0,0 +7,1 @@', '+anything'),
   );
   const { selected } = selectObligations({
-    catalogue: catalogue(),
+    catalogue: loadable(),
     addedLines: added,
     head: 'abc',
   });
@@ -202,7 +217,7 @@ test('a path-only trigger fires on the file at its first changed line', () => {
 });
 
 test('a content trigger fires only on added lines that match', () => {
-  const cat = catalogue([
+  const cat = loadable([
     obligation({ trigger: { paths: ['libs/**'], addedPattern: 'needle' } }),
   ]);
   const added = parseAddedLines(
@@ -228,7 +243,7 @@ test('an obligation whose paths do not match does not fire at all', () => {
     diff('--- a/x', '+++ b/apps/a.ts', '@@ -0,0 +1,1 @@', '+anything'),
   );
   const { selected } = selectObligations({
-    catalogue: catalogue(),
+    catalogue: loadable(),
     addedLines: added,
     head: 'abc',
   });
@@ -239,7 +254,7 @@ test('an obligation whose paths do not match does not fire at all', () => {
 test('sites are capped and the overflow is counted, not dropped silently', () => {
   const lines = ['--- a/x', '+++ b/libs/a.ts', '@@ -0,0 +1,40 @@'];
   for (let i = 0; i < 40; i += 1) lines.push('+needle');
-  const cat = catalogue([
+  const cat = loadable([
     obligation({ trigger: { paths: ['libs/**'], addedPattern: 'needle' } }),
   ]);
   const { selected } = selectObligations({
@@ -600,14 +615,14 @@ test('a path may carry its own addedPattern, overriding the entry-level one', ()
   // gate obligation shipped firing on ANY package.json edit because a single
   // entry-level pattern cannot say both things; the CI reviewer proved it on
   // this branch's own scripts-only edit.
-  const cat = catalogue([
+  const cat = loadable([
     obligation({
       trigger: {
         paths: [{ glob: 'package.json', addedPattern: 'needle' }, 'libs/**'],
       },
     }),
   ]);
-  const fired = (diffText) =>
+  const fired = (diffText: string) =>
     selectObligations({
       catalogue: cat,
       addedLines: parseAddedLines(diffText),
@@ -676,7 +691,7 @@ test('the shipped catalogue is well-formed', () => {
 // dead and the golden case that scores it can only ever miss.
 const ENV = 'process' + '.env.';
 
-const fires = (id, diffText) => {
+const fires = (id: string, diffText: string) => {
   const { selected } = selectObligations({
     catalogue: loadObligationCatalogue(),
     addedLines: parseAddedLines(diffText),
@@ -806,7 +821,7 @@ test('a diff touching none of those shapes fires nothing', () => {
 // caught repeatedly while the gap was open. What is asserted here is the
 // mechanism: that answer is no longer expressible.
 
-const gated = (over = {}) =>
+const gated = (over: Record<string, unknown> = {}) =>
   obligation({
     answerFields: ['wiredBy'],
     citedFields: ['wiredBy'],
@@ -818,7 +833,7 @@ const gated = (over = {}) =>
   });
 
 test('a trigger path must carry every declared site field', () => {
-  const bad = [
+  const bad: [ObligationCandidate, RegExp][] = [
     // The whole point of requiring it: an entry that omits the gate cannot
     // load, so "no map entry exists" is unrepresentable and the only state
     // left is "no gate covers this" — which is `wiredBy: "none"`.
@@ -839,10 +854,10 @@ test('a trigger path must carry every declared site field', () => {
       /both siteFields and answerFields/,
     ],
   ];
-  for (const o of bad) {
-    const cat = catalogue([o[0]]);
+  for (const [entry, named] of bad) {
+    const cat = catalogue([entry]);
     assert.throws(() => assertObligationCatalogue(cat), ObligationError);
-    assert.throws(() => assertObligationCatalogue(cat), o[1]);
+    assert.throws(() => assertObligationCatalogue(cat), named);
   }
 });
 
@@ -895,9 +910,9 @@ test("run 47's answer is not expressible: gate is not an answer field", () => {
 
   // The field the reviewer filled with `deploy:pages:check` is gone from the
   // sheet entirely. Citing it would only have proved the named gate exists.
-  assert.equal(entry.answerFields.includes('gate'), false);
-  assert.deepEqual(entry.answerFields, ['command', 'exitCode', 'wiredBy']);
-  assert.deepEqual(entry.siteFields, ['coveringGate']);
+  assert.equal(entry!.answerFields.includes('gate'), false);
+  assert.deepEqual(entry!.answerFields, ['command', 'exitCode', 'wiredBy']);
+  assert.deepEqual(entry!.siteFields, ['coveringGate']);
 
   // And the gate it should have named is the one the site now hands it. The
   // run 47 diff was a version bump: the invalidated artifact is the OpenAPI
@@ -918,7 +933,7 @@ test("run 47's answer is not expressible: gate is not an answer field", () => {
     (o) => o.id === 'run-the-gate-that-covers-this-change',
   );
   assert.deepEqual(
-    fired.sites.map((s) => s.coveringGate),
+    fired!.sites.map((s) => s.coveringGate),
     ['openapi:check'],
   );
 });
@@ -933,13 +948,17 @@ test('every covering gate in the live catalogue names a real script', () => {
     ),
   );
   for (const o of live.obligations)
-    for (const p of o.trigger.paths)
+    for (const p of o.trigger.paths) {
+      // Only a trigger path with its own facts states a covering gate; a
+      // bare glob states none.
+      if (typeof p === 'string') continue;
       for (const f of o.siteFields ?? [])
         if (f === 'coveringGate')
           assert.ok(
-            scripts.has(p[f]),
-            `${o.id}: ${p.glob}: coveringGate ${p[f]} is not a package.json script`,
+            scripts.has(String(p[f])),
+            `${o.id}: ${p.glob}: coveringGate ${String(p[f])} is not a package.json script`,
           );
+    }
 });
 
 // --- Enum fan-out: the lesson ADR 0053 recorded, carried by the harness ------
@@ -953,7 +972,7 @@ test('every covering gate in the live catalogue names a real script', () => {
 
 const ENUM_FANOUT = 'enum-fanout-omits-a-member';
 
-const enumFanoutSites = (diffText) =>
+const enumFanoutSites = (diffText: string) =>
   selectObligations({
     catalogue: loadObligationCatalogue(),
     addedLines: parseAddedLines(diffText),
@@ -1130,7 +1149,10 @@ const VAULT_MEMBERS = [
   'todos',
 ];
 
-const generatedSites = (diffText, membersOf = () => VAULT_MEMBERS) =>
+const generatedSites = (
+  diffText: string,
+  membersOf: () => string[] = () => VAULT_MEMBERS,
+) =>
   selectObligations({
     catalogue: loadObligationCatalogue(undefined, { membersOf }),
     addedLines: parseAddedLines(diffText),
@@ -1195,7 +1217,9 @@ test('the catalogue names no enum: every one comes from the checker list, both w
       'utf8',
     ),
   );
-  const entry = raw.obligations.find((o) => o.id === ENUM_FANOUT);
+  const entry = raw.obligations.find(
+    (o: { id?: string }) => o.id === ENUM_FANOUT,
+  );
   for (const g of GUARDED_ENUMS)
     assert.equal(
       JSON.stringify(entry.trigger).includes(g.enum),
@@ -1206,10 +1230,16 @@ test('the catalogue names no enum: every one comes from the checker list, both w
   const named = new Set();
   for (const p of loadObligationCatalogue().obligations.find(
     (o) => o.id === ENUM_FANOUT,
-  ).trigger.paths)
-    for (const s of [p.addedPattern, p.hunkPattern].filter(Boolean))
+  )!.trigger.paths) {
+    // The expanded trigger states its patterns per path, so a bare glob
+    // names no enum.
+    if (typeof p === 'string') continue;
+    for (const s of [p.addedPattern, p.hunkPattern].filter((v): v is string =>
+      Boolean(v),
+    ))
       for (const m of s.matchAll(/([A-Z][A-Za-z0-9]+)(?:\\\.| = )/g))
         named.add(m[1]);
+  }
   assert.deepEqual(
     [...named].sort(),
     [...new Set(GUARDED_ENUMS.map((g) => g.enum))].sort(),
@@ -1243,7 +1273,7 @@ test('the selector reads member values from the reviewed head, not the tooling t
   const { join } = await import('node:path');
   const out = join(mkdtempSync(join(tmpdir(), 'select-')), 'w.json');
   const file = 'libs/vault-core/src/lib/envelope.ts';
-  const reads = [];
+  const reads: [string, string][] = [];
   main(['--base', 'b', '--head', 'h', '--out', out], {
     run: () =>
       diff(
@@ -1257,10 +1287,10 @@ test('the selector reads member values from the reviewed head, not the tooling t
       return "export const VaultBlobType = {\n    Chores: 'chores'\n} as const;";
     },
   });
-  const worklist = JSON.parse(readFileSync(out, 'utf8'));
+  const worklist: Worklist = JSON.parse(readFileSync(out, 'utf8'));
   assert.deepEqual(
     worklist.selected
-      .find((o) => o.id === ENUM_FANOUT)
+      .find((o) => o.id === ENUM_FANOUT)!
       .sites.map((s) => s.line),
     [7],
   );
@@ -1341,7 +1371,7 @@ test('a deleted file and a deletion-only file add no lines and are not changed f
   // before it.
   assert.deepEqual(addedLines.get('x.mjs') ?? [], []);
   assert.deepEqual(
-    addedLines.get('kept.mjs').map((l) => l.text),
+    addedLines.get('kept.mjs')!.map((l) => l.text),
     ['hello', '++ b/not-a-file.mjs'],
   );
   // There is nothing at head to open in either, so neither is listed (#1140).

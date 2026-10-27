@@ -61,11 +61,7 @@ export const GATE_TIER_LABELS = [
   'gate:standard',
   'gate:full',
 ] as const;
-export const FINDING_SEVERITIES = [
-  'blocking',
-  'should-fix',
-  'nit',
-] as const;
+export const FINDING_SEVERITIES = ['blocking', 'should-fix', 'nit'] as const;
 export const FINDING_EVIDENCE_KINDS = [
   'executed',
   'cited',
@@ -97,11 +93,7 @@ export const VERDICT_VALUES = [
  * Sharing these is necessary and, since issue #940, no longer enough: the two
  * findings' lines must overlap as well (`assignFindingIds`).
  */
-export const FINDING_MATCH_FIELDS = [
-  'axis',
-  'ruleId',
-  'file',
-] as const;
+export const FINDING_MATCH_FIELDS = ['axis', 'ruleId', 'file'] as const;
 /**
  * What a new finding's id is hashed from: the match fields, and the line the
  * finding starts at.
@@ -117,11 +109,7 @@ export const FINDING_IDENTITY_FIELDS = [
   ...FINDING_MATCH_FIELDS,
   'startLine',
 ] as const;
-export const CONFIDENCE_VALUES = [
-  'high',
-  'medium',
-  'low',
-] as const;
+export const CONFIDENCE_VALUES = ['high', 'medium', 'low'] as const;
 export const SPEC_KINDS = ['issue', 'path', 'none'] as const;
 export const SPEC_FOUND_BY = [
   'branch',
@@ -164,7 +152,11 @@ const VERDICT_TITLES: Record<Verdict, string> = {
   comment: 'Comment',
   approve: 'Approve',
 };
-const TITLE_TABLES: [readonly string[], Readonly<Record<string, string>>, string][] = [
+const TITLE_TABLES: [
+  readonly string[],
+  Readonly<Record<string, string>>,
+  string,
+][] = [
   [FINDING_AXES, AXIS_TITLES, 'AXIS_TITLES'],
   [VERDICT_VALUES, VERDICT_TITLES, 'VERDICT_TITLES'],
 ];
@@ -487,10 +479,7 @@ export const ReportInputSchema = z.strictObject({
 });
 
 /** Where a normalized report's facts about its own run came from. */
-export const RUN_FACTS_SOURCES = [
-  'transcript',
-  'reviewer',
-] as const;
+export const RUN_FACTS_SOURCES = ['transcript', 'reviewer'] as const;
 
 /** Whether a transcript could be read for facts at all. */
 export const RUN_FACTS_SHAPES = ['readable', 'unknown'] as const;
@@ -792,10 +781,7 @@ const IDENTITY_ACCESSORS: Record<
  * minted at the line a finding of the previous report was first seen at —
  * whether that one has drifted away under its carried id or has gone.
  */
-export const findingId = (
-  finding: IdentityFields,
-  occurrence = 0,
-): string => {
+export const findingId = (finding: IdentityFields, occurrence = 0): string => {
   const tuple: (string | number)[] = FINDING_IDENTITY_FIELDS.map((field) =>
     IDENTITY_ACCESSORS[field](finding),
   );
@@ -974,7 +960,7 @@ export const computeVerdict = (
  * @param run whether a tightening fact holds, and whether a run failure does
  */
 export const computeEffectiveTier = (
-  report: { tier: ReviewTierLabel | null; spec: { kind: SpecKind } },
+  report: { tier: ReviewTierLabel | null; spec: SpecSource },
   { tightened = false, failed = false }: EffectiveTierRun = {},
 ): ReviewTierLabel | null => {
   if (report.tier === null) return null;

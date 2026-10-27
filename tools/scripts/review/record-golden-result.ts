@@ -23,20 +23,24 @@
 // Exit 0 = appended. Exit 2 = the record would be invalid.
 import { existsSync } from 'node:fs';
 
+import { errorMessage } from '../lib/error-message.ts';
+import type { Bail } from './cli.ts';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './cli.ts';
 import { appendResultLine, runFactFields } from './golden-results.ts';
 
-const toNumberOrNull = (v) =>
+const toNumberOrNull = (v: string | null | undefined) =>
   v === undefined || v === null ? null : Number(v);
 
-export const main = (argv) => {
-  const bail = cannotRun('record-golden-result');
+export const main = (argv: string[]): void => {
+  const bail: Bail = cannotRun('record-golden-result');
   const { flags } = parseArgs(argv);
   if (!flags.out) bail('--out <file> is required');
 
   const normalized =
     flags.normalized && existsSync(flags.normalized)
-      ? readJsonOr(flags.normalized, bail)
+      ? (readJsonOr(flags.normalized, bail) as Parameters<
+          typeof runFactFields
+        >[0])
       : null;
 
   try {
@@ -57,7 +61,7 @@ export const main = (argv) => {
       `record-golden-result: appended ${JSON.stringify(record)} to ${flags.out}`,
     );
   } catch (err) {
-    bail(err.message);
+    bail(errorMessage(err));
   }
 };
 

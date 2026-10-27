@@ -99,10 +99,10 @@ test('a classifier error is human, not a missing tier', () => {
   assert.equal(result.signals[0].detail, 'nx graph failed');
 });
 
-test('classifier labels match the finding-contract tuple in schema.mjs', async () => {
-  // Two declarations on purpose: schema.mjs is the finding contract (zod
+test('classifier labels match the finding-contract tuple in schema.ts', async () => {
+  // Two declarations on purpose: schema.ts is the finding contract (zod
   // `z.enum` needs a const tuple) and this module must not import it, because
-  // apply-review-tier-label.mjs runs without zod. Changing schema.mjs also
+  // apply-review-tier-label.ts runs without zod. Changing schema.ts also
   // retriggers guard golden replay (ADR 0072). The values still have to be
   // the same three labels or planRelabel would accept a label the validator
   // rejects.

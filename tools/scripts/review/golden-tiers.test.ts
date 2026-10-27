@@ -83,12 +83,12 @@ test('the script runs with no dependencies installed', () => {
   const committed = JSON.parse(readFileSync(GOLDEN_SET_PATH, 'utf8'));
   assert.deepEqual(
     ids,
-    committed.cases.map((c) => c.id),
+    committed.cases.map((c: { id: string }) => c.id),
   );
 });
 
 test('the CLI and the workflow agree on every tier', () => {
-  const run = (args) =>
+  const run = (args: string[]) =>
     JSON.parse(
       execFileSync(process.execPath, args, { encoding: 'utf8' }).trim(),
     );
@@ -189,7 +189,7 @@ test('the first week of the month is days one to seven', () => {
 // Standing by rate, and the scheduled repetitions (ADR 0116)
 // ---------------------------------------------------------------------------
 
-const tenRuns = (id, outcome) =>
+const tenRuns = (id: string, outcome: string) =>
   Array.from({ length: 10 }, () => ({ case: id, outcome }));
 
 // The filter selects by where a case stands, not only by what the set
@@ -268,7 +268,10 @@ test('the matrix CLI prints what the workflow reads, with nothing installed', ()
   const committed = JSON.parse(readFileSync(GOLDEN_SET_PATH, 'utf8'));
   assert.deepEqual(
     JSON.parse(out),
-    committed.cases.map((c) => ({ case: c.id, repetition: 1 })),
+    committed.cases.map((c: { id: string }) => ({
+      case: c.id,
+      repetition: 1,
+    })),
   );
 });
 

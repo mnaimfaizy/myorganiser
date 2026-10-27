@@ -25,7 +25,7 @@ The same transcript shows the main agent doing more than assembling:
 - It re-read the one finding's file and decided the severity should stand.
 
 The report also carried `durationMs: 20000` for a session the harness timed at 39,859 ms, and an
-`executed` list holding prose in place of commands. `tools/scripts/review/schema.mjs` checks the
+`executed` list holding prose in place of commands. `tools/scripts/review/schema.ts` checks the
 shape of all of these fields and the truth of none.
 
 [ADR 0071](0071-a-finding-blocks-only-on-evidence-and-a-verdict-is-computed-never-written.md)

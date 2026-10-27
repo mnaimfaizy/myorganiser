@@ -12,12 +12,13 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import { errorMessage } from '../lib/error-message.ts';
 // The terms file, not run-ladder.ts: this module is read before any
 // dependency is installed, and the ladder reaches zod.
 import { RUN_FAILURES } from './run-ladder-terms.ts';
 
 export class GoldenResultError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'GoldenResultError';
   }
@@ -38,10 +39,13 @@ export const OUTCOMES = Object.freeze([
   'clean-pass',
   'clean-fail',
   'void',
-]);
+] as const);
+
+/** What a case run measured. */
+export type GoldenOutcome = (typeof OUTCOMES)[number];
 
 /** The two clean-case outcomes: scored, but never carrying a recall number. */
-const CLEAN_OUTCOMES = Object.freeze(['clean-pass', 'clean-fail']);
+const CLEAN_OUTCOMES = Object.freeze(['clean-pass', 'clean-fail'] as const);
 
 /**
  * Every reason a case run can measure nothing, matched to what
@@ -67,7 +71,10 @@ export const VOID_REASONS = Object.freeze([
   'answer-sheet-check-failed',
   ...RUN_FAILURES,
   'unknown',
-]);
+] as const);
+
+/** Why a case run measured nothing. */
+export type GoldenVoidReason = (typeof VOID_REASONS)[number];
 
 /**
  * The run facts a result line carries beside its outcome (ADR 0123 item 7):
@@ -81,12 +88,109 @@ const RUN_FACT_FLAGS = Object.freeze([
   ['index_opened', 'indexOpened'],
   ['dispatch_on_template', 'dispatchOnTemplate'],
   ['shape_readable', 'shapeReadable'],
-]);
+] as const);
+
+/** One of the three run-fact flag fields a result line carries. */
+type RunFactField = (typeof RUN_FACT_FLAGS)[number][1];
+
+/**
+ * What `buildResultRecord` is handed. Every field is `unknown` because this
+ * is the validator: a line read back off disk is JSON, and naming a type
+ * here would move the check to whoever called it.
+ */
+export interface ResultRecordInput {
+  date?: unknown;
+  runId?: unknown;
+  commit?: unknown;
+  caseId?: unknown;
+  outcome?: unknown;
+  voidReason?: unknown;
+  recall?: unknown;
+  totalCostUsd?: unknown;
+  turns?: unknown;
+  model?: unknown;
+  cliVersion?: unknown;
+  indexOpened?: unknown;
+  dispatchOnTemplate?: unknown;
+  shapeReadable?: unknown;
+}
+
+/** One validated result line, in the record's fixed key order. */
+export interface GoldenResultRecord {
+  date: string;
+  run_id: string;
+  commit: string;
+  case: string;
+  outcome: GoldenOutcome;
+  void_reason: GoldenVoidReason | null;
+  recall: number | null;
+  total_cost_usd: number | null;
+  turns: number | null;
+  model: string;
+  cli_version: string | null;
+  index_opened: boolean | null;
+  dispatch_on_template: boolean | null;
+  shape_readable: boolean | null;
+}
+
+/** One replay dispatch's lines, grouped by `run_id`. */
+export interface RunGroup {
+  runId: string;
+  date: string;
+  model: string;
+  commit: string;
+  records: GoldenResultRecord[];
+}
+
+/** One line of the record as it arrives from disk: still unchecked. */
+type ResultLineFields = Record<keyof GoldenResultRecord, unknown>;
+
+/**
+ * The run facts a result line is read from, and the normalized report that
+ * carries them. Declared structurally rather than imported from schema.ts,
+ * which reaches zod: the replay's first job reads the results record before
+ * any dependency is installed, and `no-install-imports.test.ts` reads the
+ * import graph as text, so even an erased type import would fail it.
+ */
+interface ReportRunFacts {
+  runFactsFrom?: string;
+  runFacts?: {
+    shape: string;
+    cliVersion: string | null;
+    axes: Record<
+      string,
+      { dispatched: boolean; onTemplate: boolean | null }
+    > | null;
+    indexOpened: boolean | null;
+    repliesParsed?: boolean | null;
+    unattributedDispatches?: number | null;
+  } | null;
+}
+
+/** The run-fact fields of a result line. */
+interface RunFactFields {
+  cliVersion: string | null;
+  indexOpened: boolean | null;
+  dispatchOnTemplate: boolean | null;
+  shapeReadable: boolean | null;
+}
+
+/** A raw golden set, as `seededCaseIds` reads it: unvalidated. */
+interface SeededCaseSet {
+  cases?: { id: string; origin?: string }[];
+}
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isNonEmptyString = (v) => typeof v === 'string' && v.length > 0;
-const isFiniteNonNegative = (v) =>
+const isNonEmptyString = (v: unknown): v is string =>
+  typeof v === 'string' && v.length > 0;
+const isFiniteNonNegative = (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const isOutcome = (v: unknown): v is GoldenOutcome =>
+  (OUTCOMES as readonly unknown[]).includes(v);
+const isVoidReason = (v: unknown): v is GoldenVoidReason =>
+  (VOID_REASONS as readonly unknown[]).includes(v);
+const isCleanOutcome = (v: unknown): v is (typeof CLEAN_OUTCOMES)[number] =>
+  (CLEAN_OUTCOMES as readonly unknown[]).includes(v);
 
 /**
  * Validates and normalizes one result record. Throws `GoldenResultError` on
@@ -110,24 +214,28 @@ export function buildResultRecord({
   indexOpened = null,
   dispatchOnTemplate = null,
   shapeReadable = null,
-} = {}) {
-  const err = (msg) => {
+}: ResultRecordInput = {}): GoldenResultRecord {
+  // A function declaration, not a `const` arrow: a call to a named function
+  // annotated `never` is what lets the checker read the lines below as the
+  // narrowing they already were — past `err(...)`, the field has the type the
+  // check just proved.
+  function err(msg: string): never {
     throw new GoldenResultError(msg);
-  };
+  }
 
-  if (!DATE.test(date ?? ''))
+  if (!isNonEmptyString(date) || !DATE.test(date))
     err(`date must be YYYY-MM-DD, got ${JSON.stringify(date)}`);
   if (!isNonEmptyString(runId)) err('run_id is required');
   if (!isNonEmptyString(commit)) err('commit is required');
   if (!isNonEmptyString(caseId)) err('case is required');
   if (!isNonEmptyString(model)) err('model is required');
-  if (!OUTCOMES.includes(outcome))
+  if (!isOutcome(outcome))
     err(
       `outcome must be one of ${OUTCOMES.join(', ')}, got ${JSON.stringify(outcome)}`,
     );
 
   if (outcome === 'void') {
-    if (!VOID_REASONS.includes(voidReason))
+    if (!isVoidReason(voidReason))
       err(
         `a void record's void_reason must be one of ${VOID_REASONS.join(', ')}, got ${JSON.stringify(voidReason)}`,
       );
@@ -135,7 +243,7 @@ export function buildResultRecord({
       err(
         'a void record carries no recall — it was not scored (ADR 0101), never as a miss or a catch',
       );
-  } else if (CLEAN_OUTCOMES.includes(outcome)) {
+  } else if (isCleanOutcome(outcome)) {
     // clean-pass / clean-fail: scored, but on whether a Blocking finding
     // appeared, not on a recall fraction — there is nothing here to recall.
     if (voidReason !== null) err(`a ${outcome} record carries no void_reason`);
@@ -156,26 +264,38 @@ export function buildResultRecord({
       );
   }
 
-  for (const [key, value] of [
-    ['total_cost_usd', totalCostUsd],
-    ['turns', turns],
-  ]) {
+  // Checked and narrowed in one pass, for the reason the run-fact flags
+  // below are: a loop that only checks leaves the field `unknown` at the
+  // return, and a cast there would assert what the loop had just proved.
+  const givenAmounts = { total_cost_usd: totalCostUsd, turns };
+  const amounts: Record<keyof typeof givenAmounts, number | null> = {
+    total_cost_usd: null,
+    turns: null,
+  };
+  for (const key of ['total_cost_usd', 'turns'] as const) {
+    const value = givenAmounts[key];
     if (value !== null && !isFiniteNonNegative(value))
       err(
         `${key} must be a non-negative number or null, got ${JSON.stringify(value)}`,
       );
+    amounts[key] = value;
   }
 
   if (cliVersion !== null && !isNonEmptyString(cliVersion))
     err(
       `cli_version must be a non-empty string or null, got ${JSON.stringify(cliVersion)}`,
     );
-  const flags = { indexOpened, dispatchOnTemplate, shapeReadable };
+  const given = { indexOpened, dispatchOnTemplate, shapeReadable };
+  const flags: Record<RunFactField, boolean | null> = {
+    indexOpened: null,
+    dispatchOnTemplate: null,
+    shapeReadable: null,
+  };
   for (const [key, field] of RUN_FACT_FLAGS) {
-    if (flags[field] !== null && typeof flags[field] !== 'boolean')
-      err(
-        `${key} must be true, false, or null, got ${JSON.stringify(flags[field])}`,
-      );
+    const value = given[field];
+    if (value !== null && typeof value !== 'boolean')
+      err(`${key} must be true, false, or null, got ${JSON.stringify(value)}`);
+    flags[field] = value;
   }
 
   return {
@@ -186,13 +306,13 @@ export function buildResultRecord({
     outcome,
     void_reason: voidReason,
     recall,
-    total_cost_usd: totalCostUsd,
-    turns,
+    total_cost_usd: amounts.total_cost_usd,
+    turns: amounts.turns,
     model,
     cli_version: cliVersion,
-    index_opened: indexOpened,
-    dispatch_on_template: dispatchOnTemplate,
-    shape_readable: shapeReadable,
+    index_opened: flags.indexOpened,
+    dispatch_on_template: flags.dispatchOnTemplate,
+    shape_readable: flags.shapeReadable,
   };
 }
 
@@ -204,9 +324,11 @@ export function buildResultRecord({
  * `false` there would be a claim. `dispatchOnTemplate` is false when any
  * dispatch carried text beyond the template.
  *
- * @param {unknown} normalized a normalized report, or null when none was written
+ * @param normalized a normalized report, or null when none was written
  */
-export const runFactFields = (normalized) => {
+export const runFactFields = (
+  normalized?: ReportRunFacts | null,
+): RunFactFields => {
   const facts =
     normalized?.runFactsFrom === 'transcript' ? normalized.runFacts : null;
   if (!facts)
@@ -217,15 +339,18 @@ export const runFactFields = (normalized) => {
       shapeReadable: null,
     };
   const readable = facts.shape === 'readable';
+  // `axes` and `unattributedDispatches` are stated exactly when the shape is
+  // readable, so the fallbacks below are only ever taken on the branch that
+  // discards their value — the same reads the untyped version made of `null`.
   const dispatched = readable
-    ? Object.values(facts.axes).filter((a) => a.dispatched)
+    ? Object.values(facts.axes ?? {}).filter((a) => a.dispatched)
     : [];
   return {
     cliVersion: facts.cliVersion ?? null,
     indexOpened: readable ? facts.indexOpened : null,
     dispatchOnTemplate: !readable
       ? null
-      : facts.unattributedDispatches > 0
+      : (facts.unattributedDispatches ?? 0) > 0
         ? false
         : dispatched.length > 0
           ? dispatched.every((a) => a.onTemplate)
@@ -235,7 +360,8 @@ export const runFactFields = (normalized) => {
 };
 
 /** One JSON line, in the record's fixed key order. */
-export const formatResultLine = (record) => JSON.stringify(record);
+export const formatResultLine = (record: GoldenResultRecord) =>
+  JSON.stringify(record);
 
 /**
  * Parses the results record: one JSON object per non-blank line, each
@@ -243,19 +369,21 @@ export const formatResultLine = (record) => JSON.stringify(record);
  * line is caught here rather than by whatever reads the parsed records.
  * Throws `GoldenResultError` naming the offending line.
  */
-export function parseResultsFile(text) {
-  const records = [];
+export function parseResultsFile(
+  text: string | null | undefined,
+): GoldenResultRecord[] {
+  const records: GoldenResultRecord[] = [];
   const lines = (text ?? '').split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const trimmed = lines[i].trim();
     if (!trimmed) continue;
 
-    let parsed;
+    let parsed: ResultLineFields;
     try {
-      parsed = JSON.parse(trimmed);
+      parsed = JSON.parse(trimmed) as ResultLineFields;
     } catch (err) {
       throw new GoldenResultError(
-        `line ${i + 1}: not valid JSON: ${err.message}`,
+        `line ${i + 1}: not valid JSON: ${errorMessage(err)}`,
       );
     }
 
@@ -280,7 +408,7 @@ export function parseResultsFile(text) {
       );
     } catch (err) {
       if (err instanceof GoldenResultError)
-        throw new GoldenResultError(`line ${i + 1}: ${err.message}`);
+        throw new GoldenResultError(`line ${i + 1}: ${errorMessage(err)}`);
       throw err;
     }
   }
@@ -292,7 +420,10 @@ export function parseResultsFile(text) {
  * creating its directory if needed. The one write in this module; every
  * other export is pure.
  */
-export function appendResultLine(path, fields) {
+export function appendResultLine(
+  path: string,
+  fields: ResultRecordInput,
+): GoldenResultRecord {
   const record = buildResultRecord(fields);
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, `${formatResultLine(record)}\n`);
@@ -306,9 +437,9 @@ export function appendResultLine(path, fields) {
  * that never actually ran, which is a fact worth failing on rather than
  * silently picking the first value seen.
  */
-export function groupRuns(records) {
-  const order = [];
-  const byRun = new Map();
+export function groupRuns(records: GoldenResultRecord[]): RunGroup[] {
+  const order: RunGroup[] = [];
+  const byRun = new Map<string, RunGroup>();
 
   for (const r of records) {
     let group = byRun.get(r.run_id);
@@ -321,13 +452,14 @@ export function groupRuns(records) {
         records: [],
       };
       byRun.set(r.run_id, group);
-      order.push(r.run_id);
+      order.push(group);
     }
-    for (const [field, value, seen] of [
+    const agreements: [string, string, string][] = [
       ['date', r.date, group.date],
       ['model', r.model, group.model],
       ['commit', r.commit, group.commit],
-    ]) {
+    ];
+    for (const [field, value, seen] of agreements) {
       if (value !== seen)
         throw new GoldenResultError(
           `run ${r.run_id} has records with different ${field} values (${JSON.stringify(seen)} and ${JSON.stringify(value)}) — the record is corrupt`,
@@ -336,7 +468,7 @@ export function groupRuns(records) {
     group.records.push(r);
   }
 
-  return order.map((id) => byRun.get(id));
+  return order;
 }
 
 /**
@@ -348,8 +480,11 @@ export function groupRuns(records) {
  * (one a recall number, the other none) — collapsing them here would lose
  * nothing the raw `outcome` field on each record does not still say.
  */
-export function summarizeRun(group, { seeded = new Set() } = {}) {
-  const tally = (records) => {
+export function summarizeRun(
+  group: RunGroup,
+  { seeded = new Set<string>() }: { seeded?: Set<string> } = {},
+) {
+  const tally = (records: GoldenResultRecord[]) => {
     const caught = records.filter(
       (r) => r.outcome === 'caught' || r.outcome === 'clean-pass',
     ).length;
@@ -385,7 +520,7 @@ export function summarizeRun(group, { seeded = new Set() } = {}) {
 
 /** The ids of a raw golden set's Seeded Cases. Read without validating, so
  * the ledger check stays installable-free like the rest of this module. */
-export const seededCaseIds = (set) =>
+export const seededCaseIds = (set?: SeededCaseSet | null) =>
   new Set(
     (set?.cases ?? []).filter((c) => c.origin === 'seeded').map((c) => c.id),
   );
@@ -399,7 +534,10 @@ export const GENERATED_END = '<!-- GENERATED:golden-runs:END -->';
 /** Renders the generated Runs section from `records` — one row per replay
  * dispatch (grouped by `run_id`), newest last, matching the historical
  * table's own convention. */
-export function renderRunsTable(records, { seeded = new Set() } = {}) {
+export function renderRunsTable(
+  records: GoldenResultRecord[],
+  { seeded = new Set<string>() }: { seeded?: Set<string> } = {},
+): string {
   const groups = groupRuns(records);
   if (groups.length === 0) return '_No recorded runs yet._';
 

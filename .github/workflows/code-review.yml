@@ -325,7 +325,7 @@ jobs:
           corepack yarn review:tier:check \
             --base "$BASE_SHA" --head "$HEAD_SHA" --author "$PR_AUTHOR" \
             --out "$RUNNER_TEMP/tier.json"
-          node tools/scripts/review/run-review-tier-check.mjs \
+          node tools/scripts/review/run-review-tier-check.ts \
             --mode advisory --status $?
 
       # Spec discovery with the job token: branch name, then commit
@@ -432,7 +432,7 @@ jobs:
       # Leaving --facts off here would put the reviewer's own claims about its
       # run back into the report on every review after the first (ADR 0123),
       # and leaving --worklist off would fail an obligation finding as one the
-      # main agent authored; run-facts-wiring.test.mjs fails a validation that
+      # main agent authored; run-facts-wiring.test.ts fails a validation that
       # omits either. A previous report that cannot be used
       # leaves the minted ids in place and says so: every finding then reads
       # as new, which is what having no previous run means.
@@ -630,8 +630,8 @@ jobs:
         with:
           node-version: '22.18'
 
-      # The publisher reaches schema.mjs for the finding shape and the tier
-      # labels, and schema.mjs imports zod. This job needs the install like
+      # The publisher reaches schema.ts for the finding shape and the tier
+      # labels, and schema.ts imports zod. This job needs the install like
       # any other, and the cache the review job populated makes it cheap.
       - name: Restore dependency cache
         id: dependency-cache

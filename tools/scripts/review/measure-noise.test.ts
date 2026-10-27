@@ -22,7 +22,7 @@ import { isolateGitEnvironment } from '../lib/git-environment.ts';
 // Husky runs this suite with the hook's GIT_DIR; see git-environment.ts.
 isolateGitEnvironment();
 
-const run = (databaseId, headSha, createdAt) => ({
+const run = (databaseId: number, headSha: string, createdAt: string) => ({
   databaseId,
   headBranch: 'feat/a',
   headSha,
@@ -76,9 +76,9 @@ test('a range git cannot serve reads as null, not as no commits', () => {
  * length would pass here and fail on every pull request. A range whose
  * contents the test wrote is the only one it can assert against.
  */
-const repoWithCommits = (messages) => {
+const repoWithCommits = (messages: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), 'noise-commits-'));
-  const run = (...args) =>
+  const run = (...args: string[]) =>
     execFileSync('git', args, {
       cwd: dir,
       encoding: 'utf8',
@@ -86,7 +86,7 @@ const repoWithCommits = (messages) => {
   run('init', '--quiet', '--initial-branch=main');
   run('config', 'user.email', 'test@example.com');
   run('config', 'user.name', 'Test');
-  const shas = [];
+  const shas: string[] = [];
   messages.forEach((message, i) => {
     writeFileSync(join(dir, 'a.txt'), `${i}\n`);
     run('add', 'a.txt');
@@ -101,10 +101,10 @@ test('a range git can serve comes back as commits with their messages', () => {
     'feat(a): the first commit',
     'fix(a): the second commit\n\nReview-ack: 0123456789ab — real, deferred\n',
   ]);
-  const commits = commitsBetween(shas[0], shas[1], dir);
-  assert.equal(commits.length, 1);
-  assert.equal(commits[0].sha, shas[1]);
-  assert.match(commits[0].message, /fix\(a\): the second commit/);
+  const commits = commitsBetween(shas[0]!, shas[1]!, dir);
+  assert.equal(commits!.length, 1);
+  assert.equal(commits![0].sha, shas[1]);
+  assert.match(commits![0].message!, /fix\(a\): the second commit/);
   // The marker survives the trip out of git, which is the whole reason the
   // commits are read at all.
   assert.deepEqual([...acknowledgementsIn(commits).keys()], ['0123456789ab']);
@@ -120,12 +120,12 @@ test('a push of several commits is one entry each', () => {
     'feat(a): two\n\nA body.\n\nWith a blank line.\n',
     'feat(a): three\n\nReview-ack: ffffffffffff\n',
   ]);
-  const commits = commitsBetween(shas[0], shas[2], dir);
+  const commits = commitsBetween(shas[0]!, shas[2]!, dir);
   assert.deepEqual(
-    commits.map((c) => c.sha),
+    commits!.map((c) => c.sha),
     [shas[2], shas[1]],
   );
-  assert.match(commits[1].message, /With a blank line/);
+  assert.match(commits![1].message!, /With a blank line/);
   assert.deepEqual([...acknowledgementsIn(commits).keys()], ['ffffffffffff']);
   rmSync(dir, { recursive: true, force: true });
 });

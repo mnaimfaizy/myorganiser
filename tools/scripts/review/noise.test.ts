@@ -26,11 +26,21 @@ import {
   statusOf,
   summarizeNoise,
 } from './noise.ts';
+import type {
+  ObservedFinding,
+  Observation,
+  Push,
+  PushCommit,
+} from './noise.ts';
 import { REPORT_SCHEMA_VERSION, normalizeReport } from './schema.ts';
 
-const sha = (c) => c.repeat(40);
+const sha = (c: string) => c.repeat(40);
 
-const finding = (id, ruleId = 'standard-other', extra = {}) => ({
+const finding = (
+  id: string,
+  ruleId = 'standard-other',
+  extra: Partial<ObservedFinding> = {},
+): ObservedFinding => ({
   id,
   ruleId,
   axis: 'standards',
@@ -39,7 +49,14 @@ const finding = (id, ruleId = 'standard-other', extra = {}) => ({
   ...extra,
 });
 
-const push = (headSha, findings, { commits, schemaVersion } = {}) => ({
+const push = (
+  headSha: string,
+  findings: ObservedFinding[] | null,
+  {
+    commits,
+    schemaVersion,
+  }: { commits?: PushCommit[]; schemaVersion?: number } = {},
+): Push => ({
   headSha,
   createdAt: '2026-09-08T10:00:00Z',
   report:
@@ -53,7 +70,7 @@ const push = (headSha, findings, { commits, schemaVersion } = {}) => ({
   ...(commits ? { commits } : {}),
 });
 
-const classesOf = (rows) => rows.map((r) => r.class);
+const classesOf = (rows: Observation[]) => rows.map((r) => r.class);
 
 // ---------------------------------------------------------------------------
 // The three cases the issue names
@@ -104,7 +121,7 @@ test('an acknowledged finding leaves the numerator and the denominator', () => {
     ],
   });
   assert.deepEqual(classesOf(rows), ['acknowledged', 'pending']);
-  assert.equal(rows[0].acknowledgedBy.sha, sha('c'));
+  assert.equal(rows[0].acknowledgedBy!.sha, sha('c'));
   assert.deepEqual(rateOf(rows), {
     observations: 0,
     ignored: 0,
@@ -127,7 +144,7 @@ test('the marker is line-anchored, case-insensitive, and takes several ids', () 
     ].join('\n'),
   );
   assert.deepEqual([...found.keys()], ['0123456789ab', 'ffffffffffff']);
-  assert.match(found.get('0123456789ab').quote, /review-ack:/i);
+  assert.match(found.get('0123456789ab')!.quote, /review-ack:/i);
 });
 
 // Prose about the marker is not the marker. `Closes #N` is anchored the same
@@ -156,7 +173,7 @@ test('the first commit to acknowledge an id owns it', () => {
     { sha: sha('1'), message: 'Review-ack: 0123456789ab — first' },
     { sha: sha('2'), message: 'Review-ack: 0123456789ab — second' },
   ]);
-  assert.equal(found.get('0123456789ab').sha, sha('1'));
+  assert.equal(found.get('0123456789ab')!.sha, sha('1'));
   assert.equal(acknowledgementsIn().size, 0);
 });
 
@@ -261,7 +278,7 @@ test('a pair spanning a report schema version is incomparable', () => {
 // per-rule line named `undefined` — a JavaScript primitive in a document
 // people read.
 test('a finding with no rule id is grouped under a name, not under undefined', () => {
-  const legacy = (id) => {
+  const legacy = (id: string) => {
     const f = finding(id);
     delete f.ruleId;
     return f;
@@ -308,7 +325,12 @@ test('a finding that survives three pushes is two ignored observations', () => {
 // read as inaction and the acknowledgement written for the first defect
 // covered the second, which its author had never seen.
 test('a defect fixed and another raised under the same rule and file is acted on, and its acknowledgement does not travel', () => {
-  const report = (head, startLine, endLine, previous) =>
+  const report = (
+    head: string,
+    startLine: number,
+    endLine: number,
+    previous?: unknown,
+  ) =>
     normalizeReport(
       {
         schemaVersion: REPORT_SCHEMA_VERSION,
@@ -378,8 +400,16 @@ test('every class has a role and the roles are the three that exist', () => {
  * that is gone. A branch apiece, so no pair of the fixture accidentally
  * observes a neighbour's finding.
  */
-const id = (n) => String(n).padStart(12, '0');
-const branchesWith = ({ ruleId, ignored, acted }) => [
+const id = (n: number) => String(n).padStart(12, '0');
+const branchesWith = ({
+  ruleId,
+  ignored,
+  acted,
+}: {
+  ruleId: string;
+  ignored: number;
+  acted: number;
+}) => [
   ...Array.from({ length: ignored }, (_, i) => ({
     branch: `feat/${ruleId}-ignored-${i}`,
     pushes: [
@@ -412,7 +442,7 @@ test('the rate is per rule, and the budget judges only above the floor', () => {
   });
   const byId = Object.fromEntries(summary.rules.map((r) => [r.ruleId, r]));
   assert.equal(byId['smell-duplicated-code'].observations, 12);
-  assert.ok(byId['smell-duplicated-code'].rate > NOISE_BUDGET.rate);
+  assert.ok(byId['smell-duplicated-code'].rate! > NOISE_BUDGET.rate);
   assert.equal(byId['smell-duplicated-code'].status, 'over-budget');
   assert.deepEqual(summary.overBudget, ['smell-duplicated-code']);
   assert.equal(byId['standard-other'].status, 'insufficient-evidence');

@@ -36,7 +36,7 @@ test('applying the review:* label cannot fail the Review Tier check', () => {
     /continue-on-error:\s*true/,
     'the label is a display of the job output (ADR 0070 item 3); a GraphQL flake must not fail the required check',
   );
-  assert.match(apply, /apply-review-tier-label\.mjs/);
+  assert.match(apply, /apply-review-tier-label\.ts/);
   assert.doesNotMatch(
     apply,
     /gh label list --search/,
@@ -69,7 +69,7 @@ test('code-review never passes an empty --tier to the validator or publisher', (
   const classify = stepNamed(review, 'Classify the diff');
   assert.match(
     classify,
-    /run-review-tier-check\.mjs/,
+    /run-review-tier-check\.ts/,
     'both workflows share one classify-then-backfill helper',
   );
   assert.match(
@@ -107,17 +107,17 @@ test('Review Tier and Code Review share one classify-then-backfill helper', () =
     'Classify the diff',
   );
   assert.match(reviewTier, /yarn review:tier:check/);
-  assert.match(reviewTier, /run-review-tier-check\.mjs/);
+  assert.match(reviewTier, /run-review-tier-check\.ts/);
   assert.match(reviewTier, /--mode required/);
   assert.match(codeReview, /yarn review:tier:check/);
-  assert.match(codeReview, /run-review-tier-check\.mjs/);
+  assert.match(codeReview, /run-review-tier-check\.ts/);
   assert.match(codeReview, /--mode advisory/);
   assert.doesNotMatch(
     reviewTier,
-    /run-review-tier-check\.mjs[\s\S]*--base /,
+    /run-review-tier-check\.ts[\s\S]*--base /,
     'the helper does not spawn the classifier; yarn review:tier:check does',
   );
-  assert.doesNotMatch(codeReview, /run-review-tier-check\.mjs[\s\S]*--base /);
+  assert.doesNotMatch(codeReview, /run-review-tier-check\.ts[\s\S]*--base /);
   assert.doesNotMatch(
     reviewTier,
     /grep -q '\^label=review:'/,

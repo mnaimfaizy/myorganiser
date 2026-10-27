@@ -110,8 +110,7 @@ export interface ObligationCatalogue {
  * declaration is what lets those checks narrow, not a claim that the file is
  * valid. The index signature carries the site fields the catalogue states.
  */
-export type ObligationCandidate = Partial<Obligation> &
-  Record<string, unknown>;
+export type ObligationCandidate = Partial<Obligation> & Record<string, unknown>;
 
 /** A catalogue as it arrives from the file, before it is checked. */
 export interface RawObligationCatalogue {
@@ -163,6 +162,27 @@ export interface Worklist {
   changedFiles: ChangedFile[];
 }
 
+/**
+ * What the answer check reads of a worklist. Narrower than `Worklist`
+ * because the sheet is checked against a worklist read back off disk, which
+ * may predate any field the selector has since added — `changedFiles` came
+ * with issue #1140 — and nothing here is read from the entries but the
+ * sites, the fields an answer must carry, and the rule that reads a defect
+ * out of them.
+ */
+export interface AnswerObligation {
+  id: string;
+  sites: WorklistSite[];
+  answerFields: string[];
+  citedFields?: (string | CitedFieldSpec)[];
+  defectWhen?: DefectRule;
+}
+
+export interface AnswerWorklist {
+  head: string;
+  selected: AnswerObligation[];
+}
+
 export const OBLIGATION_CATALOGUE_SCHEMA_VERSION = 1;
 export const OBLIGATIONS_PATH = join(
   'tools',
@@ -202,17 +222,18 @@ export function assertObligationCatalogue(
   const candidate = (cat ?? {}) as RawObligationCatalogue;
   if (candidate.schemaVersion !== OBLIGATION_CATALOGUE_SCHEMA_VERSION)
     fail(`unsupported schemaVersion ${String(candidate.schemaVersion)}`);
-  if (!Array.isArray(candidate.obligations) || candidate.obligations.length === 0)
+  if (
+    !Array.isArray(candidate.obligations) ||
+    candidate.obligations.length === 0
+  )
     fail('obligations must be a non-empty array');
   const ids = new Set<string>();
   for (const o of candidate.obligations) {
     const where = `obligation ${o.id ?? '(no id)'}`;
-    const id = o.id;
     if (typeof o.id !== 'string' || !ID.test(o.id))
       fail(`${where}: id must be a lowercase slug`);
-    if (typeof id !== 'string') fail(`${where}: id must be a lowercase slug`);
-    if (ids.has(id)) fail(`duplicate obligation id ${id}`);
-    ids.add(id);
+    if (ids.has(o.id)) fail(`duplicate obligation id ${o.id}`);
+    ids.add(o.id);
     for (const field of ['title', 'question', 'defect'] as const) {
       if (typeof o[field] !== 'string' || !o[field])
         fail(`${where}: ${field} must be a non-empty string`);
@@ -774,10 +795,8 @@ export interface AnswerCheck {
   sound: boolean;
 }
 
-const siteKey = (
-  id: string,
-  site: { file: string; line: number },
-): string => `${id}@${site.file}:${site.line}`;
+const siteKey = (id: string, site: { file: string; line: number }): string =>
+  `${id}@${site.file}:${site.line}`;
 
 /**
  * Whitespace is presentation. A line the reviewer copied out of a Read result
@@ -904,7 +923,7 @@ export const raisedForSite = (
  *   rather than taken on trust.
  */
 export const checkAnswers = (
-  worklist: Worklist,
+  worklist: AnswerWorklist,
   sheet: AnswerSheet,
   { readSource, findings }: CheckAnswersIo = {},
 ): AnswerCheck => {

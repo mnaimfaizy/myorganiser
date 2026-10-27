@@ -12,7 +12,7 @@
 // a weekly schedule that asks which reviewer inputs moved, the golden-replay
 // Request Label, and dispatch — and never a push to a Pull Request, which
 // bought most of three weeks' replay spend on runs nobody asked to measure.
-// Which inputs the schedule watches is REPLAY_INPUT_PATHS in golden-tiers.mjs,
+// Which inputs the schedule watches is REPLAY_INPUT_PATHS in golden-tiers.ts,
 // covered by its own tests.
 // And the replay checks the reviewer's obligation answer sheet before it
 // scores, as production does, or a run production would fail as a pipeline
@@ -122,7 +122,9 @@ if (findings.length) {
 }
 console.log(
   `review-golden-set: OK — ${set.cases.length} case(s), ${set.cases.reduce(
-    (n: number, c: { expected?: unknown[] }) => n + (c.expected?.length ?? 0),
+    // A clean case carries no expectation, which is the whole of what makes
+    // it clean (issue #933).
+    (n, c) => n + (c.expectsNoBlocking ? 0 : c.expected.length),
     0,
   )} expected finding(s), replay runs on schedule and request over ${REPLAY_INPUT_PATHS.length} input path(s), repeats a frontier case ${SCHEDULED_FRONTIER_REPETITIONS} times on the schedule, and checks answer sheets before scoring`,
 );

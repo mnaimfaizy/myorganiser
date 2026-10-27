@@ -21,16 +21,22 @@
 //                  review:human.
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
+import type { Bail } from './cli.ts';
 import { cannotRun, isMain, parseArgs } from './cli.ts';
 
 export const HUMAN_OUTPUT = 'tier=human\nlabel=review:human\n';
 export const BACKFILL_WARNING =
   '::warning::classifier wrote no tier; defaulting to review:human';
 
-export const hasReviewTierLabel = (text) =>
+/** Which workflow is asking, and so what a silent miss costs. */
+export type BackfillMode = 'required' | 'advisory';
+
+export const hasReviewTierLabel = (text?: string | null) =>
   /(?:^|\n)label=review:/.test(text ?? '');
 
-export const backfillReviewTierOutput = (text) => {
+export const backfillReviewTierOutput = (
+  text?: string | null,
+): { text: string; backfilled: boolean } => {
   if (hasReviewTierLabel(text)) return { text: text ?? '', backfilled: false };
   const body = text ?? '';
   const prefix = body.length === 0 || body.endsWith('\n') ? '' : '\n';
@@ -42,17 +48,21 @@ export const backfillReviewTierOutput = (text) => {
  * classifier wrote nothing. Appends rather than rewriting so other step
  * output GitHub already placed there is kept.
  *
- * @returns {{ backfilled: boolean }}
  */
 export const applyGithubOutputBackfill = (
-  githubOutputPath,
+  githubOutputPath?: string,
   {
-    read = readFileSync,
-    append = appendFileSync,
-    exists = existsSync,
-    warn = (msg) => console.error(msg),
+    read = (path: string, encoding: 'utf8') => readFileSync(path, encoding),
+    append = (path: string, text: string) => appendFileSync(path, text),
+    exists = (path: string) => existsSync(path),
+    warn = (msg: string) => console.error(msg),
+  }: {
+    read?: (path: string, encoding: 'utf8') => string;
+    append?: (path: string, text: string) => void;
+    exists?: (path: string) => boolean;
+    warn?: (msg: string) => void;
   } = {},
-) => {
+): { backfilled: boolean } => {
   if (!githubOutputPath) return { backfilled: false };
   const current = exists(githubOutputPath)
     ? read(githubOutputPath, 'utf8')
@@ -68,24 +78,27 @@ export const exitStatusAfterBackfill = ({
   mode,
   classifierStatus,
   backfilled,
-}) => {
+}: {
+  mode: BackfillMode;
+  classifierStatus: number;
+  backfilled: boolean;
+}): number => {
   if (mode === 'advisory') return 0;
   if (backfilled && classifierStatus === 0) return 2;
   return classifierStatus;
 };
 
 /**
- * @param {{
- *   mode: 'required' | 'advisory',
- *   classifierStatus: number | null,
- *   githubOutput?: string,
- * }} input
  */
 export const runReviewTierCheck = ({
   mode,
   classifierStatus,
   githubOutput,
-}) => {
+}: {
+  mode: BackfillMode;
+  classifierStatus: number | null;
+  githubOutput?: string;
+}): number => {
   if (mode !== 'required' && mode !== 'advisory') {
     throw new Error('--mode must be required or advisory');
   }
@@ -100,14 +113,14 @@ export const runReviewTierCheck = ({
 
 if (isMain(import.meta.url)) {
   const { flags } = parseArgs(process.argv.slice(2));
-  const fail = cannotRun('run-review-tier-check');
+  const fail: Bail = cannotRun('run-review-tier-check');
   if (flags.mode !== 'required' && flags.mode !== 'advisory') {
     fail('--mode required|advisory is required');
   }
   if (flags.status === undefined || flags.status === null) {
     fail('--status <classifier-exit> is required after yarn review:tier:check');
   }
-  const classifierStatus = Number.parseInt(flags.status, 10);
+  const classifierStatus = Number.parseInt(flags.status!, 10);
   if (!Number.isInteger(classifierStatus)) fail('--status must be an integer');
   process.exit(
     runReviewTierCheck({

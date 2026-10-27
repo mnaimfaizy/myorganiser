@@ -33,15 +33,28 @@ export const REQUIRED_OUTPUTS = Object.freeze([
   'tmp/code-review/report.json',
   'tmp/code-review/<head>.report.json',
   'tmp/code-review/obligations.answers.json',
-]);
+] as const);
+
+/** One workflow annotation this script prints. */
+export interface RunAnnotation {
+  level: 'error' | 'warning';
+  message: string;
+}
+
+/** What the action's outputs should say about one reviewer session. */
+export interface ReviewerRunClassification {
+  outputs: Record<string, string>;
+  annotations: RunAnnotation[];
+}
 
 const REQUIRED_OUTPUT_PATTERN =
   /(?:^|\/)tmp\/code-review\/(?:(?:[^/]+\.)?report\.json|obligations\.answers\.json)$/;
 
 const FILE_WRITERS = new Set(['Write', 'Edit']);
 
-const isObject = (v) => typeof v === 'object' && v !== null;
-const finiteOrEmpty = (v) =>
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null;
+const finiteOrEmpty = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
 
 /**
@@ -50,9 +63,11 @@ const finiteOrEmpty = (v) =>
  * absolute, where only the tail is ours to recognize — the workspace root
  * differs per runner.
  */
-export function refusedOutputPath(denial) {
-  if (!isObject(denial) || !FILE_WRITERS.has(denial.tool_name)) return null;
-  const path = denial.tool_input?.file_path;
+export function refusedOutputPath(denial: unknown): string | null {
+  if (!isObject(denial) || !FILE_WRITERS.has(String(denial.tool_name)))
+    return null;
+  const path = (denial.tool_input as { file_path?: unknown } | undefined)
+    ?.file_path;
   if (typeof path !== 'string') return null;
   const normalized = path.replaceAll('\\', '/').replace(/^(\.\/)+/, '');
   return REQUIRED_OUTPUT_PATTERN.test(normalized) ? path : null;
@@ -72,12 +87,11 @@ export function refusedOutputPath(denial) {
  * ended `success` with six refused writes to its own report and answer sheet
  * and was read as "no valid report", issue #880).
  *
- * @param {string} text the execution file's contents
- * @returns {{ outputs: Record<string, string>, annotations: { level: 'error' | 'warning', message: string }[] }}
+ * @param text the execution file's contents
  */
-export function classifyReviewerRun(text) {
-  const annotations = [];
-  let events;
+export function classifyReviewerRun(text: string): ReviewerRunClassification {
+  const annotations: RunAnnotation[] = [];
+  let events: unknown;
   try {
     events = JSON.parse(text);
   } catch {
@@ -97,10 +111,10 @@ export function classifyReviewerRun(text) {
 
   // The last `result` event carries the run's own accounting regardless of
   // how it ended — cleanly, rate limited, or turn exhausted.
-  const objects = events.filter(isObject);
+  const objects = (events as unknown[]).filter(isObject);
   const result = objects.findLast((e) => e.type === 'result') ?? {};
   const turns = finiteOrEmpty(result.num_turns);
-  const outputs = {
+  const outputs: Record<string, string> = {
     total_cost_usd: finiteOrEmpty(result.total_cost_usd),
     turns,
   };
@@ -110,7 +124,7 @@ export function classifyReviewerRun(text) {
     .map((e) => e.rate_limit_info)
     .filter(isObject);
   if (limitInfos.some((info) => info.status === 'rejected')) {
-    const window = limitInfos.at(-1).rateLimitType ?? 'unknown';
+    const window = limitInfos.at(-1)!.rateLimitType ?? 'unknown';
     annotations.push({
       level: 'error',
       message: `the reviewer was cut off by the ${window} rate limit after ${turns || 0} turn(s); this run measured nothing and is not a miss`,
@@ -169,13 +183,16 @@ export function classifyReviewerRun(text) {
 // A refused path is text the model chose, so it is escaped the way a
 // workflow command's message is: an unescaped newline would let it start a
 // second command on its own line.
-const escapeMessage = (message) =>
+const escapeMessage = (message: string) =>
   message
     .replaceAll('%', '%25')
     .replaceAll('\r', '%0D')
     .replaceAll('\n', '%0A');
 
-export const main = (argv, env = process.env) => {
+export const main = (
+  argv: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): void => {
   const bail = cannotRun('classify-reviewer-run');
   const [file] = argv;
   if (!file) bail('usage: classify-reviewer-run.ts <execution-file>');

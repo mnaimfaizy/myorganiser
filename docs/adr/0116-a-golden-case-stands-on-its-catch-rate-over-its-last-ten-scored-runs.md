@@ -56,7 +56,7 @@ it, read from the results record.**
    something.
 5. **Under ten scored runs, nothing moves.** The case stands at the `tier` the
    set declares. A rate over three runs is the streak rule again.
-6. **The tier filter follows the record.** `golden-tiers.mjs` selects by where
+6. **The tier filter follows the record.** `golden-tiers.ts` selects by where
    a case stands, so the weekly replay picks up a move with nobody editing the
    set. The declared `tier` is where a case starts; the ledger's standing
    table, generated from the set and the record and asserted by

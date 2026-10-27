@@ -14,23 +14,17 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { REVIEW_TIER_LABELS, planRelabel } from '../lib/review-tier.ts';
+import type { Bail } from './cli.ts';
 import { cannotRun, firstLine, gh, ghJson, isMain, parseArgs } from './cli.ts';
 
 export const DEFAULT_ATTEMPTS = 3;
 
-/**
- * @param {{
- *   pr: string | number,
- *   label: string,
- *   repo: string,
- *   attempts?: number,
- *   ghJsonCall?: typeof ghJson,
- *   ghCall?: typeof gh,
- *   sleep?: (ms: number) => Promise<void>,
- *   warn?: (msg: string) => void,
- * }} input
- * @returns {Promise<{ applied: boolean, reason: string }>}
- */
+/** Whether the label was applied, and the one-word reason. */
+export interface RelabelOutcome {
+  applied: boolean;
+  reason: string;
+}
+
 export async function applyReviewTierLabel({
   pr,
   label,
@@ -39,16 +33,25 @@ export async function applyReviewTierLabel({
   ghJsonCall = ghJson,
   ghCall = gh,
   sleep = delay,
-  warn = (msg) => console.error(`apply-review-tier-label: ${msg}`),
-}) {
-  if (!REVIEW_TIER_LABELS.includes(label)) {
+  warn = (msg: string) => console.error(`apply-review-tier-label: ${msg}`),
+}: {
+  pr: string | number;
+  label: string;
+  repo: string;
+  attempts?: number;
+  ghJsonCall?: typeof ghJson;
+  ghCall?: typeof gh;
+  sleep?: (ms: number) => Promise<unknown>;
+  warn?: (msg: string) => void;
+}): Promise<RelabelOutcome> {
+  if (!(REVIEW_TIER_LABELS as readonly string[]).includes(label)) {
     warn(
       `${label} is not a review:* label; the job output still stands (ADR 0070 item 3)`,
     );
     return { applied: false, reason: 'not-a-review-tier-label' };
   }
 
-  let lastError;
+  let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const view = ghJsonCall([
@@ -59,7 +62,7 @@ export async function applyReviewTierLabel({
         repo,
         '--json',
         'labels',
-      ]);
+      ]) as { labels?: { name: string }[] } | null;
       const current = (view?.labels ?? []).map((item) => item.name);
       const plan = planRelabel(current, label);
       if (!plan) return { applied: true, reason: 'already-labelled' };
@@ -81,7 +84,7 @@ export async function applyReviewTierLabel({
 }
 
 const runCli = async () => {
-  const fail = cannotRun('apply-review-tier-label');
+  const fail: Bail = cannotRun('apply-review-tier-label');
   const { flags } = parseArgs(process.argv.slice(2));
   if (!flags.pr) fail('--pr is required');
   if (!flags.label) fail('--label is required');

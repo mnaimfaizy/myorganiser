@@ -4,9 +4,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type {
+  ExecutedEvidenceClaim,
+  TranscriptExecution,
+} from './executed-evidence.ts';
 import { matchExecutedEvidence } from './executed-evidence.ts';
 
-const evidence = (command, exitCode = 0) => ({
+// The whole evidence object a finding carries, of which the comparison
+// reads the command and the exit code.
+const evidence = (command: string, exitCode = 0) => ({
   kind: 'executed',
   command,
   exitCode,
@@ -14,9 +20,15 @@ const evidence = (command, exitCode = 0) => ({
   cwd: '.',
 });
 
-const ran = (command, exitCode = 0) => ({ command, exitCode });
+const ran = (
+  command: string,
+  exitCode: number | null = 0,
+): TranscriptExecution => ({ command, exitCode });
 
-const status = (e, executions) => matchExecutedEvidence(e, executions).status;
+const status = (
+  e: ExecutedEvidenceClaim,
+  executions: readonly TranscriptExecution[],
+) => matchExecutedEvidence(e, executions).status;
 
 test('a command the transcript shows, with the exit code it shows, ran', () => {
   assert.equal(

@@ -143,7 +143,7 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p tmp/code-review
-        node "$TOOLING/tools/scripts/review/run-from-tooling.mjs" review/select-obligations.mjs \
+        node "$TOOLING/tools/scripts/review/run-from-tooling.ts" review/select-obligations.ts \
           --base "${{ inputs.base }}" --head "${{ inputs.head }}" \
           --out "$PWD/tmp/code-review/obligations.json"
 
@@ -261,7 +261,7 @@ runs:
         # nothing above applied, having been refused six writes to its own
         # report and answer sheet. A refused write to a required output is
         # prevented whatever the run's subtype (issue #880).
-        node "$TOOLING/tools/scripts/review/classify-reviewer-run.mjs" "$EXECUTION_FILE"
+        node "$TOOLING/tools/scripts/review/classify-reviewer-run.ts" "$EXECUTION_FILE"
 
     # The action hides the reviewer's transcript from the log. Keep it as a
     # short-lived artifact so a run that wrote no report can be read.
@@ -285,7 +285,7 @@ runs:
     # transcript: a missing one is recorded as an unknown shape, so the
     # validator never falls back to the reviewer's own claims. The step
     # reports and fails nothing. What a fact costs is the validator's to
-    # decide, from this file (tools/scripts/review/run-ladder.mjs).
+    # decide, from this file (tools/scripts/review/run-ladder.ts).
     #
     # The index is the workspace's own, which is the reviewed head here and
     # the case head in a golden replay (ADR 0102).
@@ -298,7 +298,7 @@ runs:
       run: |
         FACTS="$RUNNER_TEMP/run-facts.json"
         echo "facts_file=$FACTS" >> "$GITHUB_OUTPUT"
-        node "$TOOLING/tools/scripts/review/read-transcript-facts.mjs" "${EXECUTION_FILE:-}" \
+        node "$TOOLING/tools/scripts/review/read-transcript-facts.ts" "${EXECUTION_FILE:-}" \
           --index CODING_STANDARDS.md --out "$FACTS"
 
     # The script, not the model, decides whether the report stands. The
@@ -320,7 +320,7 @@ runs:
       id: validate
       shell: bash
       env:
-        VALIDATOR: ${{ inputs.tooling-dir }}/tools/scripts/review/validate-review-report.mjs
+        VALIDATOR: ${{ inputs.tooling-dir }}/tools/scripts/review/validate-review-report.ts
         FACTS: ${{ steps.facts.outputs.facts_file }}
       run: |
         set +e

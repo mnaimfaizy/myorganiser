@@ -12,9 +12,11 @@ import {
   targetTierLabel,
   threadsToResolve,
 } from './publish.ts';
+import type { PublishableReport } from './publish.ts';
+import type { NormalizedFinding, ReviewTierLabel, Verdict } from './schema.ts';
 import { REPORT_SCHEMA_VERSION } from './schema.ts';
 
-const finding = (over = {}) => ({
+const finding = (over: Partial<NormalizedFinding> = {}): NormalizedFinding => ({
   id: 'abc123def456',
   axis: 'standards',
   severity: 'blocking',
@@ -38,13 +40,13 @@ const finding = (over = {}) => ({
 });
 
 const normalized = (
-  findings,
-  verdict = 'request-changes',
-  effectiveTier = 'review:agent',
-) => ({ verdict, effectiveTier, findings });
+  findings: NormalizedFinding[],
+  verdict: Verdict = 'request-changes',
+  effectiveTier: ReviewTierLabel | null = 'review:agent',
+): PublishableReport => ({ verdict, effectiveTier, findings });
 
 const ctx = {
-  tier: 'review:agent',
+  tier: 'review:agent' as ReviewTierLabel,
   headSha: 'a'.repeat(40),
   runUrl: 'https://example.test/run/1',
   currentLabels: ['tooling', 'review:agent'],
@@ -79,7 +81,11 @@ test('a blocking verdict targets human; otherwise the effective tier; no tier st
     targetTierLabel({ tier: null, effectiveTier: null, verdict: 'approve' }),
     null,
   );
-  assert.throws(() => targetTierLabel({ verdict: 'lgtm' }), /unknown verdict/);
+  // A verdict outside the contract's enum is the point of this one.
+  assert.throws(
+    () => targetTierLabel({ verdict: 'lgtm' as Verdict }),
+    /unknown verdict/,
+  );
 });
 
 test('relabel adds the target and removes the other review labels, or does nothing', () => {

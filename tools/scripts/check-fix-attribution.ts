@@ -13,9 +13,9 @@
 // (ADR 0085).
 //
 // This check **asks the measurement** rather than restating it: whether the
-// Pull Request is a fix is `pullRequestType` from measure-escaped-defects.mjs,
+// Pull Request is a fix is `pullRequestType` from measure-escaped-defects.ts,
 // and whether its commits attribute the defect is `attributeFix` from
-// escaped-defects.mjs, over the same `%s%n%b` text the measurement reads. A
+// escaped-defects.ts, over the same `%s%n%b` text the measurement reads. A
 // copy of either would agree on the examples in a test and drift on
 // everything else (ADR 0076 item 4) — and a gate that passed a line the
 // measurement cannot read would be satisfied while the rate stayed empty.

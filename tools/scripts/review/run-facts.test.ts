@@ -22,6 +22,7 @@ import {
   UNKNOWN_MODEL,
   normalizeReport,
 } from './schema.ts';
+import type { NormalizedReport } from './schema.ts';
 import { readTranscriptFacts } from './transcript-facts.ts';
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12';
@@ -98,7 +99,7 @@ const unknownFacts = (overrides = {}) =>
     ...overrides,
   });
 
-const fixtureFacts = (name) =>
+const fixtureFacts = (name: string) =>
   readTranscriptFacts(
     readFileSync(
       new URL(`./fixtures/transcripts/${name}.json`, import.meta.url),
@@ -142,7 +143,7 @@ test('with facts, the run fields are the transcripts and not the reviewers', () 
   assert.equal(report.durationMs, 112403);
   assert.equal(report.model, 'claude-sonnet-5-5');
   assert.equal(report.runFactsFrom, 'transcript');
-  assert.equal(report.runFacts.cliVersion, '2.1.293');
+  assert.equal(report.runFacts!.cliVersion, '2.1.293');
   assert.ok(NormalizedReportSchema.safeParse(report).success);
 });
 
@@ -172,8 +173,8 @@ test('unknown facts are recorded as unknown, never as the reviewers claim', () =
   assert.equal(report.executed, null);
   assert.equal(report.durationMs, null);
   assert.equal(report.model, UNKNOWN_MODEL);
-  assert.equal(report.runFacts.shape, 'unknown');
-  assert.equal(report.runFacts.axes, null);
+  assert.equal(report.runFacts!.shape, 'unknown');
+  assert.equal(report.runFacts!.axes, null);
   assert.ok(NormalizedReportSchema.safeParse(report).success);
 });
 
@@ -214,8 +215,11 @@ test('findings under a transcript that shows no dispatch make the shape unknown'
   const withFinding = normalizeReport(envelope({ findings: [finding()] }), {
     facts: noDispatch,
   });
-  assert.equal(withFinding.runFacts.shape, 'unknown');
-  assert.match(withFinding.runFacts.shapeReason, /shows no sub-agent dispatch/);
+  assert.equal(withFinding.runFacts!.shape, 'unknown');
+  assert.match(
+    withFinding.runFacts!.shapeReason!,
+    /shows no sub-agent dispatch/,
+  );
   assert.equal(withFinding.standardsSources, null);
 
   // So does a report that names a standards source: the list is not
@@ -223,15 +227,15 @@ test('findings under a transcript that shows no dispatch make the shape unknown'
   // that renamed the dispatch tool would otherwise publish "none opened" on
   // every clean pull request.
   const namesASource = normalizeReport(envelope(), { facts: noDispatch });
-  assert.equal(namesASource.runFacts.shape, 'unknown');
-  assert.match(namesASource.runFacts.shapeReason, /names 3 standards source/);
+  assert.equal(namesASource.runFacts!.shape, 'unknown');
+  assert.match(namesASource.runFacts!.shapeReason!, /names 3 standards source/);
 
   // No findings, no source named, and no dispatch is a reviewer that
   // dispatched nothing: a fact, and a readable one.
   const clean = normalizeReport(envelope({ standardsSources: [] }), {
     facts: noDispatch,
   });
-  assert.equal(clean.runFacts.shape, 'readable');
+  assert.equal(clean.runFacts!.shape, 'readable');
   assert.deepEqual(clean.standardsSources, []);
 
   // An obligation finding is the main agent's own and proves no dispatch.
@@ -247,7 +251,7 @@ test('findings under a transcript that shows no dispatch make the shape unknown'
     }),
     { facts: noDispatch },
   );
-  assert.equal(obligation.runFacts.shape, 'readable');
+  assert.equal(obligation.runFacts!.shape, 'readable');
 });
 
 test('facts change no finding and no verdict, whatever they cost', () => {
@@ -283,7 +287,7 @@ test('a report normalized before run facts existed still parses as a previous re
 
 // --- what the comment says --------------------------------------------------
 
-const lines = (report) => renderRunFacts(report).join('\n');
+const lines = (report: NormalizedReport) => renderRunFacts(report).join('\n');
 
 test('a transcript-read report lists what was opened, with the harness note', () => {
   const text = lines(normalizeReport(envelope(), { facts: facts() }));
@@ -427,7 +431,7 @@ test('a path cannot end its own code span', () => {
 
 // --- the two commands -------------------------------------------------------
 
-const run = (script, args) =>
+const run = (script: string, args: readonly string[]) =>
   spawnSync('node', [`tools/scripts/review/${script}`, ...args], {
     encoding: 'utf8',
   });

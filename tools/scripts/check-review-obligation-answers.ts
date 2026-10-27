@@ -16,7 +16,7 @@
 //   selected, unanswered -> the forcing function is too weak.
 //   answered, no finding -> a capability limit, and now known to be one.
 //
-// It sits in tools/scripts/ rather than beside obligations.mjs because
+// It sits in tools/scripts/ rather than beside obligations.ts because
 // gates:coverage:check discovers checkers with a NON-RECURSIVE scan of that
 // directory (tools/scripts/lib/gate-coverage.ts). A check-*.mjs in a
 // subdirectory is invisible to the Meta-Gate: it would look wired forever,
@@ -63,7 +63,9 @@ import { writeFileSync } from 'node:fs';
 import { ZodError } from 'zod';
 
 import { errorMessage } from './lib/error-message.ts';
+import type { Bail } from './review/cli.ts';
 import { cannotRun, isMain, parseArgs, readJsonOr } from './review/cli.ts';
+import type { AnswerWorklist, CitationFailure } from './review/obligations.ts';
 import {
   AnswerSheetSchema,
   checkAnswers,
@@ -117,32 +119,25 @@ const gitHasCommit = (head: string) => {
   }
 };
 
-/** One failed quotation, as `checkAnswers` reports it. */
-export interface CitationFailure {
-  key: string;
-  field: string;
-  reason: string;
-  cited: { file: string; line: number; text?: string };
-  lineCount?: number;
-  actual?: string;
-}
-
 /** One line per failed quotation, naming what was claimed and what is there. */
 export const citationLine = (f: CitationFailure) => {
   const at = `${f.key} field ${f.field}`;
+  // `uncited` is the one reason with no quotation behind it, which is why it
+  // is the one reason that reads nothing off `cited`.
+  if (f.reason === 'uncited')
+    return `review-obligations-check: ${at} claims something about source and quotes no line`;
+  const cited = f.cited!;
   switch (f.reason) {
-    case 'uncited':
-      return `review-obligations-check: ${at} claims something about source and quotes no line`;
     case 'quotes-nothing':
-      return `review-obligations-check: ${at} cites ${f.cited.file}:${f.cited.line} and quotes nothing but whitespace`;
+      return `review-obligations-check: ${at} cites ${cited.file}:${cited.line} and quotes nothing but whitespace`;
     case 'file-not-found':
-      return `review-obligations-check: ${at} cites ${f.cited.file}, which is not in the tree at head`;
+      return `review-obligations-check: ${at} cites ${cited.file}, which is not in the tree at head`;
     case 'line-out-of-range':
-      return `review-obligations-check: ${at} cites ${f.cited.file}:${f.cited.line}, and that file has ${f.lineCount} line(s) at head`;
+      return `review-obligations-check: ${at} cites ${cited.file}:${cited.line}, and that file has ${f.lineCount} line(s) at head`;
     default:
       return (
-        `review-obligations-check: ${at} quotes ${JSON.stringify(f.cited.text)} ` +
-        `at ${f.cited.file}:${f.cited.line}, where head has ${JSON.stringify(f.actual)}`
+        `review-obligations-check: ${at} quotes ${JSON.stringify(cited.text)} ` +
+        `at ${cited.file}:${cited.line}, where head has ${JSON.stringify(f.actual)}`
       );
   }
 };
@@ -157,23 +152,18 @@ export const main = (
     hasHead?: (head: string) => boolean;
   } = {},
 ) => {
-  // `cannotRun` exits the process; cli.mjs is still JavaScript, so its arrow
-  // infers `void` and nothing downstream would narrow without saying so here.
-  const bail: (msg: string) => never = cannotRun(
-    'review-obligations-check',
-  ) as (msg: string) => never;
-  const { positional, flags } = parseArgs(argv) as {
-    positional: string[];
-    flags: Record<string, string | null>;
-  };
+  // `cannotRun` exits the process; the annotation is what lets the guards
+  // below read as the narrowing they already are.
+  const bail: Bail = cannotRun('review-obligations-check');
+  const { positional, flags } = parseArgs(argv);
   const [worklistPath, answersPath] = positional;
   if (!worklistPath || !answersPath) bail(USAGE);
   if ('out' in flags && !flags.out) bail('--out needs a path');
 
   if ('report' in flags && !flags.report) bail('--report needs a path');
 
-  const worklist = readJsonOr(worklistPath, bail);
-  if (!Array.isArray(worklist?.selected))
+  const worklist = readJsonOr(worklistPath, bail) as AnswerWorklist | null;
+  if (!worklist || !Array.isArray(worklist.selected))
     bail(`${worklistPath}: not an obligation worklist`);
 
   // The report the reviewer wrote, when it wrote one. Supplying it is what
@@ -184,8 +174,10 @@ export const main = (
   // contradiction records which of the two it was read from.
   let findings: object[] | undefined;
   if (flags.report) {
-    const envelope = readJsonOr(flags.report, bail);
-    if (!Array.isArray(envelope?.findings))
+    const envelope = readJsonOr(flags.report, bail) as {
+      findings?: unknown;
+    } | null;
+    if (!envelope || !Array.isArray(envelope.findings))
       bail(`${flags.report}: not a review report`);
     findings = envelope.findings;
   }
@@ -209,9 +201,7 @@ export const main = (
 
   // Only when something is going to be read: a worklist that cites nothing
   // never resolves the head, so it is not refused for one.
-  const cites = worklist.selected.some(
-    (o: { citedFields?: unknown[] }) => o.citedFields?.length,
-  );
+  const cites = worklist.selected.some((o) => o.citedFields?.length);
   if (cites && !hasHead(worklist.head))
     bail(
       `${worklistPath}: head ${worklist.head} is not a commit in this clone, so no quotation could be compared to anything`,
@@ -257,10 +247,7 @@ export const main = (
           ? ` (no finding with ruleId ${obligationRuleId(c.id)} in the report)`
           : ' (the sheet declared none; no report was supplied to check against)'),
     );
-  // obligations.mjs is still JavaScript, so its failures arrive untyped at
-  // this boundary; `citationLine` is what gives each reason its shape.
-  for (const f of report.citationFailures)
-    console.error(citationLine(f as CitationFailure));
+  for (const f of report.citationFailures) console.error(citationLine(f));
   if (report.contradictions.length || report.citationFailures.length)
     process.exit(1);
 };

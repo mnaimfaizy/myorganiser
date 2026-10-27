@@ -16,16 +16,14 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const SCRIPT = fileURLToPath(
-  new URL('./run-from-tooling.ts', import.meta.url),
-);
+const SCRIPT = fileURLToPath(new URL('./run-from-tooling.ts', import.meta.url));
 const REPO = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
 const REPO_GIT_DIR = execFileSync('git', ['rev-parse', '--absolute-git-dir'], {
   cwd: REPO,
   encoding: 'utf8',
 }).trim();
 
-const scratch = [];
+const scratch: string[] = [];
 after(() => {
   for (const dir of scratch) rmSync(dir, { recursive: true, force: true });
 });
@@ -56,13 +54,13 @@ const toolingCopy = () => {
   return { root, copy };
 };
 
-const run = (script, args, cwd) =>
+const run = (script: string, args: readonly string[], cwd: string) =>
   spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8' });
 
 test('no script argument is a usage error, exit 2', () => {
   const r = run(SCRIPT, [], REPO);
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /usage: run-from-tooling\.mjs <script>/);
+  assert.match(r.stderr, /usage: run-from-tooling\.ts <script>/);
 });
 
 test('a caller outside any git repository is refused, exit 2', () => {

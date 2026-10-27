@@ -8,7 +8,7 @@ accepted
 
 The Spec axis of `/code-review` checks a diff against the issue that asked for it
 ([ADR 0071](0071-a-finding-blocks-only-on-evidence-and-a-verdict-is-computed-never-written.md)).
-`tools/scripts/review/resolve-spec.mjs` finds that issue in a fixed order — the branch name
+`tools/scripts/review/resolve-spec.ts` finds that issue in a fixed order — the branch name
 `<type>/<issue>-<slug>`, then the first issue reference in a commit
 ([ADR 0076](0076-an-agent-branch-carries-its-issue-in-its-first-commit.md)) — and stops at the first
 one it finds.

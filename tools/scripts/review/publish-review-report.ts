@@ -35,7 +35,54 @@ import {
   parseArgs,
   readJsonOr,
 } from './cli.ts';
+import type { ExistingComment, OpenThread } from './publish.ts';
 import { STALE_MARKER, planPublication } from './publish.ts';
+import type { NormalizedReport, ReviewTierLabel } from './schema.ts';
+
+/** The Pull Request every query here is about. */
+interface PullRequestTarget {
+  owner: string;
+  name: string;
+  number: number;
+}
+
+/** One page of a GraphQL connection. */
+interface GraphqlConnection<T> {
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  nodes: T[];
+}
+
+interface CommentNode {
+  id: string;
+  body?: string | null;
+  isMinimized?: boolean;
+}
+interface ThreadCommentNode {
+  body?: string | null;
+  databaseId?: number;
+}
+interface ThreadNode {
+  id: string;
+  isResolved: boolean;
+  comments: { nodes: ThreadCommentNode[] };
+}
+interface CommentsData {
+  repository: { pullRequest: { comments: GraphqlConnection<CommentNode> } };
+}
+interface ThreadsData {
+  repository: {
+    pullRequest: { reviewThreads: GraphqlConnection<ThreadNode> };
+  };
+}
+
+/**
+ * An open thread, plus what the stale-reply fallback needs: the id of the
+ * comment a reply goes under, and whether one is already there.
+ */
+interface PublisherThread extends OpenThread {
+  firstCommentId?: number;
+  alreadyNotified: boolean;
+}
 
 const THREADS_QUERY = `
   query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -65,11 +112,18 @@ const MINIMIZE = `
   mutation($id: ID!) { minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) { minimizedComment { isMinimized } } }`;
 
 /** Walks one GraphQL connection on the pull request to the end. */
-const paginate = (query, pick, { owner, name, number }) => {
-  const nodes = [];
-  let after = null;
+const paginate = <T>(
+  query: string,
+  pick: (data: unknown) => GraphqlConnection<T>,
+  { owner, name, number }: PullRequestTarget,
+): T[] => {
+  const nodes: T[] = [];
+  let after: string | null = null;
   for (;;) {
-    const page = pick(graphql(query, { owner, name, number, after }).data);
+    const page = pick(
+      (graphql(query, { owner, name, number, after }) as { data: unknown })
+        .data,
+    );
     nodes.push(...page.nodes);
     if (!page.pageInfo.hasNextPage) break;
     after = page.pageInfo.endCursor;
@@ -77,13 +131,23 @@ const paginate = (query, pick, { owner, name, number }) => {
   return nodes;
 };
 
-const pullRequestCommentsOf = (pr) =>
-  paginate(COMMENTS_QUERY, (d) => d.repository.pullRequest.comments, pr).map(
-    (c) => ({ nodeId: c.id, body: c.body ?? '', minimized: c.isMinimized }),
-  );
+const pullRequestCommentsOf = (pr: PullRequestTarget): ExistingComment[] =>
+  paginate<CommentNode>(
+    COMMENTS_QUERY,
+    (d) => (d as CommentsData).repository.pullRequest.comments,
+    pr,
+  ).map((c) => ({
+    nodeId: c.id,
+    body: c.body ?? '',
+    minimized: c.isMinimized,
+  }));
 
-const openThreadsOf = (pr) =>
-  paginate(THREADS_QUERY, (d) => d.repository.pullRequest.reviewThreads, pr)
+const openThreadsOf = (pr: PullRequestTarget): PublisherThread[] =>
+  paginate<ThreadNode>(
+    THREADS_QUERY,
+    (d) => (d as ThreadsData).repository.pullRequest.reviewThreads,
+    pr,
+  )
     .filter((t) => !t.isResolved)
     .map((t) => ({
       id: t.id,
@@ -97,20 +161,23 @@ const openThreadsOf = (pr) =>
       ),
     }));
 
-export const main = (argv) => {
+export const main = (argv: string[]): void => {
   const bail = cannotRun('review-publish');
   const { flags } = parseArgs(argv);
   for (const k of ['pr', 'repo', 'head', 'run-url'])
     if (!flags[k]) bail(`--${k} is required`);
   const dryRun = 'dry-run' in flags;
-  const repo = flags.repo;
+  // The loop above exits unless all four are present.
+  const repo = flags.repo!;
   const [owner, name] = repo.split('/');
-  const pr = flags.pr;
+  const pr = flags.pr!;
+  const headSha = flags.head!;
+  const runUrl = flags['run-url']!;
   const number = Number(pr);
 
-  let normalized;
-  let rendered;
-  let rejectedReason;
+  let normalized: NormalizedReport | undefined;
+  let rendered: string | undefined;
+  let rejectedReason: string | undefined;
   if (flags.rejected) {
     rejectedReason =
       readFileSync(flags.rejected, 'utf8') || '(no reason recorded)';
@@ -119,11 +186,19 @@ export const main = (argv) => {
       bail(
         '--normalized and --rendered are required unless --rejected is given',
       );
-    normalized = readJsonOr(flags.normalized, bail);
-    rendered = readFileSync(flags.rendered, 'utf8');
+    normalized = readJsonOr(flags.normalized!, bail) as NormalizedReport;
+    rendered = readFileSync(flags.rendered!, 'utf8');
   }
 
-  const prView = ghJson(['pr', 'view', pr, '--repo', repo, '--json', 'labels']);
+  const prView = ghJson([
+    'pr',
+    'view',
+    pr,
+    '--repo',
+    repo,
+    '--json',
+    'labels',
+  ]) as { labels: { name: string }[] };
   const currentLabels = prView.labels.map((l) => l.name);
   const existingComments = pullRequestCommentsOf({ owner, name, number });
   const openThreads = openThreadsOf({ owner, name, number });
@@ -132,17 +207,17 @@ export const main = (argv) => {
     normalized,
     rendered,
     rejectedReason,
-    tier: flags.tier ?? null,
-    headSha: flags.head,
-    runUrl: flags['run-url'],
+    tier: (flags.tier as ReviewTierLabel | null) ?? null,
+    headSha,
+    runUrl,
     currentLabels,
     existingComments,
     openThreads,
   });
 
-  const say = (msg) =>
+  const say = (msg: string) =>
     console.log(`review-publish: ${dryRun ? '[dry-run] ' : ''}${msg}`);
-  const act = (description, fn) => {
+  const act = <T>(description: string, fn: () => T): T | null => {
     if (dryRun) {
       say(`would ${description}`);
       return null;
@@ -153,8 +228,12 @@ export const main = (argv) => {
   };
   // After the summary is up, nothing else may abort the run: a refused
   // thread resolution or relabel is reported and the verdict still stands.
-  const warnings = [];
-  const tryAct = (description, fn, fallback) => {
+  const warnings: string[] = [];
+  const tryAct = <T>(
+    description: string,
+    fn: () => T,
+    fallback?: () => unknown,
+  ): T | null => {
     try {
       return act(description, fn);
     } catch (err) {
@@ -216,7 +295,7 @@ export const main = (argv) => {
             '-',
           ],
           JSON.stringify({
-            commit_id: flags.head,
+            commit_id: headSha,
             event: 'COMMENT',
             body: '',
             comments,
@@ -239,7 +318,7 @@ export const main = (argv) => {
                 '--input',
                 '-',
               ],
-              JSON.stringify({ commit_id: flags.head, ...c }),
+              JSON.stringify({ commit_id: headSha, ...c }),
             );
             posted += 1;
           } catch (inner) {
@@ -277,14 +356,14 @@ export const main = (argv) => {
             '-',
           ],
           JSON.stringify({
-            body: `${STALE_MARKER}\nNo longer reported as of \`${flags.head.slice(0, 7)}\`; this thread can be resolved.`,
+            body: `${STALE_MARKER}\nNo longer reported as of \`${headSha.slice(0, 7)}\`; this thread can be resolved.`,
           }),
         ),
     );
   }
 
   if (plan.relabel) {
-    const args = ['pr', 'edit', pr, '--repo', repo];
+    const args: string[] = ['pr', 'edit', pr, '--repo', repo];
     for (const l of plan.relabel.add) args.push('--add-label', l);
     for (const l of plan.relabel.remove) args.push('--remove-label', l);
     tryAct(`relabel: +${plan.relabel.add} -${plan.relabel.remove}`, () =>

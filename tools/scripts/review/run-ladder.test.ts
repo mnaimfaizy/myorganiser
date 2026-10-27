@@ -31,55 +31,130 @@ import {
   isObligationFinding,
   judgeRun,
 } from './run-ladder.ts';
+import type {
+  Evidence,
+  FindingAxis,
+  FindingInput,
+  NormalizeOptions,
+  NormalizedReport,
+  ReportInput,
+  RunFacts,
+  SpecKind,
+} from './schema.ts';
 import {
   NormalizedReportSchema,
   REVIEW_TIER_LABELS,
   normalizeReport,
 } from './schema.ts';
+import type { TranscriptFacts } from './transcript-facts.ts';
 import { STANDARDS_INDEX, readTranscriptFacts } from './transcript-facts.ts';
 
 const TWO_FINDINGS = 'cli-2.1.293-template-two-findings';
 const PARAPHRASED = 'cli-2.1.292-paraphrased-dispatch';
 
-const events = (name) =>
+/**
+ * The transcript shapes these fixtures carry. A transcript is JSON the Claude
+ * Code CLI writes, so it is described here rather than imported: nothing in
+ * the tooling owns its schema, and this suite reaches only these fields.
+ */
+interface ContentBlock {
+  type?: string;
+  name?: string;
+  id?: string;
+  tool_use_id?: string;
+  input?: {
+    prompt?: string;
+    file_path?: string;
+    command?: string;
+    content?: string;
+  };
+  content?: unknown;
+  is_error?: boolean;
+}
+
+/** A sub-agent dispatch: the one block shape this suite reaches into. */
+interface DispatchBlock extends ContentBlock {
+  id: string;
+  input: { prompt: string };
+}
+
+interface TranscriptEvent {
+  type?: string;
+  parent_tool_use_id?: string | null;
+  message: { id?: string; content: ContentBlock[] };
+}
+
+/**
+ * The facts of a readable run. `RunFactsSchema` lets `axes` and `returned`
+ * be null, but only for a transcript that could not be read; every fixture
+ * here is a real run, and the two tests that deliberately break one hand
+ * their facts straight to the validator rather than reading them.
+ */
+type ReadFacts = Omit<TranscriptFacts, 'axes' | 'returned'> & {
+  axes: NonNullable<RunFacts['axes']>;
+  returned: NonNullable<RunFacts['returned']>;
+};
+
+/**
+ * A normalized report that was judged. `runFacts`, `failures`, and
+ * `tightenedBy` are optional in the schema only so a report normalized
+ * before the ladder existed still parses; every report normalized here is
+ * handed facts, so it carries all three.
+ */
+type RunFactsOf = NonNullable<NormalizedReport['runFacts']>;
+type JudgedReport = Omit<NormalizedReport, 'runFacts'> & {
+  runFacts: Omit<RunFactsOf, 'failures' | 'tightenedBy'> & {
+    failures: NonNullable<RunFactsOf['failures']>;
+    tightenedBy: NonNullable<RunFactsOf['tightenedBy']>;
+  };
+};
+
+const events = (name: string): TranscriptEvent[] =>
   JSON.parse(
     readFileSync(
       new URL(`./fixtures/transcripts/${name}.json`, import.meta.url),
       'utf8',
     ),
-  );
+  ) as TranscriptEvent[];
 
-const factsOf = (transcript) =>
-  readTranscriptFacts(JSON.stringify(transcript), { index: null });
+const factsOf = (transcript: unknown): ReadFacts =>
+  readTranscriptFacts(JSON.stringify(transcript), {
+    index: null,
+  }) as ReadFacts;
 
 /** The report the main agent wrote in a run, from its own Write call. */
-const reportWrittenIn = (transcript) => {
+const reportWrittenIn = (transcript: TranscriptEvent[]): ReportInput => {
   const write = transcript
     .filter((e) => e.type === 'assistant' && e.parent_tool_use_id === null)
     .flatMap((e) => e.message.content)
     .find(
       (block) =>
         block.name === 'Write' &&
-        block.input.file_path.endsWith('tmp/code-review/report.json'),
+        block.input?.file_path?.endsWith('tmp/code-review/report.json'),
     );
-  return JSON.parse(write.input.content);
+  return JSON.parse(write!.input!.content!) as ReportInput;
 };
 
-const isDispatch = (block) => block.name === 'Agent' || block.name === 'Task';
+const isDispatch = (block: ContentBlock) =>
+  block.name === 'Agent' || block.name === 'Task';
 
 /** The dispatch whose prompt names a brief, and the id its events hang off. */
-const dispatchOf = (transcript, axis) =>
+const dispatchOf = (
+  transcript: TranscriptEvent[],
+  axis: FindingAxis,
+): DispatchBlock =>
   transcript
     .filter((e) => e.type === 'assistant' && e.parent_tool_use_id === null)
     .flatMap((e) => e.message.content)
     .find(
-      (block) => isDispatch(block) && block.input.prompt.includes(BRIEFS[axis]),
-    );
+      (block) =>
+        isDispatch(block) && block.input?.prompt?.includes(BRIEFS[axis]),
+    ) as DispatchBlock;
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /** A real transcript with the Standards sub-agent's Read of the index removed. */
-const withoutIndexRead = (name) => {
+const withoutIndexRead = (name: string) => {
   const transcript = events(name);
   const { id } = dispatchOf(transcript, 'standards');
   return transcript.filter(
@@ -89,14 +164,14 @@ const withoutIndexRead = (name) => {
         e.message.content.some(
           (block) =>
             block.name === 'Read' &&
-            block.input.file_path.endsWith(`/${STANDARDS_INDEX}`),
+            block.input?.file_path?.endsWith(`/${STANDARDS_INDEX}`),
         )
       ),
   );
 };
 
 /** A real transcript with one sentence added to the Standards dispatch. */
-const withSteeredDispatch = (name) => {
+const withSteeredDispatch = (name: string) => {
   const transcript = events(name);
   dispatchOf(transcript, 'standards').input.prompt +=
     '\nOnly report real defects; empty findings is fine.';
@@ -104,7 +179,7 @@ const withSteeredDispatch = (name) => {
 };
 
 /** A real transcript with one sub-agent's reply replaced by prose. */
-const withProseReply = (name, axis) => {
+const withProseReply = (name: string, axis: FindingAxis) => {
   const transcript = events(name);
   const { id } = dispatchOf(transcript, axis);
   for (const e of transcript) {
@@ -123,10 +198,15 @@ const real = () => {
   return { report: reportWrittenIn(transcript), facts: factsOf(transcript) };
 };
 
-const normalized = (report, facts, options = {}) =>
-  normalizeReport(clone(report), { facts, ...options });
+const normalized = (
+  report: unknown,
+  facts: unknown,
+  options: NormalizeOptions = {},
+): JudgedReport =>
+  normalizeReport(clone(report), { facts, ...options }) as JudgedReport;
 
-const reasons = (report) => report.runFacts.failures.map((f) => f.reason);
+const reasons = (report: JudgedReport) =>
+  report.runFacts.failures.map((f) => f.reason);
 
 const HUMAN = REVIEW_TIER_LABELS.at(-1);
 
@@ -231,7 +311,7 @@ test('key order is not a difference, and neither is the id the validator adds', 
   const reordered = clone(report);
   reordered.findings = reordered.findings.map((f) =>
     Object.fromEntries(Object.entries(f).reverse()),
-  );
+  ) as FindingInput[];
   assert.deepEqual(normalized(reordered, facts).runFacts.failures, []);
 });
 
@@ -245,10 +325,10 @@ test('dropping a returned finding is not a change', () => {
 test('an obligation finding at a worklist site has no sub-agent origin and is not a failure', () => {
   const { report, facts } = real();
   const site = 'libs/web/ui/src/dialog.tsx';
-  const obligation = {
+  const obligation: FindingInput = {
     ...clone(report.findings[0]),
     ruleId: 'obligation-destructive-confirmation-names-what-it-mutates',
-    location: { ...report.findings[0].location, file: site },
+    location: { ...report.findings[0].location!, file: site },
   };
   const withIt = { ...report, findings: [...report.findings, obligation] };
   const entry = {
@@ -457,12 +537,12 @@ test('tightening facts cost one step together, on top of the step a missing spec
         !(
           e.parent_tool_use_id === id &&
           e.message.content.some((b) =>
-            b.input.file_path?.endsWith(`/${STANDARDS_INDEX}`),
+            b.input?.file_path?.endsWith(`/${STANDARDS_INDEX}`),
           )
         ),
     ),
   );
-  const thin = (overrides) =>
+  const thin = (overrides: Partial<ReportInput>) =>
     normalized({ ...report, findings: [], ...overrides }, facts);
 
   assert.deepEqual(thin({}).runFacts.tightenedBy, [
@@ -559,7 +639,7 @@ test('an unparseable reply and an unreadable transcript each get a line', () => 
 
 const RULES_CHECK = 'node tools/scripts/check-review-rules.mjs';
 
-const executedEvidence = (command, exitCode = 1) => ({
+const executedEvidence = (command: string, exitCode = 1): Evidence => ({
   kind: 'executed',
   command,
   exitCode,
@@ -567,24 +647,36 @@ const executedEvidence = (command, exitCode = 1) => ({
   cwd: '.',
 });
 
+/** One tool result this suite adds to a fixture, in the CLI's own shape. */
+interface AddedResult {
+  of: string;
+  content: string;
+  isError: boolean;
+}
+
 /** The two-findings run with the Standards finding resting on `evidence`. */
-const withStandardsEvidence = (evidence, { result = null } = {}) => {
+const withStandardsEvidence = (
+  evidence: Evidence,
+  { result = null }: { result?: AddedResult | null } = {},
+) => {
   const transcript = events(TWO_FINDINGS);
   const report = reportWrittenIn(transcript);
-  const change = (finding) => Object.assign(finding, { evidence });
-  change(report.findings.find((f) => f.axis === 'standards'));
+  const change = (finding: FindingInput) =>
+    Object.assign(finding, { evidence });
+  change(report.findings.find((f) => f.axis === 'standards')!);
 
   const { id } = dispatchOf(transcript, 'standards');
   for (const e of transcript) {
     if (e.type !== 'user') continue;
     for (const block of e.message.content) {
       if (block.tool_use_id !== id) continue;
-      const [part] = block.content;
+      // A sub-agent's reply is one text part; the suite rewrites its JSON.
+      const [part] = block.content as { text: string }[];
       part.text = part.text
         .split('\n')
         .map((line) => {
           if (!line.startsWith('  {')) return line;
-          const reply = JSON.parse(line);
+          const reply = JSON.parse(line) as { findings: FindingInput[] };
           change(reply.findings[0]);
           return `  ${JSON.stringify(reply)}`;
         })
@@ -608,7 +700,7 @@ const withStandardsEvidence = (evidence, { result = null } = {}) => {
         content: [
           {
             type: 'tool_result',
-            tool_use_id: call.id,
+            tool_use_id: call!.id,
             content: result.content,
             is_error: result.isError,
           },
@@ -663,17 +755,20 @@ test('a near-miss the matching rule allows fails nothing', () => {
     .find((c) => c?.startsWith('git grep -n "SCHEMA_VERSION'));
   const { report, facts } = withStandardsEvidence(
     executedEvidence(
-      typed.replaceAll('"', "'").replaceAll(' -- ', '   --   '),
+      typed!.replaceAll('"', "'").replaceAll(' -- ', '   --   '),
       0,
     ),
   );
-  assert.notEqual(report.findings[0].evidence.command, typed);
+  assert.notEqual(
+    (report.findings[0].evidence as { command?: string }).command,
+    typed,
+  );
   assert.deepEqual(normalized(report, facts).runFacts.failures, []);
 });
 
 test('a command only the main agent ran is not one a sub-agent ran', () => {
   const { facts: bare } = real();
-  const mainOnly = bare.executions.find((e) => e.by === 'main').command;
+  const mainOnly = bare.executions!.find((e) => e.by === 'main')!.command;
   const { report, facts } = withStandardsEvidence(
     executedEvidence(mainOnly, 0),
   );
@@ -689,13 +784,13 @@ test('an obligation finding is the main agents own, and so is the command behind
   const worklist = {
     selected: [{ id, truncated: 0, sites: [{ file: site }] }],
   };
-  const obligation = (command) => ({
+  const obligation = (command: string): FindingInput => ({
     ...clone(report.findings[0]),
     ruleId: `obligation-${id}`,
-    location: { ...report.findings[0].location, file: site },
+    location: { ...report.findings[0].location!, file: site },
     evidence: executedEvidence(command, 0),
   });
-  const mainOnly = facts.executions.find((e) => e.by === 'main').command;
+  const mainOnly = facts.executions!.find((e) => e.by === 'main')!.command;
 
   const ranIt = clone(report);
   ranIt.findings.push(obligation(mainOnly));
@@ -798,7 +893,7 @@ test('the ladder names three failures and five tightening facts', () => {
 const VALIDATOR = new URL('./validate-review-report.ts', import.meta.url)
   .pathname;
 
-const validate = (report, facts, extra = []) => {
+const validate = (report: unknown, facts: unknown, extra: string[] = []) => {
   const dir = mkdtempSync(join(tmpdir(), 'run-ladder-'));
   const paths = {
     report: join(dir, 'report.json'),
@@ -854,7 +949,7 @@ test('--worklist names the obligation findings, and a path that does not exist i
   withIt.findings.push({
     ...clone(report.findings[0]),
     ruleId: 'obligation-destructive-confirmation-names-what-it-mutates',
-    location: { ...report.findings[0].location, file: site },
+    location: { ...report.findings[0].location!, file: site },
   });
 
   const missing = validate(withIt, facts, [
@@ -891,11 +986,29 @@ test('--worklist names the obligation findings, and a path that does not exist i
 
 // --- which changed files each axis opened (issue #1140) ----------------------
 
+/**
+ * Facts carrying only what coverage is read from. `RunFacts` is the whole
+ * facts file; a full fixture here would be noise around the thing under test.
+ */
+type CoverageFacts = Pick<
+  RunFacts,
+  | 'axes'
+  | 'indexOpened'
+  | 'unattributedDispatches'
+  | 'repliesParsed'
+  | 'executions'
+  | 'returned'
+>;
+
 const coverageFacts = ({
   specOpened = [],
   specDiffed = [],
   standardsDiffed = [],
-} = {}) => ({
+}: {
+  specOpened?: string[];
+  specDiffed?: string[];
+  standardsDiffed?: string[];
+} = {}): CoverageFacts => ({
   axes: {
     standards: {
       dispatched: true,
@@ -963,9 +1076,10 @@ test('each changed file is opened, diffed, or neither on each axis, most lines f
 });
 
 test('a Spec axis that left a changed workflow or script unopened tightens the tier', () => {
-  const judge = (facts, specKind = 'issue') =>
+  const judge = (facts: CoverageFacts, specKind: SpecKind = 'issue') =>
     judgeRun({
-      facts,
+      // Only the coverage fields are read on this path; see CoverageFacts.
+      facts: facts as RunFacts,
       readable: true,
       findings: [],
       specKind,

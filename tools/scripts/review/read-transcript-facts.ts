@@ -23,31 +23,38 @@
 // Exit 2 = the script could not run (bad arguments, or --out not writable).
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { errorMessage } from '../lib/error-message.ts';
+import type { Bail } from './cli.ts';
 import { cannotRun, isMain, parseArgs } from './cli.ts';
 import { readTranscriptFacts } from './transcript-facts.ts';
 
 const USAGE =
   'usage: read-transcript-facts.ts <execution-file> --out <run-facts.json> [--index <CODING_STANDARDS.md>]';
 
-const readOr = (path, fallback) => {
+function readOr(path: string | null | undefined, fallback: string): string;
+function readOr(
+  path: string | null | undefined,
+  fallback: string | null,
+): string | null;
+function readOr(path: string | null | undefined, fallback: string | null) {
   if (!path) return fallback;
   try {
     return readFileSync(path, 'utf8');
   } catch {
     return fallback;
   }
-};
+}
 
 // A reason is text derived from a file the reviewer's session wrote, so it is
 // escaped the way a workflow command's message is.
-const escapeMessage = (message) =>
+const escapeMessage = (message: string) =>
   message
     .replaceAll('%', '%25')
     .replaceAll('\r', '%0D')
     .replaceAll('\n', '%0A');
 
-export const main = (argv) => {
-  const bail = cannotRun('review-facts');
+export const main = (argv: string[]): void => {
+  const bail: Bail = cannotRun('review-facts');
   const { positional, flags } = parseArgs(argv);
   if (!flags.out) bail(USAGE);
   const [file] = positional;
@@ -63,18 +70,20 @@ export const main = (argv) => {
       `::error::${escapeMessage(`the reviewer transcript could not be read for run facts (Claude Code CLI ${cli}): ${facts.shapeReason}. The report's standards sources and executed commands are recorded as unknown, not as the reviewer's own claim. If this appears on every review, the transcript format changed under tools/scripts/review/transcript-facts.ts.`)}`,
     );
   } else {
-    const { standards, spec } = facts.axes;
+    // Every fact is stated when the shape is readable, which the branch
+    // above has already taken when it is not.
+    const { standards, spec } = facts.axes!;
     console.log(
-      `review-facts: Claude Code CLI ${facts.cliVersion}, ${facts.models.join(', ')}, ${facts.durationMs} ms; ` +
+      `review-facts: Claude Code CLI ${facts.cliVersion}, ${facts.models?.join(', ')}, ${facts.durationMs} ms; ` +
         `Standards ${standards.toolCalls} tool call(s), Spec ${spec.toolCalls}; ` +
-        `standards sources opened: ${facts.standardsSources.join(', ') || 'none'}`,
+        `standards sources opened: ${facts.standardsSources?.join(', ') || 'none'}`,
     );
   }
 
   try {
     writeFileSync(flags.out, `${JSON.stringify(facts, null, 2)}\n`);
   } catch (err) {
-    bail(`could not write ${flags.out}: ${err.message}`);
+    bail(`could not write ${flags.out}: ${errorMessage(err)}`);
   }
 };
 
