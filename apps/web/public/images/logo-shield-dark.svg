@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 244 52" fill="none" role="img" aria-label="MyOrganiser logo">
   <title>MyOrganiser</title>
   <!-- GENERATED FILE — do not edit. Produced by `yarn brand:logos:generate`
-       (tools/scripts/generate-brand-logos.mjs) from the AppLogo shield and the
+       (tools/scripts/generate-brand-logos.ts) from the AppLogo shield and the
        design-token build. -->
   <defs>
     <linearGradient id="shield-grad" x1="0" y1="0" x2="0" y2="1">
