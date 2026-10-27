@@ -99,6 +99,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # golden-tiers.ts below is TypeScript run by Node's type stripping
+      # (ADR 0135), which needs 22.18 — the runner image's own Node is not
+      # pinned to anything. Nothing is installed in this job; the version is
+      # for the language, not for the dependencies.
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
       # Which tiers this run replays (ADR 0072, ADR 0109).
       #
       # By hand: the tier asked for. On the schedule: golden-tiers.ts reads
@@ -660,6 +669,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # check-review-golden-results.ts below is TypeScript run by Node's type
+      # stripping (ADR 0135), which needs 22.18. It imports only Node
+      # built-ins, so this pins the language and still installs nothing.
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
 
       - name: Download every case run's result line
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8

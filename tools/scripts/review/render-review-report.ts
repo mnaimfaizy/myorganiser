@@ -87,11 +87,6 @@ export const formatTokens = (count: number): string => {
  */
 const codePath = (path: string) => `\`${path.replaceAll('`', '')}\``;
 
-const AXIS_NAMES = {
-  standards: 'Standards',
-  spec: 'Spec',
-} as const satisfies Record<FindingAxis, string>;
-
 const COVERAGE_ROWS = 25;
 
 /**
@@ -190,15 +185,15 @@ export const renderRunFacts = (report: NormalizedReport): string[] => {
     const a = facts.axes![axis];
     if (!a.briefRead)
       lines.push(
-        `- ${AXIS_NAMES[axis]} brief: **not read** — no sub-agent opened it${a.dispatched ? '' : ', and no dispatch named it'}`,
+        `- ${AXIS_TITLES[axis]} brief: **not read** — no sub-agent opened it${a.dispatched ? '' : ', and no dispatch named it'}`,
       );
     if (a.replyIsJson === false)
       lines.push(
-        `- ${AXIS_NAMES[axis]} reply: **not a bare JSON object** — it cannot be compared with the findings reported`,
+        `- ${AXIS_TITLES[axis]} reply: **not a bare JSON object** — it cannot be compared with the findings reported`,
       );
     if (a.dispatched && a.onTemplate === false)
       lines.push(
-        `- ${AXIS_NAMES[axis]} dispatch: **carried text beyond the skill's template**`,
+        `- ${AXIS_TITLES[axis]} dispatch: **carried text beyond the skill's template**`,
       );
   }
   if (standards.briefRead && !facts.indexOpened)
