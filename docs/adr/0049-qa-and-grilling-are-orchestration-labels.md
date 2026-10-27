@@ -32,7 +32,7 @@ ADRs drew on purpose.
   stress-tested in a `grill-with-docs` session before implementation starts. Like `type:hitl`, it
   signals that `dispatch-agents` should not pick the issue up — but for a different reason: not
   "a human must decide something" but "the shape of the work is not settled yet".
-- **Neither label may appear on a Pull Request.** This needs no new code: `create-pr.mjs` builds its
+- **Neither label may appear on a Pull Request.** This needs no new code: `create-pr.ts` builds its
   allowlist from `surfaceLabelNames()`, which reads only `surface.kind` and `surface.area`, so
   moving `qa` out of `surface.kind` makes the runner reject it automatically.
 - **Neither label participates in branch naming.** The `AGENTS.md` branch-type table maps Surface

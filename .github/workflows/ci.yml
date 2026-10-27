@@ -186,7 +186,7 @@ jobs:
           # looked at the root package.json).
           #
           # If the detector itself fails, audit anyway — never skip on error.
-          if ! result="$(node tools/scripts/ci/dependency-manifest-changed.mjs "$BASE_SHA" "$HEAD_SHA")"; then
+          if ! result="$(node tools/scripts/ci/dependency-manifest-changed.ts "$BASE_SHA" "$HEAD_SHA")"; then
             echo '::warning title=Dependency detection failed::Falling back to running the audit.'
             echo 'run_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
@@ -217,7 +217,7 @@ jobs:
           set -uo pipefail
 
           corepack yarn npm audit --all --recursive --severity high --json > "$RUNNER_TEMP/npm-audit.ndjson" || true
-          echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.mjs < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
+          echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.ts < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
 
       - name: Explain skipped npm audit
         if: github.event_name == 'pull_request' && steps.dependency-files.outputs.run_audit != 'true'

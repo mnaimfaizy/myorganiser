@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,7 @@ import {
   rejectedPrLabels,
   surfaceLabelNames,
   syncSurfaceLabelChanges,
+  type GithubLabelCatalog,
 } from '../lib/github-labels.ts';
 import {
   checkMergeBaseProof,
@@ -23,6 +24,8 @@ import {
   findOrphanedRemoteCommits,
   parseCherryOutput,
   parseCommitRecords,
+  type CommitRecord,
+  type RemoteCommitRef,
 } from '../lib/pr-push-plan.ts';
 
 const usage = `Usage:
@@ -41,13 +44,51 @@ Options:
   --help                  Show this help text.
 `;
 
-function fail(message, exitCode = 1) {
+interface CreatePrOptions {
+  base: string | null;
+  body: string | null;
+  bodyFile: string | null;
+  draft: boolean;
+  forceWithLease: boolean;
+  help: boolean;
+  labels: string[];
+  mergeBase: string | null;
+  reviewers: string[];
+  title: string | null;
+}
+
+interface BranchCommit {
+  subject: string;
+  body: string;
+}
+
+interface SpawnedBodySource {
+  bodyPath: string;
+  tempDir: string;
+}
+
+interface PullRequestLabel {
+  name?: string;
+}
+
+interface PullRequestReviewRequest {
+  login?: string;
+}
+
+interface ExistingPullRequest {
+  number: number;
+  url: string;
+  reviewRequests?: PullRequestReviewRequest[];
+  labels?: PullRequestLabel[];
+}
+
+function fail(message: string, exitCode = 1): never {
   process.stderr.write(`${message}\n`);
   process.exit(exitCode);
 }
 
-function parseArgs(argv) {
-  const options = {
+function parseArgs(argv: string[]): CreatePrOptions {
+  const options: CreatePrOptions = {
     base: null,
     body: null,
     bodyFile: null,
@@ -126,7 +167,11 @@ function parseArgs(argv) {
   return options;
 }
 
-function run(command, args, options = {}) {
+function run(
+  command: string,
+  args: string[],
+  options: { allowFailure?: boolean } = {},
+): SpawnSyncReturns<string> {
   const { allowFailure = false } = options;
   const result = spawnSync(command, args, {
     encoding: 'utf8',
@@ -153,11 +198,15 @@ function run(command, args, options = {}) {
   return result;
 }
 
-function trimStdout(command, args, options = {}) {
+function trimStdout(
+  command: string,
+  args: string[],
+  options: { allowFailure?: boolean } = {},
+): string {
   return run(command, args, options).stdout.trim();
 }
 
-function normalizeReviewers(reviewers) {
+function normalizeReviewers(reviewers: readonly string[]): string[] {
   return reviewers
     .flatMap((reviewer) => reviewer.split(','))
     .map((reviewer) => reviewer.trim())
@@ -171,7 +220,7 @@ function normalizeReviewers(reviewers) {
     });
 }
 
-function validateReviewers(reviewers) {
+function validateReviewers(reviewers: readonly string[]): void {
   const unsupportedReviewers = reviewers.filter((reviewer) =>
     /^@(copilot|me)$/i.test(reviewer),
   );
@@ -185,7 +234,10 @@ function validateReviewers(reviewers) {
   );
 }
 
-function validateLabels(labels, catalog) {
+function validateLabels(
+  labels: readonly string[],
+  catalog: GithubLabelCatalog,
+): void {
   const rejected = rejectedPrLabels(labels, catalog);
 
   if (rejected.length === 0) {
@@ -197,7 +249,10 @@ function validateLabels(labels, catalog) {
   );
 }
 
-function ensureMergeBaseProof(options, mergeBase) {
+function ensureMergeBaseProof(
+  options: CreatePrOptions,
+  mergeBase: string,
+): void {
   const result = checkMergeBaseProof({
     computedMergeBase: mergeBase,
     isAgentDraft: isAgentDraftInvocation(options),
@@ -209,11 +264,11 @@ function ensureMergeBaseProof(options, mergeBase) {
   }
 }
 
-function ensureGhAvailable() {
+function ensureGhAvailable(): void {
   run('gh', ['--version']);
 }
 
-function getCurrentBranch() {
+function getCurrentBranch(): string {
   const branch = trimStdout('git', ['branch', '--show-current']);
 
   if (!branch) {
@@ -223,7 +278,7 @@ function getCurrentBranch() {
   return branch;
 }
 
-function getDefaultBaseBranch() {
+function getDefaultBaseBranch(): string {
   const result = run('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], {
     allowFailure: true,
   });
@@ -235,7 +290,7 @@ function getDefaultBaseBranch() {
   return 'main';
 }
 
-function ensureNotBaseBranch(branch, baseBranch) {
+function ensureNotBaseBranch(branch: string, baseBranch: string): void {
   if (branch === baseBranch) {
     fail(
       `Refusing to create a pull request from the base branch '${baseBranch}'.`,
@@ -243,7 +298,10 @@ function ensureNotBaseBranch(branch, baseBranch) {
   }
 }
 
-function ensureUpstreamBranch(options, baseBranch) {
+function ensureUpstreamBranch(
+  options: CreatePrOptions,
+  baseBranch: string,
+): void {
   const upstreamResult = run(
     'git',
     ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
@@ -260,8 +318,8 @@ function ensureUpstreamBranch(options, baseBranch) {
 
   let ahead = 0;
   let behind = 0;
-  let remoteSha;
-  let unmatchedRemoteCommits = [];
+  let remoteSha: string | undefined;
+  let unmatchedRemoteCommits: RemoteCommitRef[] = [];
 
   if (hasUpstream) {
     const aheadBehind = trimStdout('git', [
@@ -292,11 +350,11 @@ function ensureUpstreamBranch(options, baseBranch) {
         ).equivalent,
       );
       const format = '--format=%H%x1f%ae%x1f%s';
-      const remoteOnly = parseCommitRecords(
+      const remoteOnly: RemoteCommitRef[] = parseCommitRecords(
         trimStdout('git', ['log', format, '@{u}', '^HEAD'], {
           allowFailure: true,
         }),
-      ).map((commit) => ({
+      ).map((commit: CommitRecord) => ({
         ...commit,
         patchEquivalent: equivalent.has(commit.sha),
       }));
@@ -342,10 +400,10 @@ function ensureUpstreamBranch(options, baseBranch) {
     );
   }
 
-  run('git', plan.args);
+  run('git', plan.args ?? []);
 }
 
-function resolveBaseRef(baseBranch) {
+function resolveBaseRef(baseBranch: string): string {
   const remoteRef = `refs/remotes/origin/${baseBranch}`;
   const remoteCheck = run('git', ['rev-parse', '--verify', remoteRef], {
     allowFailure: true,
@@ -358,7 +416,7 @@ function resolveBaseRef(baseBranch) {
   return baseBranch;
 }
 
-function getMergeBase(baseBranch) {
+function getMergeBase(baseBranch: string): string {
   // Soft-failed on purpose: a missing merge base is a case the proof gate has a
   // useful message for, and letting `run` exit here would replace it with raw git
   // stderr.
@@ -367,7 +425,7 @@ function getMergeBase(baseBranch) {
   });
 }
 
-function getBranchCommits(mergeBase) {
+function getBranchCommits(mergeBase: string): BranchCommit[] {
   const logOutput = trimStdout('git', [
     'log',
     '--format=%s%x1f%b%x1e',
@@ -390,11 +448,11 @@ function getBranchCommits(mergeBase) {
     .filter((commit) => Boolean(commit.subject));
 }
 
-function stripConventionalPrefix(subject) {
+function stripConventionalPrefix(subject: string): string {
   return subject.replace(/^[a-z]+(?:\([^)]+\))?!?:\s*/i, '').trim();
 }
 
-function toSentence(text) {
+function toSentence(text: string): string {
   if (!text) {
     return '';
   }
@@ -403,7 +461,7 @@ function toSentence(text) {
   return /[.!?]$/.test(normalizedText) ? normalizedText : `${normalizedText}.`;
 }
 
-function extractCommitBodyBullets(body) {
+function extractCommitBodyBullets(body: string): string[] {
   return body
     .split('\n')
     .map((line) => line.trim())
@@ -412,7 +470,11 @@ function extractCommitBodyBullets(body) {
     .filter(Boolean);
 }
 
-function buildFallbackWhy(commits, branch, baseBranch) {
+function buildFallbackWhy(
+  commits: BranchCommit[],
+  branch: string,
+  baseBranch: string,
+): string {
   const primaryIntent = toSentence(stripConventionalPrefix(commits[0].subject));
 
   if (commits.length === 1) {
@@ -428,7 +490,7 @@ function buildFallbackWhy(commits, branch, baseBranch) {
   ].join(' ');
 }
 
-function buildFallbackTitle(commits, branch) {
+function buildFallbackTitle(commits: BranchCommit[], branch: string): string {
   const commitSubjects = commits.map((commit) => commit.subject);
 
   if (commitSubjects.length >= 1) {
@@ -439,7 +501,11 @@ function buildFallbackTitle(commits, branch) {
   return normalizedBranch ? `Update ${normalizedBranch}` : commitSubjects[0];
 }
 
-function buildFallbackBody(commits, branch, baseBranch) {
+function buildFallbackBody(
+  commits: BranchCommit[],
+  branch: string,
+  baseBranch: string,
+): string {
   const detailBullets = commits.flatMap((commit) =>
     extractCommitBodyBullets(commit.body),
   );
@@ -462,7 +528,12 @@ function buildFallbackBody(commits, branch, baseBranch) {
   ].join('\n');
 }
 
-function readBody(options, commits, branch, baseBranch) {
+function readBody(
+  options: CreatePrOptions,
+  commits: BranchCommit[],
+  branch: string,
+  baseBranch: string,
+): string | SpawnedBodySource {
   if (options.body && options.bodyFile) {
     fail('Provide either --body or --body-file, not both.');
   }
@@ -484,7 +555,7 @@ function readBody(options, commits, branch, baseBranch) {
   return { bodyPath, tempDir };
 }
 
-function getAuthenticatedLogin() {
+function getAuthenticatedLogin(): string {
   const login = trimStdout('gh', ['api', 'user', '--jq', '.login']);
 
   if (!login) {
@@ -494,7 +565,10 @@ function getAuthenticatedLogin() {
   return login;
 }
 
-function findExistingPullRequest(branch, baseBranch) {
+function findExistingPullRequest(
+  branch: string,
+  baseBranch: string,
+): ExistingPullRequest | null {
   const response = trimStdout('gh', [
     'pr',
     'list',
@@ -512,22 +586,22 @@ function findExistingPullRequest(branch, baseBranch) {
     return null;
   }
 
-  const pullRequests = JSON.parse(response);
+  const pullRequests: ExistingPullRequest[] = JSON.parse(response);
   return pullRequests[0] ?? null;
 }
 
 function updateExistingPullRequest(
-  pullRequest,
-  assignee,
-  reviewers,
-  labels,
-  surfaceNames,
-  title,
-  bodyPath,
-) {
+  pullRequest: ExistingPullRequest,
+  assignee: string,
+  reviewers: string[],
+  labels: string[],
+  surfaceNames: Set<string>,
+  title: string,
+  bodyPath: string,
+): void {
   const existingReviewers = (pullRequest.reviewRequests ?? [])
     .map((reviewRequest) => reviewRequest.login)
-    .filter(Boolean);
+    .filter((login): login is string => Boolean(login));
   const reviewersToAdd = reviewers.filter(
     (reviewer) => !existingReviewers.includes(reviewer),
   );
@@ -536,7 +610,7 @@ function updateExistingPullRequest(
   );
   const currentLabelNames = (pullRequest.labels ?? [])
     .map((label) => label.name)
-    .filter(Boolean);
+    .filter((name): name is string => Boolean(name));
   const { toAdd: labelsToAdd, toRemove: labelsToRemove } =
     syncSurfaceLabelChanges({
       currentNames: currentLabelNames,
@@ -575,15 +649,15 @@ function updateExistingPullRequest(
 }
 
 function createPullRequest(
-  branch,
-  baseBranch,
-  assignee,
-  reviewers,
-  labels,
-  title,
-  bodyPath,
-  draft,
-) {
+  branch: string,
+  baseBranch: string,
+  assignee: string,
+  reviewers: string[],
+  labels: string[],
+  title: string,
+  bodyPath: string,
+  draft: boolean,
+): string {
   const args = [
     'pr',
     'create',

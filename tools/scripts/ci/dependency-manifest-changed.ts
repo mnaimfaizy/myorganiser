@@ -19,7 +19,7 @@
  * callers should treat a failure as "audit anyway" rather than "skip".
  *
  * Usage:
- *   node tools/scripts/ci/dependency-manifest-changed.mjs <baseSha> <headSha>
+ *   node tools/scripts/ci/dependency-manifest-changed.ts <baseSha> <headSha>
  */
 
 import { execFileSync } from 'node:child_process';
@@ -39,14 +39,29 @@ const DEPENDENCY_FIELDS = [
   'workspaces',
   'bundledDependencies',
   'bundleDependencies',
-];
+] as const;
 
 /** Files whose change always warrants an audit, regardless of content. */
 const ALWAYS_AUDIT = new Set(['yarn.lock', '.yarnrc.yml']);
 
 const MANIFEST_RE = /(^|\/)package\.json$/;
 
-function git(args) {
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+type Manifest = Record<string, JsonValue>;
+
+interface RenamedPath {
+  before: string;
+  after: string;
+}
+
+function git(args: string[]): string {
   return execFileSync('git', args, {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
@@ -54,15 +69,15 @@ function git(args) {
 }
 
 /** Returns the parsed manifest at `ref:path`, or null when absent/unparseable. */
-function manifestAt(ref, path) {
-  let raw;
+function manifestAt(ref: string, path: string): Manifest | null {
+  let raw: string;
   try {
     raw = git(['show', `${ref}:${path}`]);
   } catch {
     return null; // added or deleted on one side
   }
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as Manifest;
   } catch {
     // A manifest we cannot parse is not something to reason about — let the
     // caller audit rather than silently skipping.
@@ -70,9 +85,9 @@ function manifestAt(ref, path) {
   }
 }
 
-function dependencySlice(manifest) {
+function dependencySlice(manifest: Manifest | null): Manifest | null {
   if (!manifest) return null;
-  const slice = {};
+  const slice: Manifest = {};
   for (const field of DEPENDENCY_FIELDS) {
     if (manifest[field] !== undefined) slice[field] = manifest[field];
   }
@@ -80,7 +95,7 @@ function dependencySlice(manifest) {
 }
 
 /** Stable stringify so key reordering alone is not treated as a change. */
-function canonical(value) {
+function canonical(value: JsonValue | null): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
     return `{${Object.keys(value)
@@ -91,11 +106,11 @@ function canonical(value) {
   return JSON.stringify(value) ?? 'null';
 }
 
-function main() {
+function main(): void {
   const [baseSha, headSha] = process.argv.slice(2);
   if (!baseSha || !headSha) {
     process.stderr.write(
-      'Usage: dependency-manifest-changed.mjs <baseSha> <headSha>\n',
+      'Usage: dependency-manifest-changed.ts <baseSha> <headSha>\n',
     );
     process.exit(2);
   }
@@ -104,7 +119,7 @@ function main() {
   // Read path-by-path, a moved manifest looks absent at base and present at
   // head, so moving a library directory audited a pull request that changed no
   // dependency at all.
-  const changed = git([
+  const changed: RenamedPath[] = git([
     'diff',
     '--name-status',
     '-M',
@@ -122,7 +137,7 @@ function main() {
         : { before: first, after: first };
     });
 
-  const reasons = [];
+  const reasons: string[] = [];
 
   for (const { before, after } of changed) {
     for (const file of new Set([before, after])) {

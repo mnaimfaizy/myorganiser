@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 
 import {
   loadGithubLabelCatalog,
@@ -10,7 +10,7 @@ import {
 const REPO = 'mnaimfaizy/myorganiser';
 const LABELS = provisionLabels(loadGithubLabelCatalog());
 
-function run(args) {
+function run(args: string[]): SpawnSyncReturns<string> {
   return spawnSync('gh', args, {
     encoding: 'utf8',
     stdio: 'pipe',
@@ -18,12 +18,16 @@ function run(args) {
   });
 }
 
-function fail(message, exitCode = 1) {
+function fail(message: string, exitCode = 1): never {
   process.stderr.write(`${message}\n`);
   process.exit(exitCode);
 }
 
-const results = { created: [], skipped: [], failed: [] };
+const results: { created: string[]; skipped: string[]; failed: string[] } = {
+  created: [],
+  skipped: [],
+  failed: [],
+};
 
 for (const label of LABELS) {
   const result = run([

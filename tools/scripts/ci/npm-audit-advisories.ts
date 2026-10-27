@@ -14,7 +14,7 @@
  *
  * Usage:
  *   corepack yarn npm audit --all --recursive --severity high --json \
- *     | node tools/scripts/ci/npm-audit-advisories.mjs
+ *     | node tools/scripts/ci/npm-audit-advisories.ts
  */
 
 import { readFileSync } from 'node:fs';

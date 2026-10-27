@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +9,8 @@ import {
   classifyCommitFailure,
   findBlockedSecretPaths,
   formatCommitFailureTrailer,
-} from './classify-commit-failure.mjs';
+  type CommitFailureTrailerFields,
+} from './classify-commit-failure.ts';
 
 const usage = `Usage:
   corepack yarn ai:commit --message-file path/to/message.txt
@@ -23,11 +24,21 @@ Options:
   --help                 Show this help text.
 `;
 
-function writeTrailer(fields) {
+interface CommitOptions {
+  help: boolean;
+  message: string | null;
+  messageFile: string | null;
+}
+
+function writeTrailer(fields: CommitFailureTrailerFields): void {
   process.stderr.write(formatCommitFailureTrailer(fields));
 }
 
-function fail(message, trailer, exitCode = 1) {
+function fail(
+  message: string,
+  trailer?: CommitFailureTrailerFields,
+  exitCode = 1,
+): never {
   process.stderr.write(`${message}\n`);
   if (trailer) {
     writeTrailer(trailer);
@@ -35,8 +46,8 @@ function fail(message, trailer, exitCode = 1) {
   process.exit(exitCode);
 }
 
-function parseArgs(argv) {
-  const options = {
+function parseArgs(argv: string[]): CommitOptions {
+  const options: CommitOptions = {
     help: false,
     message: null,
     messageFile: null,
@@ -71,7 +82,11 @@ function parseArgs(argv) {
   return options;
 }
 
-function run(command, args, { capture = false } = {}) {
+function run(
+  command: string,
+  args: string[],
+  { capture = false }: { capture?: boolean } = {},
+): SpawnSyncReturns<string> {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
     stdio: capture ? 'pipe' : 'inherit',
@@ -88,7 +103,7 @@ function run(command, args, { capture = false } = {}) {
   return result;
 }
 
-function readCommitMessage(options) {
+function readCommitMessage(options: CommitOptions): string {
   if (options.message && options.messageFile) {
     fail('Provide either --message or --message-file, not both.', {
       reason: 'unknown',
@@ -117,7 +132,9 @@ function readCommitMessage(options) {
   );
 }
 
-function listStagedPaths({ diffFilter } = {}) {
+function listStagedPaths({
+  diffFilter,
+}: { diffFilter?: string } = {}): string[] {
   const args = ['diff', '--cached', '--name-only'];
   if (diffFilter) {
     args.push(`--diff-filter=${diffFilter}`);
@@ -140,7 +157,7 @@ function listStagedPaths({ diffFilter } = {}) {
     .filter(Boolean);
 }
 
-function ensureStagedChanges(stagedPaths) {
+function ensureStagedChanges(stagedPaths: string[]): void {
   if (stagedPaths.length > 0) {
     return;
   }
@@ -154,7 +171,7 @@ function ensureStagedChanges(stagedPaths) {
   );
 }
 
-function rejectStagedSecrets(stagedPaths) {
+function rejectStagedSecrets(stagedPaths: string[]): void {
   const blocked = findBlockedSecretPaths(stagedPaths);
   if (blocked.length === 0) {
     return;
@@ -167,7 +184,7 @@ function rejectStagedSecrets(stagedPaths) {
   });
 }
 
-function runCommit(messagePath) {
+function runCommit(messagePath: string): SpawnSyncReturns<string> {
   const result = spawnSync('git', ['commit', '--file', messagePath], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

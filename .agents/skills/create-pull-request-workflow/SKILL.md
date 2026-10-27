@@ -71,6 +71,6 @@ corepack yarn ai:create-pr --title "<title>" --body-file <path-to-body-file> --m
 - `.github/agents/pr-author.agent.md` — title, Surface Labels, merge base, and body
 - `tools/scripts/lib/pr-merge-base.ts` — merge-base proof gate (`yarn ai:create-pr:test`)
 - `tools/config/github-labels.json` — Surface Label catalog (ADR 0025)
-- `tools/scripts/ai/create-pr.mjs` — shared PR runner (push, assign, create/reuse, labels)
+- `tools/scripts/ai/create-pr.ts` — shared PR runner (push, assign, create/reuse, labels)
 - `DEVELOPMENT.md` — human-facing PR workflow
 - `AGENTS.md` — repo-wide workflow routing

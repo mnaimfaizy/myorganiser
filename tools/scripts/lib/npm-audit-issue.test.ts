@@ -313,7 +313,7 @@ test('advisories are collected only after a failed audit on a push to main', () 
   assert.match(ifLine[0], /github\.event_name == 'push'/);
   assert.match(ifLine[0], /github\.ref == 'refs\/heads\/main'/);
   assert.match(collect, /--severity high --json/);
-  assert.match(collect, /npm-audit-advisories\.mjs/);
+  assert.match(collect, /npm-audit-advisories\.ts/);
 });
 
 for (const [jobId, status, outcome] of [

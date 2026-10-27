@@ -10,7 +10,7 @@ import {
   findBlockedSecretPaths,
   formatCommitFailureTrailer,
   isBlockedSecretPath,
-} from './classify-commit-failure.mjs';
+} from './classify-commit-failure.ts';
 
 test('classifies Nx lint failures and names the project', () => {
   const output = [

@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { isolateGitEnvironment } from '../lib/git-environment.ts';
@@ -12,13 +12,18 @@ import { isolateGitEnvironment } from '../lib/git-environment.ts';
 isolateGitEnvironment();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DETECTOR = join(HERE, 'dependency-manifest-changed.mjs');
+const DETECTOR = join(HERE, 'dependency-manifest-changed.ts');
+
+interface Repo {
+  workspace: string;
+  base: string;
+}
 
 /**
  * The detector diffs two commits, so every fixture is a real repository with
  * a base commit and a head commit on top of it.
  */
-function createRepo(t, files) {
+function createRepo(t: TestContext, files: Record<string, string>): Repo {
   const workspace = mkdtempSync(join(tmpdir(), 'dependency-manifest-'));
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
   git(workspace, 'init', '-q');
@@ -28,7 +33,7 @@ function createRepo(t, files) {
   return { workspace, base: commit(workspace, 'base') };
 }
 
-function git(workspace, ...args) {
+function git(workspace: string, ...args: string[]): string {
   return execFileSync(
     'git',
     ['-c', 'user.email=test@example.com', '-c', 'user.name=test', ...args],
@@ -36,28 +41,32 @@ function git(workspace, ...args) {
   ).trim();
 }
 
-function write(workspace, relative, contents) {
+function write(workspace: string, relative: string, contents: string): void {
   const path = join(workspace, relative);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, contents);
 }
 
-function commit(workspace, message) {
+function commit(workspace: string, message: string): string {
   git(workspace, 'add', '-A');
   git(workspace, 'commit', '-q', '--allow-empty', '-m', message);
   return git(workspace, 'rev-parse', 'HEAD');
 }
 
-const manifest = (fields) => `${JSON.stringify(fields, null, 2)}\n`;
+const manifest = (fields: Record<string, unknown>): string =>
+  `${JSON.stringify(fields, null, 2)}\n`;
 
-function detect({ workspace, base }, head = 'HEAD') {
+function detect({ workspace, base }: Repo, head = 'HEAD') {
   return spawnSync(process.execPath, [DETECTOR, base, head], {
     cwd: workspace,
     encoding: 'utf8',
   });
 }
 
-function assertAudit(result, expected) {
+function assertAudit(
+  result: ReturnType<typeof detect>,
+  expected: boolean,
+): void {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), String(expected), result.stderr);
 }
