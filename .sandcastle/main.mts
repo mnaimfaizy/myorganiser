@@ -1296,6 +1296,32 @@ const HOST_GID = process.getgid?.() ?? 1000;
 
 const worktreesDir = join(process.cwd(), '.sandcastle', 'worktrees');
 
+// The CI Test job runs `nx affected -t test` against a `postgres:16` service with
+// trust auth and this database name, after `prisma migrate deploy` and a drift
+// check (.github/workflows/ci.yml). The gate reproduces that service when
+// `backend:test` is in scope, so a database-backed suite fails here only when it
+// would fail on the PR.
+//
+// Declared here, above `if (gateOnly)`: --gate-only reaches runGate during module
+// evaluation, so a const declared further down is still in its temporal dead zone.
+const GATE_DB_IMAGE = 'postgres:16';
+const GATE_DB_NAME = 'myorganiser';
+// Every gate database carries this label, so containers orphaned by a killed
+// run can be found and removed (`docker rm -f $(docker ps -aq --filter label=…)`).
+const GATE_DB_LABEL = 'sandcastle.gate-db=1';
+// The same placeholder CI's non-database jobs pass: several backend modules build a
+// PrismaClient at module scope, so a suite importing one throws without any value.
+const GATE_PLACEHOLDER_DATABASE_URL = 'postgresql://localhost:5432/myorganiser';
+
+// Same commands, same order, as CI's "Apply Prisma migrations and check schema
+// drift" step. Runs inside the gate container after install.
+const GATE_DB_PREPARE = [
+  'cd apps/backend/src',
+  'node ../../../node_modules/.bin/prisma migrate deploy --schema prisma/schema',
+  'node ../../../node_modules/.bin/prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code',
+  'cd /home/agent/workspace',
+].join(' && ');
+
 if (gateOnly) {
   if (integrationBranch === null) {
     fail(
@@ -1921,6 +1947,101 @@ function preserveInterruptedSlice(
 // slice is not one that fails the moment it is pushed. `build` is what typechecks
 // this repo — there is no `typecheck` target — and it is the step that catches a
 // slice whose types do not compile against its consumers.
+
+interface GateDatabase {
+  network: string;
+  container: string;
+  url: string;
+}
+
+function dockerCmd(args: string[]) {
+  return spawnSync('docker', args, { encoding: 'utf8', windowsHide: true });
+}
+
+/**
+ * Start a throwaway Postgres on a private Docker network for one gate run.
+ * Returns null (after cleaning up whatever it created) if it cannot be started
+ * or does not accept TCP connections within a minute.
+ */
+function startGateDatabase(label: string): GateDatabase | null {
+  // Short on purpose: the container name is the hostname in DATABASE_URL, and a
+  // DNS label over 63 characters (a branch-derived name easily is) never resolves.
+  const suffix = `${process.pid}-${Date.now().toString(36)}`;
+  const db: GateDatabase = {
+    network: `sandcastle-gate-${suffix}`,
+    container: `sandcastle-gate-db-${suffix}`,
+    url: '',
+  };
+  db.url = `postgresql://postgres@${db.container}:5432/${GATE_DB_NAME}`;
+
+  const net = dockerCmd([
+    'network',
+    'create',
+    '--label',
+    GATE_DB_LABEL,
+    db.network,
+  ]);
+  if (net.status !== 0) {
+    console.error(
+      `  [${label}] gate: could not create the database network.\n${net.stderr}`,
+    );
+    return null;
+  }
+  const pg = dockerCmd([
+    'run',
+    '-d',
+    '--rm',
+    '--name',
+    db.container,
+    '--network',
+    db.network,
+    '--label',
+    GATE_DB_LABEL,
+    '-e',
+    'POSTGRES_USER=postgres',
+    // Throwaway, unpublished, reachable only on its private network — as in CI.
+    '-e',
+    'POSTGRES_HOST_AUTH_METHOD=trust',
+    '-e',
+    `POSTGRES_DB=${GATE_DB_NAME}`,
+    GATE_DB_IMAGE,
+  ]);
+  if (pg.status !== 0) {
+    console.error(
+      `  [${label}] gate: could not start ${GATE_DB_IMAGE}.\n${pg.stderr}`,
+    );
+    stopGateDatabase(db);
+    return null;
+  }
+
+  // Probe over TCP, not the default Unix socket: the image's init phase runs a
+  // temporary server that answers on the socket only, then restarts.
+  const tick = new Int32Array(new SharedArrayBuffer(4));
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const ready = dockerCmd([
+      'exec',
+      db.container,
+      'pg_isready',
+      '-h',
+      '127.0.0.1',
+      '-U',
+      'postgres',
+    ]);
+    if (ready.status === 0) return db;
+    Atomics.wait(tick, 0, 0, 1000);
+  }
+  console.error(
+    `  [${label}] gate: ${GATE_DB_IMAGE} did not become ready within 60s.`,
+  );
+  stopGateDatabase(db);
+  return null;
+}
+
+function stopGateDatabase(db: GateDatabase): void {
+  dockerCmd(['rm', '-f', db.container]);
+  dockerCmd(['network', 'rm', db.network]);
+}
+
 function runGate(
   label: string,
   base: string,
@@ -2043,84 +2164,104 @@ function runGate(
       );
     }
     console.log(`  [${label}] gate: installing + running ...`);
-    // Read here rather than at module scope: --gate-only reaches runGate during module
-    // evaluation, so a top-level const declared below this point is still in its
-    // temporal dead zone by the time it is used.
-    const gateDatabaseUrl =
-      process.env.SLICE_GATE_DATABASE_URL ||
-      'postgresql://localhost:5432/myorganiser';
-    const gate = spawnSync(
-      'docker',
-      [
-        'run',
-        '--rm',
-        '--user',
-        `${HOST_UID}:${HOST_GID}`,
-        '-e',
-        'HOME=/home/agent',
-        '-e',
-        // Several backend modules construct a PrismaClient at module scope, so any
-        // suite importing them throws on import without this — and the integration
-        // suites then sit until jest's 30s timeout. Nothing here connects: the value
-        // is the same dummy URL the CI test job uses (.github/workflows/ci.yml), and
-        // CI provisions no database service either. Without it the gate reports a
-        // backend:test failure that CI does not have.
-        `DATABASE_URL=${gateDatabaseUrl}`,
-        '-e',
-        'NX_DAEMON=false',
-        '-e',
-        'NX_ISOLATE_PLUGINS=false',
-        '-e',
-        'NX_SKIP_NX_CACHE=true',
-        '-e',
-        'NX_CACHE_DIRECTORY=/home/agent/workspace/.nx/cache',
-        '-e',
-        'NX_WORKSPACE_DATA_DIRECTORY=/home/agent/workspace/.nx/workspace-data',
-        '-e',
-        `YARN_ENABLE_GLOBAL_CACHE=${YARN_CACHE_ENV.YARN_ENABLE_GLOBAL_CACHE}`,
-        '-e',
-        `YARN_GLOBAL_FOLDER=${YARN_CACHE_ENV.YARN_GLOBAL_FOLDER}`,
-        '-v',
-        `${gatePath}:/home/agent/workspace`,
-        '-v',
-        `${yarnCacheDir}:/home/agent/.yarn-cache`,
-        '--entrypoint',
-        '/bin/bash',
-        SANDBOX_IMAGE,
-        '-c',
-        [
-          'cd /home/agent/workspace',
-          'corepack yarn install --immutable',
-          ...runs.map(
-            (run) =>
-              `node node_modules/.bin/nx run-many -t ${run.targets.join(' ')} --projects=${run.projects.join(',')} --skip-nx-cache${run.args.map((a) => ` ${a}`).join('')}`,
-          ),
-        ].join(' && '),
-      ],
-      {
-        encoding: 'utf8',
-        stdio: 'inherit',
-        windowsHide: true,
-        // Install + lint + test + a Next.js production build. The 30-minute budget
-        // this carried when the gate ran lint alone is not enough once `build` is in.
-        timeout: 3600000,
-      },
-    );
-
-    const ok = gate.status === 0;
-    console.log(`  [${label}] gate: ${ok ? 'PASS' : 'FAIL'}.`);
-    // Mirror the verdict into the slice log as a handoff marker. A gate failure is
-    // the one thing about the previous run that git cannot show the next agent, and
-    // without it a resumed agent cannot tell "my code was rejected" from "I was
-    // killed mid-thought" — so it re-runs every pipeline. See ADR 0044.
-    if (handoffIssue !== undefined)
-      appendHandoffToSliceLog(
-        handoffIssue,
-        ok
-          ? `gate PASS (${targets})`
-          : `gate FAILED (${targets}) — the agent's work was committed; the HOST GATE rejected it`,
+    // Database, decided per run. An operator-supplied SLICE_GATE_DATABASE_URL wins
+    // and is used as-is. Otherwise, when backend:test is in scope, the gate brings
+    // up the same Postgres CI's Test job has; with no backend tests, nothing
+    // connects and the placeholder is enough.
+    const testProjects = runs
+      .filter((run) => run.targets.includes('test'))
+      .flatMap((run) => run.projects);
+    const operatorDatabaseUrl = process.env.SLICE_GATE_DATABASE_URL;
+    let database: GateDatabase | null = null;
+    if (!operatorDatabaseUrl && testProjects.includes('backend')) {
+      console.log(
+        `  [${label}] gate: backend:test in scope — starting a throwaway ${GATE_DB_IMAGE} (as CI's Test job) ...`,
       );
-    return ok;
+      database = startGateDatabase(label);
+      if (database === null) {
+        console.error(
+          `  [${label}] gate: no database for backend:test — failing closed. ` +
+            'This is an environment failure, not a verdict on the code.',
+        );
+        return false;
+      }
+    }
+    const gateDatabaseUrl =
+      operatorDatabaseUrl || database?.url || GATE_PLACEHOLDER_DATABASE_URL;
+    try {
+      const gate = spawnSync(
+        'docker',
+        [
+          'run',
+          '--rm',
+          ...(database ? ['--network', database.network] : []),
+          '--user',
+          `${HOST_UID}:${HOST_GID}`,
+          '-e',
+          'HOME=/home/agent',
+          '-e',
+          // The gate database when one was started; otherwise the placeholder that
+          // keeps module-scope PrismaClient construction from throwing on import.
+          `DATABASE_URL=${gateDatabaseUrl}`,
+          '-e',
+          'NX_DAEMON=false',
+          '-e',
+          'NX_ISOLATE_PLUGINS=false',
+          '-e',
+          'NX_SKIP_NX_CACHE=true',
+          '-e',
+          'NX_CACHE_DIRECTORY=/home/agent/workspace/.nx/cache',
+          '-e',
+          'NX_WORKSPACE_DATA_DIRECTORY=/home/agent/workspace/.nx/workspace-data',
+          '-e',
+          `YARN_ENABLE_GLOBAL_CACHE=${YARN_CACHE_ENV.YARN_ENABLE_GLOBAL_CACHE}`,
+          '-e',
+          `YARN_GLOBAL_FOLDER=${YARN_CACHE_ENV.YARN_GLOBAL_FOLDER}`,
+          '-v',
+          `${gatePath}:/home/agent/workspace`,
+          '-v',
+          `${yarnCacheDir}:/home/agent/.yarn-cache`,
+          '--entrypoint',
+          '/bin/bash',
+          SANDBOX_IMAGE,
+          '-c',
+          [
+            'cd /home/agent/workspace',
+            'corepack yarn install --immutable',
+            ...(database ? [GATE_DB_PREPARE] : []),
+            ...runs.map(
+              (run) =>
+                `node node_modules/.bin/nx run-many -t ${run.targets.join(' ')} --projects=${run.projects.join(',')} --skip-nx-cache${run.args.map((a) => ` ${a}`).join('')}`,
+            ),
+          ].join(' && '),
+        ],
+        {
+          encoding: 'utf8',
+          stdio: 'inherit',
+          windowsHide: true,
+          // Install + lint + test + a Next.js production build. The 30-minute budget
+          // this carried when the gate ran lint alone is not enough once `build` is in.
+          timeout: 3600000,
+        },
+      );
+
+      const ok = gate.status === 0;
+      console.log(`  [${label}] gate: ${ok ? 'PASS' : 'FAIL'}.`);
+      // Mirror the verdict into the slice log as a handoff marker. A gate failure is
+      // the one thing about the previous run that git cannot show the next agent, and
+      // without it a resumed agent cannot tell "my code was rejected" from "I was
+      // killed mid-thought" — so it re-runs every pipeline. See ADR 0044.
+      if (handoffIssue !== undefined)
+        appendHandoffToSliceLog(
+          handoffIssue,
+          ok
+            ? `gate PASS (${targets})`
+            : `gate FAILED (${targets}) — the agent's work was committed; the HOST GATE rejected it`,
+        );
+      return ok;
+    } finally {
+      if (database) stopGateDatabase(database);
+    }
   } finally {
     spawnSync('git', ['worktree', 'remove', '--force', gatePath], {
       encoding: 'utf8',

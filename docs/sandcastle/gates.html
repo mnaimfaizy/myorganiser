@@ -1420,7 +1420,7 @@
   <section class="panel" aria-labelledby="hero-h">
     <div class="phead">
       <h2 id="hero-h">One gate, two callers</h2>
-      <span class="src">main.mts:1924-2154</span>
+      <span class="src">main.mts:2045-2295</span>
     </div>
     <div class="pbody">
       <div class="chips">
@@ -2118,7 +2118,7 @@
   <section class="panel" aria-labelledby="scope-h">
     <div class="phead">
       <h2 id="scope-h">Two scopes, because the targets have different blast radii</h2>
-      <span class="src">main.mts:262-272, :311-314, :1937-1951</span>
+      <span class="src">main.mts:262-272, :311-314, :2058-2072</span>
     </div>
     <div class="pbody">
       <p>
@@ -2288,7 +2288,7 @@
   <section class="panel" aria-labelledby="modes-h">
     <div class="phead">
       <h2 id="modes-h">The two modes, side by side</h2>
-      <span class="src">main.mts:2035-2053, :2133-2137, :2141-2149</span>
+      <span class="src">main.mts:2156-2193, :2274-2278, :2282-2290</span>
     </div>
     <div class="pbody">
       <div class="scrollx">
@@ -2356,7 +2356,7 @@
         on the PR &mdash; while costing one container install per slice.
         <span class="small muted"
           >&mdash; <code>runFeatureGate</code> docblock,
-          <code>main.mts:2144-2146</code></span
+          <code>main.mts:2285-2287</code></span
         >
       </blockquote>
 
@@ -2432,7 +2432,7 @@
   <section class="panel" aria-labelledby="red-h">
     <div class="phead">
       <h2 id="red-h">Reading a red gate</h2>
-      <span class="src">main.mts:2110-2111, :3113-3185, :3270-3292</span>
+      <span class="src">main.mts:2248-2249, :3254-3326, :3411-3433</span>
     </div>
     <div class="pbody">
       <ol class="chain">
@@ -2491,7 +2491,7 @@
   <section class="panel" aria-labelledby="tier-h">
     <div class="phead">
       <h2 id="tier-h">Two different things are called a gate</h2>
-      <span class="src">main.mts:2154 &middot; ADR 0012</span>
+      <span class="src">main.mts:2295 &middot; ADR 0012</span>
     </div>
     <div class="pbody">
       <p>
@@ -3385,7 +3385,7 @@
 {
   "note": "Citation anchors for docs/sandcastle/gates.html, re-verified on 2026-09-30 against .sandcastle/main.mts. Every continuation range is written as a bare :NNN so findCitations sees it — a comma-separated number without a leading colon is a claim nothing checks.",
   "anchors": {
-    "main.mts:1924-2154": {
+    "main.mts:2045-2295": {
       "file": ".sandcastle/main.mts",
       "start": "function runGate(",
       "end": "return runGate(featureBranch, prdGateBase, featureBranch);"
@@ -3400,47 +3400,47 @@
       "start": "* The Nx projects a slice affects: the projects whose own files changed PLUS every",
       "end": "* and that consumer's own files never changed."
     },
-    "main.mts:1937-1951": {
+    "main.mts:2058-2072": {
       "file": ".sandcastle/main.mts",
       "start": "const targets = (process.env.SLICE_GATE_TARGETS || 'lint test build').trim();",
       "end": "const changed = changedProjects(base, head);"
     },
-    "main.mts:2035-2053": {
+    "main.mts:2156-2193": {
       "file": ".sandcastle/main.mts",
       "start": "// Validate this slice INSIDE the Linux container (cross-platform: WSL2, native",
       "end": "'docker',"
     },
-    "main.mts:2133-2137": {
+    "main.mts:2274-2278": {
       "file": ".sandcastle/main.mts",
       "start": "* Gate ONE slice against its base. Retained for standalone runs, where the work",
       "end": "return runGate(`#${issue.number}`, baseRef, sliceBranch, issue.number);"
     },
-    "main.mts:2141-2149": {
+    "main.mts:2282-2290": {
       "file": ".sandcastle/main.mts",
       "start": "* Gate the whole PRD once, on the integrated feature branch, against the ref the",
       "end": "function runFeatureGate(featureBranch: string): boolean {"
     },
-    "main.mts:2144-2146": {
+    "main.mts:2285-2287": {
       "file": ".sandcastle/main.mts",
       "start": "* This is the gate that matters. A per-slice gate can only see one slice against",
       "end": "* and fail on the PR — while costing one container install per slice. Gating"
     },
-    "main.mts:2110-2111": {
+    "main.mts:2248-2249": {
       "file": ".sandcastle/main.mts",
       "start": "const ok = gate.status === 0;",
       "end": "console.log(`  [${label}] gate: ${ok ? 'PASS' : 'FAIL'}.`);"
     },
-    "main.mts:3113-3185": {
+    "main.mts:3254-3326": {
       "file": ".sandcastle/main.mts",
       "start": "const outcome = judgeRunOutcome(",
       "end": "unblockDependents(issue);"
     },
-    "main.mts:3270-3292": {
+    "main.mts:3411-3433": {
       "file": ".sandcastle/main.mts",
       "start": "'edit',",
       "end": ");"
     },
-    "main.mts:2154": {
+    "main.mts:2295": {
       "file": ".sandcastle/main.mts",
       "start": "return runGate(featureBranch, prdGateBase, featureBranch);"
     }

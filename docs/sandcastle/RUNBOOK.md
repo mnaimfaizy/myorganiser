@@ -314,12 +314,12 @@ For a standalone run, substitute the `issue/<n>-<slug>` branch the summary print
 
 ### Tunables
 
-| Env var                   | Default                                   | Purpose                                                                                      |
-| ------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `SLICE_GATE`              | (on)                                      | `off` skips the gate entirely (integrates without verification).                             |
-| `SLICE_GATE_TARGETS`      | `lint test build`                         | Space/comma-separated Nx targets the gate runs (e.g. `lint` for a fast check).               |
-| `SLICE_GATE_DATABASE_URL` | `postgresql://localhost:5432/myorganiser` | `DATABASE_URL` handed to the gate container. A placeholder, not a live database — see below. |
-| `SLICE_GATE_JEST_WORKERS` | `2`                                       | Jest worker cap for the gate's `test` invocation. Raise only with more Docker VM memory.     |
+| Env var                   | Default           | Purpose                                                                                                                               |
+| ------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLICE_GATE`              | (on)              | `off` skips the gate entirely (integrates without verification).                                                                      |
+| `SLICE_GATE_TARGETS`      | `lint test build` | Space/comma-separated Nx targets the gate runs (e.g. `lint` for a fast check).                                                        |
+| `SLICE_GATE_DATABASE_URL` | (unset)           | Use this database instead of the throwaway Postgres the gate starts for `backend:test`. Migrations are not applied to it — see below. |
+| `SLICE_GATE_JEST_WORKERS` | `2`               | Jest worker cap for the gate's `test` invocation. Raise only with more Docker VM memory.                                              |
 
 #### What the gate verifies, and at what scope
 
@@ -329,11 +329,44 @@ run one — `build` is what typechecks a slice here, and it is the step that cat
 types do not compile against its consumers. The workspace-wide compile is `yarn typecheck:check`,
 which CI runs.
 
-The gate container is given a `DATABASE_URL`. Nothing connects to it: several backend modules
-construct a `PrismaClient` at module scope, so a suite importing one throws on import when the
-variable is absent, and the HTTP integration suites then sit until jest's 30s timeout. The CI test
-job sets the same placeholder for the same reason and provisions no Postgres service either. Left
-unset, the gate reports a `backend:test` failure that CI does not have.
+#### The gate database
+
+When `backend:test` is in the gate's test scope, the gate gives it the database CI's Test job
+has, so a database-backed suite (for example `backfillUserCreatedAt.int.test.ts`) fails here only
+when it would fail on the PR:
+
+1. It creates a private Docker network and starts `postgres:16` on it, with the same user, trust
+   auth and database name as the `services:` block in `.github/workflows/ci.yml`. No port is
+   published to the host.
+2. It waits up to 60s for the server to accept TCP connections.
+3. After `yarn install`, the gate container runs CI's "Apply Prisma migrations and check schema
+   drift" step: `prisma migrate deploy`, then `prisma migrate diff … --exit-code`. A migration
+   that fails to apply, or schema drift, fails the gate as it fails CI.
+4. Tests run with `DATABASE_URL=postgresql://postgres@<container>:5432/myorganiser`.
+5. The container and network are removed when the gate finishes, pass or fail.
+
+If the database cannot be started, the gate **fails closed** and says so with "no database for
+`backend:test`" — an environment failure, not a verdict on the code. Check Docker and that
+`postgres:16` can be pulled, then re-run with `--gate-only`.
+
+With no backend tests in scope, no database is started. The container still gets the placeholder
+`postgresql://localhost:5432/myorganiser`: several backend modules construct a `PrismaClient` at
+module scope, so a suite importing one throws on import when the variable is absent.
+
+Setting `SLICE_GATE_DATABASE_URL` skips all of this and hands that URL to the container as-is;
+the gate neither starts a database nor applies migrations to yours. The URL must be reachable from
+inside the gate container, so `localhost` means the container, not your machine.
+
+A run killed outright (for example `kill -9`) skips the cleanup. Every gate database and network
+carries the `sandcastle.gate-db=1` label, so remove leftovers with:
+
+```bash
+docker rm -f $(docker ps -aq --filter label=sandcastle.gate-db=1)
+```
+
+```bash
+docker network prune --filter label=sandcastle.gate-db=1
+```
 
 `test` runs as its own `nx run-many` invocation so it can carry `--maxWorkers`, which the build
 executors must not see. Jest sizes its pool from the CPU count visible inside the container — the
