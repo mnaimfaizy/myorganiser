@@ -5,12 +5,6 @@
   // deprecated `node` — this config does not extend tsconfig.base.json at
   // all, so it never inherits that setting by accident.
   //
-  // `copilot-hooks/__tests__` is excluded because its specs are Jest
-  // (`describe`/`it`/`expect`, jest globals), typechecked today by
-  // `tools/tsconfig.spec.json`'s `types: ["jest", "node"]`. ADR 0135 moves
-  // them to `node --test` in its own later slice; until then they stay on
-  // the Jest program rather than failing here for missing jest types.
-  //
   // `allowJs`/`checkJs: false` let a migrated `.ts` file import a module
   // that is not TypeScript (e.g. `check-upstream-briefs.ts` ->
   // `.agents/skills/upstream-brief/report.mjs`, which ADR 0135 leaves out of
@@ -33,6 +27,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["copilot-hooks/__tests__"]
+  "include": ["**/*.ts"]
 }

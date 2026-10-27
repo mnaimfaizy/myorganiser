@@ -4,8 +4,8 @@
     "postToolUse": [
       {
         "type": "command",
-        "bash": "node tools/scripts/copilot-hooks/post-tool-use.mjs",
-        "powershell": "node tools/scripts/copilot-hooks/post-tool-use.mjs",
+        "bash": "node tools/scripts/copilot-hooks/post-tool-use.ts",
+        "powershell": "node tools/scripts/copilot-hooks/post-tool-use.ts",
         "cwd": ".",
         "timeoutSec": 5
       }

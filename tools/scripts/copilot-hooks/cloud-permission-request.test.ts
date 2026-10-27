@@ -1,8 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   CLOUD_PERMISSION_REQUEST_HOOK,
   runHookRaw,
   shellPayload,
-} from './hook-harness';
+} from './hook-harness.ts';
 
 describe('cloud-permission-request hook', () => {
   const cloudEnv = { CLAUDE_CODE_REMOTE: 'true' };
@@ -17,13 +19,13 @@ describe('cloud-permission-request hook', () => {
         },
       );
 
-      expect(result.status).toBe(0);
-      expect(result.stdout).toBe('');
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, '');
     });
   });
 
   describe('cloud session — approvable commands', () => {
-    const approvableCases = [
+    const approvableCases: [toolName: string, command: string][] = [
       // git push with Bash
       ['Bash', 'git push -u origin chore/1-test'],
       ['Bash', 'git push origin feat/123:feat/123'],
@@ -39,24 +41,23 @@ describe('cloud-permission-request hook', () => {
       ['PowerShell', 'git push origin feat/a:feat/a'],
     ];
 
-    it.each(approvableCases)(
-      'should approve %s command: %s',
-      (toolName, command) => {
+    for (const [toolName, command] of approvableCases) {
+      it(`should approve ${toolName} command: ${command}`, () => {
         const result = runHookRaw(
           CLOUD_PERMISSION_REQUEST_HOOK,
           shellPayload(toolName, command),
           { env: cloudEnv },
         );
 
-        expect(result.status).toBe(0);
-        expect(result.stdout).toContain('PermissionRequest');
-        expect(result.stdout).toContain('allow');
-      },
-    );
+        assert.equal(result.status, 0);
+        assert.ok(result.stdout.includes('PermissionRequest'));
+        assert.ok(result.stdout.includes('allow'));
+      });
+    }
   });
 
   describe('cloud session — commands that stay silent (no approval)', () => {
-    const silentCases = [
+    const silentCases: [command: string][] = [
       // Protected branches and refs
       ['git push origin main'],
       ['git push origin master'],
@@ -100,36 +101,37 @@ describe('cloud-permission-request hook', () => {
       ['git push origin feature:dest:extra'],
     ];
 
-    it.each(silentCases)('should stay silent: %s', (command) => {
-      const result = runHookRaw(
-        CLOUD_PERMISSION_REQUEST_HOOK,
-        shellPayload('Bash', command),
-        { env: cloudEnv },
-      );
+    for (const [command] of silentCases) {
+      it(`should stay silent: ${command}`, () => {
+        const result = runHookRaw(
+          CLOUD_PERMISSION_REQUEST_HOOK,
+          shellPayload('Bash', command),
+          { env: cloudEnv },
+        );
 
-      expect(result.status).toBe(0);
-      expect(result.stdout).toBe('');
-    });
+        assert.equal(result.status, 0);
+        assert.equal(result.stdout, '');
+      });
+    }
   });
 
   describe('non-Bash/PowerShell tools and edge cases', () => {
-    const nonShellCases = [
+    const nonShellCases: [toolName: string, toolInput: object][] = [
       ['Read', { file_path: 'src/app.ts' }],
       ['Write', { file_path: 'src/app.ts', content: 'code' }],
     ];
 
-    it.each(nonShellCases)(
-      'should stay silent for %s tool',
-      (toolName, toolInput) => {
+    for (const [toolName, toolInput] of nonShellCases) {
+      it(`should stay silent for ${toolName} tool`, () => {
         const result = runHookRaw(
           CLOUD_PERMISSION_REQUEST_HOOK,
           { tool_name: toolName, tool_input: toolInput },
           { env: cloudEnv },
         );
 
-        expect(result.status).toBe(0);
-        expect(result.stdout).toBe('');
-      },
-    );
+        assert.equal(result.status, 0);
+        assert.equal(result.stdout, '');
+      });
+    }
   });
 });

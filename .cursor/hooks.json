@@ -3,24 +3,24 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "node tools/scripts/copilot-hooks/secret-scan.mjs",
+        "command": "node tools/scripts/copilot-hooks/secret-scan.ts",
         "matcher": "Shell|Write|Delete",
         "timeout": 5
       },
       {
-        "command": "node tools/scripts/copilot-hooks/pre-tool-use.mjs",
+        "command": "node tools/scripts/copilot-hooks/pre-tool-use.ts",
         "matcher": "Shell|Write|Delete",
         "timeout": 5
       }
     ],
     "postToolUse": [
       {
-        "command": "node tools/scripts/copilot-hooks/post-tool-use.mjs",
+        "command": "node tools/scripts/copilot-hooks/post-tool-use.ts",
         "matcher": "Shell|Write|Delete",
         "timeout": 5
       },
       {
-        "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.mjs",
+        "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.ts",
         "matcher": "Shell",
         "timeout": 5
       }

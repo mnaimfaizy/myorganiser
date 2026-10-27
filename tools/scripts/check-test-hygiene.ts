@@ -406,8 +406,8 @@ function isE2E(file: string) {
 /** A `node --test` Contract Suite (ADR 0135), not a Jest spec: it asserts
  *  with `node:assert`, never `expect()`, so the Jest-oriented checks below
  *  would read it as having none. Matched by `.test.ts` specifically — a
- *  `tools/scripts/copilot-hooks/__tests__/*.spec.ts` file is a Jest spec
- *  this checker still has to run. */
+ *  `*.spec.ts` file under tools/scripts would be a Jest spec this checker
+ *  still has to run. */
 function isToolsScripts(file: string) {
   const normalized = path.normalize(file).replace(/\\/g, '/');
   return (

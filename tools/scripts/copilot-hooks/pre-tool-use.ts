@@ -11,10 +11,10 @@ import {
   readPayloadOrExit,
   SHELL_TOOL_NAMES,
   stripHeredocBodies,
-} from './lib.mjs';
+} from './lib.ts';
 
 /** Read-only tools across harnesses. Not mutating, but they can exfiltrate. */
-const READ_TOOL_NAMES = new Set([
+const READ_TOOL_NAMES = new Set<string>([
   'glob',
   'grep',
   'read',
@@ -30,7 +30,7 @@ const READ_TOOL_NAMES = new Set([
  * carries a search expression, not a path, and matching it would block a plain
  * `grep "secrets"`.
  */
-const READ_PATH_KEYS = new Set([
+const READ_PATH_KEYS = new Set<string>([
   'dir',
   'directory',
   'file',
@@ -51,7 +51,7 @@ const READ_PATH_KEYS = new Set([
   'targets',
 ]);
 
-const PATH_KEYS = new Set([
+const PATH_KEYS = new Set<string>([
   'dest',
   'destination',
   'dir',
@@ -78,13 +78,22 @@ const PATH_KEYS = new Set([
   'targets',
 ]);
 
+/** A path rule: matched against normalized text, unless `exclude` says otherwise. */
+interface PathRule {
+  pattern: RegExp;
+  reason: string;
+  exclude?: (normalized: string) => boolean;
+  /** Checked against structured path arguments only, never raw command text. */
+  pathOnly?: boolean;
+}
+
 /**
  * Workflow guards: generated or tool-owned outputs that must be regenerated
  * rather than hand-edited. These are lifted inside the sandbox (see SANDBOX
  * below) — there they are pure friction, and blocking them also blocks the
  * recovery commands an agent needs to undo its own mistake.
  */
-const WORKFLOW_PROTECTED_PATTERNS = [
+const WORKFLOW_PROTECTED_PATTERNS: PathRule[] = [
   {
     pattern: /(^|[^a-z0-9])libs\/app-api-client\/src(?:\/|$)/i,
     reason:
@@ -118,10 +127,11 @@ const WORKFLOW_PROTECTED_PATTERNS = [
  * filesystem is disposable, but the transcript is not: it is written to
  * .sandcastle/logs on the host and fed back into model context.
  */
-const SECRET_WRITE_PATTERNS = [
+const SECRET_WRITE_PATTERNS: PathRule[] = [
   {
     pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized) => /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
+    exclude: (normalized: string) =>
+      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
     reason:
       'Direct edits to environment files are blocked. Keep secrets in local env files or managed secret storage.',
   },
@@ -165,10 +175,11 @@ const PROTECTED_PATTERNS = SANDBOX
  * raw shell command text, where the token is too ambiguous to match safely
  * (`.key` would fire on `obj.key`).
  */
-const SECRET_READ_PATTERNS = [
+const SECRET_READ_PATTERNS: PathRule[] = [
   {
     pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized) => /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
+    exclude: (normalized: string) =>
+      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
     reason:
       'Reading environment files is blocked. They hold live credentials — read `.env.example` for the shape, or ask the user for the specific value.',
   },
@@ -201,7 +212,10 @@ const SECRET_READ_PATTERNS = [
   },
 ];
 
-function getSecretReadReason(text, { pathOnly = false } = {}) {
+function getSecretReadReason(
+  text: string,
+  { pathOnly = false }: { pathOnly?: boolean } = {},
+): string | null {
   const normalized = normalizeText(text);
 
   for (const rule of SECRET_READ_PATTERNS) {
@@ -221,7 +235,7 @@ function getSecretReadReason(text, { pathOnly = false } = {}) {
   return null;
 }
 
-function inspectReadNode(node, key = '') {
+function inspectReadNode(node: unknown, key = ''): string | null {
   if (node === null || node === undefined) {
     return null;
   }
@@ -255,7 +269,7 @@ function inspectReadNode(node, key = '') {
   return getSecretReadReason(node, { pathOnly: true });
 }
 
-function looksLikePath(text) {
+function looksLikePath(text: string): boolean {
   const normalized = normalizeText(text);
 
   return (
@@ -265,7 +279,7 @@ function looksLikePath(text) {
   );
 }
 
-function getProtectedPathReason(text) {
+function getProtectedPathReason(text: string): string | null {
   const normalized = normalizeText(text);
 
   for (const rule of PROTECTED_PATTERNS) {
@@ -281,7 +295,7 @@ function getProtectedPathReason(text) {
   return null;
 }
 
-function inspectPatchText(text) {
+function inspectPatchText(text: string): string | null {
   const lines = text.split(/\r?\n/);
 
   for (const line of lines) {
@@ -302,7 +316,7 @@ function inspectPatchText(text) {
   return null;
 }
 
-function inspectNode(node, key = '') {
+function inspectNode(node: unknown, key = ''): string | null {
   if (node === null || node === undefined) {
     return null;
   }
@@ -350,7 +364,7 @@ function inspectNode(node, key = '') {
   return null;
 }
 
-function inspectToolInput(toolName, toolInput) {
+function inspectToolInput(toolName: string, toolInput: unknown): string | null {
   if (!toolName) {
     return null;
   }
@@ -419,7 +433,7 @@ async function main() {
   if (SHELL_TOOL_NAMES.has(toolName)) {
     // Same reasoning as the write guard: a heredoc body that *names* an env
     // file is prose, not a read of it. Actual secret values in that body are
-    // still caught by secret-scan.mjs, which scans content on purpose.
+    // still caught by secret-scan.ts, which scans content on purpose.
     const readReason = getSecretReadReason(
       stripHeredocBodies(extractCommand(toolInput)),
     );

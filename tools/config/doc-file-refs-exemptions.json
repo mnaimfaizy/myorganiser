@@ -51,6 +51,11 @@
       "file": "docs/adr/0124-the-npm-audit-runs-on-main-and-a-failure-there-is-one-tracked-issue.md",
       "claim": "tools/scripts/ci/dependency-manifest-changed.mjs",
       "reason": "Names commit 5e02d893 (#284) by the path the detector had in August 2026, when that commit made it content-aware. ADR 0135 moved the script to tools/scripts/ci/dependency-manifest-changed.ts; the sentence is a dated historical record of that commit, not a pointer for a reader to follow today."
+    },
+    {
+      "file": "docs/adr/0135-tooling-scripts-are-typescript-run-by-node-and-tested-by-node-test.md",
+      "claim": "tools/jest.config.ts",
+      "reason": "The Decision states that tools/jest.config.ts is deleted; issue #1336 deleted it when the copilot-hooks Jest specs moved to node --test. The path names the file the decision retires, not a pointer for a reader to follow today."
     }
   ]
 }

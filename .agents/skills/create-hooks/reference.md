@@ -51,7 +51,7 @@ Cursor-only extras: `beforeShellExecution`, `afterShellExecution`,
 | Claude       | `Bash`               | `Edit` / `Write`                       | `Write`                      | —            |
 | VS Code Chat | `runTerminalCommand` | `editFiles` / `replace_string_in_file` | `createFile` / `create_file` | `deleteFile` |
 
-## Output Fields Emitted by `lib.mjs`
+## Output Fields Emitted by `lib.ts`
 
 ### Allow (`allowTool`)
 

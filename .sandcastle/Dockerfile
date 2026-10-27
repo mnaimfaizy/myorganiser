@@ -140,7 +140,7 @@ RUN node -e "const f='/home/agent/.claude.json',fs=require('fs');let j={};try{j=
 # only block legitimate work, including the `git restore` an agent needs to undo
 # its own mistake. Secret guards (.env, credentials, key material) are NOT
 # lifted — the transcript still leaves the container. See
-# tools/scripts/copilot-hooks/pre-tool-use.mjs.
+# tools/scripts/copilot-hooks/pre-tool-use.ts.
 ENV MYORGANISER_SANDBOX=1
 
 WORKDIR /home/agent

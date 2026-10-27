@@ -21,12 +21,12 @@ points at it.
 
 ## Canonical Layout
 
-| Harness                    | Config                              | Notes                                                 |
-| -------------------------- | ----------------------------------- | ----------------------------------------------------- |
-| GitHub Copilot CLI / cloud | `.github/hooks/<name>.json`         | `version: 1`, camelCase events, `bash` + `powershell` |
-| Cursor IDE / CLI / cloud   | `.cursor/hooks.json`                | Single file, camelCase events, `command` string only  |
-| Claude Code                | `.claude/settings.json` → `hooks`   | PascalCase events, nested `matcher` + `hooks[]`       |
-| Shared scripts             | `tools/scripts/copilot-hooks/*.mjs` | Always use `./lib.mjs` helpers                        |
+| Harness                    | Config                             | Notes                                                 |
+| -------------------------- | ---------------------------------- | ----------------------------------------------------- |
+| GitHub Copilot CLI / cloud | `.github/hooks/<name>.json`        | `version: 1`, camelCase events, `bash` + `powershell` |
+| Cursor IDE / CLI / cloud   | `.cursor/hooks.json`               | Single file, camelCase events, `command` string only  |
+| Claude Code                | `.claude/settings.json` → `hooks`  | PascalCase events, nested `matcher` + `hooks[]`       |
+| Shared scripts             | `tools/scripts/copilot-hooks/*.ts` | Always use `./lib.ts` helpers                         |
 
 Cursor does **not** read `.github/hooks/*.json`. Copilot cloud does **not** read
 `.cursor/hooks.json`. Wire both when the behavior should apply everywhere.
@@ -56,17 +56,20 @@ Hook Progress:
 | -------------------------- | ----------------------------------------------------------------------------- |
 | Block a tool call          | `preToolUse` (all). Cursor also has `beforeShellExecution` / `beforeReadFile` |
 | Remind after a change      | `postToolUse`                                                                 |
-| Package install → dep-sync | `postToolUse` + shell matcher → `dep-sync-reminder.mjs`                       |
+| Package install → dep-sync | `postToolUse` + shell matcher → `dep-sync-reminder.ts`                        |
 
 ### 2. Write or extend a shared script
 
-- Import from `./lib.mjs`: `readPayloadOrExit`, `getToolName`, `getToolInput`,
+- Import from `./lib.ts`: `readPayloadOrExit`, `getToolName`, `getToolInput`,
   `isMutatingTool`, `allowTool`, `denyTool`, `emitAdditionalContext`
 - Never `process.exit(1)` on parse errors — use `readPayloadOrExit` (fail-open)
 - Allow/skip with `allowTool()` on preToolUse scripts (required before enabling
   Cursor `failClosed`)
 - Block with `denyTool(reason)` (emits dual-format JSON + exit `2`)
 - Remind with `emitAdditionalContext(message)` (emits Copilot + Cursor + Claude fields)
+- Pin its behaviour in a `node --test` Contract Suite beside it,
+  `<script>.test.ts`, driving the hook as a subprocess through `./hook-harness.ts`;
+  `yarn tools:test` runs it
 
 ### 3. Wire harness configs
 
@@ -79,8 +82,8 @@ Hook Progress:
     "preToolUse": [
       {
         "type": "command",
-        "bash": "node tools/scripts/copilot-hooks/<script>.mjs",
-        "powershell": "node tools/scripts/copilot-hooks/<script>.mjs",
+        "bash": "node tools/scripts/copilot-hooks/<script>.ts",
+        "powershell": "node tools/scripts/copilot-hooks/<script>.ts",
         "cwd": ".",
         "timeoutSec": 5
       }
@@ -97,7 +100,7 @@ Hook Progress:
   "hooks": {
     "preToolUse": [
       {
-        "command": "node tools/scripts/copilot-hooks/<script>.mjs",
+        "command": "node tools/scripts/copilot-hooks/<script>.ts",
         "matcher": "Shell|Write|Delete",
         "timeout": 5
       }
@@ -121,7 +124,7 @@ Cursor (including this agent).
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/<script>.mjs",
+            "command": "node tools/scripts/copilot-hooks/<script>.ts",
             "timeout": 5
           }
         ]
@@ -144,8 +147,8 @@ Cursor (including this agent).
 ### 5. Smoke-test
 
 ```powershell
-'{"toolName":"bash","toolArgs":"{\"command\":\"ls\"}"}' | node tools/scripts/copilot-hooks/<script>.mjs; echo exit=$LASTEXITCODE
-'{"toolName":"edit","toolArgs":"{\"path\":\"libs/app-api-client/src/index.ts\"}"}' | node tools/scripts/copilot-hooks/pre-tool-use.mjs; echo exit=$LASTEXITCODE
+'{"toolName":"bash","toolArgs":"{\"command\":\"ls\"}"}' | node tools/scripts/copilot-hooks/<script>.ts; echo exit=$LASTEXITCODE
+'{"toolName":"edit","toolArgs":"{\"path\":\"libs/app-api-client/src/index.ts\"}"}' | node tools/scripts/copilot-hooks/pre-tool-use.ts; echo exit=$LASTEXITCODE
 ```
 
 | Exit  | Meaning         |
@@ -156,14 +159,14 @@ Cursor (including this agent).
 
 ## Existing Shared Scripts
 
-| Script                         | Role                                                                                                                                   |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `pre-tool-use.mjs`             | Block edits to generated/protected paths                                                                                               |
-| `secret-scan.mjs`              | Block secret-looking tool input                                                                                                        |
-| `post-tool-use.mjs`            | Remind after OpenAPI/Prisma contract edits                                                                                             |
-| `dep-sync-reminder.mjs`        | Remind `/dep-sync` after package manager mutations                                                                                     |
-| `cloud-permission-request.mjs` | Claude-only `PermissionRequest`: in cloud sessions (`CLAUDE_CODE_REMOTE=true`), approve a feature-branch `git push` and `ai:create-pr` |
-| `lib.mjs`                      | Shared stdin parsing + dual-format output                                                                                              |
+| Script                        | Role                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `pre-tool-use.ts`             | Block edits to generated/protected paths                                                                                               |
+| `secret-scan.ts`              | Block secret-looking tool input                                                                                                        |
+| `post-tool-use.ts`            | Remind after OpenAPI/Prisma contract edits                                                                                             |
+| `dep-sync-reminder.ts`        | Remind `/dep-sync` after package manager mutations                                                                                     |
+| `cloud-permission-request.ts` | Claude-only `PermissionRequest`: in cloud sessions (`CLAUDE_CODE_REMOTE=true`), approve a feature-branch `git push` and `ai:create-pr` |
+| `lib.ts`                      | Shared stdin parsing + dual-format output                                                                                              |
 
 ## Claude launches guards with `--defer`
 
@@ -175,7 +178,7 @@ The Claude launcher in `.claude/settings.json` passes `--defer`, which makes
 unchanged. Copilot and Cursor launch without it and keep the explicit allow.
 A new Claude PreToolUse entry must pass `--defer` too.
 
-`cloud-permission-request.mjs` relies on two facts from the Claude Code docs
+`cloud-permission-request.ts` relies on two facts from the Claude Code docs
 ([hooks](https://code.claude.com/docs/en/hooks#permissionrequest),
 [env vars](https://code.claude.com/docs/en/env-vars)), not on anything this
 repository runs: that Claude Code dispatches a `PermissionRequest` event before

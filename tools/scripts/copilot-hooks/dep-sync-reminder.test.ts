@@ -2,7 +2,7 @@
  * Tests for the dep-sync-reminder hook.
  *
  * Uses Node's built-in test runner (node --test).
- * Run with: node --test tools/scripts/copilot-hooks/dep-sync-reminder.test.mjs
+ * Run with: node --test tools/scripts/copilot-hooks/dep-sync-reminder.test.ts
  *
  * Imports the real module rather than re-typing its regexes and message loop.
  */
@@ -17,7 +17,7 @@ import {
   extractCommand,
   isPackageMutation,
   shouldEmitReminder,
-} from './dep-sync-reminder.mjs';
+} from './dep-sync-reminder.ts';
 
 const DEP_SYNC_LINE =
   'package.json may have changed — run /dep-sync to update TECH_STACK.md.';
@@ -26,13 +26,18 @@ function makeTmp() {
   return mkdtempSync(join(process.cwd(), 'tmp-'));
 }
 
-function writeInstalled(repoDir, lead, version) {
+function writeInstalled(repoDir: string, lead: string, version: string) {
   const dir = join(repoDir, 'node_modules', lead);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ version }));
 }
 
-function writeReport(briefDir, lead, baseline, checkedAndClear) {
+function writeReport(
+  briefDir: string,
+  lead: string,
+  baseline: string,
+  checkedAndClear: { claim: string; holdsFor: string }[],
+) {
   mkdirSync(briefDir, { recursive: true });
   writeFileSync(
     join(briefDir, `${lead}-report.json`),
@@ -45,7 +50,7 @@ function writeReport(briefDir, lead, baseline, checkedAndClear) {
   );
 }
 
-function shellPayload(toolName, command) {
+function shellPayload(toolName: string, command: string) {
   return { tool_name: toolName, tool_input: { command } };
 }
 

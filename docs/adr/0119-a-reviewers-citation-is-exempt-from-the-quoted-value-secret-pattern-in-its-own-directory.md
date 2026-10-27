@@ -14,7 +14,7 @@ write the line as it is.
 Five tracked E2E specs hold a fixture of one shape — a `passphrase` constant assigned a multi-word
 English phrase of 28 characters (`vault.spec.ts`, `vault-export-import.spec.ts` twice,
 `groceries.spec.ts`, `groceries-items.spec.ts`). The secret-scan PreToolUse hook
-(`tools/scripts/copilot-hooks/secret-scan.mjs`) denies any tool input matching a credential-like
+(`tools/scripts/copilot-hooks/secret-scan.ts`) denies any tool input matching a credential-like
 name, `=` or `:`, then a quoted value of 16 or more characters. The fixture matches. A reviewer that
 cites it has its Write to `tmp/code-review/obligations.answers.json` refused, and the review ends
 with no report. Reproduced against the hook: the same payload with a short value is allowed. The

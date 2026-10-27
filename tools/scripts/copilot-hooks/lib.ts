@@ -7,7 +7,32 @@ import process from 'node:process';
  * Scripts emit dual-format JSON so one implementation works across hosts.
  */
 
-export const MUTATING_TOOL_NAMES = new Set([
+/**
+ * A hook's stdin payload. Each harness names the same fields differently, so
+ * every one is optional and read through `getToolName` / `getToolInput`.
+ */
+export interface HookPayload {
+  toolName?: unknown;
+  tool_name?: unknown;
+  tool?: unknown;
+  name?: unknown;
+  toolArgs?: unknown;
+  tool_args?: unknown;
+  toolInput?: unknown;
+  tool_input?: unknown;
+  input?: unknown;
+  args?: unknown;
+  arguments?: unknown;
+  cwd?: unknown;
+}
+
+/** An open heredoc waiting for its terminator line. */
+interface HeredocTerminator {
+  delimiter: string;
+  stripIndent: boolean;
+}
+
+export const MUTATING_TOOL_NAMES = new Set<string>([
   // Copilot CLI / cloud
   'apply_patch',
   'applypatch',
@@ -44,12 +69,12 @@ export const MUTATING_TOOL_NAMES = new Set([
   'write',
 ]);
 
-export function normalizeText(value) {
+export function normalizeText(value: string): string {
   return value.replace(/\\/g, '/').toLowerCase();
 }
 
 /** Tool names whose input carries a shell command rather than file arguments. */
-export const SHELL_TOOL_NAMES = new Set([
+export const SHELL_TOOL_NAMES = new Set<string>([
   'bash',
   'command',
   'execute',
@@ -60,7 +85,12 @@ export const SHELL_TOOL_NAMES = new Set([
 ]);
 
 /** Input keys that hold a shell command. */
-export const COMMAND_KEYS = new Set(['cmd', 'command', 'script', 'shell']);
+export const COMMAND_KEYS = new Set<string>([
+  'cmd',
+  'command',
+  'script',
+  'shell',
+]);
 
 /**
  * Input keys that name a file a tool is about to write.
@@ -69,7 +99,7 @@ export const COMMAND_KEYS = new Set(['cmd', 'command', 'script', 'shell']);
  * every content-bearing key — `content`, `new_string`, `old_string`. Matching
  * content is how a hook ends up firing because a document *mentions* a path.
  */
-export const WRITE_PATH_KEYS = new Set([
+export const WRITE_PATH_KEYS = new Set<string>([
   'dest',
   'destination',
   'dir',
@@ -95,9 +125,9 @@ export const WRITE_PATH_KEYS = new Set([
 // the lookarounds keep `>=`, `=>`, and `->` from reading as redirects at all. Getting this wrong
 // is not cosmetic: a bare `/>/` test made every command carrying `2>/dev/null` look like a write.
 const FILE_REDIRECT = /(?<![-=>])>{1,2}(?![=>])\s*([^\s|;&<>]+)/g;
-const NULL_SINKS = new Set(['/dev/null', 'nul', '$null']);
+const NULL_SINKS = new Set<string>(['/dev/null', 'nul', '$null']);
 
-export function hasFileRedirect(normalized) {
+export function hasFileRedirect(normalized: string): boolean {
   for (const match of normalized.matchAll(FILE_REDIRECT)) {
     if (!NULL_SINKS.has(match[1])) {
       return true;
@@ -113,7 +143,7 @@ export function hasFileRedirect(normalized) {
  * Conservative by design — a read misclassified as a write blocks or nags on
  * `ls`, `cat`, and `grep`, which is the failure this guard exists to avoid.
  */
-export function isLikelyWriteCommand(command) {
+export function isLikelyWriteCommand(command: string): boolean {
   const normalized = normalizeText(command);
 
   return (
@@ -145,11 +175,11 @@ export function isLikelyWriteCommand(command) {
  * Handles `<<EOF`, `<<-EOF`, and quoted `<<'EOF'` / `<<"EOF"`. Herestrings
  * (`<<<`) carry no body and are left alone.
  */
-export function stripHeredocBodies(command) {
+export function stripHeredocBodies(command: string): string {
   const lines = command.split(/\r?\n/);
-  const output = [];
-  const pending = [];
-  let active = null;
+  const output: string[] = [];
+  const pending: HeredocTerminator[] = [];
+  let active: HeredocTerminator | null = null;
 
   for (const line of lines) {
     if (active) {
@@ -187,15 +217,16 @@ export function stripHeredocBodies(command) {
  * A relative `value` is joined to `baseDir` first; with no `baseDir` it stays
  * relative and so can never equal an absolute directory.
  */
-export function normalizePathForCompare(value, baseDir = '') {
+export function normalizePathForCompare(value: string, baseDir = ''): string {
   const unified = normalizeText(value);
   const base = normalizeText(baseDir);
-  const isAbsolute = (text) => text.startsWith('/') || /^[a-z]:\//.test(text);
+  const isAbsolute = (text: string) =>
+    text.startsWith('/') || /^[a-z]:\//.test(text);
   const joined = isAbsolute(unified) || !base ? unified : `${base}/${unified}`;
 
   const root =
     /^[a-z]:\//.exec(joined)?.[0] ?? (joined.startsWith('/') ? '/' : '');
-  const segments = [];
+  const segments: string[] = [];
   for (const segment of joined.slice(root.length).split('/')) {
     if (segment === '' || segment === '.') {
       continue;
@@ -213,7 +244,11 @@ export function normalizePathForCompare(value, baseDir = '') {
 }
 
 /** Whether `path` names something strictly inside `directory` — not the directory itself. */
-export function isPathInsideDirectory(path, directory, baseDir = '') {
+export function isPathInsideDirectory(
+  path: string,
+  directory: string,
+  baseDir = '',
+): boolean {
   const target = normalizePathForCompare(path, baseDir);
   const container = normalizePathForCompare(directory);
 
@@ -222,7 +257,7 @@ export function isPathInsideDirectory(path, directory, baseDir = '') {
   );
 }
 
-export function extractCommand(toolInput) {
+export function extractCommand(toolInput: unknown): string {
   if (typeof toolInput === 'string') {
     return toolInput;
   }
@@ -231,8 +266,9 @@ export function extractCommand(toolInput) {
     return '';
   }
 
+  const record = toolInput as Record<string, unknown>;
   for (const key of COMMAND_KEYS) {
-    const value = toolInput[key];
+    const value = record[key];
     if (typeof value === 'string') {
       return value;
     }
@@ -246,7 +282,11 @@ export function extractCommand(toolInput) {
  * look like writes, and values under `WRITE_PATH_KEYS`. Unlike `collectStrings`
  * this never returns file content.
  */
-export function collectWriteTargets(node, key = '', output = []) {
+export function collectWriteTargets(
+  node: unknown,
+  key = '',
+  output: string[] = [],
+): string[] {
   if (node === null || node === undefined) {
     return output;
   }
@@ -286,7 +326,7 @@ export function collectWriteTargets(node, key = '', output = []) {
   return output;
 }
 
-export function getToolName(payload) {
+export function getToolName(payload: HookPayload | undefined): string {
   const value =
     payload?.toolName ??
     payload?.tool_name ??
@@ -297,7 +337,7 @@ export function getToolName(payload) {
   return typeof value === 'string' ? value.toLowerCase() : '';
 }
 
-export function getToolInput(payload) {
+export function getToolInput(payload: HookPayload | undefined): unknown {
   const raw =
     payload?.toolArgs ??
     payload?.tool_args ??
@@ -318,13 +358,13 @@ export function getToolInput(payload) {
   }
 
   try {
-    return JSON.parse(trimmed);
+    return JSON.parse(trimmed) as unknown;
   } catch {
     return raw;
   }
 }
 
-export function collectStrings(node, output = []) {
+export function collectStrings(node: unknown, output: string[] = []): string[] {
   if (node === null || node === undefined) {
     return output;
   }
@@ -351,12 +391,12 @@ export function collectStrings(node, output = []) {
   return output;
 }
 
-export function readStdin() {
+export function readStdin(): Promise<string> {
   return new Promise((resolve) => {
     let rawInput = '';
 
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => {
+    process.stdin.on('data', (chunk: string) => {
       rawInput += chunk;
     });
     process.stdin.on('end', () => {
@@ -370,7 +410,7 @@ export function readStdin() {
  * Never exit non-zero on parse errors — that fail-closes Copilot preToolUse
  * and can trip Cursor failClosed when stdout is empty.
  */
-export async function readPayloadOrExit() {
+export async function readPayloadOrExit(): Promise<HookPayload> {
   const rawInput = await readStdin();
 
   if (!rawInput.trim()) {
@@ -378,7 +418,7 @@ export async function readPayloadOrExit() {
   }
 
   try {
-    return JSON.parse(rawInput);
+    return JSON.parse(rawInput) as HookPayload;
   } catch (error) {
     console.error('[agent-hooks] Unable to parse hook payload.');
     console.error(error instanceof Error ? error.message : String(error));
@@ -386,7 +426,7 @@ export async function readPayloadOrExit() {
   }
 }
 
-export function isMutatingTool(toolName) {
+export function isMutatingTool(toolName: string): boolean {
   return Boolean(toolName) && MUTATING_TOOL_NAMES.has(toolName);
 }
 
@@ -407,7 +447,7 @@ const DEFER_ALLOW = process.argv.includes('--defer');
  * empty stdout is treated as hook failure and blocks the tool. Under `--defer`
  * it exits 0 with no output: no decision, so the normal permission flow applies.
  */
-export function allowTool() {
+export function allowTool(): never {
   if (DEFER_ALLOW) {
     process.exit(0);
   }
@@ -430,7 +470,7 @@ export function allowTool() {
  * Exit 2 is the portable "block" signal across Cursor and Claude; Copilot
  * preToolUse also treats exit 2 as deny.
  */
-export function denyTool(reason) {
+export function denyTool(reason: string): never {
   process.stdout.write(
     JSON.stringify({
       permissionDecision: 'deny',
@@ -451,7 +491,7 @@ export function denyTool(reason) {
 /**
  * Inject follow-up context after a tool completes.
  */
-export function emitAdditionalContext(message) {
+export function emitAdditionalContext(message: string): never {
   process.stdout.write(
     JSON.stringify({
       additionalContext: message,

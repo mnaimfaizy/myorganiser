@@ -8,10 +8,11 @@ import {
   extractCommand,
   getToolInput,
   getToolName,
+  type HookPayload,
   isMutatingTool,
   isPathInsideDirectory,
   readPayloadOrExit,
-} from './lib.mjs';
+} from './lib.ts';
 
 /**
  * The code-review reviewer records ADR 0078 citations — verbatim tracked source
@@ -28,14 +29,18 @@ const REPO_ROOT = resolve(
 const REVIEWER_OUTPUT_DIR = `${REPO_ROOT}/tmp/code-review`;
 
 /** Claude Code's file-writing tools. A shell command is never a reviewer write. */
-const REVIEWER_WRITE_TOOLS = new Set([
+const REVIEWER_WRITE_TOOLS = new Set<string>([
   'write',
   'edit',
   'multiedit',
   'multi_edit',
 ]);
 
-const SECRET_PATTERNS = [
+const SECRET_PATTERNS: {
+  pattern: RegExp;
+  reason: string;
+  exemptInReviewerOutput?: boolean;
+}[] = [
   {
     pattern: /-----BEGIN [A-Z0-9 ]+PRIVATE KEY-----/i,
     reason:
@@ -76,7 +81,11 @@ const SECRET_PATTERNS = [
  * qualifies. No destination at all is not a match: an unnamed target is not
  * known to be the reviewer's.
  */
-function isReviewerOutputWrite(payload, toolName, toolInput) {
+function isReviewerOutputWrite(
+  payload: HookPayload,
+  toolName: string,
+  toolInput: unknown,
+): boolean {
   if (!REVIEWER_WRITE_TOOLS.has(toolName) || extractCommand(toolInput) !== '') {
     return false;
   }
@@ -93,7 +102,10 @@ function isReviewerOutputWrite(payload, toolName, toolInput) {
   );
 }
 
-function getSecretReason(strings, { reviewerOutput = false } = {}) {
+function getSecretReason(
+  strings: string[],
+  { reviewerOutput = false }: { reviewerOutput?: boolean } = {},
+): string | null {
   for (const text of strings) {
     for (const secretPattern of SECRET_PATTERNS) {
       if (reviewerOutput && secretPattern.exemptInReviewerOutput) {

@@ -30,17 +30,13 @@
 // false-positive risk a bare substring match on an import specifier has in
 // `check-mobile-platform.ts`.
 //
-// `copilot-hooks/__tests__` is excluded, mirroring `tools/scripts/tsconfig.json`:
-// those specs are still Jest, not yet subject to ADR 0135's strict-TypeScript
-// convention this rule enforces, until their own later migration slice.
-//
-// Every other `.ts` file under `tools/scripts` is in scope, this file and its
+// Every `.ts` file under `tools/scripts` is in scope, this file and its
 // Contract Suite included.
 //
 // Exit 0 = zero violations. Exit 1 = a forbidden suppression comment was
 // found, naming the file and line. Exit 2 = the check could not run.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, resolve, sep } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { errorMessage } from './lib/error-message.ts';
 
@@ -49,8 +45,6 @@ const printOnly = args.includes('--print');
 const SCRIPTS_DIR = resolve(
   args.find((a) => !a.startsWith('--')) ?? 'tools/scripts',
 );
-
-const EXCLUDED_PREFIX = ['copilot-hooks', '__tests__'].join(sep) + sep;
 
 /**
  * The prefix every directive shares, kept apart from its suffix so no literal
@@ -66,15 +60,13 @@ const fail: (msg: string) => never = (msg) => {
   process.exit(2);
 };
 
-/** Every `.ts` file under `dir`, recursively, excluding the still-Jest copilot-hooks specs. Returns `[]` for a missing dir. */
+/** Every `.ts` file under `dir`, recursively. Returns `[]` for a missing dir. */
 function listTsFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { recursive: true })
     .filter(
       (entry): entry is string =>
-        typeof entry === 'string' &&
-        entry.endsWith('.ts') &&
-        !entry.startsWith(EXCLUDED_PREFIX),
+        typeof entry === 'string' && entry.endsWith('.ts'),
     )
     .sort();
 }

@@ -9,9 +9,9 @@ import {
   normalizeText,
   readPayloadOrExit,
   SHELL_TOOL_NAMES,
-} from './lib.mjs';
+} from './lib.ts';
 
-const CONTRACT_TARGETS = [
+const CONTRACT_TARGETS: { pattern: RegExp; additionalContext: string }[] = [
   {
     pattern: /(^|[^a-z0-9])apps\/backend\/src\/controllers(?:\/|$)/i,
     additionalContext:
@@ -32,7 +32,7 @@ const CONTRACT_TARGETS = [
  * contract change, and telling the agent to regenerate the API in those cases
  * trains it to ignore the reminder entirely.
  */
-function getWriteTargets(toolName, toolInput) {
+function getWriteTargets(toolName: string, toolInput: unknown): string[] {
   if (SHELL_TOOL_NAMES.has(toolName)) {
     const command = extractCommand(toolInput);
     return isLikelyWriteCommand(command) ? [command] : [];
@@ -45,8 +45,8 @@ function getWriteTargets(toolName, toolInput) {
   return collectWriteTargets(toolInput);
 }
 
-function getAdditionalContext(strings) {
-  const matches = new Set();
+function getAdditionalContext(strings: string[]): string | null {
+  const matches = new Set<string>();
 
   for (const text of strings) {
     const normalized = normalizeText(text);

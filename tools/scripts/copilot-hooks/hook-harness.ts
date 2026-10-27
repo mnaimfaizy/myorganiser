@@ -1,13 +1,13 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-export const PRE_TOOL_USE_HOOK = join(__dirname, '..', 'pre-tool-use.mjs');
-export const SECRET_SCAN_HOOK = join(__dirname, '..', 'secret-scan.mjs');
-export const POST_TOOL_USE_HOOK = join(__dirname, '..', 'post-tool-use.mjs');
+export const PRE_TOOL_USE_HOOK = join(import.meta.dirname, 'pre-tool-use.ts');
+export const SECRET_SCAN_HOOK = join(import.meta.dirname, 'secret-scan.ts');
+export const POST_TOOL_USE_HOOK = join(import.meta.dirname, 'post-tool-use.ts');
 export const CLOUD_PERMISSION_REQUEST_HOOK = join(
-  __dirname,
-  '..',
-  'cloud-permission-request.mjs',
+  import.meta.dirname,
+  'cloud-permission-request.ts',
 );
 
 /** Exit code the shared hook lib uses to block a tool call. */
@@ -30,9 +30,9 @@ export interface HookRunOptions {
  * Invoke a hook exactly as a harness does: JSON payload on stdin, decision on
  * stdout, block signalled by exit code 2.
  *
- * These hooks are ESM `.mjs` CLI scripts with no exports, and this Jest project
- * compiles to CommonJS — so they are exercised as subprocesses rather than
- * imported.
+ * These hooks are CLI scripts that act at import time — they read stdin and
+ * call `process.exit` — so they are exercised as subprocesses rather than
+ * imported, which is also exactly how a harness runs them.
  */
 export function runHook(
   hookPath: string,
@@ -45,7 +45,10 @@ export function runHook(
   let reason = '';
 
   try {
-    const parsed = JSON.parse(result.stdout || '{}');
+    const parsed = JSON.parse(result.stdout || '{}') as {
+      permissionDecision?: string;
+      permissionDecisionReason?: string;
+    };
     decision = parsed.permissionDecision ?? '';
     reason = parsed.permissionDecisionReason ?? '';
   } catch {
@@ -102,9 +105,9 @@ export function expectDenied(
 ): void {
   const outcome = runHook(hookPath, payload, options);
 
-  expect(outcome.status).toBe(DENY_EXIT_CODE);
-  expect(outcome.decision).toBe('deny');
-  expect(outcome.reason).toMatch(reasonPattern);
+  assert.equal(outcome.status, DENY_EXIT_CODE);
+  assert.equal(outcome.decision, 'deny');
+  assert.match(outcome.reason, reasonPattern);
 }
 
 export function expectAllowed(
@@ -114,8 +117,8 @@ export function expectAllowed(
 ): void {
   const outcome = runHook(hookPath, payload, options);
 
-  expect(outcome.status).toBe(0);
-  expect(outcome.decision).toBe('allow');
+  assert.equal(outcome.status, 0);
+  assert.equal(outcome.decision, 'allow');
 }
 
 export function shellPayload(toolName: string, command: string) {
@@ -132,17 +135,18 @@ export function runContextHook(hookPath: string, payload: unknown): string {
     encoding: 'utf8',
   });
 
-  expect(result.status).toBe(0);
+  assert.equal(result.status, 0);
 
   if (!result.stdout.trim()) {
     return '';
   }
 
-  return JSON.parse(result.stdout).additionalContext ?? '';
+  const parsed = JSON.parse(result.stdout) as { additionalContext?: string };
+  return parsed.additionalContext ?? '';
 }
 
 export function expectNoContext(hookPath: string, payload: unknown): void {
-  expect(runContextHook(hookPath, payload)).toBe('');
+  assert.equal(runContextHook(hookPath, payload), '');
 }
 
 export function expectContext(
@@ -150,5 +154,5 @@ export function expectContext(
   payload: unknown,
   pattern: RegExp,
 ): void {
-  expect(runContextHook(hookPath, payload)).toMatch(pattern);
+  assert.match(runContextHook(hookPath, payload), pattern);
 }

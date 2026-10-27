@@ -486,12 +486,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/secret-scan.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/secret-scan.ts --defer",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/pre-tool-use.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/pre-tool-use.ts --defer",
             "timeout": 5
           }
         ]
@@ -503,7 +503,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/cloud-permission-request.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/cloud-permission-request.ts --defer",
             "timeout": 5
           }
         ]
@@ -515,7 +515,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/post-tool-use.mjs",
+            "command": "node tools/scripts/copilot-hooks/post-tool-use.ts",
             "timeout": 5
           }
         ]
@@ -525,7 +525,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.mjs",
+            "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.ts",
             "timeout": 5
           }
         ]

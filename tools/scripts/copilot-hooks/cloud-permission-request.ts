@@ -1,4 +1,4 @@
-import { extractCommand, getToolInput, readPayloadOrExit } from './lib.mjs';
+import { extractCommand, getToolInput, readPayloadOrExit } from './lib.ts';
 
 /**
  * Claude Code `PermissionRequest` hook: answers a narrow set of permission
@@ -26,7 +26,7 @@ import { extractCommand, getToolInput, readPayloadOrExit } from './lib.mjs';
  * terminal, the desktop app's local sessions, and the CI reviewer never see it.
  *
  * Launch with `--defer`: this script never reads argv, but `readPayloadOrExit`
- * in lib.mjs does — on an empty or unparsable payload it calls `allowTool()`,
+ * in lib.ts does — on an empty or unparsable payload it calls `allowTool()`,
  * which without the flag prints a PreToolUse-shaped allow into a
  * PermissionRequest response.
  */
@@ -40,8 +40,8 @@ const PUSH_FLAGS = new Set(['-u', '--set-upstream']);
 const PROTECTED_REF =
   /^(?:refs\/heads\/)?(?:main|master|head|release\/.*)$|^refs\/tags\//i;
 
-function isSafePush(args) {
-  const positional = [];
+function isSafePush(args: string[]): boolean {
+  const positional: string[] = [];
 
   for (const arg of args) {
     if (arg.startsWith('-')) {
@@ -70,7 +70,7 @@ function isSafePush(args) {
   return !PROTECTED_REF.test(source) && !PROTECTED_REF.test(destination);
 }
 
-function isCloudApprovable(command) {
+function isCloudApprovable(command: string): boolean {
   const trimmed = command.trim();
   if (!trimmed || NOT_A_SIMPLE_COMMAND.test(trimmed)) {
     return false;

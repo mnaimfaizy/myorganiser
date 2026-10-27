@@ -4,8 +4,8 @@
     "postToolUse": [
       {
         "type": "command",
-        "bash": "node tools/scripts/copilot-hooks/dep-sync-reminder.mjs",
-        "powershell": "node tools/scripts/copilot-hooks/dep-sync-reminder.mjs",
+        "bash": "node tools/scripts/copilot-hooks/dep-sync-reminder.ts",
+        "powershell": "node tools/scripts/copilot-hooks/dep-sync-reminder.ts",
         "cwd": ".",
         "timeoutSec": 5
       }

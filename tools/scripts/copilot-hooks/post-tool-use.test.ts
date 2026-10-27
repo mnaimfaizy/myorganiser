@@ -1,9 +1,10 @@
+import { describe, it } from 'node:test';
 import {
   POST_TOOL_USE_HOOK,
   expectContext,
   expectNoContext,
   shellPayload,
-} from './hook-harness';
+} from './hook-harness.ts';
 
 const CONTROLLER = 'apps/backend/src/controllers/AuthController.ts';
 const SCHEMA_DIR = 'apps/backend/src/prisma/schema';

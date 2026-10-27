@@ -34,6 +34,25 @@ import {
   readDeclaredLeads,
 } from '../../../.agents/skills/upstream-brief/resolve-ledger.mjs';
 
+/** One Ecosystem's entry in a committed report, as far as this hook reads it. */
+interface ReportEcosystem {
+  lead?: unknown;
+  baseline?: unknown;
+  checkedAndClear?: unknown;
+}
+
+/** A committed report, plus the file it was read from. */
+export interface LatestReport {
+  ecosystems: (ReportEcosystem | null | undefined)[];
+  reportFile: string;
+}
+
+/** The adapter config, as far as this hook reads it. */
+export interface UpstreamBriefConfig {
+  ecosystems: { lead: string }[];
+  brief_dir: string;
+}
+
 /** Same lookup order as `resolve-ledger.mjs` — the first file present wins. */
 const ADAPTER_FILES = [
   'upstream-brief.config.yml',
@@ -42,13 +61,14 @@ const ADAPTER_FILES = [
 ];
 
 /**
- * @param {string|null} root join relative paths onto this directory; `null`
- *   leaves paths unchanged (absolute brief directories in the unit tests).
+ * @param root join relative paths onto this directory; `null` leaves paths
+ *   unchanged (absolute brief directories in the unit tests).
  */
-function makeFsIo(root = null) {
-  const resolvePath = (path) => (root == null ? path : join(root, path));
+function makeFsIo(root: string | null = null) {
+  const resolvePath = (path: string) =>
+    root == null ? path : join(root, path);
   return {
-    read(path) {
+    read(path: string): string | null {
       const absolute = resolvePath(path);
       if (!existsSync(absolute)) return null;
       try {
@@ -57,7 +77,7 @@ function makeFsIo(root = null) {
         return null;
       }
     },
-    list(dir) {
+    list(dir: string): string[] | null {
       const absolute = resolvePath(dir);
       if (!existsSync(absolute)) return null;
       return readdirSync(absolute, { withFileTypes: true })
@@ -67,7 +87,7 @@ function makeFsIo(root = null) {
   };
 }
 
-function hasAdapter(repoDir) {
+function hasAdapter(repoDir: string): boolean {
   return ADAPTER_FILES.some((name) => existsSync(join(repoDir, name)));
 }
 
@@ -75,7 +95,10 @@ function hasAdapter(repoDir) {
  * Resolve the installed version of a package from node_modules/package.json
  * (the lead package only — not companions).
  */
-export function resolveInstalledVersion(packageName, repoDir = process.cwd()) {
+export function resolveInstalledVersion(
+  packageName: string,
+  repoDir = process.cwd(),
+): string | null {
   const packageJsonPath = join(
     repoDir,
     'node_modules',
@@ -86,7 +109,7 @@ export function resolveInstalledVersion(packageName, repoDir = process.cwd()) {
 
   try {
     const content = readFileSync(packageJsonPath, 'utf8');
-    const pkg = JSON.parse(content);
+    const pkg = JSON.parse(content) as { version?: unknown };
     return typeof pkg.version === 'string' ? pkg.version : null;
   } catch {
     return null;
@@ -98,13 +121,14 @@ export function resolveInstalledVersion(packageName, repoDir = process.cwd()) {
  * file is present, so a first-time clone does not look like an empty Ecosystem
  * list.
  */
-export function loadConfig(repoDir = process.cwd()) {
+export function loadConfig(
+  repoDir = process.cwd(),
+): UpstreamBriefConfig | null {
   if (!hasAdapter(repoDir)) return null;
   const { read } = makeFsIo(repoDir);
+  const leads: string[] = readDeclaredLeads(read);
   return {
-    ecosystems: readDeclaredLeads(read)
-      .filter(Boolean)
-      .map((lead) => ({ lead })),
+    ecosystems: leads.filter(Boolean).map((lead) => ({ lead })),
     brief_dir: readBriefDir(read) ?? DEFAULT_BRIEF_DIR,
   };
 }
@@ -112,27 +136,33 @@ export function loadConfig(repoDir = process.cwd()) {
 /**
  * The latest committed report that carries this Ecosystem, or null.
  */
-export function findLatestReport(ecosystemLead, briefDir) {
+export function findLatestReport(
+  ecosystemLead: string,
+  briefDir: string,
+): LatestReport | null {
   const { read, list } = makeFsIo();
   const found = selectLatestLedgerReport(
     readCommittedReports(read, list, briefDir),
     ecosystemLead,
   );
   if (!found) return null;
-  return { ...found.report, reportFile: found.path };
+  return {
+    ...(found.report as Omit<LatestReport, 'reportFile'>),
+    reportFile: found.path,
+  };
 }
 
 /**
  * Check if an ecosystem's current baseline is outside the range recorded
  * in its latest report. Returns the ecosystem lead name if it needs a new brief.
  *
- * @returns {string|null} the ecosystem lead name, or null if no suggestion
+ * @returns the ecosystem lead name, or null if no suggestion
  */
 export function checkEcosystemBaseline(
-  ecosystemLead,
-  briefDir,
+  ecosystemLead: string,
+  briefDir: string,
   repoDir = process.cwd(),
-) {
+): string | null {
   const currentBaseline = resolveInstalledVersion(ecosystemLead, repoDir);
   if (!currentBaseline) return null;
 
@@ -156,7 +186,8 @@ export function checkEcosystemBaseline(
   });
 
   const baselineLeftRange = toResearch.some(
-    (item) => item.reason === RESEARCH.baselineOutsideRange,
+    (item) =>
+      (item as { reason?: unknown }).reason === RESEARCH.baselineOutsideRange,
   );
   return baselineLeftRange ? ecosystemLead : null;
 }
@@ -164,14 +195,14 @@ export function checkEcosystemBaseline(
 /**
  * Main entry point: check all configured ecosystems and return those needing a new brief.
  *
- * @returns {string[]} array of ecosystem lead names that need a new brief
+ * @returns ecosystem lead names that need a new brief
  */
-export function getUpstreamBriefSuggestions(repoDir = process.cwd()) {
+export function getUpstreamBriefSuggestions(repoDir = process.cwd()): string[] {
   const config = loadConfig(repoDir);
   if (!config) return [];
 
   const briefDirPath = join(repoDir, config.brief_dir || DEFAULT_BRIEF_DIR);
-  const suggestions = [];
+  const suggestions: string[] = [];
 
   for (const ecoConfig of config.ecosystems) {
     const lead = ecoConfig?.lead;

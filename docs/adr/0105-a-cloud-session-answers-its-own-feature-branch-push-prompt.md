@@ -6,7 +6,7 @@ terminal that costs a keystroke. In a cloud session (claude.ai/code), which
 exists to push a branch and open a pull request, it is a round trip to a
 browser tab for the one command the session was started to run. So a
 Claude-only `PermissionRequest` hook,
-`tools/scripts/copilot-hooks/cloud-permission-request.mjs`, answers that prompt
+`tools/scripts/copilot-hooks/cloud-permission-request.ts`, answers that prompt
 itself when Claude Code reports a cloud session. Everywhere else the prompt
 stands.
 

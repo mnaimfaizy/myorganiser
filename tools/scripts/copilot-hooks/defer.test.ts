@@ -1,10 +1,12 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   PRE_TOOL_USE_HOOK,
   SECRET_SCAN_HOOK,
   runHookRaw,
   expectDenied,
   shellPayload,
-} from './hook-harness';
+} from './hook-harness.ts';
 
 const ENV_FILE = '.env';
 
@@ -15,8 +17,8 @@ describe('--defer flag behavior', () => {
         args: ['--defer'],
       });
 
-      expect(result.status).toBe(0);
-      expect(result.stdout).toBe('');
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, '');
     });
 
     it('should still deny a Write to a protected file', () => {
@@ -34,9 +36,9 @@ describe('--defer flag behavior', () => {
     it('should exit 0 with explicit allow JSON without --defer', () => {
       const result = runHookRaw(PRE_TOOL_USE_HOOK, shellPayload('Bash', 'ls'));
 
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('permissionDecision');
-      expect(result.stdout).toContain('allow');
+      assert.equal(result.status, 0);
+      assert.ok(result.stdout.includes('permissionDecision'));
+      assert.ok(result.stdout.includes('allow'));
     });
   });
 
@@ -48,8 +50,8 @@ describe('--defer flag behavior', () => {
         { args: ['--defer'] },
       );
 
-      expect(result.status).toBe(0);
-      expect(result.stdout).toBe('');
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, '');
     });
   });
 });

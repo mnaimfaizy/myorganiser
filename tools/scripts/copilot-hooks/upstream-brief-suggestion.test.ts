@@ -2,7 +2,7 @@
  * Tests for upstream-brief-suggestion module.
  *
  * Uses Node's built-in test runner (node --test).
- * Run with: node --test tools/scripts/copilot-hooks/upstream-brief-suggestion.test.mjs
+ * Run with: node --test tools/scripts/copilot-hooks/upstream-brief-suggestion.test.ts
  *
  * Version comparison and range parsing live in the skill
  * (`.agents/skills/upstream-brief/{report,ledger}.mjs`); this suite covers
@@ -18,19 +18,24 @@ import {
   getUpstreamBriefSuggestions,
   findLatestReport,
   loadConfig,
-} from './upstream-brief-suggestion.mjs';
+} from './upstream-brief-suggestion.ts';
 
 function makeTmp() {
   return mkdtempSync(join(process.cwd(), 'tmp-'));
 }
 
-function writeInstalled(repoDir, lead, version) {
+function writeInstalled(repoDir: string, lead: string, version: string) {
   const dir = join(repoDir, 'node_modules', lead);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ version }));
 }
 
-function writeReport(briefDir, lead, baseline, checkedAndClear) {
+function writeReport(
+  briefDir: string,
+  lead: string,
+  baseline: string,
+  checkedAndClear: { claim: string; holdsFor: string }[],
+) {
   mkdirSync(briefDir, { recursive: true });
   writeFileSync(
     join(briefDir, `${lead}-report.json`),
@@ -119,8 +124,8 @@ test('findLatestReport: finds report by ecosystem lead', () => {
 
     const report = findLatestReport('nx', tmpDir);
     assert(report !== null);
-    assert.equal(report.ecosystems[0].lead, 'nx');
-    assert.equal(report.ecosystems[0].baseline, '22.7.7');
+    assert.equal(report.ecosystems[0]?.lead, 'nx');
+    assert.equal(report.ecosystems[0]?.baseline, '22.7.7');
   } finally {
     rmSync(tmpDir, { recursive: true });
   }

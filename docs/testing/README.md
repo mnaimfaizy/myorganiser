@@ -198,7 +198,7 @@ Aim for meaningful coverage, not high percentages. Priority order:
 
 ### Credentials in test fixtures
 
-A pre-tool-use hook (`tools/scripts/copilot-hooks/secret-scan.mjs`) blocks tool input that looks
+A pre-tool-use hook (`tools/scripts/copilot-hooks/secret-scan.ts`) blocks tool input that looks
 like a committed credential. Its rule is narrow and purely mechanical — a credential keyword,
 then `:` or `=`, then a quoted literal of **16 or more** characters:
 

@@ -1,10 +1,12 @@
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+
 import {
   SECRET_SCAN_HOOK,
   expectAllowed,
   expectDenied,
   shellPayload,
-} from './hook-harness';
+} from './hook-harness.ts';
 
 /**
  * Every credential-shaped fixture is assembled from fragments at runtime. A
@@ -25,9 +27,9 @@ const PASSPHRASE_FIXTURE = [
   "'",
 ].join('');
 
-// Compute REPO_ROOT: spec is at tools/scripts/copilot-hooks/__tests__/secret-scan.spec.ts,
-// so 4 levels up from __dirname reaches the repository root.
-const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
+// Compute REPO_ROOT: this suite is at tools/scripts/copilot-hooks/secret-scan.test.ts,
+// so 3 levels up from its directory reaches the repository root.
+const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
 describe('secret-scan hook', () => {
   describe('credential detection', () => {

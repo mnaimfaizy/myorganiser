@@ -1,10 +1,12 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   PRE_TOOL_USE_HOOK,
   expectAllowed,
   expectDenied,
   runHook,
   shellPayload,
-} from './hook-harness';
+} from './hook-harness.ts';
 
 const ENV_FILE = '.env';
 const ENV_EXAMPLE = '.env.example';
@@ -393,8 +395,8 @@ describe('pre-tool-use hook', () => {
     it('should allow the call when stdin carries no payload', () => {
       const outcome = runHook(PRE_TOOL_USE_HOOK, '');
 
-      expect(outcome.status).toBe(0);
-      expect(outcome.decision).toBe('allow');
+      assert.equal(outcome.status, 0);
+      assert.equal(outcome.decision, 'allow');
     });
   });
 

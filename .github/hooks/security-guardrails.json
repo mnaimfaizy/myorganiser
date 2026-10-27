@@ -4,8 +4,8 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "node tools/scripts/copilot-hooks/pre-tool-use.mjs",
-        "powershell": "node tools/scripts/copilot-hooks/pre-tool-use.mjs",
+        "bash": "node tools/scripts/copilot-hooks/pre-tool-use.ts",
+        "powershell": "node tools/scripts/copilot-hooks/pre-tool-use.ts",
         "cwd": ".",
         "timeoutSec": 5
       }
