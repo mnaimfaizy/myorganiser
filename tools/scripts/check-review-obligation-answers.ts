@@ -63,13 +63,13 @@ import { writeFileSync } from 'node:fs';
 import { ZodError } from 'zod';
 
 import { errorMessage } from './lib/error-message.ts';
-import { cannotRun, isMain, parseArgs, readJsonOr } from './review/cli.mjs';
+import { cannotRun, isMain, parseArgs, readJsonOr } from './review/cli.ts';
 import {
   AnswerSheetSchema,
   checkAnswers,
   obligationRuleId,
-} from './review/obligations.mjs';
-import { formatIssues } from './review/schema.mjs';
+} from './review/obligations.ts';
+import { formatIssues } from './review/schema.ts';
 
 const USAGE =
   'usage: check-review-obligation-answers.ts <worklist.json> <answers.json> [--report <report.json>] [--out <path>]';

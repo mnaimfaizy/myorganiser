@@ -36,14 +36,14 @@ import {
   parseResultsFile,
   renderRunsTable,
   seededCaseIds,
-} from './review/golden-results.mjs';
+} from './review/golden-results.ts';
 import {
   STANDING_END,
   STANDING_START,
   renderStandingTable,
-} from './review/golden-standing.mjs';
+} from './review/golden-standing.ts';
 import { errorMessage } from './lib/error-message.ts';
-import { GOLDEN_SET_PATH } from './review/golden-tiers.mjs';
+import { GOLDEN_SET_PATH } from './review/golden-tiers.ts';
 
 const RECORD = 'docs/review/golden-replay-results.jsonl';
 const LEDGER = 'docs/review/golden-replay-results.md';

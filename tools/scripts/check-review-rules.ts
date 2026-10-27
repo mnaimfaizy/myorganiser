@@ -32,8 +32,8 @@
 //      lost their markers would otherwise compare equal.
 //
 //   5. The skill stops printing the dispatch template the transcript reader
-//      expects. `review/briefs.mjs` holds the template, and
-//      `review/transcript-facts.mjs` reports a dispatch that differs from it
+//      expects. `review/briefs.ts` holds the template, and
+//      `review/transcript-facts.ts` reports a dispatch that differs from it
 //      as steered. A template reworded in the skill alone would make every
 //      correct dispatch read as steered, so each line of it, and the retry
 //      line, must appear in SKILL.md verbatim.
@@ -56,20 +56,20 @@ import {
   familyOf,
   loadRuleCatalogue,
   RULES_DISPLAY_PATH,
-} from './review/rules.mjs';
-import { BRIEFS, DISPATCH_TEMPLATES, RETRY_LINE } from './review/briefs.mjs';
-import { isMain } from './review/cli.mjs';
+} from './review/rules.ts';
+import { BRIEFS, DISPATCH_TEMPLATES, RETRY_LINE } from './review/briefs.ts';
+import { isMain } from './review/cli.ts';
 import {
   FINDING_AXES,
   FINDING_SEVERITIES,
   SMELL_BASELINE_SOURCE,
-} from './review/schema.mjs';
+} from './review/schema.ts';
 
 export const OBLIGATIONS = 'tools/config/review-obligations.json';
 export const SKILL = '.agents/skills/code-review/SKILL.md';
 
 // Re-exported: the brief paths live with the dispatch template in
-// review/briefs.mjs, which the transcript reader shares.
+// review/briefs.ts, which the transcript reader shares.
 export { BRIEFS };
 
 export const SHARED_BLOCK_START = '<!-- shared-block:start -->';

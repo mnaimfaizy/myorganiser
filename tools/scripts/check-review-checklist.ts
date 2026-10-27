@@ -23,12 +23,12 @@
 import { readFileSync } from 'node:fs';
 
 import { errorMessage } from './lib/error-message.ts';
-import { isMain } from './review/cli.mjs';
-import { loadGoldenSet } from './review/golden.mjs';
+import { isMain } from './review/cli.ts';
+import { loadGoldenSet } from './review/golden.ts';
 import {
   loadObligationCatalogue,
   normalizeCitedFields,
-} from './review/obligations.mjs';
+} from './review/obligations.ts';
 
 const CHECKLIST = 'docs/review/REVIEW_CHECKLIST.md';
 

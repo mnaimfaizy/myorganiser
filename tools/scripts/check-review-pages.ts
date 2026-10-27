@@ -16,7 +16,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { errorMessage } from './lib/error-message.ts';
-import { RULE_FAMILIES } from './review/rules.mjs';
+import { RULE_FAMILIES } from './review/rules.ts';
 import {
   FINDING_AXES,
   FINDING_EVIDENCE_KINDS,
@@ -26,7 +26,7 @@ import {
   REPORT_SCHEMA_VERSION,
   REVIEW_TIER_LABELS,
   VERDICT_VALUES,
-} from './review/schema.mjs';
+} from './review/schema.ts';
 
 const PAGE = 'docs/review/finding-lifecycle.html';
 const MANIFEST_ID = 'review-lifecycle-manifest';

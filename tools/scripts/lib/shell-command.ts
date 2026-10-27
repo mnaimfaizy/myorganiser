@@ -11,7 +11,7 @@
  * four.
  *
  * So the split lives here rather than as a copy in each file, for the reason
- * `tools/scripts/review/cli.mjs` gives for its own contents: two copies of one
+ * `tools/scripts/review/cli.ts` gives for its own contents: two copies of one
  * rule drift, and the drift is silent.
  */
 

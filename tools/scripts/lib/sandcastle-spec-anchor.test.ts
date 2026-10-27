@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { discoverSpec } from '../review/resolve-spec.mjs';
+import { discoverSpec } from '../review/resolve-spec.ts';
 import {
   branchNameCarriesIssue,
   prdBranchSlug,

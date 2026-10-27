@@ -17,8 +17,8 @@ import {
   idsOfferedBy,
   type CatalogueRule,
 } from './check-review-rules.ts';
-import { DISPATCH_TEMPLATES, RETRY_LINE } from './review/briefs.mjs';
-import { RULE_CATALOGUE_SCHEMA_VERSION } from './review/rules.mjs';
+import { DISPATCH_TEMPLATES, RETRY_LINE } from './review/briefs.ts';
+import { RULE_CATALOGUE_SCHEMA_VERSION } from './review/rules.ts';
 
 const rule = (over: Partial<CatalogueRule> = {}): CatalogueRule => ({
   id: 'standard-example',

@@ -42,8 +42,8 @@
 // not. Exit 2 = could not run.
 import { execFileSync } from 'node:child_process';
 
-import { attributeFix } from './review/escaped-defects.mjs';
-import { pullRequestType } from './review/measure-escaped-defects.mjs';
+import { attributeFix } from './review/escaped-defects.ts';
+import { pullRequestType } from './review/measure-escaped-defects.ts';
 
 const fail: (msg: string) => never = (msg) => {
   console.error(`fix-attribution: ${msg}`);

@@ -136,7 +136,7 @@ import { readFileSync } from 'node:fs';
 
 import { errorMessage } from './lib/error-message.ts';
 import { tokenize } from './lib/shell-command.ts';
-import { isMain } from './review/cli.mjs';
+import { isMain } from './review/cli.ts';
 
 export const ACTION = '.github/actions/code-reviewer/action.yml';
 /**

@@ -17,7 +17,7 @@
 // A pull request body is deliberately NOT a spec source, so this cannot be
 // solved by having the agent describe its own work — see the same ADR.
 
-import { discoverSpec } from '../review/resolve-spec.mjs';
+import { discoverSpec } from '../review/resolve-spec.ts';
 
 /** The reference keywords `resolve-spec.mjs` matches; `Closes` is one of them. */
 const CLOSING_KEYWORD = 'Closes';

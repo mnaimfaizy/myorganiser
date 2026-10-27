@@ -107,7 +107,7 @@ test('classifier labels match the finding-contract tuple in schema.mjs', async (
   // the same three labels or planRelabel would accept a label the validator
   // rejects.
   const { REVIEW_TIER_LABELS: schemaLabels } =
-    await import('../review/schema.mjs');
+    await import('../review/schema.ts');
   assert.deepEqual([...REVIEW_TIER_LABELS], [...schemaLabels]);
 });
 

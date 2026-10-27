@@ -47,12 +47,12 @@ import {
   replayRunFactsFindings,
   replaySpecSnapshotFindings,
   replayTriggerFindings,
-} from './review/golden.mjs';
+} from './review/golden.ts';
 import {
   REPLAY_INPUT_PATHS,
   SCHEDULED_FRONTIER_REPETITIONS,
   loadGoldenRecords,
-} from './review/golden-tiers.mjs';
+} from './review/golden-tiers.ts';
 
 const REPLAY_WORKFLOW = '.github/workflows/review-golden-replay.yml';
 const fail: (msg: string) => never = (msg) => {
