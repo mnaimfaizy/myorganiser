@@ -16,7 +16,7 @@
  * The workflow jobs import this module. A second copy of the label list in
  * YAML would be the drift this file exists to prevent.
  *
- * Run the tests with: yarn nightly-e2e:rot:test
+ * Run the tests with: node --test tools/scripts/lib/nightly-e2e-rot-issue.test.ts
  */
 
 export const ROT_ISSUE_TITLE = '[automation] Nightly E2E suite is failing';

@@ -43,7 +43,7 @@ yarn review:escaped:measure --days 60
 
 `tools/scripts/review/measure-escaped-defects.ts` gathers; the classification
 and the arithmetic are pure, in `tools/scripts/review/escaped-defects.ts`,
-and covered by `yarn review:test`.
+and covered by `yarn tools:test`.
 
 - **The population** is every merged fix Pull Request in the window: a `fix/`
   head branch, or — for a squash merge or a reserved branch prefix, where the

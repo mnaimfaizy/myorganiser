@@ -13,7 +13,7 @@
  * selector store. It never opens a real SSH connection — verifying that
  * belongs to a live host, not a unit test.
  *
- * Run the tests with: yarn host-apply:test
+ * Run the tests with: node --test tools/scripts/lib/host-apply.test.ts
  */
 
 /** Refusal raised by a guard in this module. Never carries a secret value. */

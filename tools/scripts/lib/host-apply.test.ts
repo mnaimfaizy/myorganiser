@@ -1,7 +1,7 @@
 /**
  * Tests for host-apply.mjs — the engine for CI-owned Host Apply (ADR 0056, issue #566).
  *
- * Run with: yarn host-apply:test
+ * Run with: node --test tools/scripts/lib/host-apply.test.ts
  */
 
 import assert from 'node:assert/strict';

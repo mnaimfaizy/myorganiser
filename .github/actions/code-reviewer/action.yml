@@ -245,7 +245,7 @@ runs:
         TOOLING: ${{ inputs.tooling-dir }}
       run: |
         # The judgments live in the script, where fixture transcripts test
-        # them (`yarn review:test`): the accounting, the three-answer
+        # them (`yarn tools:test`): the accounting, the three-answer
         # rate-limit reading, the turn ceiling, and `prevented`.
         #
         # Turn exhaustion is a third outcome, and until run 45 the apparatus

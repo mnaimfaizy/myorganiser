@@ -9,7 +9,7 @@
  * Both answer false for a commit git does not know: an unknown commit is
  * evidence of nothing.
  *
- * Run the tests with: yarn staging-web:test
+ * Run the tests with: node --test tools/scripts/lib/staging-web-deploy.test.ts tools/scripts/staging-web-deploy.test.ts
  */
 import { spawnSync } from 'node:child_process';
 

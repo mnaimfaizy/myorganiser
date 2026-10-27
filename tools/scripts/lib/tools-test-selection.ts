@@ -1,7 +1,7 @@
 /**
  * The decision behind Husky's pre-commit selection of tools/scripts Contract
- * Suites: which `*.test.ts` / `*.test.mjs` files a commit's staged files
- * select (ADR 0135 slice 2).
+ * Suites: which `*.test.ts` files a commit's staged files select (ADR 0135
+ * slice 2).
  *
  * The full set under tools/scripts takes about 34s in one `node --test` run,
  * so a commit outside tooling should pay nothing, and a commit touching one
@@ -13,11 +13,11 @@
  *
  * Two kinds of staged file select a suite:
  *   - the suite itself, staged directly;
- *   - a script staged alongside it — paired by name, `check-x.mjs` ->
- *     `check-x.test.mjs` or `check-x.test.ts`, in the same directory.
+ *   - a script staged alongside it — paired by name, `check-x.ts` ->
+ *     `check-x.test.ts`, in the same directory.
  *
  * A pairing is only reported when the candidate suite actually exists in the
- * `suites` list this function is handed: staging a new `check-x.mjs` before
+ * `suites` list this function is handed: staging a new `check-x.ts` before
  * its suite exists selects nothing, rather than asking Husky to run a file
  * that is not there yet.
  *
@@ -54,13 +54,11 @@ export function selectStagedSuites({
       continue;
     }
 
-    const withoutExt = file.replace(/\.(mjs|ts)$/, '');
+    const withoutExt = file.replace(/\.ts$/, '');
     if (withoutExt === file) continue;
 
-    for (const ext of ['ts', 'mjs']) {
-      const candidate = `${withoutExt}.test.${ext}`;
-      if (suiteSet.has(candidate)) selected.add(candidate);
-    }
+    const candidate = `${withoutExt}.test.ts`;
+    if (suiteSet.has(candidate)) selected.add(candidate);
   }
 
   return [...selected].sort();

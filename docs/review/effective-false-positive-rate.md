@@ -37,7 +37,7 @@ yarn review:noise:measure --days 30
 
 `tools/scripts/review/measure-noise.ts` gathers; the classification and the
 arithmetic are pure, in `tools/scripts/review/noise.ts`, and covered by
-`yarn review:test`.
+`yarn tools:test`.
 
 - **The evidence** is the review's own stored artifacts. Every run of the Code
   Review workflow uploads the normalized report it validated

@@ -1,7 +1,7 @@
 /**
  * The decision behind `checker-contracts:check`
  * (`tools/scripts/check-checker-contracts.ts`): a ratchet holding
- * contract-suite coverage for `tools/scripts/check-*.{mjs,ts}` checkers to a fixed
+ * contract-suite coverage for `tools/scripts/check-*.ts` checkers to a fixed
  * baseline, so the count of untested checkers can only shrink (ADR 0085).
  *
  * ADR 0085's finding is that "state your direction in the header" is not
@@ -12,9 +12,10 @@
  * `check-lint-coverage.ts` asserts a source file has *a* test, not that the
  * test is any good.
  *
- * Coverage is file adjacency: `tools/scripts/check-x.{mjs,ts}` "has a contract
- * suite" iff the sibling `tools/scripts/check-x.test.{mjs,ts}` exists, in the
- * checker's own extension (ADR 0135). This is the same
+ * Coverage is file adjacency: `tools/scripts/check-x.ts` "has a contract
+ * suite" iff the sibling `tools/scripts/check-x.test.ts` exists. A retired
+ * `check-*.mjs` is not classified here; the Meta-Gate rejects it by name
+ * (ADR 0135). This is the same
  * convention the rest of the checkers already use for their own tests, and
  * it is what `--test` filters on in `tools/scripts/lib/gate-coverage.ts`.
  *
@@ -44,24 +45,24 @@ export const BASELINE_PATH = join(
   'checker-contract-baseline.json',
 );
 export const SCHEMA_VERSION = 1;
-// `.ts` from ADR 0135's expand step, ahead of any checker actually migrating
-// there: a `.replace(/\.mjs$/, '.test.mjs')` on a `check-x.ts` path matches
-// nothing and returns the checker's own path unchanged, so `hasContractSuite`
-// would test whether the checker itself exists rather than its suite — always
-// true — and silently report every `.ts` checker as covered.
-export const CHECKER_PATH_PATTERN = /^tools\/scripts\/check-[^/]+\.(mjs|ts)$/;
+// `.ts` only since ADR 0135's contract step. A replace that matches nothing
+// returns the checker's own path unchanged, so `hasContractSuite` would test
+// whether the checker itself exists rather than its suite — always true — and
+// silently report it as covered; it therefore refuses any other extension.
+export const CHECKER_PATH_PATTERN = /^tools\/scripts\/check-[^/]+\.ts$/;
 
 export interface ContractSuiteOptions {
   cwd?: string;
   exists?: (path: string) => boolean;
 }
 
-/** Does `checkerPath` (e.g. `tools/scripts/check-x.mjs` or `check-x.ts`) have a sibling contract suite? */
+/** Does `checkerPath` (e.g. `tools/scripts/check-x.ts`) have a sibling contract suite? */
 export function hasContractSuite(
   checkerPath: string,
   { cwd = process.cwd(), exists = existsSync }: ContractSuiteOptions = {},
 ): boolean {
-  const testPath = checkerPath.replace(/\.(mjs|ts)$/, '.test.$1');
+  if (!checkerPath.endsWith('.ts')) return false;
+  const testPath = checkerPath.replace(/\.ts$/, '.test.ts');
   return exists(join(cwd, testPath));
 }
 
@@ -108,12 +109,9 @@ export function readBaseline({
     if (!checker) {
       throw new Error(`${at}: entry must be a non-empty checker path`);
     }
-    if (
-      /\.test\.(mjs|ts)$/.test(checker) ||
-      !CHECKER_PATH_PATTERN.test(checker)
-    ) {
+    if (/\.test\.ts$/.test(checker) || !CHECKER_PATH_PATTERN.test(checker)) {
       throw new Error(
-        `${at}: "${checker}" is not a tools/scripts/check-*.{mjs,ts} path`,
+        `${at}: "${checker}" is not a tools/scripts/check-*.ts path`,
       );
     }
     if (seen.has(checker)) {

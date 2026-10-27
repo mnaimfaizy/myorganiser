@@ -11,12 +11,12 @@ import test from 'node:test';
 
 import { selectAndRun } from './run-tools-test-selection.ts';
 
-const SUITES = ['tools/scripts/check-a.test.mjs'];
+const SUITES = ['tools/scripts/check-a.test.ts'];
 
 test('a staged script runs its paired suite and exits 0 when it passes', () => {
   const runCalls: string[][] = [];
   const result = selectAndRun({
-    stagedFiles: ['tools/scripts/check-a.mjs'],
+    stagedFiles: ['tools/scripts/check-a.ts'],
     suites: SUITES,
     runTest: (selected) => {
       runCalls.push(selected);
@@ -25,15 +25,15 @@ test('a staged script runs its paired suite and exits 0 when it passes', () => {
   });
 
   assert.equal(result.exitCode, 0);
-  assert.deepEqual(result.selected, ['tools/scripts/check-a.test.mjs']);
-  assert.deepEqual(runCalls, [['tools/scripts/check-a.test.mjs']]);
+  assert.deepEqual(result.selected, ['tools/scripts/check-a.test.ts']);
+  assert.deepEqual(runCalls, [['tools/scripts/check-a.test.ts']]);
   assert.match(result.message, /running 1 suite\(s\)/);
-  assert.match(result.message, /check-a\.test\.mjs/);
+  assert.match(result.message, /check-a\.test\.ts/);
 });
 
 test('a selected suite that fails exits 1', () => {
   const result = selectAndRun({
-    stagedFiles: ['tools/scripts/check-a.mjs'],
+    stagedFiles: ['tools/scripts/check-a.ts'],
     suites: SUITES,
     runTest: () => 1,
   });

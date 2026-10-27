@@ -16,7 +16,7 @@
  * built with the CLI's own auto-updater off, so the version the log names is
  * the version the agent ran.
  *
- * Run the tests with: yarn sandcastle:cli-version:test
+ * Run the tests with: node --test tools/scripts/lib/sandcastle-cli-version.test.ts
  */
 
 export const UPDATE_VARIABLE = 'SANDCASTLE_CLAUDE_CODE_UPDATE';

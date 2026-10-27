@@ -5,7 +5,7 @@
  * Docker, or a real PRD. The orchestrator stays orchestration; the judgement about
  * what is dispatchable is decided here from explicit inputs.
  *
- * Run the tests with: yarn sandcastle:slice-selection:test
+ * Run the tests with: node --test tools/scripts/lib/sandcastle-slice-selection.test.ts
  *
  * ## Why this module exists
  *

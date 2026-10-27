@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Ratchets contract-suite coverage for tools/scripts/check-*.{mjs,ts} checkers
+// Ratchets contract-suite coverage for tools/scripts/check-*.ts checkers
 // against a shrink-only baseline, so the count of untested checkers can only
 // go down (ADR 0085).
 //
@@ -13,9 +13,11 @@
 // suite proving the checker actually fails on the drift its header claims to
 // catch is what makes it true. This gate makes carrying one somebody's job.
 //
-// A checker "has a contract suite" when tools/scripts/check-x.{mjs,ts} has a
-// sibling tools/scripts/check-x.test.{mjs,ts} — the same file-adjacency
-// convention this codebase's checkers already use for their own tests.
+// A checker "has a contract suite" when tools/scripts/check-x.ts has a
+// sibling tools/scripts/check-x.test.ts — the same file-adjacency convention
+// this codebase's checkers already use for their own tests. A retired
+// `check-*.mjs` is left out: `gates:coverage:check` rejects it by name
+// (ADR 0135), and classifying it here would only repeat that failure.
 // Thirteen of thirty-five checkers had none on the day this baseline was
 // seeded; the baseline records that as debt with a direction of travel, and
 // this gate asserts both directions of the ratchet: a checker with no suite
@@ -57,8 +59,10 @@ try {
   fail(error instanceof Error ? error.message : String(error));
 }
 
-const checkers = listCheckers({ cwd });
-if (checkers.length === 0) fail('no check-*.{mjs,ts} checkers found');
+const checkers = listCheckers({ cwd }).filter((checker) =>
+  checker.endsWith('.ts'),
+);
+if (checkers.length === 0) fail('no check-*.ts checkers found');
 
 const classified = classifyCheckers(checkers, { cwd });
 const { debt, missing, stale } = compareBaseline(baseline, classified);
@@ -79,7 +83,7 @@ if (printOnly) {
 const findings = [];
 for (const checker of missing) {
   findings.push(
-    `${checker}: no contract suite (expected ${checker.replace(/\.(mjs|ts)$/, '.test.$1')}) ` +
+    `${checker}: no contract suite (expected ${checker.replace(/\.ts$/, '.test.ts')}) ` +
       `and no entry in ${BASELINE_PATH}. A checker with no suite proving it fails on the ` +
       'drift its header claims to catch is an unasserted claim (ADR 0085) — add the ' +
       'suite, or add the checker to the baseline as recorded debt.',

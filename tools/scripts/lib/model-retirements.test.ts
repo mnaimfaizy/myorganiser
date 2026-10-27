@@ -1,5 +1,5 @@
 /**
- * Run with: yarn agents:models:test
+ * Run with: node --test tools/scripts/lib/model-retirements.test.ts
  */
 
 import assert from 'node:assert/strict';

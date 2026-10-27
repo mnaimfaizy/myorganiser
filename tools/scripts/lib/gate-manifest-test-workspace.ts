@@ -1,6 +1,6 @@
 /**
- * Temp workspace with `tools/scripts/*.mjs` stubs that exit 0.
- * Shared by `gate-manifest.test.mjs` and `run-assertion-gates.test.mjs`.
+ * Temp workspace with `tools/scripts/*.ts` stubs that exit 0.
+ * Shared by `gate-manifest.test.ts` and `run-assertion-gates.test.ts`.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,7 +11,7 @@ export function createGateManifestWorkspace(
   t: TestContext,
   {
     prefix = 'gate-manifest-',
-    scripts = ['tools/scripts/check-a.mjs', 'tools/scripts/check-b.mjs'],
+    scripts = ['tools/scripts/check-a.ts', 'tools/scripts/check-b.ts'],
   }: { prefix?: string; scripts?: string[] } = {},
 ): string {
   const workspace = mkdtempSync(join(tmpdir(), prefix));

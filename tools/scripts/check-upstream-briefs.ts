@@ -8,7 +8,7 @@
 //   skill is portable and a validator in this repo's script tree would make a
 //   brief checkable only here (ADR 0018, retained by ADR 0084). But
 //   `gates:coverage:check` — the Meta-Gate — discovers checkers by a
-//   NON-RECURSIVE scan of `tools/scripts/` for `check-*.mjs`
+//   NON-RECURSIVE scan of `tools/scripts/` for `check-*.ts`
 //   (`tools/scripts/lib/gate-coverage.ts`). A gate living anywhere else is
 //   invisible to it: it would look wired forever, and deleting the line that
 //   runs it would fail nothing. So this file is a thin adapter, named and

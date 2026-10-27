@@ -1,7 +1,7 @@
 // Contracts for check-checker-contracts.ts's command-line surface, following
 // check-nx-declared-targets.test.ts's shape: the checker runs as a real
 // subprocess against a fixture workspace, because it reads
-// tools/scripts/check-*.{mjs,ts} from disk the same way tools/scripts/lib/gate-coverage.ts
+// tools/scripts/check-*.ts from disk the same way tools/scripts/lib/gate-coverage.ts
 // does. Unlike the Declared Target ratchet this checker never shells out to
 // git, so the fixture is a plain temp directory rather than a git repository.
 import assert from 'node:assert/strict';
@@ -61,10 +61,10 @@ test('exits 0 against the real repository with the committed baseline', () => {
 
 test('passes when every checker without a suite is in the baseline', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-a.test.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-b.mjs', '// noop\n');
-  writeBaseline(workspace, ['tools/scripts/check-b.mjs']);
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-b.ts', '// noop\n');
+  writeBaseline(workspace, ['tools/scripts/check-b.ts']);
   const result = run(workspace);
   assert.equal(result.status, 0, result.stderr);
   assert.match(
@@ -74,23 +74,6 @@ test('passes when every checker without a suite is in the baseline', (t) => {
 });
 
 test('fails a checker with no suite and no baseline entry, naming the checker', (t) => {
-  const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  writeBaseline(workspace, []);
-  const result = run(workspace);
-  assert.equal(result.status, 1);
-  assert.match(
-    result.stderr,
-    /tools\/scripts\/check-a\.mjs: no contract suite \(expected tools\/scripts\/check-a\.test\.mjs\) and no entry in/,
-  );
-});
-
-// Regression: hasContractSuite's `.replace(/\.mjs$/, '.test.mjs')` matched
-// nothing on a `.ts` path and returned it unchanged, so this checked whether
-// check-a.ts existed (always true) instead of check-a.test.ts, silently
-// reporting debt as covered. ADR 0135's expand step makes check-*.ts a real
-// checker shape, so this suite covers it the same way the .mjs cases above do.
-test('fails a check-*.ts checker with no suite and no baseline entry, naming the checker', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   writeBaseline(workspace, []);
@@ -102,10 +85,13 @@ test('fails a check-*.ts checker with no suite and no baseline entry, naming the
   );
 });
 
-test('passes a check-*.ts checker that carries its .test.ts sibling', (t) => {
+// A retired check-*.ts is the Meta-Gate's to reject; this ratchet does not
+// count it, covered or not.
+test('does not classify a check-*.ts checker', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-b.mjs', '// noop\n');
   writeBaseline(workspace, []);
   const result = run(workspace);
   assert.equal(result.status, 0, result.stderr);
@@ -114,52 +100,52 @@ test('passes a check-*.ts checker that carries its .test.ts sibling', (t) => {
 
 test('fails a baseline entry whose checker now has a suite, as stale', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-a.test.mjs', '// noop\n');
-  writeBaseline(workspace, ['tools/scripts/check-a.mjs']);
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
+  writeBaseline(workspace, ['tools/scripts/check-a.ts']);
   const result = run(workspace);
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /baseline entry tools\/scripts\/check-a\.mjs has no matching checker without a contract suite/,
+    /baseline entry tools\/scripts\/check-a\.ts has no matching checker without a contract suite/,
   );
 });
 
 test('fails a baseline entry whose checker no longer exists, as stale', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   writeBaseline(workspace, [
-    'tools/scripts/check-a.mjs',
-    'tools/scripts/check-gone.mjs',
+    'tools/scripts/check-a.ts',
+    'tools/scripts/check-gone.ts',
   ]);
   const result = run(workspace);
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /baseline entry tools\/scripts\/check-gone\.mjs has no matching checker without a contract suite/,
+    /baseline entry tools\/scripts\/check-gone\.ts has no matching checker without a contract suite/,
   );
-  assert.doesNotMatch(result.stderr, /check-a\.mjs: no contract suite/);
+  assert.doesNotMatch(result.stderr, /check-a\.ts: no contract suite/);
 });
 
 test('reports both a new-debt finding and a stale finding in one run', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-a.test.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-b.mjs', '// noop\n');
-  writeBaseline(workspace, ['tools/scripts/check-a.mjs']);
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-b.ts', '// noop\n');
+  writeBaseline(workspace, ['tools/scripts/check-a.ts']);
   const result = run(workspace);
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /check-b\.mjs: no contract suite/);
+  assert.match(result.stderr, /check-b\.ts: no contract suite/);
   assert.match(
     result.stderr,
-    /baseline entry tools\/scripts\/check-a\.mjs has no matching checker/,
+    /baseline entry tools\/scripts\/check-a\.ts has no matching checker/,
   );
 });
 
 test('does not require a checker file that is itself a test file', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-a.test.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
   writeBaseline(workspace, []);
   const result = run(workspace);
   assert.equal(result.status, 0, result.stderr);
@@ -167,7 +153,7 @@ test('does not require a checker file that is itself a test file', (t) => {
 
 test('exits 2 when the baseline is missing entirely', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /not found/);
@@ -176,7 +162,7 @@ test('exits 2 when the baseline is missing entirely', (t) => {
 test('exits 2 when the baseline is not valid JSON', (t) => {
   const workspace = createWorkspace(t);
   write(workspace, 'tools/config/checker-contract-baseline.json', '{ not json');
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /not valid JSON/);
@@ -185,7 +171,7 @@ test('exits 2 when the baseline is not valid JSON', (t) => {
 test('exits 2 when the baseline has the wrong schema version', (t) => {
   const workspace = createWorkspace(t);
   writeBaseline(workspace, [], { schemaVersion: 2 });
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /expected "schemaVersion": 1/);
@@ -199,7 +185,7 @@ test('exits 2 when "baseline" is not an array', (t) => {
     comment: 'fixture',
     baseline: { not: 'an array' },
   });
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /expected a "baseline" array/);
@@ -207,25 +193,25 @@ test('exits 2 when "baseline" is not an array', (t) => {
 
 test('exits 2 when a baseline entry is duplicated', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
   writeBaseline(workspace, [
-    'tools/scripts/check-a.mjs',
-    'tools/scripts/check-a.mjs',
+    'tools/scripts/check-a.ts',
+    'tools/scripts/check-a.ts',
   ]);
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /is duplicated in the baseline/);
 });
 
-test('exits 2 when a baseline entry is not a tools\\/scripts\\/check-*.{mjs,ts} path', (t) => {
+test('exits 2 when a baseline entry is not a tools\\/scripts\\/check-*.ts path', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  writeBaseline(workspace, ['tools/scripts/check-a.test.mjs']);
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  writeBaseline(workspace, ['tools/scripts/check-a.test.ts']);
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(
     result.stderr,
-    /"tools\/scripts\/check-a\.test\.mjs" is not a tools\/scripts\/check-\*\.\{mjs,ts\} path/,
+    /"tools\/scripts\/check-a\.test\.ts" is not a tools\/scripts\/check-\*\.ts path/,
   );
 });
 
@@ -235,23 +221,23 @@ test('exits 2 when no checkers are found', (t) => {
   writeBaseline(workspace, []);
   const result = run(workspace);
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /no check-\*\.\{mjs,ts\} checkers found/);
+  assert.match(result.stderr, /no check-\*\.ts checkers found/);
 });
 
 test('--print lists every baseline entry and every classified checker', (t) => {
   const workspace = createWorkspace(t);
-  write(workspace, 'tools/scripts/check-a.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-a.test.mjs', '// noop\n');
-  write(workspace, 'tools/scripts/check-b.mjs', '// noop\n');
-  writeBaseline(workspace, ['tools/scripts/check-b.mjs']);
+  write(workspace, 'tools/scripts/check-a.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-a.test.ts', '// noop\n');
+  write(workspace, 'tools/scripts/check-b.ts', '// noop\n');
+  writeBaseline(workspace, ['tools/scripts/check-b.ts']);
   const result = run(workspace, '--print');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /1 baseline entry/);
-  assert.match(result.stdout, /baseline: tools\/scripts\/check-b\.mjs/);
+  assert.match(result.stdout, /baseline: tools\/scripts\/check-b\.ts/);
   assert.match(
     result.stdout,
     /2 checker\(s\) classified, 1 without a contract suite/,
   );
-  assert.match(result.stdout, /covered: tools\/scripts\/check-a\.mjs/);
-  assert.match(result.stdout, /debt: tools\/scripts\/check-b\.mjs/);
+  assert.match(result.stdout, /covered: tools\/scripts\/check-a\.ts/);
+  assert.match(result.stdout, /debt: tools\/scripts\/check-b\.ts/);
 });

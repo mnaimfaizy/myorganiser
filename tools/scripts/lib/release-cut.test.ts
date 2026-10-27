@@ -3,7 +3,7 @@
  * `git status` read, the leftover check, and the failure wrapping that
  * `release:cut` relies on once the release branch exists.
  *
- * Run with: yarn release:test
+ * Run with: node --test tools/scripts/lib/release-cut.test.ts
  */
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';

@@ -1,5 +1,5 @@
 /**
- * Run with: yarn ai:create-pr:test
+ * Run with: node --test tools/scripts/lib/pr-merge-base.test.ts
  */
 
 import assert from 'node:assert/strict';

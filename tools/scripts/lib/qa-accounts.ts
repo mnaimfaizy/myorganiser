@@ -1,6 +1,6 @@
 /**
  * QA Accounts (CONTEXT.md): the judgments `tools/scripts/qa-accounts.ts`
- * makes, kept free of a database so `qa-accounts.test.mjs` can run them.
+ * makes, kept free of a database so `qa-accounts.test.ts` can run them.
  *
  * A QA Account's sign-in password, Vault passphrase and Recovery Key are
  * public by design: all three are derived from the account's id in tracked

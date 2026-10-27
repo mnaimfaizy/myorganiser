@@ -31,14 +31,14 @@ function createWorkspace(t: TestContext, optOutConfig: unknown): string {
   mkdirSync(join(workspace, 'tools/config'), { recursive: true });
   mkdirSync(join(workspace, '.husky'), { recursive: true });
 
-  writeFileSync(join(workspace, 'tools/scripts/check-wired.mjs'), '');
-  writeFileSync(join(workspace, 'tools/scripts/check-orphan.mjs'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-wired.ts'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-orphan.ts'), '');
   writeFileSync(
     join(workspace, 'package.json'),
     JSON.stringify({
       scripts: {
-        'wired:check': 'node tools/scripts/check-wired.mjs',
-        'orphan:check': 'node tools/scripts/check-orphan.mjs',
+        'wired:check': 'node tools/scripts/check-wired.ts',
+        'orphan:check': 'node tools/scripts/check-orphan.ts',
       },
     }),
   );
@@ -80,13 +80,13 @@ function createWorkspaceWithSuite(
   mkdirSync(join(workspace, 'tools/config'), { recursive: true });
   mkdirSync(join(workspace, '.husky'), { recursive: true });
 
-  writeFileSync(join(workspace, 'tools/scripts/check-wired.mjs'), '');
-  writeFileSync(join(workspace, 'tools/scripts/check-wired.test.mjs'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-wired.ts'), '');
+  writeFileSync(join(workspace, 'tools/scripts/check-wired.test.ts'), '');
   writeFileSync(
     join(workspace, 'package.json'),
     JSON.stringify({
       scripts: {
-        'wired:check': 'node tools/scripts/check-wired.mjs',
+        'wired:check': 'node tools/scripts/check-wired.ts',
       },
     }),
   );
@@ -112,10 +112,10 @@ test('exits 1 naming each unwired suite, not a count', (t) => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /ADR 0135/);
-  assert.match(result.stderr, /tools\/scripts\/check-wired\.test\.mjs/);
+  assert.match(result.stderr, /tools\/scripts\/check-wired\.test\.ts/);
   assert.match(
     result.stderr,
-    /runnable as: node --test tools\/scripts\/check-wired\.test\.mjs/,
+    /runnable as: node --test tools\/scripts\/check-wired\.test\.ts/,
   );
 });
 
@@ -124,7 +124,7 @@ test('exits 0 when the unwired suite carries an opt-out with a reason', (t) => {
     schemaVersion: 1,
     optOut: [
       {
-        check: 'check-wired.test.mjs',
+        check: 'check-wired.test.ts',
         reason: 'Benchmark contract run by hand only, never in a pipeline.',
       },
     ],
@@ -142,10 +142,10 @@ test('exits 1 naming each unwired checker, not a count', (t) => {
   const result = run(workspace);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /tools\/scripts\/check-orphan\.mjs/);
+  assert.match(result.stderr, /tools\/scripts\/check-orphan\.ts/);
   assert.match(result.stderr, /runnable as: yarn orphan:check/);
   assert.ok(
-    !result.stderr.includes('check-wired.mjs'),
+    !result.stderr.includes('check-wired.ts'),
     'a wired checker must not appear in the failure',
   );
 });
@@ -155,7 +155,7 @@ test('exits 0 when the unwired checker carries an opt-out with a reason', (t) =>
     schemaVersion: 1,
     optOut: [
       {
-        check: 'check-orphan.mjs',
+        check: 'check-orphan.ts',
         reason:
           'Not a gate — it prints a benchmark and has no fact to fail on.',
       },
@@ -168,10 +168,37 @@ test('exits 0 when the unwired checker carries an opt-out with a reason', (t) =>
   assert.match(result.stdout, /1 checkers opted out/);
 });
 
+// ADR 0135's contract step: a retired `check-*.mjs` fails by name, even
+// when a pipeline runs it.
+test('exits 1 naming a check-*.mjs checker even when it is wired', (t) => {
+  const workspace = createWorkspace(t, { schemaVersion: 1, optOut: [] });
+  writeFileSync(join(workspace, 'tools/scripts/check-legacy.mjs'), '');
+  writeFileSync(
+    join(workspace, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'wired:check': 'node tools/scripts/check-wired.ts',
+        'orphan:check': 'node tools/scripts/check-orphan.ts',
+        'legacy:check': 'node tools/scripts/check-legacy.mjs',
+      },
+    }),
+  );
+  writeFileSync(
+    join(workspace, '.husky/pre-commit'),
+    'corepack yarn wired:check\ncorepack yarn orphan:check\ncorepack yarn legacy:check\n',
+  );
+
+  const result = run(workspace);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /check-\*\.mjs is retired \(ADR 0135\)/);
+  assert.match(result.stderr, /tools\/scripts\/check-legacy\.mjs/);
+});
+
 test('exits 2 when an opt-out entry carries no written reason', (t) => {
   const workspace = createWorkspace(t, {
     schemaVersion: 1,
-    optOut: [{ check: 'check-orphan.mjs' }],
+    optOut: [{ check: 'check-orphan.ts' }],
   });
 
   const result = run(workspace);

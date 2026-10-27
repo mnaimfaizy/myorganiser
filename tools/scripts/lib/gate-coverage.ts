@@ -1,6 +1,6 @@
 /**
  * The decision behind `gates:coverage:check` (`tools/scripts/check-gate-coverage.ts`):
- * which `check-*.{mjs,ts}` scripts are Wired Gates, and which run nowhere.
+ * which `check-*.ts` scripts are Wired Gates, and which run nowhere.
  *
  * ADR 0043's corollary is that a gate nobody runs asserts nothing, so a
  * checker no pipeline invokes is a defect of the same class as a checker that
@@ -9,9 +9,11 @@
  *
  * Three rules carry all the risk here, and each one is a mistake already made:
  *
- *   1. **Detection is by filename**, `check-*.mjs` or `check-*.ts` in the
- *      scripts directory (ADR 0135's expand step — a migrated checker stays
- *      found) — never by a `*:check` script-name suffix. `openapi:artifacts` and
+ *   1. **Detection is by filename**, `check-*.ts` in the scripts directory
+ *      — never by a `*:check` script-name suffix. A `check-*.mjs` is still
+ *      found, but only so it can be rejected by name: ADR 0135's contract
+ *      step retired the `.mjs` form, and a checker the scan skipped would be
+ *      a gate nothing reports. `openapi:artifacts` and
  *      `component:hygiene` carry no such suffix, and the first is one of the
  *      two unwired checks that motivated the rule. Selecting on a *name* is
  *      also exactly why `check-lint-coverage.ts` had to exist.
@@ -49,11 +51,15 @@
  * tests exercise fixtures rather than the repository. `gatherFromDisk` is the
  * only part that reads files.
  *
- * A fourth rule governs suites only (ADR 0135 slice 2): `tools:test`'s own
- * glob reaches a suite the same way the aggregate's manifest reaches a
- * checker. Its reach is resolved from the live `node --test` command,
- * never assumed — a pattern narrowed later drops exactly the suites it no
- * longer matches, and those report unwired rather than staying laundered.
+ * A fourth rule governs suites only (ADR 0135): a Contract Suite is wired
+ * exactly when `tools:test` is invoked by a pipeline and its own glob
+ * reaches the suite. That glob is the only runner since the per-suite
+ * `package.json` scripts were retired, so a suite named by some other
+ * script or run by path in a workflow is not counted — the rule reduces to
+ * asserting `tools:test` is wired. Its reach is resolved from the live
+ * `node --test` command, never assumed: a pattern narrowed later drops
+ * exactly the suites it no longer matches, and those report unwired rather
+ * than staying laundered.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -67,11 +73,12 @@ export const OPT_OUT_PATH = 'tools/config/gate-coverage-optout.json';
 export const OPT_OUT_SCHEMA_VERSION = 1;
 export const AGGREGATE_SCRIPT = 'tools/scripts/run-assertion-gates.ts';
 /**
- * The glob runner (ADR 0135 slice 2): a plain npm script, not a file, so it
- * is matched by exact script name rather than by path like the aggregate.
- * Once it is wired, every suite its own glob pattern reaches counts as
- * wired too — resolved from the live `tools:test` command rather than
- * assumed, so a pattern someone narrows later fails safe instead of lying.
+ * The glob runner (ADR 0135): a plain npm script, not a file, so it is
+ * matched by exact script name rather than by path like the aggregate. It is
+ * the only thing that wires a suite: once it is wired, every suite its own
+ * glob pattern reaches counts as wired — resolved from the live `tools:test`
+ * command rather than assumed, so a pattern someone narrows later fails safe
+ * instead of lying.
  */
 export const GLOB_TEST_SCRIPT = 'tools:test';
 
@@ -110,23 +117,22 @@ export function stripComments(text: string): string {
  * The `node` invocations a command performs, as `{ script, isTestRunner }`.
  *
  * Flags between `node` and its script are skipped so `node --enable-source-maps
- * x.mjs` still resolves to `x.mjs`. `node --test <file>` is reported as a test
- * runner and never counts as running the file as a checker: `openapi:artifacts:test`
- * runs `check-openapi-artifacts.test.ts`, which is a contract suite, not a gate.
+ * x.ts` still resolves to `x.ts`. `node --test <file>` is reported as a test
+ * runner and never counts as running the file as a checker: `node --test
+ * check-openapi-artifacts.test.ts` runs a contract suite, not a gate.
  *
- * `node --test` accepts more than one file (`node --test a.test.mjs
- * b.test.mjs`), which is how a single Contract Suite script such as
- * `agents:sync:test` runs several files — every trailing non-flag token is
+ * `node --test` accepts more than one file or quoted glob pattern
+ * (`node --test a.test.ts b.test.ts`) — every trailing non-flag token is
  * reported as its own test-runner run. A non-test invocation keeps the old,
  * narrower behaviour of reporting only the first non-flag token as the
  * script: a trailing argument there is a flag to the checker
- * (`node check-a.mjs --report out.md`), never a second script.
+ * (`node check-a.ts --report out.md`), never a second script.
  *
  * `gate-manifest.ts` has its own `parseNodeSegments`, and these are not the
  * same job. That one reads one package.json command, anchored to `^node` per
  * `&&` segment, and keeps the argument list so the manifest can be compared
  * invocation-for-invocation. This one scans free-form pipeline text, where a
- * `node` call arrives mid-line (`run: node tools/scripts/x.mjs`), and it must
+ * `node` call arrives mid-line (`run: node tools/scripts/x.ts`), and it must
  * tell a checker run from a `--test` run — a distinction the manifest never
  * meets, because no manifest entry is a contract suite.
  *
@@ -155,7 +161,7 @@ export function nodeRuns(command: string): NodeRun[] {
   };
   const runs: NodeRun[] = [];
   // The captured span stops at a newline as well as at a shell metacharacter:
-  // a multi-file `node --test a.mjs b.mjs` invocation is always one
+  // a multi-file `node --test a.ts b.ts` invocation is always one
   // package.json string (necessarily one line), while pipeline text is
   // free-form YAML/shell where a later, unrelated step's own `node` call
   // sits on a following line with nothing but a newline between it and this
@@ -222,11 +228,10 @@ export function pipelineInvocations(text: string): PipelineInvocations {
 }
 
 /**
- * Every `check-*.mjs` or `check-*.ts` in the scripts directory (flat, not
- * recursive — checkers live at the top level), contract suites excluded.
- * `.ts` is included from the expand step on (ADR 0135), ahead of any checker
- * actually migrating there, the same way `listSuites` already covers
- * `.test.ts` from slice 1.
+ * Every `check-*.ts` in the scripts directory (flat, not recursive —
+ * checkers live at the top level), contract suites excluded. A
+ * `check-*.mjs` is listed too, so `assertGateCoverage` can reject it by name
+ * rather than the scan passing over it (ADR 0135's contract step).
  */
 export interface ScanOptions {
   cwd?: string;
@@ -252,15 +257,13 @@ export function listCheckers({
 }
 
 /**
- * Every Contract Suite (`*.test.mjs` or `*.test.ts`) anywhere under the
- * scripts directory, `lib/`, `review/`, `ai/`, `ci/`, and `copilot-hooks/`
- * included. A suite is wired or it is not independently of whether the
- * script it tests is a `check-*.mjs` checker (ADR 0135 slice 1) — this list,
- * unlike `listCheckers`, is not filtered to the checker-filename convention.
- * `.test.ts` is included from slice 1 on even though migration has not
- * started: `tools:test`'s glob (ADR 0135 slice 2) already covers both
- * extensions, and a suite this function cannot see is a suite the Meta-Gate
- * cannot name as unwired either.
+ * Every Contract Suite (`*.test.ts`) anywhere under the scripts directory,
+ * `lib/`, `review/`, `ai/`, `ci/`, and `copilot-hooks/` included. A suite is
+ * wired or it is not independently of whether the script it tests is a
+ * `check-*.ts` checker — this list, unlike `listCheckers`, is not filtered
+ * to the checker-filename convention. A `*.test.mjs` is listed too: the
+ * `tools:test` glob names `.test.ts` only, so it reports unreached by name
+ * instead of being a suite the Meta-Gate cannot see.
  */
 export function listSuites({
   cwd = process.cwd(),
@@ -452,7 +455,7 @@ function parseOptOut(
 function isAggregateSource(source: string): boolean {
   if (/\brunGateManifest\s*\(/.test(source)) return true;
   return (
-    /gate-manifest\.(?:mjs|ts)|GATE_MANIFEST/.test(source) &&
+    /gate-manifest\.ts|GATE_MANIFEST/.test(source) &&
     /\bspawn(?:Sync)?\s*\(|\bexecFile(?:Sync)?\s*\(/.test(source)
   );
 }
@@ -520,13 +523,12 @@ function resolveAggregate({
 
 /**
  * Decides, for every target in `targets` (checkers or suites), whether some
- * pipeline reaches it — directly, by npm script name, through the
- * aggregate, or (suites only) through the `tools:test` glob. Shared between
- * the checker rule and the suite rule so the two are matched by the exact
- * same mechanics (ADR 0135 slice 1): only the `npmScriptsRunning` /
- * `invokedPaths` a caller supplies differ, filtered to non-test or
- * test-runner `node` invocations respectively. `globState` is omitted for
- * the checker call: the glob names no checker, only suites.
+ * pipeline reaches it. A checker is reached directly, by npm script name, or
+ * through the aggregate; a suite only through the `tools:test` glob (ADR
+ * 0135), so the suite call passes no npm scripts, no direct paths, and no
+ * aggregate, and the checker call passes no `globState`. Sharing one
+ * function keeps the record shapes and the opt-out contradiction rule the
+ * same for both.
  *
  * Mutates `errors` in place with a contradiction when an opted-out target is
  * actually wired, mirroring the checker rule's existing behaviour.
@@ -569,7 +571,7 @@ interface ClassifyTargetsInput<K extends TargetKey> {
   npmScriptsRunning: (path: string) => string[];
   invokedNames: Map<string, string[]>;
   invokedPaths: Map<string, string[]>;
-  aggregateState: AggregateState;
+  aggregateState?: AggregateState;
   globState?: GlobState;
   optedOutMap: Map<string, OptOutEntry>;
   optOutPath: string;
@@ -607,7 +609,7 @@ function classifyTargets<K extends TargetKey>({
     const directFiles = invokedPaths.get(target);
     if (directFiles)
       via.push({ kind: 'direct', name: target, files: directFiles });
-    if (aggregateState.reached.has(target) && aggregateState.wired) {
+    if (aggregateState?.reached.has(target) && aggregateState.wired) {
       via.push({
         kind: 'aggregate',
         name: aggregateState.wiredVia[0] ?? aggregateState.script,
@@ -663,10 +665,11 @@ function classifyTargets<K extends TargetKey>({
  * Decides, for every checker and every Contract Suite, whether some pipeline
  * reaches it.
  *
- * Returns `{ exitCode, errors, unwired, wired, optedOut, unwiredSuites,
- * wiredSuites, optedOutSuites, declaredNonGates }`. Exit 0 = every checker
- * and suite is wired or deliberately opted out. Exit 1 = at least one checker
- * or suite runs nowhere, and every one of them is named. Exit 2 = the check
+ * Returns `{ exitCode, errors, rejected, unwired, wired, optedOut,
+ * unwiredSuites, wiredSuites, optedOutSuites, declaredNonGates }`. Exit 0 =
+ * every checker is a `.ts` file, and every checker and suite is wired or
+ * deliberately opted out. Exit 1 = a `check-*.mjs` exists, or at least one
+ * checker or suite runs nowhere, and every one of them is named. Exit 2 = the check
  * could not run: a missing, malformed, or self-contradicting opt-out list, or
  * a nested aggregate.
  */
@@ -675,6 +678,8 @@ export interface GateCoverageResult {
   ok: boolean;
   exitCode: 0 | 1 | 2;
   errors: string[];
+  /** `check-*` checkers that are not `.ts` — the retired form (ADR 0135). */
+  rejected: string[];
   unwired: UnwiredTarget<'checker'>[];
   wired: WiredTarget<'checker'>[];
   optedOut: OptedOutTarget<'checker'>[];
@@ -703,9 +708,8 @@ export function assertGateCoverage({
 }: GateCoverageInput): GateCoverageResult {
   const invokedNames = new Map<string, string[]>();
   const invokedPaths = new Map<string, string[]>();
-  const invokedTestPaths = new Map<string, string[]>();
   for (const { path, text } of pipelines) {
-    const { names, nodeScripts, nodeTestScripts } = pipelineInvocations(text);
+    const { names, nodeScripts } = pipelineInvocations(text);
     for (const name of names) {
       if (!invokedNames.has(name)) invokedNames.set(name, []);
       invokedNames.get(name)!.push(path);
@@ -714,14 +718,10 @@ export function assertGateCoverage({
       if (!invokedPaths.has(script)) invokedPaths.set(script, []);
       invokedPaths.get(script)!.push(path);
     }
-    for (const script of nodeTestScripts) {
-      if (!invokedTestPaths.has(script)) invokedTestPaths.set(script, []);
-      invokedTestPaths.get(script)!.push(path);
-    }
   }
 
   // An npm script "runs" a checker only when it executes the file itself.
-  // `node --test check-x.test.mjs` runs the contracts, never the checker —
+  // `node --test check-x.test.ts` runs the contracts, never the checker —
   // and, symmetrically, a suite is run only by the `--test` invocations.
   const runsByNpmScript = new Map(
     Object.entries(pkgScripts).map(([name, command]) => [
@@ -743,10 +743,13 @@ export function assertGateCoverage({
     [...runsByNpmScript]
       .filter(([, scripts]) => scripts.includes(path))
       .map(([name]) => name);
-  const npmScriptsRunningSuite = (path: string) =>
-    [...testRunsByNpmScript]
-      .filter(([, scripts]) => scripts.includes(path))
-      .map(([name]) => name);
+
+  // ADR 0135's contract step: a checker is TypeScript. A `check-*.mjs` is
+  // rejected by name before classification, wired or not — counting it as
+  // wired would accept the retired form, and leaving it out of the scan
+  // would let it run unreported.
+  const rejected = checkers.filter((checker) => !checker.endsWith('.ts'));
+  const tsCheckers = checkers.filter((checker) => checker.endsWith('.ts'));
 
   const aggregateState = resolveAggregate({
     aggregate,
@@ -845,7 +848,7 @@ export function assertGateCoverage({
   }
 
   const checkerResult = classifyTargets({
-    targets: checkers,
+    targets: tsCheckers,
     key: 'checker',
     npmScriptsRunning: npmScriptsRunningChecker,
     invokedNames,
@@ -856,13 +859,14 @@ export function assertGateCoverage({
     errors,
   });
 
+  // The suite rule reduces to `tools:test` being wired (ADR 0135): no npm
+  // script, direct path, or aggregate entry reaches a suite, only the glob.
   const suiteResult = classifyTargets({
     targets: suites,
     key: 'suite',
-    npmScriptsRunning: npmScriptsRunningSuite,
+    npmScriptsRunning: () => [],
     invokedNames,
-    invokedPaths: invokedTestPaths,
-    aggregateState,
+    invokedPaths: new Map(),
     globState,
     optedOutMap: optedOutSuites,
     optOutPath,
@@ -872,13 +876,16 @@ export function assertGateCoverage({
   const exitCode =
     errors.length > 0
       ? 2
-      : checkerResult.unwired.length > 0 || suiteResult.unwired.length > 0
+      : rejected.length > 0 ||
+          checkerResult.unwired.length > 0 ||
+          suiteResult.unwired.length > 0
         ? 1
         : 0;
   return {
     ok: exitCode === 0,
     exitCode,
     errors,
+    rejected,
     unwired: checkerResult.unwired,
     wired: checkerResult.wired,
     optedOut: checkerResult.optedOut,

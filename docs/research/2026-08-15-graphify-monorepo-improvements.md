@@ -260,7 +260,7 @@ The project-edge baseline is implemented on branch `chore/graphify-architecture-
 
 ```sh
 yarn graphify:project-edges
-yarn graphify:project-edges:test
+node --test tools/scripts/graphify-project-edge-benchmark.test.ts
 ```
 
 The command projects Graphify import-like edges onto longest-root Nx ownership, compares them with

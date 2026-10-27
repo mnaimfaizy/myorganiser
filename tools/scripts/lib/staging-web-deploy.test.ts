@@ -2,9 +2,9 @@
  * Tests for staging-web-deploy.ts — the decisions behind Staging's web deploy
  * (issue #1138, ADR 0128). Every read of a host, of git and of the Actions API
  * is a stub here; the command-line glue that makes the real reads is tested in
- * ../staging-web-deploy.test.mjs.
+ * ../staging-web-deploy.test.ts.
  *
- * Run with: yarn staging-web:test
+ * Run with: node --test tools/scripts/lib/staging-web-deploy.test.ts
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

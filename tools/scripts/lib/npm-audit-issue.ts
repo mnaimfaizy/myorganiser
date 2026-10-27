@@ -23,7 +23,7 @@
  * The workflow jobs import this module. A second copy of the title or the
  * label list in YAML would be the drift this file exists to prevent.
  *
- * Run the tests with: yarn npm-audit:issue:test
+ * Run the tests with: node --test tools/scripts/lib/npm-audit-issue.test.ts
  */
 
 import {

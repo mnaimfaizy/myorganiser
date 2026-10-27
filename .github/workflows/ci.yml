@@ -738,12 +738,12 @@ jobs:
         run: git diff --exit-code -- yarn.lock
 
       # One glob target for every Contract Suite under tools/scripts (ADR
-      # 0135 slice 2), in place of the per-suite steps this job used to carry
-      # one at a time — the Sandcastle decision contracts included, which
-      # are tools/scripts/lib/sandcastle-*.test.mjs like any other suite here.
-      # A suite reached only through this glob still counts as wired (the
-      # gate-coverage meta-gate below), and the per-suite npm scripts stay
-      # for isolated runs. upstream:briefs:test still runs on its own further
+      # 0135), in place of the per-suite steps this job used to carry one at
+      # a time — the Sandcastle decision contracts included, which are
+      # tools/scripts/lib/sandcastle-*.test.ts like any other suite here.
+      # This glob is the only thing that wires a suite (the gate-coverage
+      # meta-gate below); run one in isolation with `node --test <file>`.
+      # upstream:briefs:test still runs on its own further
       # down: it also runs suites under .agents/skills/upstream-brief, which
       # this glob does not reach.
       - name: Run tools/scripts contract suites
@@ -858,13 +858,13 @@ jobs:
       - name: Upstream Brief report contract and checker contracts
         run: corepack yarn upstream:briefs:test
 
-      # The meta-gate: asserts every check-*.mjs is invoked by some hook or
+      # The meta-gate: asserts every check-*.ts is invoked by some hook or
       # workflow, resolving one level of indirection through the aggregate's
-      # manifest, and that every *.test.mjs / *.test.ts Contract Suite is run
-      # by some wired script the same way — directly, through the aggregate,
-      # or through `tools:test`'s own glob (ADR 0135). Nine checkers ran
-      # nowhere when ADR 0043 was written; six suites ran nowhere when the
-      # suite rule was added.
+      # manifest, rejects any check-*.mjs, and asserts every *.test.ts
+      # Contract Suite is reached by the wired `tools:test` glob (ADR 0135).
+      # Nine checkers ran nowhere when ADR 0043 was written; six suites ran
+      # nowhere when the suite rule was added, before that glob was the one
+      # runner.
       - name: Check gate coverage
         run: corepack yarn gates:coverage:check
 

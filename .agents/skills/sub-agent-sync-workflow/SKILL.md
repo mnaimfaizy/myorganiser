@@ -61,7 +61,7 @@ Rules:
 - `.github/agents` is canonical, not a render target, so Copilot reads the file with the markers
   still in it and sees every block. Keep block contents short and self-labeling
   (`**Claude Code —** ...`) so that reads as a reference table, not as contradictory instructions.
-- Implementation and tests: `tools/scripts/lib/harness-sections.ts`, run with `yarn agents:sync:test`.
+- Implementation and tests: `tools/scripts/lib/harness-sections.ts`, run with `node --test tools/scripts/lib/harness-sections.test.ts`.
 
 ## Tool Grants
 
@@ -77,7 +77,7 @@ overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-d
   committing.
 - If the vocabulary cannot express a grant, add an entry under `overrides` in the map, keyed by agent
   then harness, with a written `reason`. A recurring override should become a role instead.
-- Implementation and tests: `tools/scripts/lib/agent-tool-grants.ts`, run with `yarn agents:sync:test`.
+- Implementation and tests: `tools/scripts/lib/agent-tool-grants.ts`, run with `node --test tools/scripts/lib/agent-tool-grants.test.ts`.
 
 ## Commands
 
@@ -86,7 +86,7 @@ overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-d
 - Apply sync and prune extras:
   - `yarn agents:sync`
 - Test the harness-section and tool-grant renderers:
-  - `yarn agents:sync:test`
+  - `node --test tools/scripts/lib/harness-sections.test.ts tools/scripts/lib/agent-tool-grants.test.ts`
 - Keep extra non-canonical files (rare):
   - `node tools/scripts/sync-subagents.ts --apply --no-prune`
 
@@ -130,7 +130,7 @@ Run this workflow after any of the following:
 Before closing the task:
 
 - `yarn agents:sync:check` returns exit code 0.
-- `yarn agents:sync:test` passes if you touched the harness-section or tool-grant renderer, their markers, or `tools/config/agent-tool-map.json`.
+- `node --test tools/scripts/lib/harness-sections.test.ts tools/scripts/lib/agent-tool-grants.test.ts` passes if you touched the harness-section or tool-grant renderer, their markers, or `tools/config/agent-tool-map.json`.
 - `CodeExplorer` in Cursor remains `model: composer-2.5`.
 - Every harness model matches `tools/config/agent-model-policy.json`.
 - No canonical agent exists only in `.github/agents`.

@@ -265,7 +265,7 @@ export const NOT_THE_REVIEWERS_TO_RUN: Exemption[] = [
   {
     command: 'yarn prisma:migrations:check',
     reason:
-      'A coveringGate value in the same obligation. The entry answers wiredBy by reading, not running; where a reviewer does run a checker it is the check-*.mjs script through node, which the allowlist permits and this spelling is not.',
+      'A coveringGate value in the same obligation. The entry answers wiredBy by reading, not running; where a reviewer does run a checker it is the check-*.ts script through node, which the allowlist permits and this spelling is not.',
   },
   {
     command: 'yarn design-tokens:check',

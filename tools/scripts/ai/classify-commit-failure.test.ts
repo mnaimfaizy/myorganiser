@@ -1,5 +1,5 @@
 /**
- * Run with: yarn ai:commit:test
+ * Run with: node --test tools/scripts/ai/classify-commit-failure.test.ts
  */
 
 import assert from 'node:assert/strict';

@@ -13,7 +13,7 @@
  * ran `git merge-base` proves only that it touched the branch, which is exactly the
  * failure mode observed and all this gate claims to close.
  *
- * Run the tests with: yarn ai:create-pr:test
+ * Run the tests with: node --test tools/scripts/lib/pr-merge-base.test.ts
  */
 
 /**

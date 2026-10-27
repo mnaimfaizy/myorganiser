@@ -72,15 +72,15 @@ cannot be expressed there, so it stays writable in Cursor.
 
 ## Commands
 
-| Command                    | Purpose                                                               |
-| -------------------------- | --------------------------------------------------------------------- |
-| `yarn agents:sync`         | Sync agent bodies and tool grants, then model frontmatter from policy |
-| `yarn agents:sync:check`   | Validate body, tool grants, and model frontmatter                     |
-| `yarn agents:sync:test`    | Test the harness-section and tool-grant renderers                     |
-| `yarn agents:map:check`    | Assert the orchestration map still matches the policy                 |
-| `yarn agents:models:audit` | Check assignments and first-party catalog snapshots                   |
-| `yarn agents:models:test`  | Test the audit's retirement-table reader                              |
-| `yarn agents:usage:report` | Summarize Sandcastle token telemetry                                  |
+| Command                                                                                              | Purpose                                                               |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `yarn agents:sync`                                                                                   | Sync agent bodies and tool grants, then model frontmatter from policy |
+| `yarn agents:sync:check`                                                                             | Validate body, tool grants, and model frontmatter                     |
+| `node --test tools/scripts/lib/harness-sections.test.ts tools/scripts/lib/agent-tool-grants.test.ts` | Test the harness-section and tool-grant renderers                     |
+| `yarn agents:map:check`                                                                              | Assert the orchestration map still matches the policy                 |
+| `yarn agents:models:audit`                                                                           | Check assignments and first-party catalog snapshots                   |
+| `node --test tools/scripts/lib/model-retirements.test.ts`                                            | Test the audit's retirement-table reader                              |
+| `yarn agents:usage:report`                                                                           | Summarize Sandcastle token telemetry                                  |
 
 ### Audit options
 

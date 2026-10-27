@@ -28,7 +28,7 @@
  * No function here puts an origin in a message: both addresses are GitHub
  * Environment secrets (ADR 0056), and a message names the path only.
  *
- * Run the tests with: yarn staging-web:test
+ * Run the tests with: node --test tools/scripts/lib/staging-web-deploy.test.ts
  */
 import { createHash } from 'node:crypto';
 

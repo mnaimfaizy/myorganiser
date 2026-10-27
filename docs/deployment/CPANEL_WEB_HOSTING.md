@@ -269,8 +269,8 @@ below the host's managed blocks, changing nothing above it. Copy the block from
 [`apps/web/deploy/sw-headers.htaccess`](../../apps/web/deploy/sw-headers.htaccess);
 it lives outside `public/`, so it is never uploaded. It is not reproduced here
 on purpose: the two values are stated in `next.config.js`, in that snippet, and
-in the probe's constants, and `yarn staging-web:test` fails when they fall out
-of step.
+in the probe's constants, and `tools/scripts/lib/staging-web-deploy.test.ts`
+fails when they fall out of step.
 
 The rules sit inside `<IfModule mod_headers.c>`, so a web server without that
 module ignores them silently. Staging's probe compares both headers with the

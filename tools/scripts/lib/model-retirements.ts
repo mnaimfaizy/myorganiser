@@ -18,7 +18,7 @@
  * A name matches a term only when the two are equal. `GPT-5.1` is not retired
  * because `GPT-5.1-Codex` is.
  *
- * Run the tests with: yarn agents:models:test
+ * Run the tests with: node --test tools/scripts/lib/model-retirements.test.ts
  */
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

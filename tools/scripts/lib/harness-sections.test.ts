@@ -1,5 +1,5 @@
 /**
- * Run with: yarn agents:sync:test
+ * Run with: node --test tools/scripts/lib/harness-sections.test.ts
  */
 
 import assert from 'node:assert/strict';

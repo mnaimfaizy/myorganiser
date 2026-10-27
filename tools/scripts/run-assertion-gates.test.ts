@@ -18,7 +18,7 @@ const RUNNER = join(
   dirname(fileURLToPath(import.meta.url)),
   'run-assertion-gates.ts',
 );
-const STUB_SCRIPT = 'tools/scripts/check-stub.mjs';
+const STUB_SCRIPT = 'tools/scripts/check-stub.ts';
 
 // ADR 0043: each `corepack yarn` line costs ~1.3s of overhead against ~350ms
 // of work. Issue #735: a 5000ms wall-clock cap on the whole aggregate is

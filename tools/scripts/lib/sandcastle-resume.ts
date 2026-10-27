@@ -6,7 +6,7 @@
  * orchestration; every judgement it makes about a checkpoint is decided here from
  * explicit inputs.
  *
- * Run the tests with: yarn sandcastle:resume:test
+ * Run the tests with: node --test tools/scripts/lib/sandcastle-resume.test.ts
  *
  * See docs/adr/0035-interrupted-slices-resume-from-git-and-destruction-is-deliberate.md.
  * Decisions recorded there are settled — this module implements them, it does not

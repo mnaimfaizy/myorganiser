@@ -1,5 +1,5 @@
 /**
- * Run with: yarn graphify:project-edges:test
+ * Run with: node --test tools/scripts/graphify-project-edge-benchmark.test.ts
  */
 
 import assert from 'node:assert/strict';

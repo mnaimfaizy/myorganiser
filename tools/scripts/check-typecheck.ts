@@ -21,8 +21,8 @@
 // This is a workspace-level script rather than 30-odd new `project.json`
 // targets on purpose. Issue #420 has an open decision about executor-based
 // targets versus inferred plugin targets, and hand-declaring a target per
-// project would prejudge it. It also matches the nine existing
-// `check-*.mjs` scripts.
+// project would prejudge it. It also matches every other `check-*.ts`
+// script.
 //
 // Spec configs are in scope, not just lib/app. The groceries errors lived only
 // in `tsconfig.spec.json`, and `.github/agents/test-reviewer.agent.md` already

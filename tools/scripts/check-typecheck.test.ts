@@ -94,8 +94,8 @@ test('fails naming a tools/scripts .ts fixture with a type error', (t) => {
 
 test('node runs a valid tools/scripts .ts fixture directly, with no build step', (t) => {
   // The other half of ADR 0135's expand step: a .ts file with no type errors
-  // must be directly executable by `node`, the same way check-*.mjs files
-  // are today. engines.node's >=22.18 floor is the first Node 22 that strips
+  // must be directly executable by `node`, the same way every other
+  // tools/scripts script is. engines.node's >=22.18 floor is the first Node 22 that strips
   // types by default, so this needs no flag.
   const fixture = join('tools', 'scripts', 'tmp-direct-run-fixture.ts');
   const absoluteFixture = join(REPO_ROOT, fixture);

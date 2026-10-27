@@ -16,7 +16,7 @@
  * branch tip. Working-tree files are never touched, so uncommitted edits stay
  * visible to the checkpoint capture that runs next.
  *
- * Run the tests with: yarn sandcastle:worktree-repair:test
+ * Run the tests with: node --test tools/scripts/lib/sandcastle-worktree-repair.test.ts
  */
 
 import { spawnSync } from 'node:child_process';

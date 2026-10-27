@@ -1,5 +1,5 @@
 /**
- * Run with: yarn nightly-e2e:rot:test
+ * Run with: node --test tools/scripts/lib/nightly-e2e-rot-issue.test.ts
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

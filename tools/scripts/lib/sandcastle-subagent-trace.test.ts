@@ -1,5 +1,5 @@
 /**
- * Run with: yarn sandcastle:subagent-trace:test  (node --test, matching the other libs here)
+ * Run with: node --test tools/scripts/lib/sandcastle-subagent-trace.test.ts
  */
 
 import assert from 'node:assert/strict';

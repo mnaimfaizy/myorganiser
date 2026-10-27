@@ -1,5 +1,5 @@
 /**
- * Run with: yarn npm-audit:issue:test
+ * Run with: node --test tools/scripts/lib/npm-audit-issue.test.ts
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

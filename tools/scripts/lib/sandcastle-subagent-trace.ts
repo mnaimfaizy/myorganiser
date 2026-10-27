@@ -20,7 +20,7 @@
  * fixtures. `.sandcastle/main.mts` owns locating and copying the files this module
  * reads.
  *
- * Run the tests with: yarn sandcastle:subagent-trace:test
+ * Run the tests with: node --test tools/scripts/lib/sandcastle-subagent-trace.test.ts
  *
  * See docs/adr/0036-sub-agent-work-is-auditable-and-gate-commands-are-derived.md.
  */

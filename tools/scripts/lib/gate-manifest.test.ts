@@ -23,11 +23,11 @@ test('parseNodeSegments reads a single bare node invocation', () => {
 
 test('parseNodeSegments reads a && chain and keeps arguments', () => {
   const segments = parseNodeSegments(
-    'node tools/scripts/sync-subagents.mjs --check && node tools/scripts/sync-agent-models.mjs --check',
+    'node tools/scripts/sync-subagents.ts --check && node tools/scripts/sync-agent-models.ts --check',
   );
   assert.deepEqual(segments, [
-    { script: 'tools/scripts/sync-subagents.mjs', args: ['--check'] },
-    { script: 'tools/scripts/sync-agent-models.mjs', args: ['--check'] },
+    { script: 'tools/scripts/sync-subagents.ts', args: ['--check'] },
+    { script: 'tools/scripts/sync-agent-models.ts', args: ['--check'] },
   ]);
 });
 
@@ -44,13 +44,13 @@ const twoEntryManifest: GateManifestEntry[] = [
   {
     id: 'a',
     npmScript: 'a:check',
-    script: 'tools/scripts/check-a.mjs',
+    script: 'tools/scripts/check-a.ts',
     args: [],
   },
   {
     id: 'b',
     npmScript: 'b:check',
-    script: 'tools/scripts/check-b.mjs',
+    script: 'tools/scripts/check-b.ts',
     args: ['--check'],
   },
 ];
@@ -59,8 +59,8 @@ test('assertManifestAgainstDisk accepts a manifest that matches package.json', (
   const workspace = createWorkspace(t);
   const pkg = {
     scripts: {
-      'a:check': 'node tools/scripts/check-a.mjs',
-      'b:check': 'node tools/scripts/check-b.mjs --check',
+      'a:check': 'node tools/scripts/check-a.ts',
+      'b:check': 'node tools/scripts/check-b.ts --check',
     },
   };
 
@@ -74,11 +74,11 @@ test('assertManifestAgainstDisk accepts a manifest that matches package.json', (
 
 test('assertManifestAgainstDisk rejects a declared script missing from disk', (t) => {
   const workspace = createWorkspace(t);
-  rmSync(join(workspace, 'tools/scripts/check-a.mjs'));
+  rmSync(join(workspace, 'tools/scripts/check-a.ts'));
   const pkg = {
     scripts: {
-      'a:check': 'node tools/scripts/check-a.mjs',
-      'b:check': 'node tools/scripts/check-b.mjs --check',
+      'a:check': 'node tools/scripts/check-a.ts',
+      'b:check': 'node tools/scripts/check-b.ts --check',
     },
   };
 
@@ -90,14 +90,39 @@ test('assertManifestAgainstDisk rejects a declared script missing from disk', (t
   assert.equal(result.ok, false);
   assert.match(
     result.findings.join('\n'),
-    /declared script .*check-a\.mjs does not exist/,
+    /declared script .*check-a\.ts does not exist/,
   );
+});
+
+test('assertManifestAgainstDisk rejects a check-*.mjs entry even when it matches package.json', (t) => {
+  const workspace = createGateManifestWorkspace(t, {
+    scripts: ['tools/scripts/check-a.mjs'],
+  });
+  const manifest: GateManifestEntry[] = [
+    {
+      id: 'a',
+      npmScript: 'a:check',
+      script: 'tools/scripts/check-a.mjs',
+      args: [],
+    },
+  ];
+
+  const result = assertManifestAgainstDisk(manifest, {
+    cwd: workspace,
+    pkg: { scripts: { 'a:check': 'node tools/scripts/check-a.mjs' } },
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.findings, [
+    'a: declared script tools/scripts/check-a.mjs is not a .ts file — ' +
+      'the aggregate runs only TypeScript checkers (ADR 0135)',
+  ]);
 });
 
 test('assertManifestAgainstDisk rejects a manifest entry whose npm script no longer exists', (t) => {
   const workspace = createWorkspace(t);
   const pkg = {
-    scripts: { 'b:check': 'node tools/scripts/check-b.mjs --check' },
+    scripts: { 'b:check': 'node tools/scripts/check-b.ts --check' },
   };
 
   const result = assertManifestAgainstDisk(twoEntryManifest, {
@@ -116,8 +141,8 @@ test('assertManifestAgainstDisk rejects a manifest entry that drifted from its n
   const workspace = createWorkspace(t);
   const pkg = {
     scripts: {
-      'a:check': 'node tools/scripts/check-a.mjs --now-with-a-flag',
-      'b:check': 'node tools/scripts/check-b.mjs --check',
+      'a:check': 'node tools/scripts/check-a.ts --now-with-a-flag',
+      'b:check': 'node tools/scripts/check-b.ts --check',
     },
   };
 
@@ -129,21 +154,21 @@ test('assertManifestAgainstDisk rejects a manifest entry that drifted from its n
   assert.equal(result.ok, false);
   assert.match(
     result.findings.join('\n'),
-    /manifest says `a:check` runs `node tools\/scripts\/check-a\.mjs`, but package\.json's script does not contain that invocation/,
+    /manifest says `a:check` runs `node tools\/scripts\/check-a\.ts`, but package\.json's script does not contain that invocation/,
   );
 });
 
 test('assertManifestAgainstDisk rejects an npm script invocation the manifest never declared', (t) => {
   const workspace = createWorkspace(t);
   writeFileSync(
-    join(workspace, 'tools/scripts/check-c.mjs'),
+    join(workspace, 'tools/scripts/check-c.ts'),
     'process.exit(0);\n',
   );
   const pkg = {
     scripts: {
       'a:check':
-        'node tools/scripts/check-a.mjs && node tools/scripts/check-c.mjs',
-      'b:check': 'node tools/scripts/check-b.mjs --check',
+        'node tools/scripts/check-a.ts && node tools/scripts/check-c.ts',
+      'b:check': 'node tools/scripts/check-b.ts --check',
     },
   };
 
@@ -155,7 +180,7 @@ test('assertManifestAgainstDisk rejects an npm script invocation the manifest ne
   assert.equal(result.ok, false);
   assert.match(
     result.findings.join('\n'),
-    /a:check: package\.json runs `node tools\/scripts\/check-c\.mjs`, which is not declared in the gate manifest/,
+    /a:check: package\.json runs `node tools\/scripts\/check-c\.ts`, which is not declared in the gate manifest/,
   );
 });
 

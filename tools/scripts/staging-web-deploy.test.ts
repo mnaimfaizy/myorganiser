@@ -9,7 +9,7 @@
  * the program: git is a throwaway repository, the host is a `node:http` server
  * on 127.0.0.1, and `gh` is a script on PATH that answers from a fixture.
  *
- * Run with: yarn staging-web:test
+ * Run with: node --test tools/scripts/staging-web-deploy.test.ts
  */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';

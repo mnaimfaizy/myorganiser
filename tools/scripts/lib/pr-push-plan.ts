@@ -25,7 +25,7 @@
  * and identity — same author, same subject — is the fallback that recognises a commit the
  * rebase reshaped. A teammate's genuinely different commit matches neither.
  *
- * Run the tests with: yarn ai:create-pr:test
+ * Run the tests with: node --test tools/scripts/lib/pr-push-plan.test.ts
  */
 
 /** What the runner should do about pushing, once the branch state is known. */

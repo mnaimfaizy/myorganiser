@@ -277,6 +277,12 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
     script: 'tools/scripts/check-ts-suppressions.ts',
     args: [],
   },
+  {
+    id: 'tools:mjs:check',
+    npmScript: 'tools:mjs:check',
+    script: 'tools/scripts/check-tools-mjs.ts',
+    args: [],
+  },
 ];
 
 /** A single `node <script> [...args]` invocation. */
@@ -316,7 +322,9 @@ const sameInvocation = (a: NodeSegment, b: NodeSegment): boolean =>
 /**
  * Compares `manifest` against package.json in both directions.
  *
- *   1. Every declared entry's script file exists on disk.
+ *   1. Every declared entry's script file exists on disk and is a `.ts`
+ *      file: a `check-*.mjs` is no longer a checker the aggregate accepts
+ *      (ADR 0135's contract step).
  *   2. Every declared entry's npm script exists in package.json, and its
  *      command contains that entry's exact invocation.
  *   3. Every `node` invocation an npm script named in the manifest actually
@@ -347,6 +355,12 @@ export function assertManifestAgainstDisk(
     if (!existsSync(join(cwd, entry.script))) {
       findings.push(
         `${entry.id}: declared script ${entry.script} does not exist`,
+      );
+    }
+    if (!entry.script.endsWith('.ts')) {
+      findings.push(
+        `${entry.id}: declared script ${entry.script} is not a .ts file — ` +
+          'the aggregate runs only TypeScript checkers (ADR 0135)',
       );
     }
   }

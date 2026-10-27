@@ -18,7 +18,7 @@
 //
 // It sits in tools/scripts/ rather than beside obligations.ts because
 // gates:coverage:check discovers checkers with a NON-RECURSIVE scan of that
-// directory (tools/scripts/lib/gate-coverage.ts). A check-*.mjs in a
+// directory (tools/scripts/lib/gate-coverage.ts). A check-*.ts in a
 // subdirectory is invisible to the Meta-Gate: it would look wired forever,
 // and if the workflow line invoking it were deleted nothing would notice.
 // That is precisely the shape ADR 0074 names — a checker nothing runs — so
