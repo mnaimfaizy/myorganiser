@@ -860,3 +860,117 @@ test('each axis records the files it opened and the files it diffed by path', ()
   assert.ok(!f.axes!.standards.opened.includes('.github/workflows/deploy.yml'));
   assert.ok(!f.axes!.standards.diffed.includes('tools/a.sh'));
 });
+
+/** A real transcript with one Bash call, and the result it got, added to an axis. */
+const withResultOn = (
+  axis: FindingAxis,
+  command: string,
+  result: { content: string; is_error?: boolean } | null,
+) => {
+  const events: TranscriptEvent[] = JSON.parse(fixture(TWO_FINDINGS));
+  const dispatch = events
+    .flatMap((e) => (e.parent_tool_use_id ? [] : (e.message?.content ?? [])))
+    .find(
+      (b) =>
+        b.type === 'tool_use' &&
+        typeof b.input?.prompt === 'string' &&
+        b.input!.prompt!.includes(BRIEFS[axis]),
+    )!;
+  const id = `added-${axis}-diff`;
+  events.push({
+    type: 'assistant',
+    parent_tool_use_id: dispatch.id,
+    message: {
+      content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }],
+    },
+  });
+  if (result)
+    events.push({
+      type: 'user',
+      parent_tool_use_id: dispatch.id,
+      message: {
+        content: [{ type: 'tool_result', tool_use_id: id, ...result }],
+      },
+    });
+  return readTranscriptFacts(JSON.stringify(events), { index: INDEX });
+};
+
+const TWO_FILE_DIFF = [
+  'diff --git a/apps/web/src/app/youtube/data-privacy/page.tsx b/apps/web/src/app/youtube/data-privacy/page.tsx',
+  'index 64b6453..c5e3990 100644',
+  '--- a/apps/web/src/app/youtube/data-privacy/page.tsx',
+  '+++ b/apps/web/src/app/youtube/data-privacy/page.tsx',
+  '@@ -1,5 +1,9 @@',
+  '+export const metadata = {',
+  'diff --git a/tools/a.sh b/tools/a.sh',
+  '@@ -1 +1 @@',
+  '-echo a',
+  '+echo b',
+].join('\n');
+
+/** The two files `TWO_FILE_DIFF` names; the fixture itself diffs neither. */
+const ADDED_PATHS = [
+  'apps/web/src/app/youtube/data-privacy/page.tsx',
+  'tools/a.sh',
+] as const;
+
+test('a whole-range diff credits the files its output handed back', () => {
+  // Regression: run 40649791114 (#1361). Both axes ran `git diff <base>...HEAD`
+  // and got the whole diff, and the files table still said neither had seen it.
+  const f = withResultOn('spec', 'git diff 4b730ac7...HEAD', {
+    content: TWO_FILE_DIFF,
+  });
+  for (const path of ADDED_PATHS) {
+    assert.ok(f.axes!.spec.diffed.includes(path), path);
+    // The other axis is credited with nothing the Spec sub-agent did.
+    assert.ok(!f.axes!.standards.diffed.includes(path), path);
+  }
+});
+
+test('a whole-range diff is not credited when its output may not be whole', () => {
+  const cases: [
+    string,
+    string,
+    { content: string; is_error?: boolean } | null,
+  ][] = [
+    [
+      'piped through head',
+      'git diff main...HEAD | head -40',
+      { content: TWO_FILE_DIFF },
+    ],
+    [
+      'truncated',
+      'git diff main...HEAD',
+      { content: `${TWO_FILE_DIFF}\n... [120 lines truncated] ...` },
+    ],
+    [
+      'saved elsewhere',
+      'git diff main...HEAD',
+      {
+        content: `Output too large (90KB). Full output saved to: /tmp/x\n${TWO_FILE_DIFF}`,
+      },
+    ],
+    [
+      'failed',
+      'git diff main...HEAD',
+      { content: `Exit code 128\n${TWO_FILE_DIFF}`, is_error: true },
+    ],
+    ['no result in the transcript', 'git diff main...HEAD', null],
+    ['a stat', 'git diff main...HEAD --stat', { content: TWO_FILE_DIFF }],
+  ];
+  for (const [label, command, result] of cases)
+    for (const path of ADDED_PATHS)
+      assert.ok(
+        !withResultOn('spec', command, result).axes!.spec.diffed.includes(path),
+        `${label}: ${path}`,
+      );
+});
+
+test('a path-limited diff is still credited by its paths, not its output', () => {
+  const f = withResultOn('spec', 'git diff main...HEAD -- tools/a.sh', {
+    content: TWO_FILE_DIFF,
+  });
+  assert.ok(f.axes!.spec.diffed.includes('tools/a.sh'));
+  // The page is in the output but not on the path list, so it is not credited.
+  assert.ok(!f.axes!.spec.diffed.includes(ADDED_PATHS[0]));
+});
