@@ -271,9 +271,8 @@ function checkVacuousAssertions(
   code: string,
   raw: string,
   findings: Finding[],
-  helperAssertions = 0,
+  total: number,
 ) {
-  const total = (code.match(/\bexpect\s*\(/g) ?? []).length + helperAssertions;
   if (total === 0) {
     findings.push({
       level: 'error',
@@ -415,18 +414,35 @@ async function countCalledLocalAssertionHelpers(
   return count;
 }
 
+/** Assertions matching `assertionRe`, found directly in the file plus any
+ *  reached through a called local helper whose exported body asserts with
+ *  the same pattern. Shared by the Jest no-assertions/vacuous-ratio check
+ *  and the Contract Suite's no-assertions check (ADR 0135): both ask the
+ *  same "did anything assert here, directly or through a credited helper"
+ *  question, against a different assertionRe. */
+async function countAssertions(
+  file: string,
+  raw: string,
+  code: string,
+  assertionRe: RegExp,
+): Promise<number> {
+  const direct = (code.match(new RegExp(assertionRe, 'g')) ?? []).length;
+  const helperAssertions = await countCalledLocalAssertionHelpers(
+    file,
+    raw,
+    code,
+    assertionRe,
+  );
+  return direct + helperAssertions;
+}
+
 async function inspect(file: string): Promise<Finding[]> {
   const raw = normalize(await fs.readFile(file, 'utf8'));
   const code = maskNonCode(raw);
   const findings: Finding[] = [];
   for (const check of CHECKS) check(code, raw, findings);
-  const helperAssertions = await countCalledLocalAssertionHelpers(
-    file,
-    raw,
-    code,
-    EXPECT_RE,
-  );
-  checkVacuousAssertions(code, raw, findings, helperAssertions);
+  const total = await countAssertions(file, raw, code, EXPECT_RE);
+  checkVacuousAssertions(code, raw, findings, total);
   findings.sort((a, b) => a.line - b.line);
   return findings;
 }
@@ -444,14 +460,13 @@ const CONTRACT_SUITE_ASSERTION_RE =
 async function inspectContractSuite(file: string): Promise<Finding[]> {
   const raw = normalize(await fs.readFile(file, 'utf8'));
   const code = maskNonCode(raw);
-  if (CONTRACT_SUITE_ASSERTION_RE.test(code)) return [];
-  const helperAssertions = await countCalledLocalAssertionHelpers(
+  const total = await countAssertions(
     file,
     raw,
     code,
     CONTRACT_SUITE_ASSERTION_RE,
   );
-  if (helperAssertions > 0) return [];
+  if (total > 0) return [];
   return [
     {
       level: 'error',
