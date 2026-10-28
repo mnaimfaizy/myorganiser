@@ -375,33 +375,73 @@ export const findingsReturnedBy = (
 };
 
 /**
- * The files one tool call diffed by name: a `git diff` that lists paths after
- * `--` returns those files' hunks. A diff naming no path, or one asking only for
- * names or counts (`--stat`, `--name-only`), is not credited to any file: the
- * reader cannot tell from the call whether a whole-range diff came back whole
- * (issue #1140).
+ * The files one tool call diffed: a `git diff` that lists paths after `--`
+ * returns those files' hunks. A diff asking only for names or counts
+ * (`--stat`, `--name-only`) is not credited to any file.
+ *
+ * A diff naming no path is credited from what came back (issue #1140 left it
+ * uncredited, because the call alone cannot say whether a whole-range diff
+ * came back whole). The result can: each `diff --git a/… b/…` header in its
+ * text is a file whose hunks the agent was handed. It is credited only when
+ * the call is that one `git diff` and nothing else, so no `| head` cut it;
+ * the call did not fail; and the text carries no truncation marker. A
+ * truncation this does not recognise can credit at most the files whose
+ * headers survived the cut, each of which the agent saw at least the start
+ * of. Run 40649791114 (#1361) is the case: both axes ran
+ * `git diff <base>...HEAD`, got the whole one-file diff back, and the files
+ * table said neither axis had seen the file.
  *
  * @param call a tool_use block
  * @param cwd the workspace root
+ * @param result the call's tool_result block, when the transcript has one
  * @returns repo-relative paths, in order
  */
-export const filesDiffedBy = (call: ToolCall, cwd: string): string[] => {
+export const filesDiffedBy = (
+  call: ToolCall,
+  cwd: string,
+  result?: unknown,
+): string[] => {
   const input = isObject(call?.input) ? call.input : {};
   const command = call?.name === 'Bash' ? input.command : undefined;
   if (typeof command !== 'string') return [];
+  const simples = simpleCommands(command);
   const diffed: string[] = [];
-  for (const simple of simpleCommands(command)) {
+  for (const simple of simples) {
     const [program, sub, ...args] = tokenize(simple);
     if (program !== 'git' || sub !== 'diff') continue;
     const dashes = args.indexOf('--');
-    if (dashes === -1) continue;
-    if (args.slice(0, dashes).some((a) => NAMES_ONLY.test(a))) continue;
-    for (const arg of args.slice(dashes + 1)) {
-      const path = toRepoPath(arg, cwd);
-      if (path) diffed.push(path);
+    const options = dashes === -1 ? args : args.slice(0, dashes);
+    if (options.some((a) => NAMES_ONLY.test(a))) continue;
+    if (dashes !== -1) {
+      for (const arg of args.slice(dashes + 1)) {
+        const path = toRepoPath(arg, cwd);
+        if (path) diffed.push(path);
+      }
+    } else if (simples.length === 1) {
+      diffed.push(...filesInDiffOutput(result));
     }
   }
   return diffed;
+};
+
+/** Text a truncated tool result carries in place of what it dropped. */
+const TRUNCATED =
+  /\btruncated\b|output too large|full output (?:saved|written) to/i;
+
+/** One file header in `git diff` output; a quoted (unusual) path is skipped. */
+const DIFF_HEADER = /^diff --git a\/(\S+) b\/(\S+)$/gm;
+
+/**
+ * The files whose hunks a whole `git diff` result handed back, or none when
+ * the result is missing, failed, or truncated.
+ *
+ * @param result a tool_result block
+ */
+const filesInDiffOutput = (result: unknown): string[] => {
+  if (!isObject(result) || result.is_error === true) return [];
+  const text = textOf(result.content);
+  if (TRUNCATED.test(text)) return [];
+  return [...text.matchAll(DIFF_HEADER)].map((header) => header[2]);
 };
 
 const NAMES_ONLY =
@@ -620,7 +660,9 @@ export const readTranscriptFacts = (
     entry.toolCalls += calls.length;
     for (const path of openedHere)
       if (!entry.opened.includes(path)) entry.opened.push(path);
-    for (const path of calls.flatMap((call) => filesDiffedBy(call, cwd)))
+    for (const path of calls.flatMap((call) =>
+      filesDiffedBy(call, cwd, results.get(call.id)),
+    ))
       if (!entry.diffed.includes(path)) entry.diffed.push(path);
     if (axis === 'standards') standardsOpened.push(...openedHere);
   }
