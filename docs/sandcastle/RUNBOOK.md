@@ -306,11 +306,14 @@ When the run finishes, **you** finish the loop by hand:
 
 ```bash
 git switch feat/<slug>                 # QA the integrated branch locally
-git push -u origin feat/<slug>         # publish it when you're satisfied
-gh pr create --base main               # open ONE PR; CI runs here; merge it on GitHub
+corepack yarn ai:create-pr             # push it and open ONE PR; CI runs here; merge it on GitHub
 ```
 
-For a standalone run, substitute the `issue/<n>-<slug>` branch the summary printed.
+`ai:create-pr` with no flags uses its commit-subject fallback, which is for a person at the
+keyboard. An agent opening the PR goes through the create-pull-request-workflow Skill instead, so
+`PrAuthor` drafts the title, body, Surface Labels, and merge base.
+
+For a standalone run, substitute the `<type>/<n>-<slug>` branch the summary printed.
 
 ### Tunables
 

@@ -397,7 +397,7 @@ export const renderReport = (
           report.spec.also
             ? `, also ${report.spec.also.join(', ')} (closed by commits)`
             : ''
-        }`;
+        }${report.spec.text ? ` · text: ${report.spec.text.join(' + ')}` : ''}`;
   const tierText = report.effectiveTier ?? 'interactive';
   // `null` is a transcript that carried no figures; absent is a report that
   // never had any. Only the first is something to say.

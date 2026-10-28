@@ -26,7 +26,9 @@
 // Review`. The Spec axis answers to those too, exactly as the AFK agent that
 // built the change did (`lib/issue-comments.ts`), so each issue also carries
 // `brief` (the latest trusted triage brief) and `notes` (trusted maintainer
-// notes) when it has them. Only the repository's owner, members, and
+// notes) when it has them, and `spec.text` names which of `body`, `brief`, and
+// `notes` the primary issue's text was made of, so the published report can
+// show it. Only the repository's owner, members, and
 // collaborators can write either.
 //
 // Every body is untrusted text (ADR 0071 item 4); it is written verbatim for
@@ -44,6 +46,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { Bail } from './cli.ts';
+import type { SPEC_TEXT_PARTS } from './schema.ts';
 import { cannotRun, ghJson, isMain, parseArgs } from './cli.ts';
 import { errorMessage } from '../lib/error-message.ts';
 import type { IssueComment } from '../lib/issue-comments.ts';
@@ -60,6 +63,7 @@ export type DiscoveredSpec =
       ref: string;
       foundBy: 'branch' | 'commits';
       also?: string[];
+      text?: (typeof SPEC_TEXT_PARTS)[number][];
     };
 
 /** One issue as `gh issue view` returns the fields this script asks for. */
@@ -156,6 +160,15 @@ export const isPullRequest = (issue?: IssueView | null) =>
  * brief and maintainer notes its trusted comments carry. A field with nothing
  * in it is left out, so an untriaged issue resolves exactly as before.
  */
+/** Pure: what one issue's spec text is made of, for `spec.text`. */
+export const specTextParts = (
+  text: SpecText,
+): (typeof SPEC_TEXT_PARTS)[number][] => [
+  'body',
+  ...(text.brief ? (['brief'] as const) : []),
+  ...(text.notes ? (['notes'] as const) : []),
+];
+
 export const specTextOf = (issue: IssueView): SpecText => {
   const brief = latestTriageBrief(issue.comments);
   const notes = extractMaintainerNotes(issue.comments);
@@ -206,7 +219,9 @@ export const main = (argv: string[]): void => {
     also?: ({ ref: string } & SpecText)[];
   } & Partial<SpecText> = { spec: primary };
   if (primary.kind === 'issue') {
-    Object.assign(result, specTextOf(fetchIssue(primary.ref)));
+    const primaryText = specTextOf(fetchIssue(primary.ref));
+    Object.assign(result, primaryText);
+    result.spec = { ...primary, text: specTextParts(primaryText) };
     // A closing reference to a pull request is dropped, not fetched as spec:
     // the envelope names only what the Spec axis was actually handed.
     const also: ({ ref: string } & SpecText)[] = [];
@@ -221,7 +236,7 @@ export const main = (argv: string[]): void => {
     if (also.length > 0) {
       result = {
         ...result,
-        spec: { ...primary, also: also.map((issue) => issue.ref) },
+        spec: { ...result.spec, also: also.map((issue) => issue.ref) },
         also,
       };
     }

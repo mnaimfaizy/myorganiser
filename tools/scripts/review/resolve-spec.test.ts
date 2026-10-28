@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { discoverSpec, isPullRequest, specTextOf } from './resolve-spec.ts';
+import {
+  discoverSpec,
+  isPullRequest,
+  specTextOf,
+  specTextParts,
+} from './resolve-spec.ts';
 
 test('the branch name wins when it carries an issue number', () => {
   assert.deepEqual(
@@ -150,4 +155,14 @@ test('a triaged issue carries its trusted brief and notes beside the body', () =
       notes: ['a note'],
     },
   );
+});
+
+test('spec.text names the parts an issue spec was made of', () => {
+  assert.deepEqual(specTextParts({ body: 'report' }), ['body']);
+  assert.deepEqual(specTextParts({ body: 'r', brief: 'b' }), ['body', 'brief']);
+  assert.deepEqual(specTextParts({ body: 'r', brief: 'b', notes: ['n'] }), [
+    'body',
+    'brief',
+    'notes',
+  ]);
 });

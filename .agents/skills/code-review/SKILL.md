@@ -367,8 +367,9 @@ rediscover them:
 - **The spec is already resolved** in `tmp/code-review/spec.json` as
   `{ "spec": { kind, ref, foundBy }, "title", "body" }`, plus `brief` and `notes` from the issue's
   trusted comments when it has them, by `review:spec`, using the job token, with
-  `spec.also` and an `also` array beside it when the change closes further issues. Copy `spec` into
-  the envelope whole, `also` included. The Spec sub-agent reads `body`, `brief`, and `notes` from that file itself. Fetch nothing;
+  `spec.also` and an `also` array beside it when the change closes further issues, and `spec.text`
+  naming what the issue's text was made of. Copy `spec` into the envelope whole, `also` and `text`
+  included. The Spec sub-agent reads `body`, `brief`, and `notes` from that file itself. Fetch nothing;
   there is no token in your environment and nobody to ask. `kind: none` skips the Spec axis.
 - **The obligation worklist is already selected** in `tmp/code-review/obligations.json` by
   `review:obligations:select`. Read it, answer every site, and write
