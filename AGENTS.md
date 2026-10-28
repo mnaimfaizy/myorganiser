@@ -112,7 +112,7 @@ Named workflows live in `.agents/skills/`. Load the Skill; do not copy its steps
 - Ad-hoc GitHub issue (bug, task, or follow-up that is **not** a PRD): `.agents/skills/github-issue-creation-workflow/SKILL.md`
 - Planned feature, spec, or grill outcome published as a **PRD Issue**: `.agents/skills/to-prd/SKILL.md` — do not use IssueCreator
 - Break a PRD Issue into slices: `.agents/skills/to-issues/SKILL.md`
-- Existing issue or external PR (state machine, not create): `.agents/skills/triage/SKILL.md`
+- Existing issue or external PR (state machine, not create): `.agents/skills/my-triage/SKILL.md`
 - Jest tests: `.agents/skills/unit-test-delegation-workflow/SKILL.md`
 - Playwright E2E: `.agents/skills/playwright-e2e-workflow/SKILL.md`
 - Storybook: `.agents/skills/storybook-delegation-workflow/SKILL.md`

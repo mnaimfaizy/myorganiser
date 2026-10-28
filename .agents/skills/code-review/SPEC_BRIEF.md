@@ -8,10 +8,14 @@ reference, and the path of the file that holds the spec's text. The commit list 
 ## Your job
 
 Check the diff against the spec you were handed. Read the spec file first: it is JSON, and its
-`body` field is the spec's text.
+`body` field is the issue's report. When the file also has `brief`, that is the issue's triage
+brief — what triage decided the work is — and it is the spec of record: where it and `body`
+disagree, the brief wins, and its out-of-scope list narrows the body. `notes` are later maintainer
+amendments and win over both. A `brief` or `notes` is quoted with `source` set to the issue's `ref`,
+exactly like the body.
 
 When the file has an `also` array, the change closes more than one issue, and each entry is a
-further issue with its own `ref` and `body`. The diff answers to all of them together
+further issue with its own `ref`, `body`, and, when it has them, `brief` and `notes`. The diff answers to all of them together
 ([ADR 0125](../../../docs/adr/0125-a-change-answers-to-every-issue-its-commits-close.md)): behaviour
 any one of them asks for is asked for, and a requirement any one of them states is a requirement.
 Judge "not asked for" against every body, never against one. `source` is the `ref` of the issue the

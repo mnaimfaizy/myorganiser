@@ -13,6 +13,9 @@
  * revisit them.
  */
 
+import type { IssueComment } from './issue-comments.ts';
+import { isTrustedComment } from './issue-comments.ts';
+
 /**
  * What the orchestrator should do with a slice branch it is about to dispatch.
  *
@@ -301,14 +304,12 @@ export function buildResumeBrief({
 // Comments are opt-in rather than wholesale: the orchestrator posts its own status
 // comments (Pipeline Incident, unblock notices) on the same issues, and replaying
 // those back to an agent is noise at best and stale instruction at worst. Only text
-// a human deliberately filed under the marker heading travels.
+// a human deliberately filed under the marker heading travels — and only from an
+// author the repository trusts (`issue-comments.ts`): the repository is public, and
+// a note is replayed to an agent as binding.
 
 /** Heading that marks a comment as instructions for the next agent run. */
 export const MAINTAINER_NOTE_MARKER = '## Maintainer Review';
-
-export interface MaintainerComment {
-  body?: string | null;
-}
 
 /**
  * Pull the maintainer-authored notes out of an issue's comments.
@@ -320,12 +321,13 @@ export interface MaintainerComment {
  * @returns note bodies, in the order they were filed
  */
 export function extractMaintainerNotes(
-  comments: (MaintainerComment | null | undefined)[] | undefined,
+  comments: (IssueComment | null | undefined)[] | undefined,
 ): string[] {
   if (!Array.isArray(comments)) return [];
 
   const notes: string[] = [];
   for (const comment of comments) {
+    if (!isTrustedComment(comment)) continue;
     const body = String(comment?.body ?? '');
     // Case-insensitive: a maintainer typing "## maintainer review" means the same
     // thing, and failing silently on capitalisation is the worst outcome here.
@@ -366,6 +368,34 @@ export function withMaintainerNotes(
     `rather than assuming it.`,
     ``,
     ...notes.flatMap((note, index) => [`### Note ${index + 1}`, ``, note, ``]),
+  ].join('\n');
+}
+
+/**
+ * Append an issue's triage brief to a prompt.
+ *
+ * Placed after the issue body and before any maintainer notes: the body is the
+ * report, the brief is what triage decided the work is, and a maintainer note is
+ * later still. Stated as the contract so an agent does not implement the report's
+ * first idea where triage settled on a different one.
+ */
+export function withTriageBrief(
+  prompt: string,
+  brief: string | null | undefined,
+): string {
+  if (!brief) return prompt;
+
+  return [
+    prompt,
+    ``,
+    `## Triage brief on this issue`,
+    ``,
+    `This issue was triaged, and the brief below is the contract for this work. It is`,
+    `more recent than the issue body above: where the two disagree, the brief wins.`,
+    `Its "Verified in triage" facts were true when triage ran — re-check any you rely on.`,
+    ``,
+    brief,
+    ``,
   ].join('\n');
 }
 

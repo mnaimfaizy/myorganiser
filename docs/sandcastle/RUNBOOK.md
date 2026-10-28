@@ -524,6 +524,10 @@ TestRunner`. A spec file existing in the tree is not evidence a pipeline ran —
   invisible to the next agent. A comment containing that heading has everything below it appended
   to the brief and marked binding. Anything above the heading is dropped, and a comment without
   it is ignored entirely — that is what keeps sandcastle's own status comments out of the prompt.
+  The issue's latest `## Agent Brief` comment (the `my-triage` Skill) travels the same way, placed
+  before the notes. Both count only from the repository's owner, members, or collaborators: the
+  repository is public, and a stranger's comment must not become an agent's instructions
+  ([ADR 0137](../adr/0137-an-issue-is-specified-by-its-body-and-its-trusted-triage-brief.md)).
 
 - **Nothing in a checkpoint has been linted, type-checked, or tested.** The preservation commit uses
   `--no-verify` on purpose, so husky never reformats half-written work — which also means the build

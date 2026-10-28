@@ -29,7 +29,10 @@ import {
   validateDiscardScope,
   extractMaintainerNotes,
   withMaintainerNotes,
+  withTriageBrief,
 } from '../tools/scripts/lib/sandcastle-resume.ts';
+import type { IssueComment } from '../tools/scripts/lib/issue-comments.ts';
+import { latestTriageBrief } from '../tools/scripts/lib/issue-comments.ts';
 import {
   blockedBy,
   blocks,
@@ -2442,18 +2445,22 @@ function buildGateInstructions(
 }
 
 /**
- * Read the maintainer notes filed on an issue.
+ * Read what an issue's comments add to its brief: the latest triage brief and
+ * the maintainer notes, both from trusted authors only (`issue-comments.ts`).
  *
  * Fetched here, per dispatched slice, rather than added to the issue LIST queries:
  * those pull up to 200 issues and would carry every comment on all of them for the
  * sake of the handful actually being run.
  *
  * A failure to read comments must not stop a dispatch — the issue body is still a
- * complete brief — so this degrades to "no notes" and says so.
+ * brief — so this degrades to "no brief, no notes" and says so.
  */
-function readMaintainerNotes(issueNumber: number): string[] {
+function readIssueAmendments(issueNumber: number): {
+  triageBrief: string | null;
+  maintainerNotes: string[];
+} {
   try {
-    const { comments } = ghJson<{ comments?: Array<{ body?: string }> }>([
+    const { comments } = ghJson<{ comments?: IssueComment[] }>([
       'issue',
       'view',
       String(issueNumber),
@@ -2462,12 +2469,15 @@ function readMaintainerNotes(issueNumber: number): string[] {
       '--json',
       'comments',
     ]);
-    return extractMaintainerNotes(comments);
+    return {
+      triageBrief: latestTriageBrief(comments),
+      maintainerNotes: extractMaintainerNotes(comments),
+    };
   } catch {
     console.warn(
       `  [#${issueNumber}] could not read issue comments; dispatching on the issue body alone.`,
     );
-    return [];
+    return { triageBrief: null, maintainerNotes: [] };
   }
 }
 
@@ -3028,11 +3038,16 @@ while (pendingSlices.length > 0) {
         ? readSliceCheckpoint(sliceBranch)
         : undefined;
 
-    const maintainerNotes = readMaintainerNotes(issue.number);
+    const { triageBrief, maintainerNotes } = readIssueAmendments(issue.number);
     const parentPrd = readParentPrd(issue);
     if (parentPrd) {
       console.log(
         `  [#${issue.number}] carrying PRD #${parentPrd.number} into the brief.`,
+      );
+    }
+    if (triageBrief) {
+      console.log(
+        `  [#${issue.number}] carrying its triage brief into the brief.`,
       );
     }
     if (maintainerNotes.length > 0) {
@@ -3193,7 +3208,10 @@ while (pendingSlices.length > 0) {
           // Notes wrap the base prompt, so the resume brief inherits them too: a
           // maintainer reviewing a checkpoint is the likeliest author of one.
           const basePrompt = withMaintainerNotes(
-            buildPrompt(issue, sliceBranch, parentPrd),
+            withTriageBrief(
+              buildPrompt(issue, sliceBranch, parentPrd),
+              triageBrief,
+            ),
             maintainerNotes,
           );
           return checkpoint

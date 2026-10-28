@@ -21,6 +21,14 @@
 //     "title": "...", "body": "...",
 //     "also": [{ "ref": "#124", "title": "...", "body": "..." }] }
 //
+// An issue's body is its report; what triage decided is a comment headed
+// `## Agent Brief`, and a maintainer can amend that under `## Maintainer
+// Review`. The Spec axis answers to those too, exactly as the AFK agent that
+// built the change did (`lib/issue-comments.ts`), so each issue also carries
+// `brief` (the latest trusted triage brief) and `notes` (trusted maintainer
+// notes) when it has them. Only the repository's owner, members, and
+// collaborators can write either.
+//
 // Every body is untrusted text (ADR 0071 item 4); it is written verbatim for
 // the reviewer to quote, never interpreted here.
 //
@@ -38,6 +46,9 @@ import { dirname } from 'node:path';
 import type { Bail } from './cli.ts';
 import { cannotRun, ghJson, isMain, parseArgs } from './cli.ts';
 import { errorMessage } from '../lib/error-message.ts';
+import type { IssueComment } from '../lib/issue-comments.ts';
+import { latestTriageBrief } from '../lib/issue-comments.ts';
+import { extractMaintainerNotes } from '../lib/sandcastle-resume.ts';
 
 /** The spec source a review was handed, as `spec.json` records it. */
 export type DiscoveredSpec =
@@ -55,6 +66,16 @@ interface IssueView {
   body?: string | null;
   state?: string;
   url?: string;
+  comments?: IssueComment[];
+}
+
+/** One issue's text as `spec.json` records it. */
+export interface SpecText {
+  title?: string;
+  body: string;
+  state?: string;
+  brief?: string;
+  notes?: string[];
 }
 
 const BRANCH_ISSUE = /^[a-z]+\/(\d+)-/;
@@ -128,6 +149,23 @@ export const discoverSpec = ({
 export const isPullRequest = (issue?: IssueView | null) =>
   /\/pull\/\d+$/.test(String(issue?.url ?? ''));
 
+/**
+ * Pure: one fetched issue's text for `spec.json` — its body, plus the triage
+ * brief and maintainer notes its trusted comments carry. A field with nothing
+ * in it is left out, so an untriaged issue resolves exactly as before.
+ */
+export const specTextOf = (issue: IssueView): SpecText => {
+  const brief = latestTriageBrief(issue.comments);
+  const notes = extractMaintainerNotes(issue.comments);
+  return {
+    title: issue.title,
+    body: issue.body ?? '',
+    state: issue.state,
+    ...(brief ? { brief } : {}),
+    ...(notes.length > 0 ? { notes } : {}),
+  };
+};
+
 export const main = (argv: string[]): void => {
   const bail: Bail = cannotRun('review-spec');
   const { flags } = parseArgs(argv);
@@ -153,44 +191,30 @@ export const main = (argv: string[]): void => {
         ref.slice(1),
         ...repoArgs,
         '--json',
-        'title,body,state,url',
+        'title,body,state,url,comments',
       ]) as IssueView;
     } catch (err) {
       return bail(`cannot fetch ${ref}: ${errorMessage(err)}`);
     }
   };
-  const textOf = (issue: IssueView) => ({
-    title: issue.title,
-    body: issue.body ?? '',
-    state: issue.state,
-  });
-
   const { also: alsoRefs = [], ...primary } =
     found.kind === 'issue' ? found : { ...found, also: undefined };
   let result: {
     spec: DiscoveredSpec;
-    title?: string;
-    body?: string;
-    state?: string;
-    also?: { ref: string; title?: string; body: string; state?: string }[];
-  } = { spec: primary };
+    also?: ({ ref: string } & SpecText)[];
+  } & Partial<SpecText> = { spec: primary };
   if (primary.kind === 'issue') {
-    Object.assign(result, textOf(fetchIssue(primary.ref)));
+    Object.assign(result, specTextOf(fetchIssue(primary.ref)));
     // A closing reference to a pull request is dropped, not fetched as spec:
     // the envelope names only what the Spec axis was actually handed.
-    const also: {
-      ref: string;
-      title?: string;
-      body: string;
-      state?: string;
-    }[] = [];
+    const also: ({ ref: string } & SpecText)[] = [];
     for (const ref of alsoRefs) {
       const issue = fetchIssue(ref);
       if (isPullRequest(issue)) {
         console.log(`review-spec: ${ref} is a pull request, not a spec source`);
         continue;
       }
-      also.push({ ref, ...textOf(issue) });
+      also.push({ ref, ...specTextOf(issue) });
     }
     if (also.length > 0) {
       result = {

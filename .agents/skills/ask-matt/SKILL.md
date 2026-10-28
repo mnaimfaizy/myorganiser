@@ -38,7 +38,7 @@ Keep grilling → PRD → issue slicing in **one unbroken context** when possibl
 
 ## On-ramps
 
-- **Bugs and requests piling up** → **`/triage`** (incoming/raw issues only — not slices `/to-issues` already made agent-ready).
+- **Bugs and requests piling up** → **`/my-triage`** (incoming/raw issues only — not slices `/to-issues` already made agent-ready).
 - **Something's broken** → **`/diagnosing-bugs`** (hard bugs, flakes, regressions). Refuse theories until there is a tight red-capable feedback loop; hand off to **`/improve-codebase-architecture`** when the finding is a missing seam.
 - **Huge / foggy effort (cannot yet write the PRD's goal sentence)** → **`/grill-with-docs`**. Interview until the abstractions have edges; the moment you _can_ write that sentence, switch to **`/to-prd`**.
 
@@ -74,7 +74,7 @@ If the work is:
 
 - **New planned feature** → `/to-prd`
 - **Something's broken (hard bug)** → `/diagnosing-bugs`
-- **Incoming raw request to track** → `/github-issue-creation-workflow` or `/triage`
+- **Incoming raw request to track** → `/github-issue-creation-workflow` or `/my-triage`
 - **Ad-hoc fix now, no ticket** → classify gate → `/implement` (with `/tdd` when appropriate)
 - **Test-heavy behavioral change** → matching test workflow at `standard`/`full`
 - **Architecture/terminology uncertainty** → `/grill-with-docs` (and `/domain-modeling` when updating glossary/ADRs)
