@@ -88,8 +88,22 @@ const BRANCH_ISSUE = /^[a-z]+\/(\d+)-/;
 // A commit reference is a keyword and a number, the shapes GitHub links
 // to an issue. A bare `#N` is not one: `(#123)` is the squash-merge PR
 // number and `item #4` is an ADR citation.
-const COMMIT_ISSUE =
-  /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|see|issue)\s+#(\d+)\b/i;
+//
+// A closing keyword counts anywhere on a line, because GitHub closes on one
+// mid-sentence and the spec must agree with what the merge closes. A
+// pointing keyword — `Refs`, `see`, `issue` — counts only where it opens the
+// line, as a trailer does (`Refs #12`, or `- Refs #12` in a bullet list).
+// Mid-sentence, those words are prose about an issue, not a claim that the
+// change answers to it: #1362's commit described a report line as
+// "e.g. `spec: issue #1273 (found by branch)`", and every review of it was
+// judged against #1273, a page-title issue it never set out to meet.
+const COMMIT_ISSUE = new RegExp(
+  [
+    /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b/.source,
+    /^\s*(?:[-*]\s+)?(?:refs?|see|issue)\s+#(\d+)\b/.source,
+  ].join('|'),
+  'i',
+);
 // The closing keywords alone, every one on the line. `Closes #12` says the
 // change finishes #12, so the change answers to it; `Refs #12` and `see #12`
 // only point at it, and a spec made of everything a commit mentions would
@@ -111,7 +125,8 @@ const discoverPrimary = ({
     return { kind: 'issue', ref: `#${fromBranch[1]}`, foundBy: 'branch' };
   for (const message of commits) {
     const hit = message.match(COMMIT_ISSUE);
-    if (hit) return { kind: 'issue', ref: `#${hit[1]}`, foundBy: 'commits' };
+    if (hit)
+      return { kind: 'issue', ref: `#${hit[1] ?? hit[2]}`, foundBy: 'commits' };
   }
   return { kind: 'none', foundBy: 'none' };
 };

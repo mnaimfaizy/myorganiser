@@ -166,3 +166,46 @@ test('spec.text names the parts an issue spec was made of', () => {
     'notes',
   ]);
 });
+
+test('a pointing keyword in mid-sentence is prose, not the spec', () => {
+  // Regression: #1362's commit body said "e.g. `spec: issue #1273 (found by
+  // branch)`", and every review of it was judged against #1273.
+  assert.deepEqual(
+    discoverSpec({
+      headRef: 'fix/dispatch-attribution-and-pr-hint',
+      commits: [
+        'fix(sandcastle): stop agents guessing fix attribution',
+        '- `spec.text` records what an issue spec was made of. The report line shows it, e.g. `spec: issue #1273 (found by branch) · text: body + brief`.',
+        'The agent on #1273 guessed; see #1318 for why that passed.',
+        'Introduced in #884',
+      ],
+    }),
+    { kind: 'none', foundBy: 'none' },
+  );
+});
+
+test('a pointing keyword that opens a line, or a bullet, is still found', () => {
+  for (const line of [
+    'Refs #12',
+    '  refs #12',
+    '- Refs #12',
+    '* see #12',
+    'Issue #12',
+  ]) {
+    assert.deepEqual(
+      discoverSpec({ headRef: 'chore/tidy', commits: ['subject', line] }),
+      { kind: 'issue', ref: '#12', foundBy: 'commits' },
+      line,
+    );
+  }
+});
+
+test('a closing keyword still counts in mid-sentence, as GitHub closes on it', () => {
+  assert.deepEqual(
+    discoverSpec({
+      headRef: 'chore/tidy',
+      commits: ['subject', 'This change fixes #12 by retrying.'],
+    }),
+    { kind: 'issue', ref: '#12', foundBy: 'commits' },
+  );
+});
