@@ -41,7 +41,7 @@ Committed seventh wave:
 
 Committed eighth wave:
 
-- `triage` (adapted from `mattpocock/skills`, with MyOrganiser issue/PR triage flow)
+- `my-triage` (adapted from Matt Pocock's `triage` in `mattpocock/skills`, with MyOrganiser's triage flow and dispatch contract)
 
 Committed ninth wave:
 

@@ -80,7 +80,9 @@ In this order; record which step found it as `spec.foundBy`:
 
 Fetch issues via [`docs/agents/issue-tracker.md`](../../../docs/agents/issue-tracker.md), and write
 what you fetched to `tmp/code-review/spec.json` as `{ "spec": { kind, ref, foundBy }, "title", "body" }`.
-The Spec sub-agent reads the spec from that file, so the dispatch never carries its text. In CI the
+Fetch the issue's comments too: the latest comment headed `## Agent Brief` goes in `brief`, and every
+`## Maintainer Review` note in `notes`, each only from an `OWNER`, `MEMBER`, or `COLLABORATOR`
+(`tools/scripts/lib/issue-comments.ts` is the rule; `review:spec` applies it in CI). The Spec sub-agent reads the spec from that file, so the dispatch never carries its text. In CI the
 file is already there.
 
 **A change answers to every issue its commits close**
@@ -363,9 +365,10 @@ rediscover them:
   has two axes' worth of findings to assemble (step 5) only if it dispatched before it started
   exploring standards sources on its own.
 - **The spec is already resolved** in `tmp/code-review/spec.json` as
-  `{ "spec": { kind, ref, foundBy }, "title", "body" }` by `review:spec`, using the job token, with
+  `{ "spec": { kind, ref, foundBy }, "title", "body" }`, plus `brief` and `notes` from the issue's
+  trusted comments when it has them, by `review:spec`, using the job token, with
   `spec.also` and an `also` array beside it when the change closes further issues. Copy `spec` into
-  the envelope whole, `also` included. The Spec sub-agent reads `body` from that file itself. Fetch nothing;
+  the envelope whole, `also` included. The Spec sub-agent reads `body`, `brief`, and `notes` from that file itself. Fetch nothing;
   there is no token in your environment and nobody to ask. `kind: none` skips the Spec axis.
 - **The obligation worklist is already selected** in `tmp/code-review/obligations.json` by
   `review:obligations:select`. Read it, answer every site, and write

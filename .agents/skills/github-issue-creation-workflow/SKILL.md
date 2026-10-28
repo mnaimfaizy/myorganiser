@@ -15,7 +15,7 @@ description: 'Use when the user asks to create a standalone GitHub issue for an 
 
 - The user wants to plan a feature, write a spec, or publish a grill outcome as tracked work → `.agents/skills/to-prd/SKILL.md` (not IssueCreator).
 - A PRD Issue already exists and needs slice tickets → `.agents/skills/to-issues/SKILL.md`.
-- An existing issue or external PR needs the triage state machine → `.agents/skills/triage/SKILL.md`.
+- An existing issue or external PR needs the triage state machine → `.agents/skills/my-triage/SKILL.md`.
 
 ## Core Rules
 

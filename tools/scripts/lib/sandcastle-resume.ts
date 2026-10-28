@@ -292,55 +292,10 @@ export function buildResumeBrief({
   ].join('\n');
 }
 
-// ─── Maintainer notes on an issue ─────────────────────────────────────────────
-// A maintainer who reviews a checkpoint writes their conclusions on the Slice Issue,
-// but the orchestrator interpolates only an issue's BODY into a prompt, so those
-// conclusions never reach the next agent. #396 closed with three reviewed findings
-// unaddressed for exactly this reason.
-//
-// Comments are opt-in rather than wholesale: the orchestrator posts its own status
-// comments (Pipeline Incident, unblock notices) on the same issues, and replaying
-// those back to an agent is noise at best and stale instruction at worst. Only text
-// a human deliberately filed under the marker heading travels.
-
-/** Heading that marks a comment as instructions for the next agent run. */
-export const MAINTAINER_NOTE_MARKER = '## Maintainer Review';
-
-export interface MaintainerComment {
-  body?: string | null;
-}
-
-/**
- * Pull the maintainer-authored notes out of an issue's comments.
- *
- * Everything after the marker heading in a comment is taken, so a note can carry
- * whatever structure it needs. Text BEFORE the marker is dropped — that is where
- * conversational preamble lives, and a directive belongs under the heading.
- *
- * @returns note bodies, in the order they were filed
- */
-export function extractMaintainerNotes(
-  comments: (MaintainerComment | null | undefined)[] | undefined,
-): string[] {
-  if (!Array.isArray(comments)) return [];
-
-  const notes: string[] = [];
-  for (const comment of comments) {
-    const body = String(comment?.body ?? '');
-    // Case-insensitive: a maintainer typing "## maintainer review" means the same
-    // thing, and failing silently on capitalisation is the worst outcome here.
-    const marker = body
-      .toLowerCase()
-      .indexOf(MAINTAINER_NOTE_MARKER.toLowerCase());
-    if (marker === -1) continue;
-
-    const afterHeading = body.slice(marker + MAINTAINER_NOTE_MARKER.length);
-    const note = afterHeading.replace(/^[^\n]*\n?/, '').trim();
-    if (note) notes.push(note);
-  }
-
-  return notes;
-}
+// ─── Issue comments carried into a prompt ─────────────────────────────────────
+// Which comments count — the triage brief and maintainer notes, from trusted
+// authors only — is decided in `issue-comments.ts`, which the CI spec resolver
+// reads too. This module only places them in the prompt.
 
 /**
  * Append maintainer notes to a prompt.
@@ -366,6 +321,34 @@ export function withMaintainerNotes(
     `rather than assuming it.`,
     ``,
     ...notes.flatMap((note, index) => [`### Note ${index + 1}`, ``, note, ``]),
+  ].join('\n');
+}
+
+/**
+ * Append an issue's triage brief to a prompt.
+ *
+ * Placed after the issue body and before any maintainer notes: the body is the
+ * report, the brief is what triage decided the work is, and a maintainer note is
+ * later still. Stated as the contract so an agent does not implement the report's
+ * first idea where triage settled on a different one.
+ */
+export function withTriageBrief(
+  prompt: string,
+  brief: string | null | undefined,
+): string {
+  if (!brief) return prompt;
+
+  return [
+    prompt,
+    ``,
+    `## Triage brief on this issue`,
+    ``,
+    `This issue was triaged, and the brief below is the contract for this work. It is`,
+    `more recent than the issue body above: where the two disagree, the brief wins.`,
+    `Its "Verified in triage" facts were true when triage ran — re-check any you rely on.`,
+    ``,
+    brief,
+    ``,
   ].join('\n');
 }
 

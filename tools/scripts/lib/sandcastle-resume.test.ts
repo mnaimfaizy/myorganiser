@@ -23,9 +23,8 @@ import {
   PRIOR_RUN_KINDS,
   extractHandoff,
   resumeGuardrails,
-  MAINTAINER_NOTE_MARKER,
-  extractMaintainerNotes,
   withMaintainerNotes,
+  withTriageBrief,
   SLICE_DISPOSITIONS,
   buildResumeBrief,
   decideSliceDisposition,
@@ -662,69 +661,6 @@ test('the duration makes an implausible wait obvious', () => {
 
 // ─── Maintainer notes ─────────────────────────────────────────────────────────
 
-test('a comment without the marker is not a maintainer note', () => {
-  // The orchestrator posts its own comments on these issues. Replaying an unblock
-  // notice or a Pipeline Incident back to an agent is noise at best.
-  const notes = extractMaintainerNotes([
-    { body: 'Unblocked: every blocker is now closed.' },
-    { body: '## Pipeline Incident\n\nTestReviewer hit the retry cap.' },
-    { body: 'lgtm' },
-  ]);
-
-  assert.deepEqual(notes, []);
-});
-
-test('text under the marker is taken and preamble above it is dropped', () => {
-  const notes = extractMaintainerNotes([
-    {
-      body: [
-        'Had a look at the checkpoint this morning.',
-        '',
-        MAINTAINER_NOTE_MARKER,
-        '',
-        'The CID linkage assertion cannot fail — rewrite it.',
-      ].join('\n'),
-    },
-  ]);
-
-  assert.deepEqual(notes, [
-    'The CID linkage assertion cannot fail — rewrite it.',
-  ]);
-});
-
-test('the marker is matched case-insensitively', () => {
-  // Failing silently on capitalisation is the worst outcome: the maintainer believes
-  // the note was filed and the agent never sees it.
-  const notes = extractMaintainerNotes([
-    { body: '## maintainer review\n\nlowercase still counts' },
-  ]);
-
-  assert.deepEqual(notes, ['lowercase still counts']);
-});
-
-test('an empty note is not carried', () => {
-  const notes = extractMaintainerNotes([
-    { body: `${MAINTAINER_NOTE_MARKER}\n\n   ` },
-  ]);
-  assert.deepEqual(notes, []);
-});
-
-test('notes keep the order they were filed and survive multi-line bodies', () => {
-  const notes = extractMaintainerNotes([
-    { body: `${MAINTAINER_NOTE_MARKER}\nfirst` },
-    { body: 'unrelated' },
-    { body: `${MAINTAINER_NOTE_MARKER}\nsecond\n\n- with a list` },
-  ]);
-
-  assert.deepEqual(notes, ['first', 'second\n\n- with a list']);
-});
-
-test('extraction tolerates missing or malformed comment payloads', () => {
-  assert.deepEqual(extractMaintainerNotes(undefined), []);
-  assert.deepEqual(extractMaintainerNotes([]), []);
-  assert.deepEqual(extractMaintainerNotes([null, {}, { body: null }]), []);
-});
-
 test('a prompt with no notes is returned untouched', () => {
   assert.equal(withMaintainerNotes('BASE PROMPT', []), 'BASE PROMPT');
   assert.equal(withMaintainerNotes('BASE PROMPT', undefined), 'BASE PROMPT');
@@ -749,6 +685,37 @@ test('multiple notes are numbered so a prompt can reference one', () => {
   assert.match(prompt, /### Note 1/);
   assert.match(prompt, /### Note 2/);
   assert.match(prompt, /following instructions/);
+});
+
+// ─── Triage brief ─────────────────────────────────────────────────────────────
+
+test('a prompt with no triage brief is returned untouched', () => {
+  assert.equal(withTriageBrief('BASE PROMPT', null), 'BASE PROMPT');
+  assert.equal(withTriageBrief('BASE PROMPT', undefined), 'BASE PROMPT');
+  assert.equal(withTriageBrief('BASE PROMPT', ''), 'BASE PROMPT');
+});
+
+test('a triage brief follows the issue body and is declared the contract', () => {
+  // Regression: triage briefs are comments, and only the issue body reached the
+  // prompt, so an AFK agent built from the reporter's text and never saw what
+  // triage decided.
+  const prompt = withTriageBrief(
+    'ISSUE BODY',
+    'Delete the shim; retarget importers.',
+  );
+
+  assert.ok(prompt.startsWith('ISSUE BODY'));
+  assert.match(prompt, /## Triage brief on this issue/);
+  assert.match(prompt, /the brief wins/);
+  assert.match(prompt, /Delete the shim; retarget importers\./);
+});
+
+test('maintainer notes wrap the triage brief, so they come last and win', () => {
+  const prompt = withMaintainerNotes(withTriageBrief('BODY', 'the brief'), [
+    'a later note',
+  ]);
+
+  assert.ok(prompt.indexOf('the brief') < prompt.indexOf('a later note'));
 });
 
 // ─── Handoff carried between runs (ADR 0044) ──────────────────────────────────
