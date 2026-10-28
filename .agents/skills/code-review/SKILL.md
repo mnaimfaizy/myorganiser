@@ -71,7 +71,7 @@ In this order; record which step found it as `spec.foundBy`:
 
 1. **Branch name** — `git branch --show-current` matches `<type>/<issue-number>-<slug>`
    ([AGENTS.md](../../../AGENTS.md), Branch naming). The number is the issue. `foundBy: branch`.
-2. **Issue references in commits** — `#123`, `Closes #45` in the commit list. `foundBy: commits`.
+2. **Issue references in commits** — a closing keyword anywhere on a line (`Closes #45`, `fixes #45`), or `Refs` / `see` / `issue #45` opening a line, in the commit list; a pointing word mid-sentence is prose, not a reference (`tools/scripts/review/resolve-spec.ts`). `foundBy: commits`.
 3. **An argument** — a path or issue the user passed. `foundBy: argument`.
 4. **Ask the user** (interactive only). `foundBy: user`.
 5. Otherwise `spec: { kind: 'none', foundBy: 'none' }`. The Spec sub-agent is skipped, and the
