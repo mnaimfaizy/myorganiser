@@ -302,11 +302,18 @@ const exitCodeOf = (result: unknown): number | null => {
  * The harness wraps a reply before the main agent sees it: a framing line
  * ahead of it, every line indented, and an `agentId:` trailer with usage
  * figures after it. Those are the harness's, not the sub-agent's.
+ *
+ * From CLI 2.1.312 the frame can itself come after harness notes — a
+ * `<tools-used-before-summary>…</tools-used-before-summary>` line and a blank
+ * one (run 40612259601) — so those are skipped before the frame is looked for.
  */
+const HARNESS_NOTE = /^\s*(?:<([a-z][a-z-]*)>[^\n]*<\/\1>)?\s*$/;
+
 const replyText = (content: unknown): string => {
-  let text = textOf(content);
-  if (text.startsWith('[Subagent hand-back]'))
-    text = text.slice(text.indexOf('\n') + 1);
+  const lines = textOf(content).split('\n');
+  while (lines.length > 0 && HARNESS_NOTE.test(lines[0])) lines.shift();
+  if (lines[0]?.startsWith('[Subagent hand-back]')) lines.shift();
+  let text = lines.join('\n');
   const trailer = text.search(/^agentId:/m);
   if (trailer !== -1) text = text.slice(0, trailer);
   return text
