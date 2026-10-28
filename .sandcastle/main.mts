@@ -27,12 +27,14 @@ import {
   decideSliceDisposition,
   isDiscardRequested,
   validateDiscardScope,
-  extractMaintainerNotes,
   withMaintainerNotes,
   withTriageBrief,
 } from '../tools/scripts/lib/sandcastle-resume.ts';
 import type { IssueComment } from '../tools/scripts/lib/issue-comments.ts';
-import { latestTriageBrief } from '../tools/scripts/lib/issue-comments.ts';
+import {
+  extractMaintainerNotes,
+  latestTriageBrief,
+} from '../tools/scripts/lib/issue-comments.ts';
 import {
   blockedBy,
   blocks,

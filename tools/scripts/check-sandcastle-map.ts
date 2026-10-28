@@ -50,6 +50,7 @@ import { errorMessage } from './lib/error-message.ts';
 const RESUME = 'tools/scripts/lib/sandcastle-resume.ts';
 const TRACE = 'tools/scripts/lib/sandcastle-subagent-trace.ts';
 const OUTCOME = 'tools/scripts/lib/sandcastle-outcome.ts';
+const COMMENTS = 'tools/scripts/lib/issue-comments.ts';
 const POLICY = 'tools/config/agent-model-policy.json';
 const PKG = 'package.json';
 const MAIN = '.sandcastle/main.mts';
@@ -74,6 +75,7 @@ for (const f of [
   RESUME,
   TRACE,
   OUTCOME,
+  COMMENTS,
   POLICY,
   PKG,
   MAIN,
@@ -102,6 +104,9 @@ const trace = await import(`../../${TRACE}`).catch((err) =>
 );
 const outcome = await import(`../../${OUTCOME}`).catch((err) =>
   fail(`could not import ${OUTCOME}: ${err.message}`),
+);
+const comments = await import(`../../${COMMENTS}`).catch((err) =>
+  fail(`could not import ${COMMENTS}: ${err.message}`),
 );
 
 const sandcastlePolicy = policy?.orchestrators?.sandcastle;
@@ -191,7 +196,7 @@ const EXPORT_RESOLVERS: Record<string, () => unknown> = {
   resumeHandoffMarker: () => resume.HANDOFF_MARKER,
   resumeHandoffMaxLines: () => resume.MAX_HANDOFF_LINES,
   resumeDiscardFlag: () => resume.DISCARD_FLAG,
-  resumeMaintainerNoteMarker: () => resume.MAINTAINER_NOTE_MARKER,
+  resumeMaintainerNoteMarker: () => comments.MAINTAINER_NOTE_MARKER,
   resumeSliceLogRunStartMarker: () => resume.RUN_START_MARKER,
   resumeQuotaMaxWaits: () => resume.MAX_QUOTA_WAITS,
   resumeQuotaMaxWaitsPerRun: () => resume.MAX_QUOTA_WAITS,
@@ -857,7 +862,7 @@ if (findings.length > 0) {
   );
   for (const f of findings) console.error(`  - ${f}`);
   console.error(
-    `\nRead the constants out of ${MAIN}, ${WAVES}, ${RESUME}, ${TRACE} and ${OUTCOME}, then update the page and its manifest.`,
+    `\nRead the constants out of ${MAIN}, ${WAVES}, ${RESUME}, ${COMMENTS}, ${TRACE} and ${OUTCOME}, then update the page and its manifest.`,
   );
   process.exit(1);
 }

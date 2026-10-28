@@ -47,8 +47,10 @@ import type { Bail } from './cli.ts';
 import { cannotRun, ghJson, isMain, parseArgs } from './cli.ts';
 import { errorMessage } from '../lib/error-message.ts';
 import type { IssueComment } from '../lib/issue-comments.ts';
-import { latestTriageBrief } from '../lib/issue-comments.ts';
-import { extractMaintainerNotes } from '../lib/sandcastle-resume.ts';
+import {
+  extractMaintainerNotes,
+  latestTriageBrief,
+} from '../lib/issue-comments.ts';
 
 /** The spec source a review was handed, as `spec.json` records it. */
 export type DiscoveredSpec =
