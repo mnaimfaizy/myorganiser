@@ -273,6 +273,33 @@ test('a reply is a bare JSON object once the harness framing is taken off', () =
   assert.ok(replyIsBareJson([{ type: 'text', text: '{"findings":[]}' }]));
 });
 
+// CLI 2.1.312 put harness notes ahead of the frame, and the Standards and Spec
+// replies of run 40612259601 (PR #1348) were both reported as not bare JSON.
+// This is that reply's shape, with its object shortened.
+const CLI_2_1_312_NOTES =
+  '  <tools-used-before-summary>Bash</tools-used-before-summary>\n  \n';
+
+test('harness notes ahead of the frame are taken off with it (CLI 2.1.312)', () => {
+  assert.ok(
+    replyIsBareJson(
+      `${CLI_2_1_312_NOTES}${FRAME}  {"findings":[],"executed":[]}${TRAILER}`,
+    ),
+  );
+  assert.deepEqual(
+    findingsReturnedBy(
+      `${CLI_2_1_312_NOTES}${FRAME}  {"findings":[{"title":"x"}]}${TRAILER}`,
+    ),
+    [{ title: 'x' }],
+  );
+  // The notes are skipped only ahead of the reply; one inside it still makes
+  // the reply more than a bare object.
+  assert.ok(
+    !replyIsBareJson(
+      `${FRAME}  {"findings":[]}\n  <tools-used-before-summary>Bash</tools-used-before-summary>${TRAILER}`,
+    ),
+  );
+});
+
 test('a fence, a sentence, or anything that is not an object is not a bare reply', () => {
   assert.ok(!replyIsBareJson('```json\n{"findings":[]}\n```'));
   assert.ok(!replyIsBareJson('{"findings":[]}\n\nI found nothing.'));
