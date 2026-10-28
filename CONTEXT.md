@@ -405,7 +405,7 @@ The client-side action of producing the Master Key so vault Ciphertext can be de
 _Avoid_: vault login, decrypt vault, open vault
 
 **Vault Unlock Secret**:
-Which secret produced the current in-memory Vault Unlock — passphrase, Recovery Key, or, on mobile, Biometric Unlock. Client-only session state: it is never written into the Local Vault and never sent to the server. It lives only while the Vault is unlocked on this device, and a lock or a later passphrase unlock clears a recovery-key unlock. It is what authorizes a passphrase _reset_ (no current passphrase) versus a passphrase _change_ (current passphrase required); only a Recovery Key unlock authorizes a reset.
+Which secret produced the current in-memory Vault Unlock — passphrase, Recovery Key, or a device shortcut to the same Master Key — Biometric Unlock on mobile, Passkey Unlock on the web. Client-only session state: it is never written into the Local Vault and never sent to the server. It lives only while the Vault is unlocked on this device, and a lock or a later passphrase unlock clears a recovery-key unlock. It is what authorizes a passphrase _reset_ (no current passphrase) versus a passphrase _change_ (current passphrase required); only a Recovery Key unlock authorizes a reset.
 _Avoid_: unlock provenance, unlock method, last unlock, recovery mode
 
 **Passphrase Reset Prompt**:
@@ -527,6 +527,10 @@ _Avoid_: backup key, recovery code, reset code, escrow key, second passphrase
 **Biometric Unlock**:
 A Vault Unlock on a mobile device that reads the Master Key from the platform keystore after a biometric check, instead of deriving it from the passphrase. The User opts in after a passphrase unlock on that device, and turning it on later asks for the passphrase again — an unlocked session alone is never enough to add one. It belongs to that User on that device, ends at logout, when the device's enrolled biometrics change, or when the stored key no longer decrypts the server's Ciphertext, and never replaces the passphrase or the Recovery Key — it is a shortcut to the same Vault, and it authorizes nothing a passphrase unlock does not. What the keystore holds is the plaintext Master Key, and it is client-only: it never leaves that device and is never sent to the server, which keeps holding only Ciphertext ([ADR 0108](docs/adr/0108-a-mobile-device-may-hold-the-master-key-behind-a-biometric-gate.md)).
 _Avoid_: Face ID login, fingerprint login, biometric login, quick unlock
+
+**Passkey Unlock**:
+A Vault Unlock in the web app — in a browser tab or the Installed Web App — that recovers the Master Key with a passkey the User verifies on that device, instead of deriving it from the passphrase. It is the web's counterpart to Biometric Unlock, not the same thing: what the device keeps is the Master Key wrapped by the passkey, never the Master Key itself, so nothing readable rests on the device. The same rules otherwise hold: the User opts in after a passphrase unlock, turning it on later asks for the passphrase again, it belongs to that User on that device and is enrolled per device, it ends at logout, when the User turns it off, when the wrapped key no longer decrypts the server's Ciphertext, or when the browser reports the passkey no longer exists — a cancelled or failed check is none of these and only falls back to the passphrase — and it never replaces the passphrase or the Recovery Key and authorizes nothing a passphrase unlock does not. It is offered only where the browser and passkey provider can produce the key it needs; elsewhere it does not appear. The wrapped key is client-only and never sent to the server ([ADR 0136](docs/adr/0136-a-web-device-may-hold-the-master-key-wrapped-by-a-passkey.md)).
+_Avoid_: quick unlock, web biometric, Face ID on web, passkey login
 
 **Auto-Lock**:
 The Mobile App locking its own Vault after the Auto-Lock Delay has passed with the app in the
