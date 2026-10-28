@@ -48,13 +48,13 @@ that sent readers to the wrong slot — see [ADR 0051](../adr/0051-a-pinned-valu
 Values the pages show that are **not** yet assertable are listed in each manifest under
 `notYetExported` — currently the KDF and cipher figures, which are module-private constants. To
 bring them under the check, export them and add them to `SOURCES` in
-`tools/scripts/check-vault-pages.mjs`.
+`tools/scripts/check-vault-pages.ts`.
 
 ## Changing them
 
 **These two files are the source.** There is nothing to regenerate them from.
 
-Both pages began as dc-runtime design exports, which `tools/scripts/build-agent-map.mjs` imported
+Both pages began as dc-runtime design exports, which `tools/scripts/build-agent-map.ts` imported
 once in August 2026 — inlining the design-system stylesheet, embedding both typefaces as woff2
 data URIs, and deciding how much runtime to carry from the page itself (`lifecycle.html` binds
 templates so it carries React; `trust-boundary.html` does not and ships as plain DOM at roughly a
@@ -65,7 +65,7 @@ revert them.
 So a change here is an edit to the page, briefed through
 [`design-brief`](../../.agents/skills/design-brief/SKILL.md) and executed by the `Designer`
 sub-agent, exactly as [ADR 0046](../adr/0046-house-explainer-pages-have-a-designer-and-a-gate.md)
-describes for every House Explainer Page. `build-agent-map.mjs` remains the importer for a _new_
+describes for every House Explainer Page. `build-agent-map.ts` remains the importer for a _new_
 canvas export; it is not a rebuild path for these two.
 
 Both are in `.prettierignore`, so an edit is not reformatted out from under you by the pre-commit

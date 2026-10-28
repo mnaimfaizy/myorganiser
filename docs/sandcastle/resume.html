@@ -2246,7 +2246,7 @@
     <div class="panel">
       <div class="phead">
         <b>decideSliceDisposition &middot; validateDiscardScope</b>
-        <span class="src">tools/scripts/lib/sandcastle-resume.mjs</span>
+        <span class="src">tools/scripts/lib/sandcastle-resume.ts</span>
       </div>
       <div class="pbody">
         <div class="scrollx">
@@ -2326,7 +2326,7 @@
     <div class="panel">
       <div class="phead">
         <b>resumeGuardrails(kind)</b>
-        <span class="src">tools/scripts/lib/sandcastle-resume.mjs</span>
+        <span class="src">tools/scripts/lib/sandcastle-resume.ts</span>
       </div>
       <div class="pbody">
         <div class="subhead">
@@ -2448,7 +2448,7 @@
     <div class="panel" style="margin-top: 14px">
       <div class="phead">
         <b>extractHandoff &middot; formatHandoffSection</b>
-        <span class="src">tools/scripts/lib/sandcastle-resume.mjs</span>
+        <span class="src">tools/scripts/lib/sandcastle-resume.ts</span>
       </div>
       <div class="pbody">
         <figure>
@@ -2794,7 +2794,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
       <div class="phead">
         <b>classifyRunFailure &middot; decideWaitPolicy</b>
         <span class="src"
-          >tools/scripts/lib/sandcastle-resume.mjs &middot;
+          >tools/scripts/lib/sandcastle-resume.ts &middot;
           .sandcastle/main.mts</span
         >
       </div>
@@ -2869,7 +2869,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
     </nav>
     <div>
       <b>Read from source on 2026-08-23</b>, from
-      <code>tools/scripts/lib/sandcastle-resume.mjs</code> and
+      <code>tools/scripts/lib/sandcastle-resume.ts</code> and
       <code>.sandcastle/main.mts</code>. Where a document and the source
       disagreed, the source won.
     </div>
@@ -2877,7 +2877,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
       The embedded <code>sandcastle-resume-manifest</code> block below is what the
       assertion gate diffs against source. It is split into two groups on purpose:
       <code>assertedFromExports</code> is verified by importing
-      <code>sandcastle-resume.mjs</code> and reading its exports, while
+      <code>sandcastle-resume.ts</code> and reading its exports, while
       <code>assertedFromOrchestratorSource</code> can only be verified by anchored
       regex against <code>.sandcastle/main.mts</code> &mdash; those values are
       module-local literals with no export to import.
@@ -2904,7 +2904,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
 <script type="application/json" id="sandcastle-resume-manifest">
   {
     "id": "sandcastle-resume-manifest",
-    "generatedFrom": "tools/scripts/lib/sandcastle-resume.mjs, .sandcastle/main.mts",
+    "generatedFrom": "tools/scripts/lib/sandcastle-resume.ts, .sandcastle/main.mts",
     "assertedFromExports": {
       "resumeSliceDispositions": [
         "resume",
@@ -2947,7 +2947,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
 
 <script type="application/json" id="citation-anchors">
   {
-    "note": "This page makes no file:line citation, so it anchors none (ADR 0085). Its source captions name files without line numbers, which findCitations does not read as citations. It appeared to carry two before 2026-09-17, but they were not claims about source at all: the clock times \"4:30am\" and \"2:30 pm\" matched the bare-citation shape, and the bare form takes its name from the last file the page named — inventing a citation to .sandcastle/main.mts:30 that nothing here ever meant, which is how #800's premise came to be wrong. findCitations now refuses a colon a digit precedes, so the times are written plainly and a regression test in design-page-scan.test.mjs holds it. Add an entry here for any real citation added later.",
+    "note": "This page makes no file:line citation, so it anchors none (ADR 0085). Its source captions name files without line numbers, which findCitations does not read as citations. It appeared to carry two before 2026-09-17, but they were not claims about source at all: the clock times \"4:30am\" and \"2:30 pm\" matched the bare-citation shape, and the bare form takes its name from the last file the page named — inventing a citation to .sandcastle/main.mts:30 that nothing here ever meant, which is how #800's premise came to be wrong. findCitations now refuses a colon a digit precedes, so the times are written plainly and a regression test in design-page-scan.test.ts holds it. Add an entry here for any real citation added later.",
     "anchors": {}
   }
 </script>

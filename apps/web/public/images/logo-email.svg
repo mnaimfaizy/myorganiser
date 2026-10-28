@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 244 52" fill="none" role="img" aria-label="MyOrganiser logo">
   <title>MyOrganiser</title>
   <!-- GENERATED FILE — do not edit. Produced by `yarn brand:logos:generate`
-       (tools/scripts/generate-brand-logos.mjs) from the AppLogo shield and the
+       (tools/scripts/generate-brand-logos.ts) from the AppLogo shield and the
        design-token build. -->
   <!-- Email-only variant (ADR 0034): a single logo used everywhere rather than
        a light/dark pair, because Gmail and Outlook force their own colour

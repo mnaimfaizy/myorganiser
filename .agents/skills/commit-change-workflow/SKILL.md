@@ -84,7 +84,7 @@ Do not retry `ai:commit` until the focused validation passes.
 ## References
 
 - `.github/agents/commit.agent.md` — message generation only
-- `tools/scripts/ai/commit-change.mjs` — shared commit runner
-- `tools/scripts/ai/classify-commit-failure.mjs` — trailer classification
+- `tools/scripts/ai/commit-change.ts` — shared commit runner
+- `tools/scripts/ai/classify-commit-failure.ts` — trailer classification
 - `.husky/pre-commit` — commit-time formatting and lint checks
 - `AGENTS.md` — repo-wide workflow routing

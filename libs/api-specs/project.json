@@ -11,7 +11,7 @@
         "cwd": "{workspaceRoot}",
         "commands": [
           "yarn run api-docs:generate",
-          "node tools/scripts/sync-openapi-spec.mjs",
+          "node tools/scripts/sync-openapi-spec.ts",
           "nx run app-api-client:generate-sources"
         ],
         "parallel": false
@@ -23,7 +23,7 @@
         "cwd": "{workspaceRoot}",
         "commands": [
           "nx run api-specs:sync",
-          "node tools/scripts/git-assert-clean.mjs"
+          "node tools/scripts/git-assert-clean.ts"
         ],
         "parallel": false
       }
@@ -32,7 +32,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "{workspaceRoot}",
-        "commands": ["node tools/scripts/check-openapi-artifacts.mjs"]
+        "commands": ["node tools/scripts/check-openapi-artifacts.ts"]
       }
     }
   }

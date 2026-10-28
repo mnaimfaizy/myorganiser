@@ -4,7 +4,7 @@
 
 The seam is the **PRD goal sentence**. `/wayfinder` runs while you still cannot write the sentence "this work is done when \_\_\_"; `/to-prd` takes over the moment you can. Without a stated seam, two skills that both "explore a fuzzy effort" collapse into each other and the router picks arbitrarily.
 
-`check-skill-map.mjs` reads the approval list from `EXTERNAL_SKILLS.md` when scanning for dangling `/slug` references. Approving an external must not fail the check on the very reference the approval legitimises.
+`check-skill-map.ts` reads the approval list from `EXTERNAL_SKILLS.md` when scanning for dangling `/slug` references. Approving an external must not fail the check on the very reference the approval legitimises.
 
 ## Status
 
@@ -25,4 +25,4 @@ The `/wayfinder` route it preserved is gone, along with the personal-scope tier 
 - Approved externals: [`.agents/skills/EXTERNAL_SKILLS.md`](../../.agents/skills/EXTERNAL_SKILLS.md).
 - A backticked `/slug` in a skill now resolves against repo skill directories **and** the approved-external list. A route to an unapproved external still fails `yarn skills:map:check` — approve it in `EXTERNAL_SKILLS.md` or drop the route.
 - **Superseded in part by [ADR 0030](0030-upstream-owned-skills-are-project-scope.md).** This ADR asserted that externals are installed per-developer and are therefore absent from a fresh clone. That is true of _personal_ scope only, and it was already false when written: `modern-web-guidance` was installed at project scope and committed. The rule stands for `/wayfinder`, which is personal scope — no skill may hard-depend on it, as a hop in a chain or by relative file path — but it is a property of the scope, not of externals in general. ADR 0030 settles which scope means what.
-- Every skill must now carry `name:` and `description:` frontmatter. `check-skill-map.mjs` asserts this against the source rather than against the atlas manifest, so recording the defect faithfully on the page no longer keeps the check green.
+- Every skill must now carry `name:` and `description:` frontmatter. `check-skill-map.ts` asserts this against the source rather than against the atlas manifest, so recording the defect faithfully on the page no longer keeps the check green.

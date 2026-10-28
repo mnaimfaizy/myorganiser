@@ -21,7 +21,7 @@ commands. You, the main agent, do not paste, summarise, or restate any of that.
 
 The main agent assembles the report envelope, runs the validator, and prints the rendered Markdown.
 The main agent changes no finding a sub-agent returned and writes no verdict: the verdict is
-computed from the findings by `tools/scripts/review/schema.mjs`, and a report that fails validation
+computed from the findings by `tools/scripts/review/schema.ts`, and a report that fails validation
 is rejected whole. The only findings the main agent writes itself are the ones an obligation answer
 exposes (step 4).
 
@@ -167,7 +167,7 @@ persisted nothing (issue #718) — and the `axis + source + file` tuple that rep
 because one source, `smell-baseline`, covered twelve separate rules (issue #724). The rule id is
 still not the whole identity: two defects under one rule in one file are told apart by their lines
 (issue #940). Each brief carries the ids for its own axis and no others. The rule-catalogue gate
-([`check-review-rules.mjs`](../../../tools/scripts/check-review-rules.mjs)) asserts each brief
+([`check-review-rules.ts`](../../../tools/scripts/check-review-rules.ts)) asserts each brief
 against the catalogue, and that the shared block is the same text in both.
 
 ### 4. Take the obligation worklist

@@ -2,8 +2,8 @@
  * Mints and opens a QA Account's vault with the app's own crypto.
  *
  * Not application code and shipped in nothing: the library's barrel does not
- * export it, and `tools/scripts/qa-accounts.mjs` bundles this file for Node, as
- * `check-escape-copy-reader.mjs` bundles its harness. It lives in this library
+ * export it, and `tools/scripts/qa-accounts.ts` bundles this file for Node, as
+ * `check-escape-copy-reader.ts` bundles its harness. It lives in this library
  * because a tooling project may not import a vault library. It goes through `localToServerMeta`, the converter the web client's
  * Vault Push uses, so the row the seeder writes is the row a client would have
  * sent, and through `vault-core`'s primitives, so the wrap is the one web and

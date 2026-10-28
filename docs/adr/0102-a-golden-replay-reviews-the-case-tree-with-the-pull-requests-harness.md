@@ -86,7 +86,7 @@ tree, so no Read or Grep of its lands on them, and not a worktree, so `git workt
 offer them. They resolve modules through a link to the one `node_modules` the job installed. The
 shared action takes a `tooling-dir` input for the two scripts it runs itself; it defaults to `.`,
 which leaves `code-review.yml` running exactly what it ran before. The scripts that read git — the
-selector and the answer check — run through `tools/scripts/review/run-from-tooling.mjs`, which gives
+selector and the answer check — run through `tools/scripts/review/run-from-tooling.ts`, which gives
 them the tooling copy as their working directory and the workspace's repository as their git, since
 an extracted copy is not a repository. The reviewer is given the
 validator's path, because the case's `package.json` predates the `review:*` scripts and

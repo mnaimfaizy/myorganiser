@@ -29,7 +29,7 @@ import {
   validateDiscardScope,
   extractMaintainerNotes,
   withMaintainerNotes,
-} from '../tools/scripts/lib/sandcastle-resume.mjs';
+} from '../tools/scripts/lib/sandcastle-resume.ts';
 import {
   blockedBy,
   blocks,
@@ -41,17 +41,17 @@ import {
   isSatisfiedAsDependency,
   selectPrdSlices,
   unfinishedDependencies,
-} from '../tools/scripts/lib/sandcastle-slice-selection.mjs';
+} from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 import {
   parseSubagentTranscript,
   formatSubagentIndex,
   formatTokens,
-} from '../tools/scripts/lib/sandcastle-subagent-trace.mjs';
+} from '../tools/scripts/lib/sandcastle-subagent-trace.ts';
 import {
   branchNameCarriesIssue,
   prdBranchSlug,
   specAnchorMessage,
-} from '../tools/scripts/lib/sandcastle-spec-anchor.mjs';
+} from '../tools/scripts/lib/sandcastle-spec-anchor.ts';
 import {
   LATEST_RELEASE_URL,
   claudeCodeLogLine,
@@ -59,18 +59,18 @@ import {
   describeClaudeCodeMode,
   parseClaudeCodeVersion,
   parseReleaseVersion,
-} from '../tools/scripts/lib/sandcastle-cli-version.mjs';
+} from '../tools/scripts/lib/sandcastle-cli-version.ts';
 import {
   COMPLETION_PROMISE,
   NEEDS_HUMAN_LABEL,
   OUTSTANDING_MARKER,
   formatHeldComment,
   judgeRunOutcome,
-} from '../tools/scripts/lib/sandcastle-outcome.mjs';
+} from '../tools/scripts/lib/sandcastle-outcome.ts';
 import {
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
-} from '../tools/scripts/lib/sandcastle-worktree-repair.mjs';
+} from '../tools/scripts/lib/sandcastle-worktree-repair.ts';
 
 const REPO = 'mnaimfaizy/myorganiser';
 const SANDBOX_IMAGE = 'sandcastle:myorganiser';
@@ -949,7 +949,7 @@ function planPrdRun(prd: number): RunPlan {
   // `## Blocked by` names another slice of this PRD is admitted, and `## Blocked by`
   // ordering in the dispatch loop decides when it may actually run. A slice whose
   // label is NOT explained that way stays out: it means something this code cannot
-  // evaluate. See tools/scripts/lib/sandcastle-slice-selection.mjs.
+  // evaluate. See tools/scripts/lib/sandcastle-slice-selection.ts.
   const selection = selectPrdSlices(everyIssue, {
     prd,
     only: issueNumber,
@@ -1496,7 +1496,7 @@ function staleWorkBranchesFor(issue: Issue): string[] {
 // directory (its gitdir names a host path the container cannot see), leaving files
 // git no longer recognises. Re-register before any git call in the directory, or
 // the checkpoint capture and the resume rebuild both fail on "is not a working
-// tree". See tools/scripts/lib/sandcastle-worktree-repair.mjs.
+// tree". See tools/scripts/lib/sandcastle-worktree-repair.ts.
 function ensureWorktreeRegistered(
   issueNumber: number,
   worktreePath: string,

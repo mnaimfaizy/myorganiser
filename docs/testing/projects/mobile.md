@@ -80,6 +80,6 @@ The mobile verification gate is **lint + typecheck + format** (ADR 0005) plus
 the gate matrix in [`AGENTS.md`](../../../AGENTS.md)). Tests still go through
 `TestScaffold → TestReviewer → TestRunner`.
 
-Note that `tools/scripts/check-mobile-platform.test.mjs` is **not** a Jest test — it is a
-`node --test` sibling of its checker, like every other `tools/scripts/check-*.mjs`, and it runs
-through `yarn gates:run` rather than through Jest.
+Note that `tools/scripts/check-mobile-platform.test.ts` is **not** a Jest test — it is a
+`node --test` sibling of its checker, like every other `tools/scripts/check-*.ts`, and it runs
+through `yarn tools:test` rather than through Jest.

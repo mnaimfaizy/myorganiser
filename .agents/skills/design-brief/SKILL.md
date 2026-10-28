@@ -183,7 +183,7 @@ path, because `package.json` and `SKILL.md` each match several files and "some f
 long enough" is not the claim. `start` is the literal text at the cited line and `end` the literal text at the
 last line of a range — **both ends, so a range that grows or shrinks at either end is caught** —
 whitespace-normalised on comparison, following `verifyCitation` in
-`tools/scripts/review/obligations.mjs`.
+`tools/scripts/review/obligations.ts`.
 
 `file` is itself a claim, so the gate fails a citation whose `file` cannot be read or whose cited
 line is past that file's end (`citation-anchor-unreadable`), rather than passing it unverified. An

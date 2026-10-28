@@ -3229,7 +3229,7 @@
   <section class="panel" aria-labelledby="resume-h">
     <div class="phead">
       <h2 id="resume-h">Interruption and resume</h2>
-      <span class="src">tools/scripts/lib/sandcastle-resume.mjs</span>
+      <span class="src">tools/scripts/lib/sandcastle-resume.ts</span>
     </div>
     <div class="pbody">
       <div class="grid2">
@@ -3356,7 +3356,7 @@
   <section class="panel" aria-labelledby="quota-h">
     <div class="phead">
       <h2 id="quota-h">Quota waiting &mdash; five refusals and one wait</h2>
-      <span class="src">sandcastle-resume.mjs:316-527</span>
+      <span class="src">sandcastle-resume.ts:331-563</span>
     </div>
     <div class="pbody">
       <p>
@@ -3702,8 +3702,8 @@
       <b>Read from source on 2026-09-30</b>, from
       <code>.sandcastle/main.mts</code>,
       <code>.sandcastle/dispatch-waves.mts</code>,
-      <code>tools/scripts/lib/sandcastle-resume.mjs</code>,
-      <code>tools/scripts/lib/sandcastle-outcome.mjs</code>,
+      <code>tools/scripts/lib/sandcastle-resume.ts</code>,
+      <code>tools/scripts/lib/sandcastle-outcome.ts</code>,
       <code>tools/config/agent-model-policy.json</code>, and
       <code>package.json</code>. Where a document and the source disagreed, the
       source won.
@@ -3741,7 +3741,7 @@
 <script type="application/json" id="sandcastle-dispatch-manifest">
   {
     "id": "sandcastle-dispatch-manifest",
-    "generatedFrom": ".sandcastle/main.mts, .sandcastle/dispatch-waves.mts, tools/scripts/lib/sandcastle-resume.mjs, tools/scripts/lib/sandcastle-outcome.mjs, tools/config/agent-model-policy.json, package.json",
+    "generatedFrom": ".sandcastle/main.mts, .sandcastle/dispatch-waves.mts, tools/scripts/lib/sandcastle-resume.ts, tools/scripts/lib/sandcastle-outcome.ts, tools/config/agent-model-policy.json, package.json",
     "assertedFromExports": {
       "resumeQuotaMaxWaitsPerRun": 2,
       "resumeQuotaMaxWaitMs": 21600000,
@@ -3783,7 +3783,7 @@
 
 <script type="application/json" id="citation-anchors">
   {
-    "note": "Expected-content anchors for file:line citations on this page, verified 2026-09-30 against .sandcastle/main.mts, .sandcastle/dispatch-waves.mts, and tools/scripts/lib/sandcastle-resume.mjs. See ADR 0085.",
+    "note": "Expected-content anchors for file:line citations on this page, verified 2026-09-30 against .sandcastle/main.mts, .sandcastle/dispatch-waves.mts, and tools/scripts/lib/sandcastle-resume.ts. See ADR 0085.",
     "anchors": {
       "main.mts:831-951": {
         "file": ".sandcastle/main.mts",
@@ -3835,8 +3835,8 @@
         "start": "function resolveGate(issue: Issue): 'mechanical' | 'standard' | 'full' {",
         "end": "return 'standard';"
       },
-      "sandcastle-resume.mjs:316-527": {
-        "file": "tools/scripts/lib/sandcastle-resume.mjs",
+      "sandcastle-resume.ts:331-563": {
+        "file": "tools/scripts/lib/sandcastle-resume.ts",
         "start": "// thing, and failing silently on capitalisation is the worst outcome here.",
         "end": "// would be ambiguous across the machines this runs on."
       },

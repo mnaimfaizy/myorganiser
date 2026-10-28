@@ -103,7 +103,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -139,7 +139,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -192,7 +192,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Build Host Apply script
         env:
@@ -200,7 +200,7 @@ jobs:
           COUNTERPART_APP_ROOT: ${{ secrets.COUNTERPART_APP_ROOT }}
           NODEVENV_ACTIVATE: ${{ secrets.NODEVENV_ACTIVATE }}
           SELECTOR_APP_KEY: ${{ secrets.SELECTOR_APP_KEY }}
-        run: node tools/scripts/run-host-apply.mjs production > "$RUNNER_TEMP/host-apply.sh"
+        run: node tools/scripts/run-host-apply.ts production > "$RUNNER_TEMP/host-apply.sh"
 
       - name: Apply on host over SSH
         env:
@@ -254,7 +254,7 @@ jobs:
 
       - name: Host Apply output (redaction-checked)
         if: always()
-        run: node tools/scripts/scrub-host-apply-log.mjs "$RUNNER_TEMP/host-apply.log"
+        run: node tools/scripts/scrub-host-apply-log.ts "$RUNNER_TEMP/host-apply.log"
 
       - name: Fail on a red Host Apply
         if: always()
@@ -285,7 +285,7 @@ jobs:
             -H 'X-Cron-Secret: host-apply-verification-wrong-secret' \
             -d '{}' \
             "$API_ORIGIN/api/v1/youtube/cron/sync")"
-          node tools/scripts/verify-host-apply.mjs "$docs_status" "$cron_status"
+          node tools/scripts/verify-host-apply.ts "$docs_status" "$cron_status"
 
   deploy-frontend:
     if: ${{ startsWith(github.ref, 'refs/heads/release/') && !inputs.apply_only }}
@@ -304,7 +304,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -382,11 +382,11 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Mark Feedback Reports fixed in this Release
         env:
           RELEASE_REF: ${{ needs.validate.outputs.release_ref }}
           API_ORIGIN: ${{ secrets.API_ORIGIN }}
           FEEDBACK_RELEASE_SECRET: ${{ secrets.FEEDBACK_RELEASE_SECRET }}
-        run: node tools/scripts/mark-feedback-release.mjs
+        run: node tools/scripts/mark-feedback-release.ts

@@ -6,10 +6,17 @@
     "moduleResolution": "node",
     "types": ["jest", "node"]
   },
-  // `testing/**/*.ts` is here for the shared Jest setup files. They are
-  // referenced by path from a consumer's `jest.config.ts` and imported by
-  // nothing, so they match no consumer's tsconfig `include` and would
-  // otherwise be the one TypeScript file in the workspace that
-  // `yarn typecheck:check` never compiles.
-  "include": ["**/*.spec.ts", "**/*.test.ts", "**/*.d.ts", "testing/**/*.ts"]
+  // Only the shared Jest setup files under `testing/`. They are referenced by
+  // path from a consumer's `jest.config.ts` and imported by nothing, so they
+  // match no consumer's tsconfig `include` and would otherwise be the one
+  // TypeScript file in the workspace that `yarn typecheck:check` never
+  // compiles.
+  //
+  // `tools/` itself has no Jest project any more (ADR 0135 retired it with
+  // the copilot-hooks migration). Every `.ts` under `tools/scripts` is
+  // compiled by `tools/scripts/tsconfig.json`'s `nodenext`/strict options;
+  // matching it here too would recompile it under this config's
+  // `commonjs`/`node`/Jest options instead, which rejects its `.ts`-suffixed
+  // imports and `node:test` default imports outright.
+  "include": ["testing/**/*.ts"]
 }

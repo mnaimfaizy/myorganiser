@@ -42,7 +42,7 @@ replay it knows is pointless.**
    run the replay, and it runs on any change to the paths that produce a review. A **guard** case
    is one the reviewer catches reliably; it runs only when the Standards brief
    (`.agents/skills/code-review/**`, `.github/actions/code-reviewer/**`) or the finding contract
-   (`tools/scripts/review/schema.mjs`, `validate-review-report.mjs`) changes, because those are what
+   (`tools/scripts/review/schema.ts`, `validate-review-report.ts`) changes, because those are what
    could silently undo the instruction the guard protects.
 
 2. **Promotion is asymmetric and cited.** Promotion to `guard` takes **three consecutive catches**,
@@ -166,11 +166,11 @@ caught`): a case that always passes and a case that never passes both carry less
 >
 > **The Consequences section already said this and was wrong that anything checked it.** Its
 > sentence — "the tests assert that at least one remains" — was true of no test in
-> `golden.mjs`, `golden-tiers.mjs`, or either suite, from this ADR's acceptance until today. That is
+> `golden.ts`, `golden-tiers.ts`, or either suite, from this ADR's acceptance until today. That is
 > the failure [ADR 0085](0085-an-artifact-states-no-claim-it-does-not-assert.md) names, in an ADR
 > rather than a checker header: a claim nobody asserts rots, and this one rotted silently because a
 > reader checking the rule would have found the sentence and stopped. `assertGoldenSet` now refuses
-> a set whose `cases` carry no `frontier` tier, and `golden.test.mjs` proves it refuses — including
+> a set whose `cases` carry no `frontier` tier, and `golden.test.ts` proves it refuses — including
 > the case that matters, a promotion whose `tierEvidence` is properly cited, which is the one that
 > looks correct on its way past review.
 

@@ -39,7 +39,7 @@ now discharged: [#507](https://github.com/mnaimfaizy/myorganiser/pull/507) merge
 **A gate cannot pin the meaning of a value, so it pins the structure the meaning lives in.**
 
 Where a value has acquired a second thing next to it, the gate asserts the pair rather than the
-value. `check-vault-pages.mjs` now:
+value. `check-vault-pages.ts` now:
 
 1. Asserts `localVaultKeys.unclaimed` against `VAULT_STORAGE_KEY`, as before.
 2. Asserts `localVaultKeys.ownerScoped` against the composition **read out of

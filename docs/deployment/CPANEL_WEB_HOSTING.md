@@ -44,7 +44,7 @@ yarn package:web
 Produces `dist/deploy/web/`:
 
 1. Next.js built with `output: 'standalone'` through the Nx `web:package`
-   target (`tools/scripts/package-web.mjs`).
+   target (`tools/scripts/package-web.ts`).
 2. A deploy-only `package.json` generated from `.next/standalone/node_modules`.
 3. `.next/` and `public/` copied alongside.
 4. A Linux-safe root `server.js` (avoids Windows path issues), and
@@ -140,7 +140,7 @@ commit. A dispatch always proceeds, at the commit it was dispatched at. A
 scheduled run takes the newest `main` commit whose CI is green, or stops green
 when there is none, and then checks these in order, looking at both the web
 host and the latest backend upload (`decideSchedule` in
-`tools/scripts/lib/staging-web-deploy.mjs`):
+`tools/scripts/lib/staging-web-deploy.ts`):
 
 | What the run finds, in order                                                                           | Outcome                                                                        |
 | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
@@ -155,7 +155,7 @@ The run also fails if it cannot read the recent `Deploy Staging` runs from the
 Actions API. Nothing is uploaded on any stop or failure.
 
 Then the `deploy-frontend` job does this without a shell
-(`tools/scripts/staging-web-deploy.mjs`). The bundle is built from the selected
+(`tools/scripts/staging-web-deploy.ts`). The bundle is built from the selected
 commit, while the job runs that script from a separate checkout of the tip
 (`.deploy-tools`), so the workflow's steps and the script they call always
 match ([ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md)). It has its own concurrency group and
@@ -269,8 +269,8 @@ below the host's managed blocks, changing nothing above it. Copy the block from
 [`apps/web/deploy/sw-headers.htaccess`](../../apps/web/deploy/sw-headers.htaccess);
 it lives outside `public/`, so it is never uploaded. It is not reproduced here
 on purpose: the two values are stated in `next.config.js`, in that snippet, and
-in the probe's constants, and `yarn staging-web:test` fails when they fall out
-of step.
+in the probe's constants, and `tools/scripts/lib/staging-web-deploy.test.ts`
+fails when they fall out of step.
 
 The rules sit inside `<IfModule mod_headers.c>`, so a web server without that
 module ignores them silently. Staging's probe compares both headers with the

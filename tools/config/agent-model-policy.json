@@ -84,7 +84,7 @@
     },
     "designer": {
       "tier": "T2",
-      "rationale": "Writes a whole self-contained artifact from a brief, and the failure modes are judgment ones: an accessible-name pattern that is textbook-correct and wrong here, a claimed visual review that could not have happened, a doc-vs-source contradiction silently copied. The mechanical half is check-design-hygiene.mjs; what is left needs reasoning quality.",
+      "rationale": "Writes a whole self-contained artifact from a brief, and the failure modes are judgment ones: an accessible-name pattern that is textbook-correct and wrong here, a claimed visual review that could not have happened, a doc-vs-source contradiction silently copied. The mechanical half is check-design-hygiene.ts; what is left needs reasoning quality.",
       "models": {
         "copilot": ["Claude Sonnet 5 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",

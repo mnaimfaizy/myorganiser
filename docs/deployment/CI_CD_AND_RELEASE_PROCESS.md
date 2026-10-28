@@ -344,7 +344,7 @@ Apply. Only `prepare-dependencies` keeps `deploy-staging` with
 whole workflow already queues instead of cancelling, so it needs no such split.
 
 The SSH step captures its output to a file instead of streaming it, and
-`tools/scripts/scrub-host-apply-log.mjs` decides whether that output may reach
+`tools/scripts/scrub-host-apply-log.ts` decides whether that output may reach
 the Actions log: a log carrying a connection string or a bare `DATABASE_URL=`
 is withheld, and only the offending line numbers are printed. This repository
 is public, so a streamed log would publish a leak before anything could grade
@@ -491,7 +491,7 @@ Notes:
 
 ### Release script notes
 
-The script lives at `tools/scripts/release.mjs` and automates the git steps.
+The script lives at `tools/scripts/release.ts` and automates the git steps.
 
 - It enforces `vX.Y.Z` format (no prerelease strings).
 - It requires a clean working tree.

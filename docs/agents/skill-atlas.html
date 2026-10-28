@@ -474,7 +474,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
     <div class="phead"><h2>Edges that leave the repo</h2></div>
     <div class="pbody">
       <ul class="plain">
-        <li><span class="tag flag-note">ALL&#160;36&#160;ROUTABLE</span><span>Every skill carries <code>name:</code> and <code>description:</code> frontmatter. <code>sub-agent-sync-workflow</code> was the one exception until it was given a trigger sentence; <code>check-skill-map.mjs</code> now fails on a missing one <b>against the source</b>, so a future gap cannot be papered over by recording it faithfully here.</span></li>
+        <li><span class="tag flag-note">ALL&#160;36&#160;ROUTABLE</span><span>Every skill carries <code>name:</code> and <code>description:</code> frontmatter. <code>sub-agent-sync-workflow</code> was the one exception until it was given a trigger sentence; <code>check-skill-map.ts</code> now fails on a missing one <b>against the source</b>, so a future gap cannot be papered over by recording it faithfully here.</span></li>
         <li><span class="tag flag-note">STANDING&#160;SPECIALIST</span><span><code>Audit</code>, <code>DepAudit</code>, <code>Docs</code> are <code>user-invocable</code> and belong to no pipeline &#x2014; entered directly, not run as a hop in someone else's chain. See <b>Standing Specialist</b> in <code>CONTEXT.md</code>. That is still true of all three; <code>Docs</code> is also reached by nothing, but <code>Audit</code> and <code>DepAudit</code> are not: <code>upstream-brief</code> names each as the owner an Incidental Observation is routed to, drawn as a dotted <b>names-as-owner</b> edge below, not a delegation.</span></li>
         <li><span class="tag flag-note">NO&#160;PERSONAL&#160;SCOPE</span><span>Every approved third-party skill is committed here. The thirteen personal-scope approvals were dropped: nobody installed one in four months, and one package died upstream unnoticed. <code>ask-matt</code> now routes a foggy effort to <code>/grill-with-docs</code> rather than to <code>/wayfinder</code>, which was never installed and pointed at nothing (ADR 0032).</span></li>
         <li><span class="tag flag-note">UPSTREAM-OWNED</span><span>Six skills &#x2014; <code>codebase-design</code>, <code>diagnosing-bugs</code>, <code>domain-modeling</code>, <code>handoff</code>, <code>modern-web-guidance</code>, <code>prototype</code> &#x2014; have bodies authored upstream and refreshed by the Skills CLI. They are drawn in Tier 1 because they load like any other skill, but they contribute <b>no outbound edges</b>: their prose is someone else&#x27;s writing, not this repo&#x27;s routing configuration. <code>skills-lock.json</code> is the registry the check reads.</span></li>
@@ -498,7 +498,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
   <section class="panel" style="grid-column: 1 / -1;">
     <div class="phead"><h2>Upstream-Owned skills</h2></div>
     <div class="pbody">
-      <p>Six of the thirty-six skills have bodies authored upstream. They are installed at <b>project scope</b>, committed to this repo, and listed in <code>skills-lock.json</code>, which is the registry <code>check-skill-map.mjs</code> reads to tell them from repo-native ones. Never hand-edit them: an edit is lost at the next refresh and nothing warns you. They are drawn in Tier 1 like any other skill, badged <b>UPSTREAM-OWNED</b>, and contribute <b>no outbound edges</b> &#x2014; their prose is someone else&#x27;s writing, not this repo&#x27;s routing configuration.</p>
+      <p>Six of the thirty-six skills have bodies authored upstream. They are installed at <b>project scope</b>, committed to this repo, and listed in <code>skills-lock.json</code>, which is the registry <code>check-skill-map.ts</code> reads to tell them from repo-native ones. Never hand-edit them: an edit is lost at the next refresh and nothing warns you. They are drawn in Tier 1 like any other skill, badged <b>UPSTREAM-OWNED</b>, and contribute <b>no outbound edges</b> &#x2014; their prose is someone else&#x27;s writing, not this repo&#x27;s routing configuration.</p>
       <div class="scrollx"><table class="ext" id="extTable"></table></div>
       <div class="subhead">Refresh, review the diff, commit it</div>
       <pre class="cmd">npx skills update -p</pre>
@@ -513,7 +513,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
     <b class="htitle">Extraction hazard</b>
     Sub-agent edges must be matched on <b>word boundaries</b>. A substring search for <code>TestRunner</code> returns 8 spurious hits in <code>nx-monorepo-workflow</code> from the Nx CLI flag <code>--unitTestRunner=jest</code>. Three further agent names &mdash; <code>Audit</code>, <code>Docs</code> and <code>Commit</code> &mdash; are ordinary English words and need hand-verification even with boundaries. This atlas asserts <b>55</b> skill&#8594;agent edges after those exclusions.
   </div>
-  <div>Read from source on 2026-08-19. Diff this page against the filesystem with the embedded <code>skill-atlas-manifest</code> block, following the precedent of <code>tools/scripts/check-agent-map.mjs</code>.</div>
+  <div>Read from source on 2026-08-19. Diff this page against the filesystem with the embedded <code>skill-atlas-manifest</code> block, following the precedent of <code>tools/scripts/check-agent-map.ts</code>.</div>
 </footer>
 
 </div>
@@ -580,9 +580,9 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
       "file": ".agents/skills/component-builder/SKILL.md",
       "start": "- Any component with testable behaviour → `.agents/skills/unit-test-delegation-workflow/SKILL.md`."
     },
-    "create-hooks/SKILL.md:164": {
+    "create-hooks/SKILL.md:167": {
       "file": ".agents/skills/create-hooks/SKILL.md",
-      "start": "| `dep-sync-reminder.mjs`        | Remind `/dep-sync` after package manager mutations                                                                                     |"
+      "start": "| `dep-sync-reminder.ts`        | Remind `/dep-sync` after package manager mutations                                                                                     |"
     },
     "dep-sync/SKILL.md:29": {
       "file": ".agents/skills/dep-sync/SKILL.md",
@@ -801,7 +801,7 @@ const SS = [
   ["backend-api-contract-change","prisma-migration-workflow","D","backend-api-contract-change/SKILL.md:23 \u2014 PrismaWriter reads the runbook; do not copy it."],
   ["grill-with-docs","domain-modeling","D","grill-with-docs/SKILL.md:64, :76 \u2014 it writes CONTEXT.md and ADR entries in that skill's formats (CONTEXT-FORMAT.md, ADR-FORMAT.md)."],
   ["dep-sync","grill-with-docs","D","dep-sync/SKILL.md:29"],
-  ["create-hooks","dep-sync","D","create-hooks/SKILL.md:164"],
+  ["create-hooks","dep-sync","D","create-hooks/SKILL.md:167"],
   ["qa-plan","to-prd","D","qa-plan/SKILL.md:130 \u2014 convention precedent, not a route or handoff: qa-plan publishes its issue directly with `gh` and cites to-prd as the skill that already established that rule."],
 
   /* A \u2014 routes-to (34) */

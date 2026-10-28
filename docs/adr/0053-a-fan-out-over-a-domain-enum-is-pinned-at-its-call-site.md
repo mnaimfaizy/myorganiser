@@ -52,7 +52,7 @@ Where two hand-maintained lists describe the same domain set — `VaultBlobType`
 contract and `VaultExportBlobType` from `@myorganiser/vault-core` — the table satisfies both, so
 nothing can be added to one and forgotten in the other.
 
-`yarn enum:fanout:check` (`tools/scripts/check-enum-fanout.mjs`) enforces it. It parses the
+`yarn enum:fanout:check` (`tools/scripts/check-enum-fanout.ts`) enforces it. It parses the
 corpus with the TypeScript parser — syntax only, no program and no type-checker — and judges
 **each scope**: every function, plus each file's module-level statements taken together. A scope
 naming two or more members of a Guarded Enum by name, or three or more by bare value, must reach

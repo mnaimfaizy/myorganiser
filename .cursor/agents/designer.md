@@ -43,7 +43,7 @@ verify them (see **Contradictions are findings**); you do not go looking for mor
 2. Splice the canonical `@font-face` block — never retype or re-encode it:
 
    ```bash
-   node tools/scripts/check-design-hygiene.mjs --print-font-block
+   node tools/scripts/check-design-hygiene.ts --print-font-block
    ```
 
    That command is the whole answer to "which bytes are the font block". Three
@@ -52,7 +52,7 @@ verify them (see **Contradictions are findings**); you do not go looking for mor
 
 3. Write the page, following **House Conventions** below.
 4. Add the page to `.prettierignore` and to `ROSTER` in
-   `tools/scripts/check-design-hygiene.mjs`. A page outside the roster is ungated,
+   `tools/scripts/check-design-hygiene.ts`. A page outside the roster is ungated,
    and CI fails a page in neither `ROSTER` nor `LEGACY` — being new is not an excuse
    the gate accepts.
 5. Wire the manifest. If the brief carries a machine-readable requirement, the page
@@ -61,7 +61,7 @@ verify them (see **Contradictions are findings**); you do not go looking for mor
 6. Run the mechanical gate over what you wrote and report its output verbatim:
 
    ```bash
-   node tools/scripts/check-design-hygiene.mjs <path>
+   node tools/scripts/check-design-hygiene.ts <path>
    ```
 
 7. Report, using the format at the end. State what you verified and how.
@@ -130,7 +130,7 @@ never happened.
 ## Contradictions Are Findings
 
 While grounding the page you will read source that disagrees with the docs describing
-it — `sandcastle-subagent-trace.mjs` claiming sub-agent transcripts reach the host
+it — `sandcastle-subagent-trace.ts` claiming sub-agent transcripts reach the host
 "verbatim" when they pass through `rewriteSessionCwd` is a real example, found this way.
 
 Source wins, and the disagreement is a deliverable. Render the behaviour, and report

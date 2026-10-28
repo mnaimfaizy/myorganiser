@@ -71,7 +71,7 @@ reads it.
   three shipped pages, and the importer is still the cheapest way to bring in a new canvas design.
   Deleting a working importer because it is not a rebuild path confuses "misdescribed" with
   "unused".
-- **Record provenance per page in `design-page-roster.mjs`** (the issue's third option) — rejected
+- **Record provenance per page in `design-page-roster.ts`** (the issue's third option) — rejected
   for now. The roster's `LEGACY` reasons already say "Canvas export" where it matters, and a
   provenance field nothing asserts is a second place for the same fact to rot. If a checker ever
   needs to branch on lineage, that is when the field earns its existence.

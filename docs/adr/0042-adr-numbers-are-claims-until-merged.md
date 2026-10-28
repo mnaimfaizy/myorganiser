@@ -68,9 +68,9 @@ Three consequences follow, and they shape the decision:
   review against this ADR, not mechanically. Machine-checking that would require
   diffing filenames against the merge base, making the script git-dependent and
   unrunnable outside a repository, for a failure mode that is harmless.
-- The check is standalone rather than folded into `check-docs-notes.mjs`. Every
+- The check is standalone rather than folded into `check-docs-notes.ts`. Every
   check script in `tools/scripts/` serves one decision, so a reader who opens an
-  ADR finds exactly one script named after it. `check-docs-notes.mjs` carries
+  ADR finds exactly one script named after it. `check-docs-notes.ts` carries
   two rules, but both descend from ADR 0041.
 - It runs ungated in `.husky/pre-commit`. Path-gating exists here for expensive
   checks like `skills:map:check`; the `git diff --cached` needed to decide

@@ -298,7 +298,7 @@ it across your scrollback.
 ### If the selector store is somewhere else
 
 `buildSelectorLoadStep` reads `SELECTOR_STORE_PATH` and `SELECTOR_ENV_FIELD` in
-`tools/scripts/lib/host-apply.mjs` — currently `~/.cl.selector/node-selector.json`,
+`tools/scripts/lib/host-apply.ts` — currently `~/.cl.selector/node-selector.json`,
 keyed by domain, with the app's variables under `env_vars`. That was confirmed
 against a real CloudLinux account during #569, replacing the engine's original
 guess of `~/.cpanel/nodejsapps.json` under `envvars`. Both halves of the guess
@@ -307,7 +307,7 @@ were wrong, which is a fair warning that another host may differ again.
 The preflight probes several candidate paths and field names and tells you which
 one actually holds the value. If it reports a path or field other than the
 pinned pair, it fails on purpose and names both. Change those two constants,
-rerun `yarn host-apply:test`, and rerun the preflight. A wrong pin fails closed
+rerun `node --test tools/scripts/lib/host-apply.test.ts`, and rerun the preflight. A wrong pin fails closed
 — the apply refuses rather than reading another app on the account — so being
 wrong here costs a red preflight, never a bad migration.
 

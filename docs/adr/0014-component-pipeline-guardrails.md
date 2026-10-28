@@ -24,11 +24,11 @@ accepted — retry cap amended by [ADR 0017](0017-gated-pipeline-cap-and-slice-c
 
 ## Decision
 
-| Layer                         | Owns                                                                                                                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check-component-hygiene.mjs` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX. |
-| `tsc --noEmit` + `eslint`     | Type correctness, **importer compatibility**, `any`, unused vars, hook dependency arrays.                                                                                               |
-| ComponentReviewer             | Judgment: composition pattern, scope placement, concern mixing, client boundary, Radix-vs-hand-rolled, accessibility beyond the shape rules.                                            |
+| Layer                        | Owns                                                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-component-hygiene.ts` | Shape rules: `forwardRef`/`displayName`, `cn()` merging, barrel export, deep imports, `useCallback` on handler props, inline props types, effect cleanup, generic names, oversized JSX. |
+| `tsc --noEmit` + `eslint`    | Type correctness, **importer compatibility**, `any`, unused vars, hook dependency arrays.                                                                                               |
+| ComponentReviewer            | Judgment: composition pattern, scope placement, concern mixing, client boundary, Radix-vs-hand-rolled, accessibility beyond the shape rules.                                            |
 
 `tsc` over the owning project **is** the importer check. It resolves every consumer of the changed export and fails with a file and line, which strictly dominates reading 78 files and guessing.
 
@@ -76,7 +76,7 @@ The cleanup was deliberately split by risk: named props-interface extraction was
 
 ## Consequences
 
-- New: `tools/scripts/check-component-hygiene.mjs`, `yarn component:hygiene`, and `tools/scripts/lib/source-scan.mjs` — shared lexical helpers now used by both hygiene scripts (the test script was refactored onto it with byte-identical output).
+- New: `tools/scripts/check-component-hygiene.ts`, `yarn component:hygiene`, and `tools/scripts/lib/source-scan.ts` — shared lexical helpers now used by both hygiene scripts (the test script was refactored onto it with byte-identical output).
 - `ComponentReviewer` gains `execute`; its tool grant must stay `[read, search, execute]` across all four harnesses.
 - `docs/ui/GUIDELINES.md` §8 documents the three-layer split; the agents no longer paraphrase §§1–7.
 - Targeted scans remain useful during development, while CI and staged pre-commit checks enforce the zero-warning baseline explicitly.

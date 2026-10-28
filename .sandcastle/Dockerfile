@@ -103,7 +103,7 @@ RUN curl https://cursor.com/install -fsS | bash
 # image whose `claude --version` differs. A plain `docker build` gets latest.
 # The CLI's own auto-updater is off: updates happen at dispatch, so the version
 # each slice log names is the one the agent ran. See
-# tools/scripts/lib/sandcastle-cli-version.mjs.
+# tools/scripts/lib/sandcastle-cli-version.ts.
 ARG CLAUDE_CODE_VERSION=latest
 ENV DISABLE_AUTOUPDATER=1
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
@@ -140,7 +140,7 @@ RUN node -e "const f='/home/agent/.claude.json',fs=require('fs');let j={};try{j=
 # only block legitimate work, including the `git restore` an agent needs to undo
 # its own mistake. Secret guards (.env, credentials, key material) are NOT
 # lifted — the transcript still leaves the container. See
-# tools/scripts/copilot-hooks/pre-tool-use.mjs.
+# tools/scripts/copilot-hooks/pre-tool-use.ts.
 ENV MYORGANISER_SANDBOX=1
 
 WORKDIR /home/agent

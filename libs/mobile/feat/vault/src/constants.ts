@@ -7,7 +7,7 @@
 export const PBKDF2_ITERATIONS = 310_000;
 
 // The four below have no TypeScript consumer and are still not dead.
-// tools/scripts/check-vault-pages.mjs pins these four names to this exact path and
+// tools/scripts/check-vault-pages.ts pins these four names to this exact path and
 // asserts the KDF and cipher figures on the docs/vault/*.html pages against them,
 // so deleting one fails `yarn vault:pages:check`. Issue #485 removed this file's
 // one genuinely dead constant and deliberately kept these.

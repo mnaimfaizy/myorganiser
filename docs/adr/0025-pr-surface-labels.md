@@ -9,9 +9,9 @@ accepted
 ## Decision
 
 - **Two vocabularies.** Issue Orchestration Labels stay on Issues. Surface Labels name kind (`bug`, `security`, `enhancement`, `documentation`, `tooling`, `maintenance`, `dependencies`, `research`, `qa`) and area (`backend`, `web-app`, `mobile-app`, `github-actions`). Issues may wear both. Pull Requests wear Surface Labels only.
-- **One catalog.** `tools/config/github-labels.json` is the source of truth. `create-labels.mjs` provisions both vocabularies. PrAuthor, IssueCreator, `ai:create-pr`, and branch-naming docs point at that file; they do not keep a third list. Do not add `frontend` or `database`.
+- **One catalog.** `tools/config/github-labels.json` is the source of truth. `create-labels.ts` provisions both vocabularies. PrAuthor, IssueCreator, `ai:create-pr`, and branch-naming docs point at that file; they do not keep a third list. Do not add `frontend` or `database`.
 - **How a PR is labelled.** PrAuthor infers from the combined diff (linked-issue Surface Labels are hints, kept only if the diff still justifies them). Stingy: typically one kind plus the areas the diff actually touches. Output `LABELS: a,b` after `TITLE:`. The main agent passes repeatable `--label` into `yarn ai:create-pr`. Default is unlabeled: omit `LABELS:` and pass no `--label`.
-- **Runner.** `create-pr.mjs` enforces the Surface Label allowlist. Names missing from GitHub, names not on the allowlist, and Issue Orchestration Labels all fail closed. On reuse, sync Surface Labels to the draft; leave non-allowlist labels (for example `needs-e2e-review`) untouched.
+- **Runner.** `create-pr.ts` enforces the Surface Label allowlist. Names missing from GitHub, names not on the allowlist, and Issue Orchestration Labels all fail closed. On reuse, sync Surface Labels to the draft; leave non-allowlist labels (for example `needs-e2e-review`) untouched.
 - **Out of scope for this decision.** `to-prd` / `to-issues` do not stamp Surface Labels. PrAuthor does not apply `needs-e2e-review` or `wayfinder:*`. No GitHub Actions auto-labeler.
 
 ## Considered Options

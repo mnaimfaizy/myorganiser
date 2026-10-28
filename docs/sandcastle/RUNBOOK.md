@@ -633,7 +633,7 @@ hand-edit during chat or local development. In a disposable container they prote
 actively cause harm: in the run on issue #408 they rejected every `git restore` the agent tried
 after a botched regeneration, so it was left holding a deletion it could not undo and committed
 it instead. The image sets `MYORGANISER_SANDBOX=1`, which
-`tools/scripts/copilot-hooks/pre-tool-use.mjs` reads to skip them.
+`tools/scripts/copilot-hooks/pre-tool-use.ts` reads to skip them.
 
 **Secret guards stay active.** Reads and writes of `.env`, credentials, and key material are
 still blocked. The container's filesystem is disposable, but the transcript is not — it is
@@ -642,9 +642,10 @@ leaked credential would end up.
 
 Because the marker is read by the shared hook script rather than by harness config, all three
 harnesses (Claude, Cursor, Copilot) inherit this without separate wiring. Behavior in both modes
-is pinned by `tools/scripts/copilot-hooks/__tests__/pre-tool-use.spec.ts`.
+is pinned by `tools/scripts/copilot-hooks/pre-tool-use.test.ts`.
 
-To reproduce the sandbox behavior locally: `MYORGANISER_SANDBOX=1 yarn nx test tools`.
+To reproduce the sandbox behavior locally: `node --test tools/scripts/copilot-hooks/pre-tool-use.test.ts`;
+its `sandbox mode` cases set the marker on the hook process themselves.
 
 ## Maintenance & gotchas
 

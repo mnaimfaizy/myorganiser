@@ -374,7 +374,7 @@ triage chose **ops + docs**: no new checker, and no YouTube-style availability
 switch.
 
 The facts that can fail in production are not in the repository. The Client ID
-lives in a GitHub Environment **variable** on `production` that no `check-*.mjs`
+lives in a GitHub Environment **variable** on `production` that no `check-*.ts`
 can read; a gate that demanded a non-empty value would also fail every local
 commit that leaves `.env.example`'s `NEXT_PUBLIC_GOOGLE_CLIENT_ID=` blank (that
 blank line **is** the off switch). The Cloud project, consent brand, and

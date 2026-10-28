@@ -53,7 +53,7 @@ mechanical stood behind it.
    an instruction nothing permits, which is what that checker already exists to catch.
 
 3. **A refused write to a required output is a prevented measurement, whatever the run's subtype.**
-   `tools/scripts/review/classify-reviewer-run.mjs` reads the transcript's final `result` event and
+   `tools/scripts/review/classify-reviewer-run.ts` reads the transcript's final `result` event and
    reports `prevented=true` when a Write or Edit to the report or the obligation answer sheet was
    refused, as well as on the turn ceiling with denials. The judgments moved out of the action's
    shell so fixture transcripts can test them: a transcript expires, and a live run costs a session.

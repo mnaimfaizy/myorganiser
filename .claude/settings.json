@@ -225,24 +225,24 @@
       "PowerShell(yarn ai:commit *)",
       "Bash(corepack yarn ai:commit *)",
       "PowerShell(corepack yarn ai:commit *)",
-      "Bash(node tools/scripts/check-test-hygiene.mjs *)",
-      "PowerShell(node tools/scripts/check-test-hygiene.mjs *)",
-      "Bash(node tools/scripts/check-component-hygiene.mjs *)",
-      "PowerShell(node tools/scripts/check-component-hygiene.mjs *)",
-      "Bash(node tools/scripts/check-design-hygiene.mjs *)",
-      "PowerShell(node tools/scripts/check-design-hygiene.mjs *)",
-      "Bash(node tools/scripts/check-typecheck.mjs *)",
-      "PowerShell(node tools/scripts/check-typecheck.mjs *)",
-      "Bash(node tools/scripts/git-assert-clean.mjs *)",
-      "PowerShell(node tools/scripts/git-assert-clean.mjs *)",
-      "Bash(node tools/scripts/sync-subagents.mjs *)",
-      "PowerShell(node tools/scripts/sync-subagents.mjs *)",
-      "Bash(node tools/scripts/sync-agent-models.mjs *)",
-      "PowerShell(node tools/scripts/sync-agent-models.mjs *)",
-      "Bash(node tools/scripts/audit-agent-model-catalog.mjs *)",
-      "PowerShell(node tools/scripts/audit-agent-model-catalog.mjs *)",
-      "Bash(node tools/scripts/report-agent-usage.mjs *)",
-      "PowerShell(node tools/scripts/report-agent-usage.mjs *)",
+      "Bash(node tools/scripts/check-test-hygiene.ts *)",
+      "PowerShell(node tools/scripts/check-test-hygiene.ts *)",
+      "Bash(node tools/scripts/check-component-hygiene.ts *)",
+      "PowerShell(node tools/scripts/check-component-hygiene.ts *)",
+      "Bash(node tools/scripts/check-design-hygiene.ts *)",
+      "PowerShell(node tools/scripts/check-design-hygiene.ts *)",
+      "Bash(node tools/scripts/check-typecheck.ts *)",
+      "PowerShell(node tools/scripts/check-typecheck.ts *)",
+      "Bash(node tools/scripts/git-assert-clean.ts *)",
+      "PowerShell(node tools/scripts/git-assert-clean.ts *)",
+      "Bash(node tools/scripts/sync-subagents.ts *)",
+      "PowerShell(node tools/scripts/sync-subagents.ts *)",
+      "Bash(node tools/scripts/sync-agent-models.ts *)",
+      "PowerShell(node tools/scripts/sync-agent-models.ts *)",
+      "Bash(node tools/scripts/audit-agent-model-catalog.ts *)",
+      "PowerShell(node tools/scripts/audit-agent-model-catalog.ts *)",
+      "Bash(node tools/scripts/report-agent-usage.ts *)",
+      "PowerShell(node tools/scripts/report-agent-usage.ts *)",
       "Bash(gh pr view *)",
       "PowerShell(gh pr view *)",
       "Bash(gh pr list *)",
@@ -486,12 +486,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/secret-scan.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/secret-scan.ts --defer",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/pre-tool-use.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/pre-tool-use.ts --defer",
             "timeout": 5
           }
         ]
@@ -503,7 +503,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/cloud-permission-request.mjs --defer",
+            "command": "node tools/scripts/copilot-hooks/cloud-permission-request.ts --defer",
             "timeout": 5
           }
         ]
@@ -515,7 +515,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/post-tool-use.mjs",
+            "command": "node tools/scripts/copilot-hooks/post-tool-use.ts",
             "timeout": 5
           }
         ]
@@ -525,7 +525,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.mjs",
+            "command": "node tools/scripts/copilot-hooks/dep-sync-reminder.ts",
             "timeout": 5
           }
         ]

@@ -18,7 +18,7 @@ Three gaps let that happen.
    runtime fit neither it nor `standard-secret-committed`, which ADR 0086 keeps deliberately
    separate.
 2. The rule catalogue could cap a severity (`maxSeverity`, enforced in
-   `tools/scripts/review/schema.mjs`) but had no floor. Brief text asking for a minimum severity
+   `tools/scripts/review/schema.ts`) but had no floor. Brief text asking for a minimum severity
    cannot be checked, and the run that called this a nit had read its brief.
 3. The code-review Skill's one-axis rule (PR #819) dropped any Standards finding whose lines
    overlapped a Spec finding. Had Standards raised a should-fix on the `curl` line, assembly would

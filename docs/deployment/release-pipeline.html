@@ -24,7 +24,7 @@
 
 <style>
 /* House faces. Spliced verbatim from docs/vault/lifecycle.html via
-   `node tools/scripts/check-design-hygiene.mjs --print-font-block` — the same
+   `node tools/scripts/check-design-hygiene.ts --print-font-block` — the same
    block, byte for byte, that docs/sandcastle/*.html and docs/agents/*.html
    carry. Base64 data URIs, so the page still renders from disk and inside a
    sandbox with no network. Do not re-encode or re-subset. */
@@ -1188,7 +1188,7 @@
               </text>
               <text class="nc" x="72" y="260">
                 creates + pushes release/vX.Y.Z, only if Staging is Host
-                Applied &#183; package.json:26, release.mjs:604, :632-641
+                Applied &#183; package.json:26, release.ts:668, :696-705
               </text>
             </g>
             <path
@@ -1576,7 +1576,7 @@
               </text>
               <text class="nc" x="272" y="1180">
                 no commit, no files &#8212; asserts branch state first &#183;
-                release.mjs:757-765
+                release.ts:821-829
               </text>
               <text class="nc" x="272" y="1194">
                 package.json:27
@@ -1679,7 +1679,7 @@
           must have started after that upload landed. There is no flag to
           skip this. Only then does it create + push
           <code>release/vX.Y.Z</code> (<code>package.json:26</code>,
-          <code>release.mjs:604</code>, <code>:632-641</code>). The commit is
+          <code>release.ts:668</code>, <code>:696-705</code>). The commit is
           read from the upload run's name, and a scheduled run's name
           carries none (<code>deploy-staging.yml:19</code>), so the Cut
           refuses a scheduled upload until a <b>full</b> dispatch of
@@ -1688,7 +1688,7 @@
           it. When the upload came from a dispatch and only
           <code>host-apply</code> is missing or older,
           <code>apply_only</code> is still the next step
-          (<code>staging-host-apply-guard.mjs</code>, ADR&nbsp;0056,
+          (<code>staging-host-apply-guard.ts</code>, ADR&nbsp;0056,
           amendments 2026-09-14 and 2026-10-13; ADR&nbsp;0128).
           <code>release:cut</code> has no
           <code>--tag</code> flag &mdash; cutting cannot tag.
@@ -1849,8 +1849,8 @@
         <dd id="note-tag">
           Asserts it is on the release branch and up to date with origin, and
           that <code>package.json</code> matches the tag
-          (<code>release.mjs:757-759</code>); refuses an existing tag
-          (<code>:761-763</code>); creates no commit and writes no files
+          (<code>release.ts:821-823</code>); refuses an existing tag
+          (<code>:825-827</code>); creates no commit and writes no files
           (<code>package.json:27</code>). A commit here would move the
           branch past the exact SHA CI verified and a reviewer approved.
           <code>vX.Y.Z</code> existing means that version reached production.
@@ -1911,7 +1911,7 @@
               creates + pushes <code>release/vX.Y.Z</code>, only if Staging
               is Host Applied at this commit
             </td>
-            <td class="cite">package.json:26, release.mjs:604, :632-641</td>
+            <td class="cite">package.json:26, release.ts:668, :696-705</td>
           </tr>
           <tr class="fork">
             <td>4a</td>
@@ -1944,7 +1944,7 @@
             <td>6</td>
             <td><code>yarn release:tag --version vX.Y.Z --push</code></td>
             <td>annotated tag, no commit, no files</td>
-            <td class="cite">package.json:27, release.mjs:757-765</td>
+            <td class="cite">package.json:27, release.ts:821-829</td>
           </tr>
           <tr>
             <td>7</td>
@@ -2107,17 +2107,17 @@
   <section class="panel" aria-labelledby="p4-h">
     <div class="phead">
       <h2 id="p4-h">4 &middot; The tag is a receipt</h2>
-      <span class="src">release.mjs</span>
+      <span class="src">release.ts</span>
     </div>
     <div class="pbody">
       <p>
         <code>release:tag</code> asserts it is on the release branch, up to
         date with origin, and that <code>package.json</code> matches the tag
-        (<code>release.mjs:757-759</code>); refuses an existing tag
-        (<code>:761-763</code>); and creates no commits and writes no files
+        (<code>release.ts:821-823</code>); refuses an existing tag
+        (<code>:825-827</code>); and creates no commits and writes no files
         &mdash; a commit here would move the branch past the exact SHA that
         CI verified and a reviewer approved
-        (<code>:749-756</code>). <code>release:cut</code> has no way to tag
+        (<code>:813-820</code>). <code>release:cut</code> has no way to tag
         at all: there is no <code>--tag</code> flag. <code>vX.Y.Z</code>
         existing means that version reached production
         (<a href="../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md"
@@ -2138,12 +2138,12 @@
         <div class="fact">
           <div class="fname">Node &mdash; three scopes, one floor</div>
           <p>
-            CI runners pin exactly <code>'22'</code> at every
+            CI runners pin exactly <code>'22.18'</code> at every
             <code>setup-node</code> step across <code>ci.yml</code>,
             <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>.
-            The repo floor is <code>&gt;=22.0.0</code>
-            (<code>package.json:7</code>). <code>release.mjs</code> refuses a
-            major below 22 (<code>release.mjs:22-30</code>). Three scopes, one
+            The repo floor is <code>&gt;=22.18.0</code>
+            (<code>package.json:7</code>). <code>release.ts</code> refuses a
+            major below 22 (<code>release.ts:25-33</code>). Three scopes, one
             floor &mdash; not a single pinned number.
           </p>
         </div>
@@ -2228,7 +2228,7 @@
             <code>^v[0-9]+\.[0-9]+\.[0-9]+$</code>
             (<code>publish-github-release.yml:37</code>); and
             <code>/^v?(\d+)\.(\d+)\.(\d+)$/</code>
-            (<code>release.mjs:151</code>), which rejects prerelease input
+            (<code>release.ts:169</code>), which rejects prerelease input
             outright.
           </p>
         </div>
@@ -2264,10 +2264,10 @@
           <span class="cite">:674</span>
         </li>
         <li>
-          Build Backend <span class="cite">:1310</span>, only when
-          <code>backend</code> is affected <span class="cite">:1314</span>, and
-          Build Frontend <span class="cite">:1356</span>,
-          <span class="cite">:1360</span>
+          Build Backend <span class="cite">:1137</span>, only when
+          <code>backend</code> is affected <span class="cite">:1141</span>, and
+          Build Frontend <span class="cite">:1183</span>,
+          <span class="cite">:1187</span>
         </li>
       </ol>
       <p class="small muted">
@@ -2287,7 +2287,7 @@
       <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>,
       <code>dispatch-production-deploy.yml</code>,
       <code>release-pr.yml</code>, <code>publish-github-release.yml</code>,
-      <code>tools/scripts/release.mjs</code>, and <code>package.json</code>,
+      <code>tools/scripts/release.ts</code>, and <code>package.json</code>,
       with
       <a href="../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md"
         >ADR&nbsp;0028</a
@@ -2303,10 +2303,10 @@
     <div>
       Diff this page against the source with the embedded
       <code>release-pipeline-manifest</code> block below, which
-      <code>tools/scripts/check-deploy-pipeline.mjs</code> reads
+      <code>tools/scripts/check-deploy-pipeline.ts</code> reads
       against <code>.github/workflows/*.yml</code> directly, the way
-      <code>check-env-deployment.mjs</code> reads the deployment docs and
-      <code>check-agent-map.mjs</code> diffs an embedded manifest against its
+      <code>check-env-deployment.ts</code> reads the deployment docs and
+      <code>check-agent-map.ts</code> diffs an embedded manifest against its
       source of truth. That checker is wired as
       <code>deploy:pages:check</code>, alongside
       <code>vault:pages:check</code> and <code>auth:pages:check</code>, so
@@ -2803,10 +2803,10 @@
       "ci.yml:544": { "file": ".github/workflows/ci.yml", "start": "setup:" },
       "ci.yml:622": { "file": ".github/workflows/ci.yml", "start": "lint:" },
       "ci.yml:674": { "file": ".github/workflows/ci.yml", "start": "test:" },
-      "ci.yml:1310": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1314": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1356": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1360": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:1137": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1141": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1183": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1187": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },
@@ -2826,12 +2826,12 @@
       "deploy-production.yml:164-172": { "file": ".github/workflows/deploy-production.yml", "start": "- name: Deploy backend to cPanel (production)", "end": "timeout: 300000" },
       "deploy-production.yml:170": { "file": ".github/workflows/deploy-production.yml", "start": "local-dir: ./dist/deploy/backend-api/" },
       "deploy-production.yml:172": { "file": ".github/workflows/deploy-production.yml", "start": "timeout: 300000" },
-      "deploy-production.yml:178-288": { "file": ".github/workflows/deploy-production.yml", "start": "host-apply:", "end": "node tools/scripts/verify-host-apply.mjs \"$docs_status\" \"$cron_status\"" },
+      "deploy-production.yml:178-288": { "file": ".github/workflows/deploy-production.yml", "start": "host-apply:", "end": "node tools/scripts/verify-host-apply.ts \"$docs_status\" \"$cron_status\"" },
       "deploy-production.yml:180": { "file": ".github/workflows/deploy-production.yml", "start": "if: ${{ always() && needs.validate.result == 'success' && startsWith(github.ref, 'refs/heads/release/') && (needs.deploy-backend.result == 'success' || inputs.apply_only) }}" },
       "deploy-production.yml:182": { "file": ".github/workflows/deploy-production.yml", "start": "timeout-minutes: 45" },
       "deploy-production.yml:183": { "file": ".github/workflows/deploy-production.yml", "start": "environment: production" },
       "deploy-production.yml:190": { "file": ".github/workflows/deploy-production.yml", "start": "ref: ${{ needs.validate.outputs.release_ref }}" },
-      "deploy-production.yml:271-288": { "file": ".github/workflows/deploy-production.yml", "start": "- name: Verify Host Apply (HTTP probes)", "end": "node tools/scripts/verify-host-apply.mjs \"$docs_status\" \"$cron_status\"" },
+      "deploy-production.yml:271-288": { "file": ".github/workflows/deploy-production.yml", "start": "- name: Verify Host Apply (HTTP probes)", "end": "node tools/scripts/verify-host-apply.ts \"$docs_status\" \"$cron_status\"" },
       "deploy-production.yml:291": { "file": ".github/workflows/deploy-production.yml", "start": "if: ${{ startsWith(github.ref, 'refs/heads/release/') && !inputs.apply_only }}" },
       "deploy-production.yml:292": { "file": ".github/workflows/deploy-production.yml", "start": "needs: [validate, prepare-dependencies, deploy-backend]" },
       "deploy-production.yml:294": { "file": ".github/workflows/deploy-production.yml", "start": "timeout-minutes: 45" },
@@ -2852,7 +2852,7 @@
       "deploy-staging.yml:79": { "file": ".github/workflows/deploy-staging.yml", "start": "timeout-minutes: 30" },
       "deploy-staging.yml:122-124": { "file": ".github/workflows/deploy-staging.yml", "start": "sha=\"$(gh run list --repo \"$GITHUB_REPOSITORY\" --workflow ci.yml \\", "end": "--json headSha --jq '.[0].headSha // empty')\"" },
       "deploy-staging.yml:45-64": { "file": ".github/workflows/deploy-staging.yml", "start": "# The schedule takes the newest `main` commit whose CI run is green: a red", "end": "#   - otherwise deploy it." },
-      "deploy-staging.yml:140-142": { "file": ".github/workflows/deploy-staging.yml", "start": "node tools/scripts/staging-web-deploy.mjs schedule \\", "end": "--web-origin \"$WEB_ORIGIN\"" },
+      "deploy-staging.yml:140-142": { "file": ".github/workflows/deploy-staging.yml", "start": "node tools/scripts/staging-web-deploy.ts schedule \\", "end": "--web-origin \"$WEB_ORIGIN\"" },
       "deploy-staging.yml:149": { "file": ".github/workflows/deploy-staging.yml", "start": "timeout-minutes: 30" },
       "deploy-staging.yml:150-152": { "file": ".github/workflows/deploy-staging.yml", "start": "concurrency:", "end": "cancel-in-progress: true" },
       "deploy-staging.yml:189": { "file": ".github/workflows/deploy-staging.yml", "start": "timeout-minutes: 30" },
@@ -2868,7 +2868,7 @@
       "deploy-staging.yml:402": { "file": ".github/workflows/deploy-staging.yml", "start": "timeout-minutes: 30" },
       "deploy-staging.yml:409-411": { "file": ".github/workflows/deploy-staging.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },
       "deploy-staging.yml:427-433": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Checkout deploy tools", "end": "sparse-checkout-cone-mode: false" },
-      "deploy-staging.yml:496-500": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Assert the web app and the API are on the same site", "end": "run: node .deploy-tools/tools/scripts/staging-web-deploy.mjs same-site \"$WEB_ORIGIN\" \"$API_ORIGIN\"" },
+      "deploy-staging.yml:496-500": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Assert the web app and the API are on the same site", "end": "run: node .deploy-tools/tools/scripts/staging-web-deploy.ts same-site \"$WEB_ORIGIN\" \"$API_ORIGIN\"" },
       "deploy-staging.yml:502-512": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Package web app (cPanel)", "end": "run: corepack yarn package:web" },
       "deploy-staging.yml:518-532": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Plan the web deploy", "end": "rm -f dist/deploy/web/web.zip" },
       "deploy-staging.yml:536": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Deploy web app to cPanel (staging)" },
@@ -2884,32 +2884,32 @@
       "dispatch-production-deploy.yml:40": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if [[ ! \"${CREATED_REF}\" =~ ^release/v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then" },
       "dispatch-production-deploy.yml:55": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "| grep -E '^release/v[0-9]+\\.[0-9]+\\.[0-9]+$' \\" },
       "dispatch-production-deploy.yml:93-101": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "await github.rest.actions.createWorkflowDispatch({", "end": "});" },
-      "package.json:7": { "file": "package.json", "start": "\"node\": \">=22.0.0\"," },
-      "package.json:26": { "file": "package.json", "start": "\"release:cut\": \"node tools/scripts/release.mjs cut\"," },
-      "package.json:27": { "file": "package.json", "start": "\"release:tag\": \"node tools/scripts/release.mjs tag\"," },
+      "package.json:7": { "file": "package.json", "start": "\"node\": \">=22.18.0\"," },
+      "package.json:26": { "file": "package.json", "start": "\"release:cut\": \"node tools/scripts/release.ts cut\"," },
+      "package.json:27": { "file": "package.json", "start": "\"release:tag\": \"node tools/scripts/release.ts tag\"," },
       "publish-github-release.yml:6-8": { "file": ".github/workflows/publish-github-release.yml", "start": "push:", "end": "- 'v*.*.*'" },
       "publish-github-release.yml:37": { "file": ".github/workflows/publish-github-release.yml", "start": "if [[ ! \"$tag\" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then" },
       "publish-github-release.yml:97-118": { "file": ".github/workflows/publish-github-release.yml", "start": "try {", "end": "core.info(`Created GitHub Release ${tag}.`);" },
       "release-pr.yml:6-8": { "file": ".github/workflows/release-pr.yml", "start": "push:", "end": "- 'release/v*'" },
       "release-pr.yml:36": { "file": ".github/workflows/release-pr.yml", "start": "if (!/^release\\/v\\d+\\.\\d+\\.\\d+$/.test(releaseBranch)) {" },
       "release-pr.yml:105-117": { "file": ".github/workflows/release-pr.yml", "start": "const mutation = `", "end": "core.info(`Enabled auto-merge for PR #${pr.number}`);" },
-      "release.mjs:22-30": { "file": "tools/scripts/release.mjs", "start": "function assertNodeVersion() {", "end": "}" },
-      "release.mjs:151": { "file": "tools/scripts/release.mjs", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
-      "release.mjs:604": { "file": "tools/scripts/release.mjs", "start": "const releaseBranch = `release/${version}`;" },
-      "release.mjs:632-641": { "file": "tools/scripts/release.mjs", "start": "assertCleanTree();", "end": "}" },
-      "release.mjs:749-756": { "file": "tools/scripts/release.mjs", "start": "// command === 'tag'", "end": "// never deployed." },
-      "release.mjs:757-759": { "file": "tools/scripts/release.mjs", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
-      "release.mjs:757-765": { "file": "tools/scripts/release.mjs", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
-      "release.mjs:761-763": { "file": "tools/scripts/release.mjs", "start": "if (tagExists(version)) {", "end": "}" }
+      "release.ts:25-33": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
+      "release.ts:169": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
+      "release.ts:668": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
+      "release.ts:696-705": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
+      "release.ts:813-820": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },
+      "release.ts:821-823": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
+      "release.ts:821-829": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
+      "release.ts:825-827": { "file": "tools/scripts/release.ts", "start": "if (tagExists(version)) {", "end": "}" }
     }
   }
 </script>
 
 <script type="application/json" id="release-pipeline-manifest">
   {
-    "note": "Asserted by tools/scripts/check-deploy-pipeline.mjs against .github/workflows/*.yml.",
-    "ciRunnerNodeMajor": "22",
-    "repoEnginesNodeRange": ">=22.0.0",
+    "note": "Asserted by tools/scripts/check-deploy-pipeline.ts against .github/workflows/*.yml.",
+    "ciRunnerNodeMajor": "22.18",
+    "repoEnginesNodeRange": ">=22.18.0",
     "releaseScriptMinNodeMajor": 22,
     "stagingFrontendTarget": "cpanel-ftp",
     "productionFrontendTarget": "cpanel-ftp",

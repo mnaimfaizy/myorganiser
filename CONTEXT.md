@@ -749,7 +749,7 @@ The test suite that proves a tooling script does what its header claims — for 
 _Avoid_: checker test, script test, unit test (for this sense)
 
 **Meta-Gate**:
-The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
+The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. It rejects a `check-*.mjs` by name, since a checker is TypeScript, and it asserts every Contract Suite is wired: a `*.test.ts` under `tools/scripts` that `tools:test`'s own glob does not reach, or that it reaches while `tools:test` itself is wired nowhere, fails by name (ADR 0135). An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker or suite it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
 _Avoid_: gate-of-gates, master gate, gate linter
 
 **Unasserted Claim**:
@@ -925,7 +925,7 @@ The sub-agent responsible for creating or editing a React component from a Struc
 _Avoid_: Frontend agent, UI agent, component writer
 
 **ComponentReviewer**:
-The sub-agent that gates a component produced by ComponentBuilder. Runs `check-component-hygiene.mjs`, `tsc`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project serves as the importer check. Always runs after ComponentBuilder. Produces a report only — no code edits.
+The sub-agent that gates a component produced by ComponentBuilder. Runs `check-component-hygiene.ts`, `tsc`, and `eslint`, then judges composition, scope placement, concern mixing, the client boundary, Radix usage, and accessibility. `tsc` over the owning project serves as the importer check. Always runs after ComponentBuilder. Produces a report only — no code edits.
 _Avoid_: Code reviewer, linter agent, review agent
 
 **DepSync**:

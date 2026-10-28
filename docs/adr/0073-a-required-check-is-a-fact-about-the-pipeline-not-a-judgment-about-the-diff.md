@@ -21,7 +21,7 @@ been running on without writing down.
 - deletion and non-fast-forward protection;
 - `bypass_actors: [RepositoryRole]`.
 
-None of that is in a file. `tools/scripts/check-review-pages.mjs` carries the six contexts as
+None of that is in a file. `tools/scripts/check-review-pages.ts` carries the six contexts as
 `REQUIRED_CHECK_CONTEXTS` and asserts each is still a job name in `ci.yml`, which catches a rename
 on the repository side. Nothing compares that list to the ruleset GitHub actually enforces.
 

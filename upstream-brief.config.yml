@@ -38,12 +38,12 @@ instruction_globs:
   - docs/ui/GUIDELINES.md
 
 script_globs:
-  - tools/scripts/check-component-hygiene.mjs
-  - tools/scripts/check-test-hygiene.mjs
-  - tools/scripts/check-readme.mjs
-  - tools/scripts/check-vault-pages.mjs
-  - tools/scripts/check-auth-pages.mjs
-  - tools/scripts/check-mobile-platform.mjs
+  - tools/scripts/check-component-hygiene.ts
+  - tools/scripts/check-test-hygiene.ts
+  - tools/scripts/check-readme.ts
+  - tools/scripts/check-vault-pages.ts
+  - tools/scripts/check-auth-pages.ts
+  - tools/scripts/check-mobile-platform.ts
 
 source_globs:
   - apps/web/src/**/*.{ts,tsx}

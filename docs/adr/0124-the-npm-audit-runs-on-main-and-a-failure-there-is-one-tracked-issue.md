@@ -25,7 +25,7 @@ So a new advisory against a dependency already in the tree surfaces as a red `ma
 6. **A failed audit still skips every job after it.** `Prepare Dependency Cache` needs `Secure Install Review`, so nothing is built or tested on `main` while the audit is red. Run 36808069553 shows it: every job after the audit was skipped. That stays. The tracked issue is what makes the stop visible.
 7. **The response is a dependency bump.** Bump each reported package past its vulnerable range on a branch and run the `dep-sync` Skill. That pull request is audited, because it changes dependencies.
 
-The decisions live in `tools/scripts/lib/npm-audit-issue.mjs`. `yarn npm-audit:issue:test` covers them and asserts the workflow's triggers and permissions.
+The decisions live in `tools/scripts/lib/npm-audit-issue.ts`. `yarn npm-audit:issue:test` covers them and asserts the workflow's triggers and permissions.
 
 ## Considered Options
 

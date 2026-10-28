@@ -10,7 +10,8 @@ import './global.css';
 // Staging's deploy depends on this (ADR 0128): it reads the build id out of
 // the HTML of /login to tell which build the running process serves. A
 // prerendered page would be read from disk and report the uploaded build
-// instead. `yarn staging-web:test` fails if this export goes.
+// instead. `tools/scripts/lib/staging-web-deploy.test.ts` fails if this
+// export goes.
 export const dynamic = 'force-dynamic';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myorganiser.app';

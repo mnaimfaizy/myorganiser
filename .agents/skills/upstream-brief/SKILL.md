@@ -92,7 +92,7 @@ Hand each worker its Ecosystem's lead, members, Baseline, Horizon, the loaded in
 
 **Upstream Opportunities.** At most three per Ecosystem, strongest first. Each is a technique the upstream documents or an alternative the upstream itself names, at a place where nothing is wrong today. Each must be adoptable at the Baseline — or by the Horizon, with its `minVersion` stated — must name at least one local site as a checked citation, and must state its benefit as the upstream's own quoted sentence, never an estimate. Do not propose one the ledger reports as suppressed; do propose a resurfaced one, with the reason it came back.
 
-**Zero is a legal answer, and the run says what it considered.** The report has no field for a candidate that was weighed and dropped, so it goes in `scanned` — the list of what the run read — as one entry per candidate, naming the Ecosystem, the page, and in one clause why nothing was proposed from it: `nx — https://nx.dev/… — already adopted at tools/scripts/check-component-hygiene.mjs`. An empty Opportunities section beside a `scanned` list that names no candidate reads as a run that never looked.
+**Zero is a legal answer, and the run says what it considered.** The report has no field for a candidate that was weighed and dropped, so it goes in `scanned` — the list of what the run read — as one entry per candidate, naming the Ecosystem, the page, and in one clause why nothing was proposed from it: `nx — https://nx.dev/… — already adopted at tools/scripts/check-component-hygiene.ts`. An empty Opportunities section beside a `scanned` list that names no candidate reads as a run that never looked.
 
 **Done when:** every resolved Ecosystem has a report entry or a failure note.
 

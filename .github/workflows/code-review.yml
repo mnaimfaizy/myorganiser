@@ -97,7 +97,7 @@ permissions:
 # `if:` is read, so "the job skips" is not the same as "the run is harmless" —
 # the run still joins the group and, with `cancel-in-progress`, takes the
 # review with it. Why that keeps happening, and to which pull requests, is in
-# the header of tools/scripts/check-review-concurrency.mjs; it is written once,
+# the header of tools/scripts/check-review-concurrency.ts; it is written once,
 # there, because that file is what enforces it.
 #
 # What this expression does:
@@ -295,7 +295,7 @@ jobs:
         if: steps.preflight.outputs.skip != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         if: steps.preflight.outputs.skip != 'true'
@@ -325,7 +325,7 @@ jobs:
           corepack yarn review:tier:check \
             --base "$BASE_SHA" --head "$HEAD_SHA" --author "$PR_AUTHOR" \
             --out "$RUNNER_TEMP/tier.json"
-          node tools/scripts/review/run-review-tier-check.mjs \
+          node tools/scripts/review/run-review-tier-check.ts \
             --mode advisory --status $?
 
       # Spec discovery with the job token: branch name, then commit
@@ -432,7 +432,7 @@ jobs:
       # Leaving --facts off here would put the reviewer's own claims about its
       # run back into the report on every review after the first (ADR 0123),
       # and leaving --worklist off would fail an obligation finding as one the
-      # main agent authored; run-facts-wiring.test.mjs fails a validation that
+      # main agent authored; run-facts-wiring.test.ts fails a validation that
       # omits either. A previous report that cannot be used
       # leaves the minted ids in place and says so: every finding then reads
       # as new, which is what having no previous run means.
@@ -628,10 +628,10 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
-      # The publisher reaches schema.mjs for the finding shape and the tier
-      # labels, and schema.mjs imports zod. This job needs the install like
+      # The publisher reaches schema.ts for the finding shape and the tier
+      # labels, and schema.ts imports zod. This job needs the install like
       # any other, and the cache the review job populated makes it cheap.
       - name: Restore dependency cache
         id: dependency-cache

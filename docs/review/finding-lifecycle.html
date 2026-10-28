@@ -1282,7 +1282,7 @@
           <code>Agent Review Ran</code> is eligible to be required but is not
           required yet &mdash; that needs the GitHub ruleset,
           <code>REQUIRED_CHECK_CONTEXTS</code>, and the job-name resolution
-          in <code>check-review-pages.mjs</code> (today <code>ci.yml</code>
+          in <code>check-review-pages.ts</code> (today <code>ci.yml</code>
           only) to change together (ADR 0073, Consequences). Neither check is
           ever a review approval (ADR 0070 item 6).
           <code>review:human</code> additionally needs a code-owner approval,
@@ -1538,7 +1538,7 @@
             <td class="no">no &mdash; caps at should-fix</td>
           </tr>
           <tr class="cap">
-            <td>smell-baseline (<code>schema.mjs:369</code>, the validator&rsquo;s own message: &ldquo;always a judgement call&rdquo;)</td>
+            <td>smell-baseline (<code>schema.ts:374</code>, the validator&rsquo;s own message: &ldquo;always a judgement call&rdquo;)</td>
             <td>any</td>
             <td class="no">no &mdash; caps at should-fix</td>
           </tr>
@@ -1727,7 +1727,7 @@
 
   <footer class="pagefoot">
     <div>
-      <code>tools/scripts/check-review-pages.mjs</code> diffs this page
+      <code>tools/scripts/check-review-pages.ts</code> diffs this page
       against its sources on every commit; it reads the embedded
       <code>review-lifecycle-manifest</code> block below.
       <code>requiredCheckContexts</code> are <code>ci.yml</code> job names,
@@ -1736,7 +1736,7 @@
       <code>agentReviewRanCheck</code> is the sibling job name for the
       pipeline-fact check, <code>gateTierLabels</code> come from
       <code>tools/config/github-labels.json</code>, and the rest are the
-      constants <code>tools/scripts/review/schema.mjs</code> exports.
+      constants <code>tools/scripts/review/schema.ts</code> exports.
     </div>
   </footer>
 </div>
@@ -1803,8 +1803,8 @@
         "start": "The main agent assembles the report envelope, runs the validator, and prints the rendered Markdown.",
         "end": "exposes (step 4)."
       },
-      "schema.mjs:369": {
-        "file": "tools/scripts/review/schema.mjs",
+      "schema.ts:374": {
+        "file": "tools/scripts/review/schema.ts",
         "start": "'a smell-baseline finding is always a judgement call and caps at should-fix',"
       },
       "AGENTS.md:135": {

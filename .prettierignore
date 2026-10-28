@@ -24,7 +24,7 @@ docs/vault/lifecycle.html
 
 # Upstream-Owned Skills (ADR 0030). Formatting these re-forks them: Prettier's markdown
 # normalisation is exactly how the previous `codebase-design` fork acquired its only divergence
-# from upstream. Keep in step with skills-lock.json — check-skill-map.mjs asserts it.
+# from upstream. Keep in step with skills-lock.json — check-skill-map.ts asserts it.
 .agents/skills/codebase-design/
 .agents/skills/diagnosing-bugs/
 .agents/skills/domain-modeling/

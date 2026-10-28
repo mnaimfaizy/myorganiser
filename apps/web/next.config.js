@@ -9,7 +9,7 @@ const { join } = require('node:path');
  * Read as a file rather than `require`d: the workspace package.json is outside
  * this project, and importing across that line by relative path is what
  * `@nx/enforce-module-boundaries` refuses. Reading it is also how the
- * assertion gates and `check-openapi-artifacts.mjs` take the same value.
+ * assertion gates and `check-openapi-artifacts.ts` take the same value.
  */
 const workspaceVersion = JSON.parse(
   readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'),

@@ -1,5 +1,5 @@
 {
-  "$comment": "QA Accounts (CONTEXT.md). Public by design: `yarn qa:accounts:seed` creates them and refuses any database that is not local. Each account's sign-in password, Vault passphrase and key material are derived from its id by tools/scripts/lib/qa-accounts.mjs and are not written here; `yarn qa:accounts` prints them. See docs/adr/0122-a-qa-accounts-credentials-are-public-fixtures-in-tracked-source.md.",
+  "$comment": "QA Accounts (CONTEXT.md). Public by design: `yarn qa:accounts:seed` creates them and refuses any database that is not local. Each account's sign-in password, Vault passphrase and key material are derived from its id by tools/scripts/lib/qa-accounts.ts and are not written here; `yarn qa:accounts` prints them. See docs/adr/0122-a-qa-accounts-credentials-are-public-fixtures-in-tracked-source.md.",
   "accounts": [
     {
       "id": "primary",

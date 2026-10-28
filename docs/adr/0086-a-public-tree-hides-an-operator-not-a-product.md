@@ -12,7 +12,7 @@ Issue #563 was taken out of the #437 grilling: the operator asked whether a priv
 
 Grilled 2026-09-16. Four answers decided it before any option was priced.
 
-**The content is operator fingerprints** — host, paths, account names, deploy topology — not features and not credentials. That is the one category ADR 0056 already handles: connection values and on-host pins live in GitHub Environment secrets, and public workflows carry the algorithm and secret names only. The discipline is holding where it was written: `docs/deployment/HOST_APPLY_OPERATOR_SETUP.md` uses `<port> <user>@<host>` throughout, and `tools/scripts/check-host-apply-workflow.mjs` gates the two deploy workflows against secret-name drift.
+**The content is operator fingerprints** — host, paths, account names, deploy topology — not features and not credentials. That is the one category ADR 0056 already handles: connection values and on-host pins live in GitHub Environment secrets, and public workflows carry the algorithm and secret names only. The discipline is holding where it was written: `docs/deployment/HOST_APPLY_OPERATOR_SETUP.md` uses `<port> <user>@<host>` throughout, and `tools/scripts/check-host-apply-workflow.ts` gates the two deploy workflows against secret-name drift.
 
 **There is one app and one audience.** Both open-core shapes #563 listed — shared public libraries with private application packages, and a true product split — exist to serve a second audience. Paying their cost with one audience is overhead and nothing else. No `.gitmodules`, no publishable Nx project, and no private registry exists today, so neither is a rearrangement of what is here; both are a package-publishing pipeline that would have to be built.
 

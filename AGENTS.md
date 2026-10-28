@@ -9,7 +9,7 @@ Nx monorepo for a full-stack organizer app: Next.js frontend, Express/Prisma bac
 This guide holds the always-needed rules. Open these when the trigger applies:
 
 - [Command reference](docs/agents/command-reference.md) — a task names a gate, or needs a command not under Commands below.
-- [Repository conventions](docs/agents/repository-conventions.md) — before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.mjs`.
+- [Repository conventions](docs/agents/repository-conventions.md) — before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.ts`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
@@ -96,7 +96,7 @@ The Cloud Agent VM has **no Docker**; `.cursor/install.sh` and `.cursor/start.sh
 - Use the generated API client when it covers the endpoint.
 - Add or update focused tests for changed behavior.
 - Keep docs concise and link to existing docs when possible.
-- Before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.mjs`, read [the repository conventions](docs/agents/repository-conventions.md): where notes live (short-lived working files go in `tmp/`, gitignored and never committed), how an approved design is committed, how an ADR is numbered and authored `accepted`, and what a checker header declares.
+- Before adding a file under `docs/`, committing a design, writing an ADR, or adding a `check-*.ts`, read [the repository conventions](docs/agents/repository-conventions.md): where notes live (short-lived working files go in `tmp/`, gitignored and never committed), how an approved design is committed, how an ADR is numbered and authored `accepted`, and what a checker header declares.
 - Standards live in the documents indexed by [`CODING_STANDARDS.md`](CODING_STANDARDS.md). Add a rule to its source document and link, rather than restating it in the index.
 - `CONTEXT.md` is the domain glossary — read it before changing domain language, and sharpen or extend a term it already carries instead of redefining it. A new term touching encrypted data must say whether it means plaintext (client-only) or ciphertext (server-storable).
 - Code fanning out over a domain enum reaches one `as const satisfies Record<EnumType, …>` table; it does not re-enumerate the members in an object literal, an if-chain, or a list of `if` statements. `yarn enum:fanout:check` enforces it for guarded enums ([ADR 0053](docs/adr/0053-a-fan-out-over-a-domain-enum-is-pinned-at-its-call-site.md)).

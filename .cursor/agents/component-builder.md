@@ -143,7 +143,7 @@ export * from './lib/components/<Name>/<Name>';
 Run the mechanical checks on what you wrote, in strict mode:
 
 ```bash
-node tools/scripts/check-component-hygiene.mjs <path> --max-warnings=0
+node tools/scripts/check-component-hygiene.ts <path> --max-warnings=0
 ```
 
 Fix every **error and warning** it reports before handing off — these are the

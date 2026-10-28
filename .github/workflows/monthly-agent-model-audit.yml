@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Audit assignments and official model catalogs
         id: audit
@@ -37,7 +37,7 @@ jobs:
           REPORT_PATH: ${{ runner.temp }}/agent-model-audit.md
         run: |
           set +e
-          node tools/scripts/audit-agent-model-catalog.mjs \
+          node tools/scripts/audit-agent-model-catalog.ts \
             --report "$REPORT_PATH"
           exit_code=$?
           set -e

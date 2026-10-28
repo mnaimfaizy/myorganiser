@@ -12,7 +12,7 @@ A code review Finding may carry `evidence.kind: "executed"`: a `command`, an `ex
 is one of the two kinds of evidence that can make a Finding Blocking.
 
 All three fields are written by the model that claims to have run the command.
-`tools/scripts/review/schema.mjs` checks their shape. Nothing checked that the command was run, so a
+`tools/scripts/review/schema.ts` checks their shape. Nothing checked that the command was run, so a
 Finding could name a command and an exit code that never happened and still earn Blocking.
 
 [ADR 0123](0123-a-review-reports-facts-about-its-own-run-are-read-from-the-transcript.md) took the
@@ -47,7 +47,7 @@ and evidence the transcript does not bear out fails `Agent Review Ran`.**
    redirections with a trailing `&`. A call holding a here-document matches whole or not at all,
    because its body reads as commands and is text. Nothing else is allowed: `yarn nx test backend` is not `corepack yarn nx test backend`, and an
    added flag is a different command. The rule is written out in full where the check lives,
-   `tools/scripts/review/executed-evidence.mjs`, and that file is the authority on it.
+   `tools/scripts/review/executed-evidence.ts`, and that file is the authority on it.
 3. **The exit code is compared only where the transcript carries one for what was quoted.** The
    transcript holds one code per call. Evidence that quotes the whole call is compared with it.
    Evidence that quotes one part of a chained call has no code of its own there, and is not
@@ -93,7 +93,7 @@ evidence for `yarn nx test web-vault`. Every word is compared.
 A required-eligible check can now fail because a model misquoted its own command in a way the four
 allowances do not cover. The briefs tell the sub-agents that the command and exit code are compared,
 and to write the command as run. If a kind of near-miss turns up in real runs, the allowance is
-added to `executed-evidence.mjs` with a test, and this ADR does not change.
+added to `executed-evidence.ts` with a test, and this ADR does not change.
 
 The exit code of one part of a chained call is not compared, and `cd dir && cmd` and `cmd | tail`
 are the commonest shapes a call takes. A Finding that quotes `cmd` from either can still state an

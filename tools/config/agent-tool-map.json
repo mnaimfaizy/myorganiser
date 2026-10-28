@@ -1,5 +1,5 @@
 {
-  "$comment": "Translates the capability roles declared in canonical .github/agents/*.agent.md `tools:` lines into each harness's grant. Roles are authoritative; this file only translates them. Rendered by tools/scripts/sync-subagents.mjs via tools/scripts/lib/agent-tool-grants.mjs. See ADR 0081 and issue #421.",
+  "$comment": "Translates the capability roles declared in canonical .github/agents/*.agent.md `tools:` lines into each harness's grant. Roles are authoritative; this file only translates them. Rendered by tools/scripts/sync-subagents.ts via tools/scripts/lib/agent-tool-grants.ts. See ADR 0081 and issue #421.",
   "reviewedAt": "2026-09-14",
   "sources": {
     "gemini": [

@@ -14,7 +14,7 @@ Spec `nit`, and missed `git merge-base --is-ancestor` called with its arguments 
 The Golden Set could not hold any of that, for two reasons.
 
 1. A Golden Case was defined as a real commit range in which a documented incident merged, and
-   `tools/scripts/check-review-golden-set.mjs` requires each head to be reachable from `main`. The
+   `tools/scripts/check-review-golden-set.ts` requires each head to be reachable from `main`. The
    seeded commits never existed outside a throwaway copy. The swapped-argument miss, the most
    useful signal in the issue, had nowhere to go.
 2. Golden Replay never ran the Spec axis. `.github/workflows/review-golden-replay.yml` wrote only

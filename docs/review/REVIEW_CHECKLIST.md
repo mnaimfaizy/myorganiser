@@ -143,7 +143,7 @@ commit. `none` is the one answer with nothing to quote, which is the whole
 claim it makes.
 
 Answer `wiredBy` by reading, not running: grep the `.husky` hooks, the
-`.github/workflows` jobs, and `tools/scripts/run-assertion-gates.mjs` at the
+`.github/workflows` jobs, and `tools/scripts/run-assertion-gates.ts` at the
 head commit for `coveringGate`'s script name, per
 [ADR 0074](../adr/0074-a-gate-suppresses-a-finding-only-if-something-runs-it.md).
 That answers the obligation this entry exists for on its own, and it costs no
@@ -157,7 +157,7 @@ naming a check script after yarn or corepack yarn is not on the allowlist.
 openapi:check in particular is not a bare script at all — it resyncs and can
 rewrite files in the checkout, so it is not something a reviewer should run
 either way; for the generated-output triggers below, `node
-tools/scripts/check-openapi-artifacts.mjs` is the safe, non-mutating check
+tools/scripts/check-openapi-artifacts.ts` is the safe, non-mutating check
 built for this obligation's own incident (issue #408) and is fine to run.
 When you didn't run the gate, write `not run` for both fields; that is a
 complete answer, not a missing one.
@@ -313,7 +313,7 @@ Two kinds of file are never a site (`excludePaths`):
   the list, and the pinned table's `satisfies` clause ties them back.
 
 The catalogue entry names no enum. It says `"guardedEnums"`, and the loader
-expands that from `tools/scripts/lib/enum-fanout-guarded.mjs`, the list the
+expands that from `tools/scripts/lib/enum-fanout-guarded.ts`, the list the
 checker reads, into the paths above. The selector reads the member values at
 the reviewed head, not from the tooling tree, because a replay's head can
 predate members the tooling knows. Without values at that head, only the

@@ -85,7 +85,7 @@ stay inside its own scope, or remember a previous run.
 10. **The structured report is committed beside the Markdown brief** in the brief directory, and a Wired
     Gate re-validates every committed report offline. Because local evidence is checked at the recorded
     commit, a frozen brief stays valid. The validator ships inside the skill directory as a
-    dependency-free Node script; this repo wires it through a thin `tools/scripts/check-upstream-briefs.mjs`
+    dependency-free Node script; this repo wires it through a thin `tools/scripts/check-upstream-briefs.ts`
     so the Meta-Gate sees it.
 11. **The latest committed report per Ecosystem is the ledger.** A new run reads it: a checked-and-clear
     claim whose recorded version range still covers the new Baseline, and whose quoted instruction text

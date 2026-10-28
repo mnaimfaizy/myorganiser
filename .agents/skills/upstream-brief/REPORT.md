@@ -137,6 +137,6 @@ finding dispositioned `follow-on` renders under Follow-on and nowhere else.
 ## In this repository
 
 `yarn upstream:briefs:check` re-validates every committed report and every declined Upstream
-Opportunity the adapter records (a thin adapter, `tools/scripts/check-upstream-briefs.mjs`, so the
+Opportunity the adapter records (a thin adapter, `tools/scripts/check-upstream-briefs.ts`, so the
 Meta-Gate can see the gate). It runs in `yarn gates:run` and in CI. `yarn upstream:briefs:test` is
 the contract suite for all of it, and `yarn upstream:ledger` prints what a run would carry forward.

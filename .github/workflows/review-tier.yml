@@ -37,7 +37,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -55,7 +55,7 @@ jobs:
       # Exit 2 means the classifier could not run; it still writes tier=human
       # to $GITHUB_OUTPUT, so the label step below applies human and the run
       # fails visibly rather than silently. A crash before finish() used to
-      # leave the output empty; run-review-tier-check.mjs fills human in that
+      # leave the output empty; run-review-tier-check.ts fills human in that
       # case so the label step still has something to display. Shared with
       # code-review.yml (--mode advisory there, so the reviewer still runs).
       - name: Classify the diff
@@ -69,7 +69,7 @@ jobs:
             --head '${{ github.event.pull_request.head.sha }}' \
             --author "$PR_AUTHOR" \
             --out "$RUNNER_TEMP/review-tier.json"
-          node tools/scripts/review/run-review-tier-check.mjs \
+          node tools/scripts/review/run-review-tier-check.ts \
             --mode required --status $?
 
       # The label is a display of the job output, never the truth (ADR 0070
@@ -92,5 +92,5 @@ jobs:
           LABEL: ${{ steps.classify.outputs.label }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          node tools/scripts/review/apply-review-tier-label.mjs \
+          node tools/scripts/review/apply-review-tier-label.ts \
             --pr "$PR" --label "$LABEL" --repo "$GITHUB_REPOSITORY"

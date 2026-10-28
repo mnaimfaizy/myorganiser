@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "comment": "Routes `check-feature-index.mjs` skips when asserting bidirectional coverage (ADR 0043). Every entry names a dashboard route and carries a written reason; an entry with no reason, naming a route that no longer exists, or naming a route the feature index already covers fails the check. Product features must have feature-index entries; platform-level routes like account management are infrastructure, not features, and are exempted here.",
+  "comment": "Routes `check-feature-index.ts` skips when asserting bidirectional coverage (ADR 0043). Every entry names a dashboard route and carries a written reason; an entry with no reason, naming a route that no longer exists, or naming a route the feature index already covers fails the check. Product features must have feature-index entries; platform-level routes like account management are infrastructure, not features, and are exempted here.",
   "exclusions": [
     {
       "route": "account",

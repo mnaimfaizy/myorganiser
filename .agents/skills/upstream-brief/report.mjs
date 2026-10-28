@@ -34,7 +34,7 @@
  *   also what lets a frozen brief stay valid after the tree moves on.
  *
  *   The four failure reasons mirror the review pipeline's
- *   (`tools/scripts/review/obligations.mjs`) deliberately and **by copying the
+ *   (`tools/scripts/review/obligations.ts`) deliberately and **by copying the
  *   rule rather than the code**: a reader who knows one vocabulary knows both,
  *   and the skill stays portable. The duplication is the price of that, and it
  *   is written down here so the next person does not "fix" it with an import.

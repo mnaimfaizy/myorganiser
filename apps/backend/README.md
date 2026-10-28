@@ -82,7 +82,7 @@ Before you begin, ensure you have the following installed:
 - **PostgreSQL** (v12 or higher)
 - **Docker & Docker Compose** (optional, for containerized database)
 
-Note: The repo sets `package.json.engines.node` to `>=22.0.0`.
+Note: The repo sets `package.json.engines.node` to `>=22.18.0`.
 
 ## Installation
 

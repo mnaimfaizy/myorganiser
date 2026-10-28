@@ -215,7 +215,7 @@ SUCCESS | BLOCKED
 
 Do **not** emit a review checklist. TestReviewer owns it, and a checklist the author
 grades for itself carries no information. Run
-`node tools/scripts/check-test-hygiene.mjs <path>` before reporting if you want to
+`node tools/scripts/check-test-hygiene.ts <path>` before reporting if you want to
 catch mechanical problems early, but report only whether you fixed what it found.
 
 ## Rationale

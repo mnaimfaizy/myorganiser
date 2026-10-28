@@ -32,7 +32,7 @@ of the Pull Requests the reviewer passed a later fix names as root cause.
 ## What the numbers mean
 
 Recall is matched expected findings over expected findings, scored by
-`tools/scripts/review/score-golden-case.mjs` against the validated report of
+`tools/scripts/review/score-golden-case.ts` against the validated report of
 one reviewer run per case. A pattern case passes at or above its `minRecall`.
 The reviewer is stochastic: a single run of a single case is not a
 measurement, which is why the baseline reports five runs of the same three
@@ -43,7 +43,7 @@ merged pull request that carries `expectsNoBlocking: true` in place of
 `expected` and `minRecall`, and passes only when the report carries no
 Blocking finding. It has no recall — `scoreCase` reports it as `clean-pass`
 or `clean-fail`, never as a recall number, and the results record does the
-same (`OUTCOMES` in `tools/scripts/review/golden-results.mjs`). It measures
+same (`OUTCOMES` in `tools/scripts/review/golden-results.ts`). It measures
 false alarms rather than recall, and is selected by the same tier filter as
 every other case.
 
@@ -58,7 +58,7 @@ scored runs** puts it
 seven where it was. Under ten scored runs nothing moves and the tier the set
 declares holds. A void is not a scored run. The table below is generated from
 the set and the [results record](golden-replay-results.jsonl) by
-`tools/scripts/review/golden-standing.mjs`, asserted by
+`tools/scripts/review/golden-standing.ts`, asserted by
 `yarn review:golden:results:check`, and is what the replay's tier filter
 reads.
 
@@ -427,7 +427,7 @@ one, which is the asymmetry doing its job rather than an oversight.
 
 Run [34176461268](https://github.com/mnaimfaizy/myorganiser/actions/runs/34176461268)
 is the first run the tier filter selected: seven `frontier` cases, no `guard`.
-That part worked exactly as designed — `golden-tiers.mjs` chose the tier from a
+That part worked exactly as designed — `golden-tiers.ts` chose the tier from a
 job with no dependencies installed, which is the thing no local test could
 prove.
 
@@ -828,12 +828,12 @@ or `evidence-not-executed`
 Every run uploads its lines as an artifact; a scheduled run on `main` also
 commits them here, so they outlive the artifact's 30-day retention. The table
 below is generated from that record by
-`tools/scripts/review/golden-results.mjs`, and asserted against it by
+`tools/scripts/review/golden-results.ts`, and asserted against it by
 `yarn review:golden:results:check` — the same shape as the other
 generated-page checks (`review:pages:check`, `agents:map:check`): generate
 from source, diff against what is committed, fail on drift. Do not hand-edit
 between the markers; edit the record and regenerate with
-`node tools/scripts/check-review-golden-results.mjs --write` instead, which
+`node tools/scripts/check-review-golden-results.ts --write` instead, which
 is what the scheduled replay runs after it appends to the record. The
 table above this section is historical, hand-written, and untouched by the
 check — the generated table starts from the first recorded line (issue

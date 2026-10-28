@@ -16,11 +16,11 @@
 
 ## Runtime Environment
 
-| Tool       | Version  | Notes                                               |
-| ---------- | -------- | --------------------------------------------------- |
-| Node.js    | ≥ 22.0.0 | Enforced via `engines` in `package.json`            |
-| Yarn       | 4.13.0   | Package manager — pinned via `packageManager` field |
-| TypeScript | 5.9.3    | Used across all apps and libraries                  |
+| Tool       | Version   | Notes                                                                                                          |
+| ---------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| Node.js    | ≥ 22.18.0 | Enforced via `engines` in `package.json`; the first Node 22 that strips TypeScript types by default (ADR 0135) |
+| Yarn       | 4.13.0    | Package manager — pinned via `packageManager` field                                                            |
+| TypeScript | 5.9.3     | Used across all apps and libraries                                                                             |
 
 ---
 

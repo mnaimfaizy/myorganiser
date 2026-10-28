@@ -161,7 +161,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Install dependency metadata without scripts
         run: corepack yarn install --immutable --mode=skip-build
@@ -186,7 +186,7 @@ jobs:
           # looked at the root package.json).
           #
           # If the detector itself fails, audit anyway — never skip on error.
-          if ! result="$(node tools/scripts/ci/dependency-manifest-changed.mjs "$BASE_SHA" "$HEAD_SHA")"; then
+          if ! result="$(node tools/scripts/ci/dependency-manifest-changed.ts "$BASE_SHA" "$HEAD_SHA")"; then
             echo '::warning title=Dependency detection failed::Falling back to running the audit.'
             echo 'run_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
@@ -217,7 +217,7 @@ jobs:
           set -uo pipefail
 
           corepack yarn npm audit --all --recursive --severity high --json > "$RUNNER_TEMP/npm-audit.ndjson" || true
-          echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.mjs < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
+          echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.ts < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
 
       - name: Explain skipped npm audit
         if: github.event_name == 'pull_request' && steps.dependency-files.outputs.run_audit != 'true'
@@ -250,7 +250,7 @@ jobs:
 
       # Same shape as nightly-e2e.yml: one open issue that gets commented on,
       # rather than a new issue for every failing push. The title and label
-      # list live in tools/scripts/lib/npm-audit-issue.mjs — not a second copy
+      # list live in tools/scripts/lib/npm-audit-issue.ts — not a second copy
       # here. Advisory text is third-party input, so it arrives through the
       # environment and is never interpolated into the script.
       - name: Open or update the audit issue
@@ -267,7 +267,7 @@ jobs:
               findOpenAuditIssue,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.ts`,
               ).href
             );
 
@@ -352,7 +352,7 @@ jobs:
               recoveryComment,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/npm-audit-issue.ts`,
               ).href
             );
 
@@ -422,7 +422,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       # We intentionally avoid setup-node's Yarn cache integration here.
       # In this repo it can invoke the runner's global Yarn 1 binary before
@@ -463,7 +463,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -561,7 +561,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -634,7 +634,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -709,7 +709,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Setup Java 21
         # openapi:check regenerates the client via openapi-generator-cli, which is
@@ -737,6 +737,18 @@ jobs:
         if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: git diff --exit-code -- yarn.lock
 
+      # One glob target for every Contract Suite under tools/scripts (ADR
+      # 0135), in place of the per-suite steps this job used to carry one at
+      # a time — the Sandcastle decision contracts included, which are
+      # tools/scripts/lib/sandcastle-*.test.ts like any other suite here.
+      # This glob is the only thing that wires a suite (the gate-coverage
+      # meta-gate below); run one in isolation with `node --test <file>`.
+      # upstream:briefs:test still runs on its own further
+      # down: it also runs suites under .agents/skills/upstream-brief, which
+      # this glob does not reach.
+      - name: Run tools/scripts contract suites
+        run: corepack yarn tools:test
+
       - name: Check OpenAPI spec and generated client are in sync
         # Regenerates the spec and client, then asserts a clean tree. Runs before
         # the hygiene steps so an unrelated step cannot dirty the tree first.
@@ -749,116 +761,17 @@ jobs:
         # openapi:check so both regenerate before anything else can dirty the tree.
         run: corepack yarn design-tokens:check
 
-      - name: Component hygiene checker contracts
-        run: corepack yarn component:hygiene:test
-
       - name: Check component hygiene
         run: corepack yarn component:hygiene --all --max-warnings=0
 
-      - name: Test hygiene checker contracts
-        run: corepack yarn test:hygiene:test
-
       - name: Check Jest test hygiene
         run: corepack yarn test:hygiene --all
-
-      - name: Design hygiene checker contracts
-        run: corepack yarn design:hygiene:test
 
       - name: Check House Explainer Page hygiene
         # --all also fails on a page under docs/ that is in neither ROSTER nor
         # LEGACY, which is the half Husky cannot see: a new page is unstaged
         # against the roster exactly once, here.
         run: corepack yarn design:hygiene --all
-
-      - name: PR runner label and merge-base gate contracts
-        run: corepack yarn ai:create-pr:test
-
-      - name: Sandcastle resume decision contracts
-        run: corepack yarn sandcastle:resume:test
-
-      - name: Sandcastle slice-selection contracts
-        run: corepack yarn sandcastle:slice-selection:test
-
-      - name: Sandcastle sub-agent trace contracts
-        run: corepack yarn sandcastle:subagent-trace:test
-
-      - name: Sandcastle spec-anchor contracts
-        run: corepack yarn sandcastle:spec-anchor:test
-
-      - name: Sandcastle Claude Code pin contracts
-        run: corepack yarn sandcastle:cli-version:test
-
-      - name: Sandcastle run-outcome contracts
-        run: corepack yarn sandcastle:outcome:test
-
-      - name: Sandcastle orphaned-worktree repair contracts
-        run: corepack yarn sandcastle:worktree-repair:test
-
-      - name: OpenAPI artifact checker contracts
-        run: corepack yarn openapi:artifacts:test
-
-      - name: Tree-clean assertion contracts
-        run: corepack yarn git-assert-clean:test
-
-      - name: Git-fixture environment isolation contracts
-        run: corepack yarn git-environment:test
-
-      - name: Env-declared checker contracts
-        run: corepack yarn env:declared:test
-
-      - name: Sub-agent sync contracts (harness sections, tool grants)
-        run: corepack yarn agents:sync:test
-
-      - name: Env-deployment checker contracts
-        run: corepack yarn env:deployment:test
-
-      - name: Feature index checker contracts
-        run: corepack yarn feature-index:test
-
-      - name: Documented-command checker contracts
-        run: corepack yarn docs:commands:test
-
-      - name: Documented file-ref checker contracts
-        run: corepack yarn docs:file-refs:test
-
-      - name: README checker contracts
-        run: corepack yarn readme:test
-
-      - name: Release pipeline page checker contracts
-        run: corepack yarn deploy:pages:test
-
-      - name: Brand logo generator contracts
-        run: corepack yarn brand:logos:test
-
-      - name: Host Apply engine contracts
-        run: corepack yarn host-apply:test
-
-      - name: Release script contracts
-        run: corepack yarn release:test
-
-      - name: Dependency-audit detector contracts
-        run: corepack yarn dependency-manifest:test
-
-      - name: GitHub CLI helper contracts
-        run: corepack yarn gh:lib:test
-
-      - name: Host Apply workflow checker contracts
-        run: corepack yarn host-apply:workflow:test
-
-      - name: Feedback Release marking contracts
-        run: corepack yarn feedback:release:test
-
-      - name: Staging web deploy contracts
-        run: corepack yarn staging-web:test
-
-      - name: Nightly E2E rot-issue contracts
-        run: corepack yarn nightly-e2e:rot:test
-
-      - name: npm audit issue contracts
-        run: corepack yarn npm-audit:issue:test
-
-      - name: Lint coverage checker contracts
-        run: corepack yarn lint:coverage:test
 
       # Project names, roots, and targets. `backend:generate-types` only writes
       # the Prisma client, and no Nx plugin infers a project or target from
@@ -879,12 +792,6 @@ jobs:
       # lint job selects. Five projects were outside it until #426.
       - name: Check lint gate coverage
         run: corepack yarn lint:coverage:check "$NX_GRAPH_FILE"
-
-      - name: Nx graph loader contracts
-        run: corepack yarn nx-graph:test
-
-      - name: Typecheck checker contracts
-        run: corepack yarn typecheck:check:test
 
       # apps/backend/src/prisma is generated and gitignored, so a fresh runner
       # has no @prisma/client to compile against. backend:test declares this
@@ -941,9 +848,6 @@ jobs:
       - name: Check documented file-refs resolve
         run: corepack yarn docs:file-refs:check
 
-      - name: Documented Nx target checker contracts
-        run: corepack yarn docs:nx-targets:test
-
       # Asserts every `nx run <project>:<target>` and `nx <target> <project>` in
       # tracked Markdown resolves in the project graph. DEVELOPMENT.md taught two
       # targets that never existed until #980. Reads the graph built once above,
@@ -951,90 +855,16 @@ jobs:
       - name: Check documented Nx targets resolve
         run: corepack yarn docs:nx-targets:check "$NX_GRAPH_FILE"
 
-      - name: Enum fan-out checker contracts
-        run: corepack yarn enum:fanout:test
-
-      - name: Tailwind class checker contracts
-        run: corepack yarn tailwind:classes:test
-
-      - name: Content glob checker contracts
-        run: corepack yarn content-globs:test
-
-      - name: Web app icon checker contracts
-        run: corepack yarn web:app-icons:test
-
-      - name: Mobile app icon checker contracts
-        run: corepack yarn mobile:app-icon:test
-
-      - name: Mobile platform checker contracts
-        run: corepack yarn mobile-platform:test
-
-      - name: Signing material checker contracts
-        run: corepack yarn signing-material:test
-
-      - name: Mobile Release publish contracts
-        run: corepack yarn mobile:release:test
-
-      - name: Prisma migration history checker contracts
-        run: corepack yarn prisma:migrations:test
-
-      - name: Agent orchestration map checker contracts
-        run: corepack yarn agents:map:test
-
-      - name: Agent model audit contracts (retirement table)
-        run: corepack yarn agents:models:test
-
-      - name: Gate manifest checker contracts
-        run: corepack yarn gates:run:test
-
-      - name: Nx project tag checker contracts
-        run: corepack yarn nx:tags:test
-
-      - name: Review tier classifier contracts
-        run: corepack yarn review:tier:test
-
-      - name: Code review report contracts
-        run: corepack yarn review:test
-
-      - name: Code review concurrency checker contracts
-        run: corepack yarn review:concurrency:test
-
-      - name: Review checklist checker contracts
-        run: corepack yarn review:checklist:test
-
-      - name: Reviewer tool allowlist checker contracts
-        run: corepack yarn review:allowlist:test
-
-      - name: Rule catalogue checker contracts
-        run: corepack yarn review:rules:test
-
-      - name: Golden replay results record checker contracts
-        run: corepack yarn review:golden:results:test
-
-      - name: Gate coverage checker contracts
-        run: corepack yarn gates:coverage:test
-
       - name: Upstream Brief report contract and checker contracts
         run: corepack yarn upstream:briefs:test
 
-      - name: Checker contract coverage checker contracts
-        run: corepack yarn checker-contracts:test
-
-      - name: ADR status checker contracts
-        run: corepack yarn adr:status:test
-
-      - name: Fix attribution checker contracts
-        run: corepack yarn fix:attribution:test
-
-      - name: Escape Copy reader gate contracts
-        run: corepack yarn escape-copy-reader:test
-
-      - name: QA Account seeder contracts
-        run: corepack yarn qa:accounts:test
-
-      # The meta-gate: asserts every check-*.mjs is invoked by some hook or
+      # The meta-gate: asserts every check-*.ts is invoked by some hook or
       # workflow, resolving one level of indirection through the aggregate's
-      # manifest. Nine checkers ran nowhere when ADR 0043 was written.
+      # manifest, rejects any check-*.mjs, and asserts every *.test.ts
+      # Contract Suite is reached by the wired `tools:test` glob (ADR 0135).
+      # Nine checkers ran nowhere when ADR 0043 was written; six suites ran
+      # nowhere when the suite rule was added, before that glob was the one
+      # runner.
       - name: Check gate coverage
         run: corepack yarn gates:coverage:check
 
@@ -1049,7 +879,7 @@ jobs:
       # introduced it, because the aggregate is what `.husky/pre-commit` calls
       # and wiring it there sooner would have blocked every commit in the
       # repository. It has passed since the contradiction was fixed, so it now
-      # sits in `tools/scripts/lib/gate-manifest.mjs` with the rest.
+      # sits in `tools/scripts/lib/gate-manifest.ts` with the rest.
       - name: Check the reviewer may run what it is told to run
         run: corepack yarn review:allowlist:check
 
@@ -1170,9 +1000,6 @@ jobs:
       - name: Test affected projects
         run: corepack yarn nx affected -t test --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
 
-      - name: Workflow runner image contracts
-        run: corepack yarn runner-image:test
-
       - name: Check workflow jobs pin ubuntu-24.04
         run: corepack yarn runner-image:check
 
@@ -1211,7 +1038,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -1275,7 +1102,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -1331,7 +1158,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -1372,7 +1199,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -1438,7 +1265,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       - name: Restore dependency cache
         id: dependency-cache

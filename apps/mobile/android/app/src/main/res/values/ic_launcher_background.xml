@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- The light background Semantic Role, written by
-         tools/scripts/generate-mobile-app-icon.mjs. It has no values-night
+         tools/scripts/generate-mobile-app-icon.ts. It has no values-night
          twin on purpose: a launcher icon does not follow the colour mode. -->
     <color name="ic_launcher_background">#F8FAFC</color>
 </resources>

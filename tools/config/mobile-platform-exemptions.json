@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "comment": "Files `check-mobile-platform.mjs` skips for all three mobile platform rules (no bare `react-native/` subpath imports, no browser globals, no main-entry import of a shared library that has a Portable Entry Point). Every entry names a file and carries a written reason; an entry naming a file that no longer exists fails the check. A `*.web.ts` filename convention was considered and rejected — it would silently exempt every future `.web.ts` anyone adds, which contradicts the mobile vault guide's statement that the WebCrypto Platform Variant below is the only place in libs/mobile allowed to hold a browser API.",
+  "comment": "Files `check-mobile-platform.ts` skips for all three mobile platform rules (no bare `react-native/` subpath imports, no browser globals, no main-entry import of a shared library that has a Portable Entry Point). Every entry names a file and carries a written reason; an entry naming a file that no longer exists fails the check. A `*.web.ts` filename convention was considered and rejected — it would silently exempt every future `.web.ts` anyone adds, which contradicts the mobile vault guide's statement that the WebCrypto Platform Variant below is the only place in libs/mobile allowed to hold a browser API.",
   "exemptions": [
     {
       "path": "libs/mobile/feat/vault/src/crypto.web.ts",

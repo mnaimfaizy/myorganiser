@@ -106,7 +106,7 @@ Requirements:
   imported and compared is decoration.
 - **A stable id** naming the artifact, e.g. `id="vault-lifecycle-manifest"`.
 
-Existing precedent to follow: `tools/scripts/check-agent-map.mjs` asserts an embedded manifest
+Existing precedent to follow: `tools/scripts/check-agent-map.ts` asserts an embedded manifest
 against `tools/config/agent-model-policy.json`, and `docs/agents/orchestration-map.html` carries
 the corresponding block.
 

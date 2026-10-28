@@ -86,7 +86,7 @@ against them.
   `Introduced in #415` — in a fix's issue, body, or first commit is what turns
   a fix into evidence.
 - The vocabulary and the classes are code, in
-  `tools/scripts/review/escaped-defects.mjs`, covered by `yarn review:test`.
+  `tools/scripts/review/escaped-defects.ts`, covered by `yarn review:test`.
   Changing what counts as an escape means changing a pinned table whose
   fan-out is asserted at module load
   ([ADR 0053](0053-a-fan-out-over-a-domain-enum-is-pinned-at-its-call-site.md)),

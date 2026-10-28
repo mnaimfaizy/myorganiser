@@ -21,12 +21,12 @@ import dotenv from 'dotenv';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-import { planWaveForwarding } from '../tools/scripts/lib/sandcastle-resume.mjs';
+import { planWaveForwarding } from '../tools/scripts/lib/sandcastle-resume.ts';
 import {
   blockedBy,
   findDependencyCycles,
   formatCycle,
-} from '../tools/scripts/lib/sandcastle-slice-selection.mjs';
+} from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 
 dotenv.config({ path: join(process.cwd(), '.sandcastle', '.env') });
 

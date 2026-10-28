@@ -12,9 +12,9 @@
 # under public/ itself, that rule never runs, and this block is what keeps the
 # worker uncached and confined to same-origin scripts (ADR 0127).
 #
-# Keep both values in step with next.config.js; `yarn staging-web:test` fails
-# when they differ. Staging's deploy fails its probe when /sw.js comes back
-# without them.
+# Keep both values in step with next.config.js;
+# `tools/scripts/lib/staging-web-deploy.test.ts` fails when they differ.
+# Staging's deploy fails its probe when /sw.js comes back without them.
 <IfModule mod_headers.c>
   <Files "sw.js">
     Header set Cache-Control "no-cache, no-store, must-revalidate"

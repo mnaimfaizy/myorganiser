@@ -55,7 +55,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '22.18'
 
       # Corepack downloads the pinned Yarn from repo.yarnpkg.com on first use.
       # A connect timeout there failed the chromium leg on 2026-10-13 before a
@@ -128,7 +128,7 @@ jobs:
       # the triage queue instead of sitting unlabeled the way #858 did.
       # needs-triage is a state role, so Report Success will comment on that
       # issue and leave it open. The label list lives in
-      # tools/scripts/lib/nightly-e2e-rot-issue.mjs — not a second copy here.
+      # tools/scripts/lib/nightly-e2e-rot-issue.ts — not a second copy here.
       - name: Open or update the rot report issue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -140,7 +140,7 @@ jobs:
               findOpenRotIssue,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/nightly-e2e-rot-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/nightly-e2e-rot-issue.ts`,
               ).href
             );
 
@@ -203,7 +203,7 @@ jobs:
   # needs-triage, which is what Report Failure puts on a newly created rot
   # issue. Area labels such as github-actions are not state and do not keep
   # it open. The choice itself is recoveryAction() in
-  # tools/scripts/lib/nightly-e2e-rot-issue.mjs.
+  # tools/scripts/lib/nightly-e2e-rot-issue.ts.
   report-success:
     name: Report Success
     runs-on: ubuntu-24.04
@@ -233,7 +233,7 @@ jobs:
               recoveryComment,
             } = await import(
               pathToFileURL(
-                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/nightly-e2e-rot-issue.mjs`,
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/nightly-e2e-rot-issue.ts`,
               ).href
             );
 
