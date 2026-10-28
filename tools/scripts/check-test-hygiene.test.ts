@@ -236,7 +236,7 @@ test('--all checks tracked Jest files, excludes E2E, and prints concise output',
   assert.doesNotMatch(result.stdout, /widget\.test\.ts/);
   assert.match(
     result.stdout,
-    /Checked 2 Jest files: 1 error\(s\), 0 warning\(s\)/,
+    /Checked 2 Jest files and 1 Contract Suite: 1 error\(s\), 0 warning\(s\)/,
   );
 });
 
@@ -315,7 +315,7 @@ test('explicit E2E paths remain skipped', (t) => {
   assert.match(result.stdout, /SKIPPED \(E2E spec/);
 });
 
-test('explicit tools/scripts Contract Suite paths remain skipped', (t) => {
+test('a tools/scripts Contract Suite with a node:assert call passes', (t) => {
   const workspace = createWorkspace(t);
   const file = writeFixture(
     workspace,
@@ -328,7 +328,99 @@ test('explicit tools/scripts Contract Suite paths remain skipped', (t) => {
   const result = runChecker(workspace, file);
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /SKIPPED \(Contract Suite/);
+  assert.match(result.stdout, /PASS — asserts with node:assert/);
+});
+
+test('a tools/scripts Contract Suite with no assertion fails, naming the file', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "test('widget', () => { console.info('no assertion'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+  assert.match(result.stdout, new RegExp(file.replace(/[/\\]/g, '.')));
+});
+
+test('a tools/scripts Contract Suite passes via a local helper whose exported body asserts', (t) => {
+  const workspace = createWorkspace(t);
+  writeFixture(
+    workspace,
+    'tools/scripts/lib/harness.ts',
+    "import assert from 'node:assert/strict';\n" +
+      'export function expectAllowed(value: string): void {\n' +
+      "  assert.equal(value, 'allowed');\n" +
+      '}\n',
+  );
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "import { expectAllowed } from './harness.ts';\n\n" +
+      "test('widget', () => { expectAllowed('allowed'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /PASS — asserts with node:assert/);
+});
+
+test('a tools/scripts Contract Suite still fails when its called helper does not assert', (t) => {
+  const workspace = createWorkspace(t);
+  writeFixture(
+    workspace,
+    'tools/scripts/lib/harness.ts',
+    'export function buildContext(value: string): string {\n' +
+      '  return value;\n' +
+      '}\n',
+  );
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "import { buildContext } from './harness.ts';\n\n" +
+      "test('widget', () => { buildContext('allowed'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+});
+
+test('a tools/scripts Contract Suite asserting via the test-context t.assert passes', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "test('widget', (t) => { t.assert.ok(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /PASS — asserts with node:assert/);
+});
+
+test('a Jest spec under tools/scripts is unaffected by the Contract Suite assertion rule', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.spec.ts',
+    "test('widget', () => { expect(true).toBe(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /PASS — no mechanical issues/);
 });
 
 test('a Jest spec under tools/scripts is still checked, not skipped as a Contract Suite', (t) => {

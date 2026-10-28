@@ -1,12 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * Deterministic mechanical checks for Jest test files.
+ * Deterministic mechanical checks for Jest test files, plus one assertion
+ * check for tools/scripts Contract Suites (ADR 0135).
  *
  * These are the TestReviewer checklist items that do not require judgment.
  * ADR 0004 defines TestReviewer as a static gate with "no judgment required";
  * running these here makes that literally true instead of asking a model to
  * eyeball import order. TestReviewer runs this and reports the output.
+ *
+ * What this asserts, by file kind:
+ *   - Jest `*.test.*` / `*.spec.*` outside apps/web-e2e and tools/scripts:
+ *     jest.mock() ordering against workspace imports, mock setup inside
+ *     beforeAll(), duplicate top-level describe/helper names, stacked
+ *     *Once() queues, unused jest.Mock casts, the vacuous-assertion ratio,
+ *     and that at least one expect() — direct or via an asserting local
+ *     helper — exists.
+ *   - A tools/scripts Contract Suite (any *.test.ts under tools/scripts,
+ *     ADR 0135): only that at least one assert()/assert.<method>()/
+ *     t.assert… call exists. The Jest rules above do not apply — jest.mock(),
+ *     beforeAll(), and expect() are not part of node --test.
+ *   - apps/web-e2e specs: not asserted here at all. Their structural rules
+ *     are a judgment call TestReviewer makes by reading the file against
+ *     .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
  *
  * Usage:
  *   node tools/scripts/check-test-hygiene.ts <file> [<file> ...]
@@ -39,9 +55,10 @@ const USAGE = `Usage:
 Runs the mechanical (non-judgment) TestReviewer checklist items against Jest
 test files. E2E specs under apps/web-e2e are skipped — they have their
 own rules in .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
-tools/scripts/**/*.test.ts Contract Suites are skipped too — they are
-node --test suites asserting with node:assert, not Jest specs asserting with
-expect(), and ADR 0135 covers them with their own tooling.
+A tools/scripts Contract Suite (ADR 0135) is not a Jest spec — it is a
+node --test suite that asserts with node:assert, not expect() — so the Jest
+rules above do not run against it. It is still required to assert something:
+a Contract Suite with no assert()/assert.<method>()/t.assert… call fails.
 `;
 
 const TEST_PATHS = [
@@ -69,7 +86,8 @@ interface Finding {
 interface FileResult {
   file: string;
   findings: Finding[];
-  skipped?: 'e2e' | 'tools-scripts';
+  skipped?: 'e2e';
+  kind?: 'contract-suite';
 }
 
 // --- individual checks -------------------------------------------------------
@@ -341,7 +359,14 @@ function importedBindings(raw: string, code: string): ImportedBinding[] {
   return bindings;
 }
 
-function exportedHelperHasAssertion(raw: string, exportedName: string) {
+/** An `expect(` call, credited to a Jest spec that calls this helper. */
+const EXPECT_RE = /\bexpect\s*\(/;
+
+function exportedHelperHasAssertion(
+  raw: string,
+  exportedName: string,
+  assertionRe: RegExp,
+) {
   const code = maskNonCode(raw);
   const escapedName = exportedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // `<[^(]*>` lets a generic parameter list sit between the name and the
@@ -352,13 +377,17 @@ function exportedHelperHasAssertion(raw: string, exportedName: string) {
   );
   const declaration = declarationRe.exec(code);
   if (!declaration) return false;
-  return /\bexpect\s*\(/.test(signatureBodyAfter(code, declaration.index));
+  return assertionRe.test(signatureBodyAfter(code, declaration.index));
 }
 
+/** Credits a call to a local helper whose exported body itself asserts —
+ *  with `expect(` for a Jest spec, or with `assertionRe` for a Contract
+ *  Suite's node:assert / test-context calls. */
 async function countCalledLocalAssertionHelpers(
   file: string,
   raw: string,
   code: string,
+  assertionRe: RegExp,
 ) {
   let count = 0;
   const moduleCache = new Map<string, string>();
@@ -376,7 +405,9 @@ async function countCalledLocalAssertionHelpers(
       moduleSource = normalize(await fs.readFile(modulePath, 'utf8'));
       moduleCache.set(modulePath, moduleSource);
     }
-    if (exportedHelperHasAssertion(moduleSource, binding.imported)) {
+    if (
+      exportedHelperHasAssertion(moduleSource, binding.imported, assertionRe)
+    ) {
       count += callCount;
     }
   }
@@ -393,10 +424,42 @@ async function inspect(file: string): Promise<Finding[]> {
     file,
     raw,
     code,
+    EXPECT_RE,
   );
   checkVacuousAssertions(code, raw, findings, helperAssertions);
   findings.sort((a, b) => a.line - b.line);
   return findings;
+}
+
+/** An assert()/assert.<method>() call from node:assert or node:assert/strict
+ *  (however the import is named), or a t.assert… call on the test context. */
+const CONTRACT_SUITE_ASSERTION_RE =
+  /\bassert\s*\.\s*[A-Za-z_$][\w$]*\s*\(|\bassert\s*\(|\bt\s*\.\s*assert\b/;
+
+/** A tools/scripts Contract Suite's only mechanical rule (ADR 0135): it must
+ *  call an assertion somewhere, directly or through a local helper (such as
+ *  copilot-hooks/hook-harness.ts's expectContext()) whose exported body
+ *  asserts. Every other check in CHECKS is Jest-specific and does not apply
+ *  — jest.mock(), beforeAll(), and expect() are not part of node --test. */
+async function inspectContractSuite(file: string): Promise<Finding[]> {
+  const raw = normalize(await fs.readFile(file, 'utf8'));
+  const code = maskNonCode(raw);
+  if (CONTRACT_SUITE_ASSERTION_RE.test(code)) return [];
+  const helperAssertions = await countCalledLocalAssertionHelpers(
+    file,
+    raw,
+    code,
+    CONTRACT_SUITE_ASSERTION_RE,
+  );
+  if (helperAssertions > 0) return [];
+  return [
+    {
+      level: 'error',
+      rule: 'no-assertions',
+      line: 1,
+      message: `No assert()/assert.<method>()/t.assert… call found in ${file}. A Contract Suite (ADR 0135) asserts with node:assert, not expect() — add at least one assertion.`,
+    },
+  ];
 }
 
 function isE2E(file: string) {
@@ -405,9 +468,11 @@ function isE2E(file: string) {
 
 /** A `node --test` Contract Suite (ADR 0135), not a Jest spec: it asserts
  *  with `node:assert`, never `expect()`, so the Jest-oriented checks below
- *  would read it as having none. Matched by `.test.ts` specifically — a
- *  `*.spec.ts` file under tools/scripts would be a Jest spec this checker
- *  still has to run. */
+ *  would misread it as having none. It is routed to inspectContractSuite
+ *  instead, which checks for an assertion call without applying any
+ *  Jest-specific rule. Matched by `.test.ts` specifically — a `*.spec.ts`
+ *  file under tools/scripts would be a Jest spec this checker still has to
+ *  run. */
 function isToolsScripts(file: string) {
   const normalized = path.normalize(file).replace(/\\/g, '/');
   return (
@@ -439,25 +504,27 @@ function collectGitFiles(mode: 'all' | 'staged') {
   return output
     .split('\0')
     .filter(Boolean)
-    .filter((file) => !isE2E(file) && !isToolsScripts(file));
+    .filter((file) => !isE2E(file));
 }
 
 function printResults(results: FileResult[], concise: boolean) {
   for (const result of results) {
     if (result.skipped) {
       if (!concise) {
-        const reason =
-          result.skipped === 'tools-scripts'
-            ? 'Contract Suite — asserts with node:assert, not expect() (ADR 0135)'
-            : 'E2E spec — structural rules live in the Playwright skill';
-        console.log(`\n${result.file}\n  SKIPPED (${reason})`);
+        console.log(
+          `\n${result.file}\n  SKIPPED (E2E spec — structural rules live in the Playwright skill)`,
+        );
       }
       continue;
     }
     if (concise && !result.findings.length) continue;
     console.log(`\n${result.file}`);
     if (!result.findings.length) {
-      console.log('  PASS — no mechanical issues');
+      console.log(
+        result.kind === 'contract-suite'
+          ? '  PASS — asserts with node:assert (Contract Suite, ADR 0135)'
+          : '  PASS — no mechanical issues',
+      );
       continue;
     }
     for (const finding of result.findings) {
@@ -519,16 +586,17 @@ async function main() {
       results.push({ file, skipped: 'e2e', findings: [] });
       continue;
     }
-    if (isToolsScripts(file)) {
-      results.push({ file, skipped: 'tools-scripts', findings: [] });
-      continue;
-    }
+    const kind = isToolsScripts(file) ? 'contract-suite' : undefined;
     let findings: Finding[];
     try {
-      findings = await inspect(file);
+      findings =
+        kind === 'contract-suite'
+          ? await inspectContractSuite(file)
+          : await inspect(file);
     } catch (error) {
       results.push({
         file,
+        kind,
         findings: [
           {
             level: 'error',
@@ -543,7 +611,7 @@ async function main() {
     }
     errors += findings.filter((f) => f.level === 'error').length;
     warnings += findings.filter((f) => f.level === 'warn').length;
-    results.push({ file, findings });
+    results.push({ file, kind, findings });
   }
 
   if (json) {
@@ -552,8 +620,12 @@ async function main() {
     );
   } else {
     printResults(results, all);
+    const contractChecked = results.filter(
+      (r) => r.kind === 'contract-suite',
+    ).length;
+    const jestChecked = results.length - contractChecked;
     const summary = all
-      ? `Checked ${files.length} Jest files`
+      ? `Checked ${jestChecked} Jest files${contractChecked ? ` and ${contractChecked} Contract Suite${contractChecked === 1 ? '' : 's'}` : ''}`
       : 'Mechanical hygiene';
     console.log(`\n${summary}: ${errors} error(s), ${warnings} warning(s)`);
   }
