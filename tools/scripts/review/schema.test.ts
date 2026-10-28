@@ -335,6 +335,41 @@ test('a spec names the further issues the change closes, and the report shows th
   );
 });
 
+test('the report says what the spec text was made of', () => {
+  // Regression: #1361's report said `spec: issue #1273` and nothing showed
+  // whether the Spec axis was handed the triage brief or the body alone.
+  const report = normalizeReport(
+    envelope({
+      spec: {
+        kind: 'issue',
+        ref: '#1273',
+        foundBy: 'branch',
+        text: ['body', 'brief'],
+      },
+    }),
+  );
+  assert.match(
+    renderReport(report, null, { hunks: false }),
+    /- spec: issue #1273 \(found by branch\) · text: body \+ brief/,
+  );
+  assert.doesNotMatch(
+    renderReport(normalizeReport(envelope()), null, { hunks: false }),
+    /text:/,
+  );
+  rejects(
+    envelope({
+      spec: { kind: 'none', foundBy: 'none', text: ['body'] },
+    }),
+    /spec\.text/,
+  );
+  rejects(
+    envelope({
+      spec: { kind: 'issue', ref: '#1', foundBy: 'branch', text: ['title'] },
+    }),
+    /spec\.text/,
+  );
+});
+
 test('further issues are issue references, once each, beside an issue spec only', () => {
   const spec = (over: Overrides) => ({
     kind: 'issue',

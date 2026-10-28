@@ -17,6 +17,7 @@
 // A pull request body is deliberately NOT a spec source, so this cannot be
 // solved by having the agent describe its own work — see the same ADR.
 
+import { pullRequestType } from '../review/measure-escaped-defects.ts';
 import { discoverSpec } from '../review/resolve-spec.ts';
 
 /** The reference keywords `resolve-spec.ts` matches; `Closes` is one of them. */
@@ -93,4 +94,31 @@ export const prdBranchSlug = (title: string): string => {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
   return LEADING_DIGITS.test(slug) ? `prd-${slug}` : slug;
+};
+
+/**
+ * Pure: the prompt line telling an agent on a fix branch how to attribute the
+ * defect, or `null` for any other branch.
+ *
+ * A fix's commits must name what introduced the defect (ADR 0100), and CI
+ * checks only that the line is there, not that it is right. Left to work it
+ * out, the agent on #1273 named #1318 — a pull request that touched the file
+ * but did not introduce the defect — and that passed. Triage writes the
+ * attribution into the brief (the `my-triage` Skill), so the agent copies it;
+ * with none to copy it declares the origin unknown, which the escaped-defect
+ * measurement counts honestly, rather than guessing one it would count as fact.
+ *
+ * Whether the branch is a fix is the measurement's own `pullRequestType`, so
+ * the prompt and `fix:attribution:check` cannot disagree about it.
+ */
+export const fixAttributionInstruction = (branch: string): string | null => {
+  if (pullRequestType({ branch }) !== 'fix') return null;
+  return (
+    'This is a fix branch, so the commit body must name what introduced the defect ' +
+    '(ADR 0100). Add the line to the message file before `ai:commit`: copy ' +
+    "`Introduced in #<n>` exactly from the triage brief's **Introduced in:** field. " +
+    'If the issue and its brief name none, write ' +
+    '`Introduced in unknown: not named in triage` instead. Never work out a pull ' +
+    'request number yourself: a plausible wrong one passes CI and is recorded as fact.'
+  );
 };

@@ -93,7 +93,8 @@ Windows-native dispatch (from PowerShell, repo on `D:\`) works but is ~29 min/in
    ```
    Keep your `D:\` checkout for IDE editing; the WSL2 clone is only for dispatch. The feature
    branch is built **locally** in this clone (never pushed during dispatch), so `git fetch origin`
-   keeps `main` current and, when a PRD is done, you push the feature branch from here by hand.
+   keeps `main` current and, when a PRD is done, you open its PR from here with `ai:create-pr`,
+   which pushes the feature branch.
 
 ## Running a dispatch
 
@@ -306,11 +307,14 @@ When the run finishes, **you** finish the loop by hand:
 
 ```bash
 git switch feat/<slug>                 # QA the integrated branch locally
-git push -u origin feat/<slug>         # publish it when you're satisfied
-gh pr create --base main               # open ONE PR; CI runs here; merge it on GitHub
+corepack yarn ai:create-pr             # push it and open ONE PR; CI runs here; merge it on GitHub
 ```
 
-For a standalone run, substitute the `issue/<n>-<slug>` branch the summary printed.
+`ai:create-pr` with no flags uses its commit-subject fallback, which is for a person at the
+keyboard. An agent opening the PR goes through the create-pull-request-workflow Skill instead, so
+`PrAuthor` drafts the title, body, Surface Labels, and merge base.
+
+For a standalone run, substitute the `<type>/<n>-<slug>` branch the summary printed.
 
 ### Tunables
 
@@ -661,8 +665,9 @@ its `sandbox mode` cases set the marker on the hook process themselves.
   (`df -h .`).
 - **First run is cold:** the first dispatch on a fresh checkout warms `.sandcastle/.yarn-cache`
   (downloads once); subsequent runs are incremental.
-- **The feature branch is local:** `feat/<slug>` lives only in this clone until you push it by hand
-  for the PRD PR. If you delete the local branch you lose the integrated work — push it first.
+- **The feature branch is local:** `feat/<slug>` lives only in this clone until `ai:create-pr`
+  pushes it for the PRD PR. If you delete the local branch you lose the integrated work — open
+  the PR (or push it) first.
 - **Retire the old cache:** delete `.sandcastle/node_modules_linux_cache/` if present — it's no
   longer used (the seed step and lockfile-hash invalidation were removed).
 - **Rebuild the sandbox image after any `.sandcastle/Dockerfile` change:**

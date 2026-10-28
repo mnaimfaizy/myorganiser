@@ -118,6 +118,8 @@ export const SPEC_FOUND_BY = [
   'user',
   'none',
 ] as const;
+/** What an issue spec's text was made of: its body, plus the triage brief and maintainer notes its trusted comments carried (ADR 0137). */
+export const SPEC_TEXT_PARTS = ['body', 'brief', 'notes'] as const;
 
 /**
  * The `source` a Fowler smell-baseline finding carries. The baseline is
@@ -400,6 +402,11 @@ export const FindingInputSchema = z
  * the Spec axis was handed beside `ref` (ADR 0125). It is display and
  * provenance: it decides no tier, no verdict, and no finding's identity,
  * which is why adding it did not move {@link REPORT_SCHEMA_VERSION}.
+ *
+ * `text` names what the primary issue's spec text was made of — its body, and
+ * the triage brief and maintainer notes when it had them (ADR 0137). It is
+ * display too: a report that says `body` alone shows the Spec axis was never
+ * handed a brief, which the report could not show before.
  */
 export const SpecSourceSchema = z
   .strictObject({
@@ -410,6 +417,7 @@ export const SpecSourceSchema = z
       .array(z.string().regex(/^#\d+$/, 'an issue reference like #123'))
       .min(1)
       .optional(),
+    text: z.array(z.enum(SPEC_TEXT_PARTS)).min(1).optional(),
   })
   .superRefine((s, ctx) => {
     if (s.also) {
@@ -427,6 +435,13 @@ export const SpecSourceSchema = z
           path: ['also'],
         });
       }
+    }
+    if (s.text && s.kind !== 'issue') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'only an issue spec is made of an issue body and comments',
+        path: ['text'],
+      });
     }
     if (s.kind === 'none' && (s.ref || s.foundBy !== 'none')) {
       ctx.addIssue({

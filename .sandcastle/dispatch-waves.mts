@@ -13,7 +13,7 @@
  * branch) becomes the base for the next wave. No human interaction between waves.
  *
  * Nothing is pushed and no PRs are opened — after all waves complete you QA the
- * local feature branch, then push it and open ONE PR to `main` by hand.
+ * local feature branch, then open ONE PR to `main` through `ai:create-pr`.
  *
  * Usage: npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number>
  */
@@ -391,9 +391,9 @@ if (needsAttention) {
   }
 } else {
   console.log(
-    `\nThe local feature branch contains every slice and is green. QA it, then push it\n` +
-      `and open ONE PR to main by hand:\n` +
-      `  git push -u origin <feature-branch> && gh pr create --base main`,
+    `\nThe local feature branch contains every slice and is green. QA it, then open\n` +
+      `ONE PR to main through the create-pull-request-workflow Skill:\n` +
+      `  PrAuthor drafts it; \`corepack yarn ai:create-pr --title <t> --body-file <f> --merge-base <sha>\` pushes and opens it.`,
   );
 }
 

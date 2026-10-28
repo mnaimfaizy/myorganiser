@@ -2276,9 +2276,9 @@ Nothing is pushed and nothing was discarded. Every slice branch is intact.</pre
         behind a held one, resolve the items in its comment and close the
         issue; the next run picks them up. When all three are clear, the
         closing message is the hand-off:
-        QA the local feature branch, then
-        <code>git push -u origin &lt;feature-branch&gt;</code> and open one pull
-        request to <code>main</code> by hand. Re-running skips slices already
+        QA the local feature branch, then open one pull request to
+        <code>main</code> through <code>corepack yarn ai:create-pr</code>, which
+        pushes it. Re-running skips slices already
         marked <code>status:done</code>.
       </p>
     </div>

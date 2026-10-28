@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { discoverSpec } from '../review/resolve-spec.ts';
+import { attributeFix } from '../review/escaped-defects.ts';
 import {
   branchNameCarriesIssue,
+  fixAttributionInstruction,
   prdBranchSlug,
   specAnchorMessage,
 } from './sandcastle-spec-anchor.ts';
@@ -116,4 +118,32 @@ test('an ordinary PRD title slugs unchanged', () => {
 test('an unanticipated branch type is classified by the resolver, not by a list', () => {
   assert.equal(branchNameCarriesIssue('perf/851-vault-unlock', 851), true);
   assert.equal(branchNameCarriesIssue('spike/9-idea', 9), true);
+});
+
+test('only a fix branch is told how to attribute its defect', () => {
+  assert.match(
+    fixAttributionInstruction('fix/1273-youtube-data-title') ?? '',
+    /Introduced in #<n>/,
+  );
+  for (const branch of [
+    'feat/1278-tasks-empty-state',
+    'chore/1287-dead-groceries-exports',
+    'slice/1351-passkey-unlock-storage',
+    'feat/passkey-unlock',
+  ]) {
+    assert.equal(fixAttributionInstruction(branch), null, branch);
+  }
+});
+
+test('the fallback the agent is told to write satisfies the attribution check', () => {
+  // Regression: #1273's agent guessed `Introduced in #1318`. The fallback it is
+  // now given must itself pass `fix:attribution:check`, or the agent is told to
+  // write a line CI rejects.
+  const instruction = fixAttributionInstruction('fix/1273-x') ?? '';
+  const fallback = /`(Introduced in unknown: [^`]+)`/.exec(instruction)?.[1];
+  assert.ok(fallback, 'the instruction names a fallback line');
+  assert.ok(
+    attributeFix({ commits: fallback }),
+    'the fallback reads as attribution',
+  );
 });

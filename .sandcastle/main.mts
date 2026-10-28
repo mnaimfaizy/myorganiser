@@ -54,6 +54,7 @@ import {
 } from '../tools/scripts/lib/sandcastle-subagent-trace.ts';
 import {
   branchNameCarriesIssue,
+  fixAttributionInstruction,
   prdBranchSlug,
   specAnchorMessage,
 } from '../tools/scripts/lib/sandcastle-spec-anchor.ts';
@@ -2527,6 +2528,7 @@ function buildPrompt(
 ): string {
   const gate = resolveGate(issue);
   const graphifyNote = graphifyProvenance(sliceBranch);
+  const attributionNote = fixAttributionInstruction(sliceBranch);
   return [
     `You are implementing GitHub Issue #${issue.number}: ${issue.title}`,
     ``,
@@ -2563,6 +2565,7 @@ function buildPrompt(
     // a commit is not. The reference in the message is what survives into the
     // feature branch, where the branch name carries nothing — ADR 0076.
     `- End the commit message body with \`Closes #${issue.number}\` on its own line, so the commit carries the issue even after it is integrated into a branch whose name does not.`,
+    ...(attributionNote ? [`- ${attributionNote}`] : []),
     `- Do NOT push and do NOT open a PR — this sandbox has no credentials. Just commit locally on your branch; leave nothing uncommitted. The orchestrator integrates your branch into the feature branch on the host.`,
     `- Do NOT output the completion promise until ALL of these hold: deterministic checks green; \`/code-review\` run once and each finding either fixed or listed as ${OUTSTANDING_MARKER} (see below); work committed through the \`Commit\` sub-agent + \`ai:commit\`; working tree clean.`,
     `- When all of the above hold, output ${COMPLETION_PROMISE}.`,
@@ -3639,9 +3642,14 @@ if (merged.length > 0) {
       ? `  git switch ${deliverable}   # the agent's work for this issue`
       : `  git switch ${deliverable}   # it now contains the merged slices`,
   );
-  console.log(`Then push it and open ONE PR to \`main\` manually so CI runs:`);
+  // Agents read this line as an instruction, so it names the repository's only
+  // PR entry point: `ai:create-pr` pushes, checks the merge base, and applies
+  // Surface Labels. A bare `git push && gh pr create` skips all three (AGENTS.md).
   console.log(
-    `  git push -u origin ${deliverable} && gh pr create --base main`,
+    `Then open ONE PR to \`main\` so CI runs, through the create-pull-request-workflow Skill:`,
+  );
+  console.log(
+    `  PrAuthor drafts it; \`corepack yarn ai:create-pr --title <t> --body-file <f> --merge-base <sha>\` pushes and opens it.`,
   );
 }
 
