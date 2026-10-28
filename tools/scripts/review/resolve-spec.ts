@@ -155,11 +155,6 @@ export const discoverSpec = ({
 export const isPullRequest = (issue?: IssueView | null) =>
   /\/pull\/\d+$/.test(String(issue?.url ?? ''));
 
-/**
- * Pure: one fetched issue's text for `spec.json` — its body, plus the triage
- * brief and maintainer notes its trusted comments carry. A field with nothing
- * in it is left out, so an untriaged issue resolves exactly as before.
- */
 /** Pure: what one issue's spec text is made of, for `spec.text`. */
 export const specTextParts = (
   text: SpecText,
@@ -169,6 +164,11 @@ export const specTextParts = (
   ...(text.notes ? (['notes'] as const) : []),
 ];
 
+/**
+ * Pure: one fetched issue's text for `spec.json` — its body, plus the triage
+ * brief and maintainer notes its trusted comments carry. A field with nothing
+ * in it is left out, so an untriaged issue resolves exactly as before.
+ */
 export const specTextOf = (issue: IssueView): SpecText => {
   const brief = latestTriageBrief(issue.comments);
   const notes = extractMaintainerNotes(issue.comments);
