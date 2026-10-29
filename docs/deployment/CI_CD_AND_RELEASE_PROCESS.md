@@ -33,12 +33,12 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
 ## Workflows
 
 - `.github/workflows/ci.yml` (name: `CI`)
-  - **Lint and test.** A pull request runs `nx affected`; a push runs `nx run-many` over the whole tree, so every `main` commit is linted and tested whole before a release is cut from it.
+  - **Lint and test.** A pull request runs `nx affected`; a push runs `nx run-many` over the whole tree, so the commit a release is cut from is linted and tested whole. It is not a per-commit guarantee — see `cancel-in-progress` below.
   - **The builds.** `build-backend`, `build-frontend` and `build-mobile` each run one `nx build <project>` and are selected by `needs.setup.outputs.affected_projects` on a push as well as on a pull request — a push that affects none of them builds none of them. Widening that is slice #1396's job, not the caching change's.
   - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
   - **Caching.** Two caches, both `actions/cache` with no write mode and no `pull_request_target` anywhere: the dependency cache (`<os>-node-22-deps-<lockfile digest>`, restored by exact key) and the Nx computation cache (`<os>-nx-22-<target>-<commit>`, restored through a `<os>-nx-22-<target>-` prefix). A pull request writes only into its own `refs/pull/<n>/merge` scope and reads `main`'s as a fallback, which is GitHub's own scoping and not something the workflow arranges.
-  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. Superseded entries are pruned afterwards by `cache-cleanup.yml` instead.
+  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. What it buys is that a `main` run already under way always finishes and saves its full baseline; GitHub still keeps only one run pending per concurrency group, so a third push cancels the run queued behind the one in progress and that commit is covered by the next run rather than by its own. Superseded entries are pruned afterwards by `cache-cleanup.yml` instead.
 
 - `.github/workflows/cache-cleanup.yml` (name: `Cache Cleanup`)
   - Deletes the Actions cache entries nothing can restore from, so the repository stays under GitHub's 10 GB cache limit (past which useful entries are evicted within days).

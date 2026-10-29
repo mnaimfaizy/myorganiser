@@ -765,11 +765,11 @@ The gate whose asserted artifacts are the other gates: `gates:coverage:check` co
 _Avoid_: gate-of-gates, master gate, gate linter
 
 **Cache Baseline**:
-The Nx computation cache a push to `main` saves, over the whole tree rather than over what that push affected. It is what a Pull Request's `nx affected` run restores from, so its completeness is the whole point: an affected-only push caches only the projects that push happened to touch, and a Pull Request then recomputes everything else. Push-to-`main` runs `run-many` and does not cancel superseded runs for this reason — a cancelled run saves nothing, because `actions/cache` writes in a job's post step.
+The Nx computation cache a push to `main` saves, over the whole tree rather than over what that push affected. It is what a Pull Request's `nx affected` run restores from, so its completeness is the whole point: an affected-only push caches only the projects that push happened to touch, and a Pull Request then recomputes everything else. Push-to-`main` runs `run-many` and never cancels a run already under way for this reason — a cancelled run saves nothing, because `actions/cache` writes in a job's post step. It is the newest baseline that is guaranteed, not one per commit: GitHub holds one run pending per concurrency group, so a run still queued when the next push arrives is cancelled before it starts.
 _Avoid_: warm cache, shared cache, cache seed, main cache (for the dependency cache too)
 
 **Cache Family**:
-The GitHub Actions cache entries on one ref that are copies of one cache, differing only in the variant that dates them — a lockfile digest for the dependency cache, a commit for a Cache Baseline. Only the newest copy of a family is ever restored, which is what makes every older copy safe to delete and keeps the repository under GitHub's 10 GB limit. Deleting the newest copy is not a slow cache but a cold one, so no cleanup selects it; a key whose shape names no family is left alone rather than guessed at.
+The GitHub Actions cache entries on one ref that are copies of one cache, differing only in the variant that dates them — a lockfile digest for the dependency cache, a commit for a Cache Baseline. The newest copy is the one a prefix restore resolves to, which is what makes an older copy safe to delete and keeps the repository under GitHub's 10 GB limit. Deleting the newest copy is not a slow cache but a cold one, so no cleanup selects it; a copy an exact-key restore still names is kept besides, which is why pruning the dependency cache on a ref is told that ref's current key; and a key whose shape names no family is left alone rather than guessed at.
 _Avoid_: cache group, stale cache, duplicate cache, cache generation
 
 **Unasserted Claim**:

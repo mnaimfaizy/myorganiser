@@ -10,7 +10,7 @@
 // Suites slice them, so these assertions are about the file as written.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -140,6 +140,22 @@ const normalise = (key: string): string =>
     return expression;
   });
 
+/** The `uses: actions/cache` lines: the same trigger `cacheKeysOf` reads on. */
+const CACHE_STEP = /^\s*uses:\s*actions\/cache/;
+
+/**
+ * The module specifiers a source file names: `from '…'`, a bare `import '…'`,
+ * and `import('…')`, with line comments removed so prose cannot name one.
+ * Block comments are not stripped: a `/*` inside a string literal would open
+ * one and swallow the real import after it.
+ */
+const specifiersOf = (text: string): string[] =>
+  [
+    ...text
+      .replace(/^\s*\/\/.*$/gm, '')
+      .matchAll(/\b(?:from\s+|import\s+|import\s*\(\s*)['"]([^'"\n]+)['"]/g),
+  ].map((match) => match[1]);
+
 test('ci.yml cancels in-progress runs on pull requests only, as an expression', () => {
   const cancel = scalarOf(topLevel(CI, 'concurrency'), 'cancel-in-progress');
   assert.equal(
@@ -210,12 +226,17 @@ test('no workflow file uses a cache write mode, a save or restore action, or a t
   }
 });
 
+// The defect worth catching: cacheKeysOf reads a step only when its `key:`
+// sits under a `^ {6}- ` boundary, so a re-indented or reordered cache step
+// drops out of the loop and its key is never checked. Counting the `uses:`
+// lines independently makes that drop visible.
 test('every actions/cache key in every workflow is a family cacheFamily recognises', () => {
   let found = 0;
+  let steps = 0;
   for (const file of WORKFLOW_FILES) {
-    for (const key of cacheKeysOf(
-      readFileSync(join(WORKFLOWS, file), 'utf8'),
-    )) {
+    const text = readFileSync(join(WORKFLOWS, file), 'utf8');
+    steps += text.split('\n').filter((line) => CACHE_STEP.test(line)).length;
+    for (const key of cacheKeysOf(text)) {
       found += 1;
       const normalised = normalise(key);
       assert.notEqual(
@@ -225,7 +246,12 @@ test('every actions/cache key in every workflow is a family cacheFamily recognis
       );
     }
   }
-  assert.ok(found > 0, 'the drift guard found no actions/cache keys to check');
+  assert.equal(
+    found,
+    steps,
+    'cacheKeysOf collected a key for fewer actions/cache steps than the workflows declare; a step it cannot read is a key nobody checks',
+  );
+  assert.ok(steps > 0, 'the drift guard found no actions/cache steps to check');
 });
 
 test('cache-cleanup.yml triggers only on a closed pull request, a completed CI run on main, and a manual dispatch', () => {
@@ -363,4 +389,78 @@ test('both cleanup jobs call prune-actions-caches.ts, and that file exists on di
     existsSync(join(REPO_ROOT, 'tools/scripts/ci/prune-actions-caches.ts')),
     'tools/scripts/ci/prune-actions-caches.ts is missing',
   );
+});
+
+// The defect worth catching: a `/*` inside a string literal must not hide the
+// import after it. Stripping block comments first let `'dist/*'` open one and
+// swallow `left-pad`, so an added third-party import passed the walk silently.
+test('specifiersOf still reads an import that follows a /* inside a string literal', () => {
+  assert.ok(
+    specifiersOf(
+      "const g = 'dist/*';\nimport leftPad from 'left-pad';\n/* end */",
+    ).includes('left-pad'),
+  );
+});
+
+// The defect worth catching: this job runs no `yarn install`, so the first
+// third-party import added to the cleanup's graph passes every lint and build
+// gate and fails only at runtime, on a closed pull request or a push to `main`,
+// where nothing else runs the script.
+test('the cleanup script imports only node: built-ins and relative modules, all the way down', () => {
+  const reached = new Set<string>();
+  const pending = [join(REPO_ROOT, 'tools/scripts/ci/prune-actions-caches.ts')];
+  const offending: string[] = [];
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (file === undefined || reached.has(file)) continue;
+    reached.add(file);
+    for (const specifier of specifiersOf(readFileSync(file, 'utf8'))) {
+      if (specifier.startsWith('node:')) continue;
+      if (!/^\.\.?\//.test(specifier)) {
+        offending.push(`${relative(REPO_ROOT, file)} imports '${specifier}'`);
+        continue;
+      }
+      const target = resolve(dirname(file), specifier);
+      if (!existsSync(target)) {
+        offending.push(
+          `${relative(REPO_ROOT, file)} imports '${specifier}', which does not resolve`,
+        );
+        continue;
+      }
+      pending.push(target);
+    }
+  }
+  assert.deepEqual(
+    offending,
+    [],
+    'a third-party import in the cleanup graph would fail at runtime; the job runs no yarn install',
+  );
+  // Guards the walker itself: a regex that stopped matching would reach only
+  // the entry file and pass the check above vacuously.
+  for (const lib of [
+    'tools/scripts/lib/actions-cache-cleanup.ts',
+    'tools/scripts/lib/error-message.ts',
+    'tools/scripts/lib/gh.ts',
+  ]) {
+    assert.ok(
+      reached.has(join(REPO_ROOT, lib)),
+      `the walk never reached ${lib}`,
+    );
+  }
+});
+
+// The defect worth catching: the typed `inputs.dry_run` context is a boolean,
+// and a boolean never equals the string 'true', so switching to it turns a
+// requested listing into real deletions while every other assertion stays green.
+test('cache-cleanup.yml dry_run is a boolean input that reaches the prune step as --dry-run through the untyped expression', () => {
+  const dispatch = children(onBlockOf(CLEANUP), 'workflow_dispatch');
+  const dryRun = children(children(dispatch, 'inputs'), 'dry_run');
+  assert.equal(scalarOf(dryRun, 'type'), 'boolean');
+
+  const step = stepNamed(
+    jobBlock(CLEANUP, 'prune-main-baselines'),
+    'Delete superseded cache entries on main',
+  );
+  assert.match(step, /github\.event\.inputs\.dry_run == 'true' && '--dry-run'/);
+  assert.doesNotMatch(step, /(?<![\w.])inputs\.dry_run/);
 });

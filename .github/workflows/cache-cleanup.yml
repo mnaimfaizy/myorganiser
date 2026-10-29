@@ -81,8 +81,9 @@ jobs:
         with:
           node-version: '22.18'
 
-      # No `yarn install`: the script imports only Node built-ins and two
-      # modules from this repository, so the cleanup never waits on the
+      # No `yarn install`: the script imports only Node built-ins and
+      # modules from this repository — asserted by the Contract Suite, which
+      # walks that import graph — so the cleanup never waits on the
       # dependency cache it is pruning.
       - name: Delete this pull request's cache entries
         shell: bash

@@ -55,6 +55,32 @@ const prEntry = (id: number): Record<string, unknown> => ({
   ref: 'refs/pull/7/merge',
 });
 
+/**
+ * Two copies of one Cache Family on `refs/heads/main`: the older key, then the
+ * newer one. The entries differ only in key and `created_at`, so a test that
+ * varies one axis names it at the call site and inherits the rest from here.
+ */
+const familyPair = (
+  oldKey: string,
+  newKey: string,
+  firstId = 1,
+): Record<string, unknown>[] => [
+  {
+    id: firstId,
+    key: oldKey,
+    ref: 'refs/heads/main',
+    created_at: '2026-10-01T12:00:00Z',
+    size_in_bytes: 10,
+  },
+  {
+    id: firstId + 1,
+    key: newKey,
+    ref: 'refs/heads/main',
+    created_at: '2026-10-02T12:00:00Z',
+    size_in_bytes: 10,
+  },
+];
+
 /** A listing stub that answers page N with `pages[N - 1]`, recording each path. */
 const pagedStub = (pages: readonly (readonly unknown[])[]) => {
   const paths: string[] = [];
@@ -205,21 +231,12 @@ test('pruneActionsCaches stops after the first 403 and does not attempt the rest
 // that is still there; reporting none hides the one that is gone.
 test('pruneActionsCaches reports a refusal that arrives after a successful delete as a partial run', () => {
   const caches = [
-    { ...mainEntry(1), created_at: '2026-10-01T12:00:00Z' },
-    {
-      ...mainEntry(2),
-      key: `Linux-node-22-deps-${'a'.repeat(64)}`,
-      created_at: '2026-10-01T12:00:00Z',
-    },
-    {
-      ...mainEntry(3),
-      created_at: '2026-10-05T12:00:00Z',
-    },
-    {
-      ...mainEntry(4),
-      key: `Linux-node-22-deps-${'b'.repeat(64)}`,
-      created_at: '2026-10-05T12:00:00Z',
-    },
+    ...familyPair(String(mainEntry(1).key), String(mainEntry(3).key)),
+    ...familyPair(
+      `Linux-node-22-deps-${'a'.repeat(64)}`,
+      `Linux-node-22-deps-${'b'.repeat(64)}`,
+      3,
+    ),
   ];
   let attempts = 0;
   const result = pruneActionsCaches({
@@ -387,22 +404,7 @@ test('pruneActionsCaches propagates a full-listing refusal and deletes nothing',
 test('pruneActionsCaches keeps a keepKeys key out of both the plan and the DELETE calls', () => {
   const OLD = `Linux-node-22-deps-${'1'.repeat(64)}`;
   const NEW = `Linux-node-22-deps-${'2'.repeat(64)}`;
-  const listing = [
-    {
-      id: 1,
-      key: OLD,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-01T12:00:00Z',
-      size_in_bytes: 10,
-    },
-    {
-      id: 2,
-      key: NEW,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-02T12:00:00Z',
-      size_in_bytes: 10,
-    },
-  ];
+  const listing = familyPair(OLD, NEW);
   const run = (keepKeys?: readonly string[]) => {
     const argv: string[][] = [];
     const result = pruneActionsCaches({
@@ -442,22 +444,10 @@ const SHA_OLD = '1'.repeat(40);
 const SHA_NEW = '2'.repeat(40);
 const SUPERSEDED_LISTING = {
   total_count: 2,
-  actions_caches: [
-    {
-      id: 1,
-      key: `Linux-nx-22-lint-${SHA_OLD}`,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-01T12:00:00Z',
-      size_in_bytes: 10,
-    },
-    {
-      id: 2,
-      key: `Linux-nx-22-lint-${SHA_NEW}`,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-02T12:00:00Z',
-      size_in_bytes: 10,
-    },
-  ],
+  actions_caches: familyPair(
+    `Linux-nx-22-lint-${SHA_OLD}`,
+    `Linux-nx-22-lint-${SHA_NEW}`,
+  ),
 };
 
 function runCli(
@@ -564,22 +554,7 @@ const DEPS_OLD = `Linux-node-22-deps-${'a'.repeat(64)}`;
 const DEPS_NEW = `Linux-node-22-deps-${'b'.repeat(64)}`;
 const DEPS_LISTING = {
   total_count: 2,
-  actions_caches: [
-    {
-      id: 1,
-      key: DEPS_OLD,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-01T12:00:00Z',
-      size_in_bytes: 10,
-    },
-    {
-      id: 2,
-      key: DEPS_NEW,
-      ref: 'refs/heads/main',
-      created_at: '2026-10-02T12:00:00Z',
-      size_in_bytes: 10,
-    },
-  ],
+  actions_caches: familyPair(DEPS_OLD, DEPS_NEW),
 };
 
 // The one assertion that pins `--keep-key` on the path the workflow actually
