@@ -15,7 +15,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { cacheFamily } from '../lib/actions-cache-cleanup.ts';
-import { escapeRegExp, jobBlock, stepNamed } from '../lib/workflow-yaml.ts';
+import {
+  escapeRegExp,
+  ifOf,
+  jobBlock,
+  runOf,
+  stepNamed,
+} from '../lib/workflow-yaml.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
@@ -133,11 +139,6 @@ const normalise = (key: string): string =>
     if (/runner\.os/.test(expression)) return 'Linux';
     return expression;
   });
-
-const ifOf = (step: string): string | undefined =>
-  /^ {8}if: (.+)$/m.exec(step)?.[1]?.trim();
-const runOf = (step: string): string =>
-  /^ {8}run: (.+)$/m.exec(step)?.[1]?.trim() ?? '';
 
 test('ci.yml cancels in-progress runs on pull requests only, as an expression', () => {
   const cancel = scalarOf(topLevel(CI, 'concurrency'), 'cancel-in-progress');
@@ -312,7 +313,7 @@ test('each cleanup step sets -euo pipefail and does not pipe the CLI anywhere', 
     ),
     stepNamed(
       jobBlock(CLEANUP, 'prune-main-baselines'),
-      'Delete superseded main cache entries',
+      'Delete superseded cache entries on main',
     ),
   ];
   for (const step of steps) {

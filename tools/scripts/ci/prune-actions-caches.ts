@@ -278,12 +278,12 @@ export function pruneActionsCaches({
   return {
     plan,
     ...applied,
-    // A read-only token refuses the first `DELETE` and every one after it, so
-    // `permissionDenied` means nothing was deleted: reporting the plan in the
-    // "would delete" voice is what actually happened.
-    summary: formatCleanupSummary(plan, {
-      dryRun: dryRun || applied.permissionDenied,
-    }),
+    // The count, not the refusal flag, decides how the summary reads. A
+    // read-only token normally refuses the first `DELETE` and every one
+    // after it, but a token that loses the permission partway through — or
+    // one entry it may not touch — leaves some deleted and some not, and
+    // that run must not report either extreme.
+    summary: formatCleanupSummary(plan, { dryRun, deleted: applied.deleted }),
   };
 }
 

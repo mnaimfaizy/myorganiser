@@ -2,7 +2,7 @@
 // (slice #1391). The defect worth catching is a deletion that takes the newest
 // entry of a Cache Family: on `main` that entry is the dependency cache and the
 // Nx baseline every pull request restores from, so a selection that deletes it
-// turns a warm cache cold. The other defects pinned here are the ones that widen
+// leaves a cold Cache Baseline. The other defects pinned here are the ones that widen
 // a selection: merging two Nx targets into one family, matching a pull request's
 // refs by prefix, pruning a ref other than `main`, and an order that depends on
 // the API's listing order. Fixtures are verbatim-shaped entries of
@@ -11,18 +11,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  MAIN_REF,
   cacheFamily,
   formatBytes,
   formatCleanupSummary,
   newestOf,
   planCacheCleanup,
   pullRequestOf,
-  pullRequestRefs,
   selectClosedPullRequestCaches,
   selectSupersededCaches,
   type ActionsCache,
 } from '../lib/actions-cache-cleanup.ts';
+
+/** The ref a push to the default branch saves its caches under — fixture data. */
+const MAIN_REF = 'refs/heads/main';
 
 const hex = (seed: number, length: number): string =>
   seed.toString(16).padStart(length, '0');
@@ -123,19 +124,6 @@ test('pullRequestOf reads the number from either pull request scope', () => {
 test('pullRequestOf is undefined for a ref that is not a pull request scope', () => {
   assert.equal(pullRequestOf(MAIN_REF), undefined);
   assert.equal(pullRequestOf('refs/pull/abc/merge'), undefined);
-});
-
-test('pullRequestRefs returns the merge and head refs of a pull request', () => {
-  assert.deepEqual(pullRequestRefs(7), [
-    'refs/pull/7/merge',
-    'refs/pull/7/head',
-  ]);
-});
-
-test('pullRequestRefs throws for a number that is not a pull request', () => {
-  for (const bad of [0, -1, 1.5, Number.NaN]) {
-    assert.throws(() => pullRequestRefs(bad), /not a pull request number/);
-  }
 });
 
 test('selectClosedPullRequestCaches selects every entry on the merge and head refs', () => {
@@ -391,6 +379,40 @@ test('formatCleanupSummary says "Would delete" for a dry run and "Deleted" for a
   assert.doesNotMatch(dry, /Deleted /);
   assert.match(real, /Deleted /);
   assert.doesNotMatch(real, /Would delete/);
+});
+
+// A run that stopped partway must not read as either extreme: claiming the
+// whole plan names entries that are still there, and claiming none hides the
+// ones that are gone.
+test('formatCleanupSummary reports a run that deleted only some of its plan', () => {
+  const plan = planCacheCleanup(PLAN_FIXTURE, { supersededOn: MAIN_REF });
+  assert.ok(plan.deletions.length > 1, 'the fixture plans more than one entry');
+
+  const partial = formatCleanupSummary(plan, { deleted: 1 });
+  assert.match(
+    partial,
+    new RegExp(
+      `Deleted 1 of ${plan.deletions.length} planned cache entries, then stopped`,
+    ),
+  );
+  assert.doesNotMatch(partial, /Would delete/);
+
+  const none = formatCleanupSummary(plan, { deleted: 0 });
+  assert.match(
+    none,
+    new RegExp(
+      `Deleted none of the ${plan.deletions.length} cache entries planned`,
+    ),
+  );
+  assert.doesNotMatch(none, /Would delete/);
+});
+
+test('formatCleanupSummary reads a dry run as a dry run whatever the deleted count says', () => {
+  const plan = planCacheCleanup(PLAN_FIXTURE, { supersededOn: MAIN_REF });
+  assert.match(
+    formatCleanupSummary(plan, { dryRun: true, deleted: 0 }),
+    /Would delete/,
+  );
 });
 
 test('formatCleanupSummary lists the kept entries under their own heading', () => {

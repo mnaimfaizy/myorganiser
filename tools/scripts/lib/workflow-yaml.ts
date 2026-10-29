@@ -63,3 +63,33 @@ export function stepNamed(job: string, name: string): string {
   const next = rest.slice(1).search(/\n {6}- name: /);
   return next === -1 ? rest : rest.slice(0, next + 1);
 }
+
+/**
+ * A step's `if:` condition, trimmed, or `undefined` when it carries none.
+ *
+ * Unlike `jobBlock` and `stepNamed` this returns rather than throws: "the
+ * step has no `if:`" is a fact a suite asserts as often as it asserts the
+ * condition's text, and a thrown error there would be the assertion failing
+ * before it could be made.
+ *
+ * Eight spaces, so it is a step's own `if:` and not an indented `with:` value
+ * further down the same step.
+ */
+export function ifOf(step: string): string | undefined {
+  return /^ {8}if: (.+)$/m.exec(step)?.[1]?.trim();
+}
+
+/**
+ * A step's single-line `run:`, trimmed, or `''` when it has none or carries a
+ * block scalar instead. A suite that needs the body of a `run: |` block reads
+ * it with its own dedenting helper; this is for the one-line form.
+ *
+ * A block scalar's indicator is `''` rather than `'|'` on purpose: a caller
+ * matching against the returned string would otherwise be comparing its
+ * pattern with a one-character YAML token and finding, truthfully, that the
+ * command is not in it — which reads as a command that changed.
+ */
+export function runOf(step: string): string {
+  const run = /^ {8}run: (.+)$/m.exec(step)?.[1]?.trim() ?? '';
+  return /^[|>][-+]?$/.test(run) ? '' : run;
+}

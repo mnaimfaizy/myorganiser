@@ -99,7 +99,7 @@ jobs:
   # moved on, and Nx baselines a newer commit's baseline for the same target
   # has replaced.
   prune-main-baselines:
-    name: Prune Superseded Main Caches
+    name: Prune Superseded Caches on main
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     if: github.event_name != 'pull_request'
@@ -123,7 +123,7 @@ jobs:
       # with no restore-keys, so "newest" is not enough on its own: a reverted
       # lockfile makes the key CI needs an older entry than the one saved
       # before the revert, and that entry must survive the prune.
-      - name: Delete superseded main cache entries
+      - name: Delete superseded cache entries on main
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

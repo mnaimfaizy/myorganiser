@@ -4,12 +4,20 @@
 // `- name: Lint affected projects` and a suite asserts the neighbour's `if:`
 // while passing. Also pinned: a job key outside `jobs:` cannot be mistaken for
 // the job, a missing job or missing `jobs:` fails naming what is absent, and
-// regex metacharacters in a name match literally. The fixture is inline, so
-// the suite never reads a real workflow.
+// regex metacharacters in a name match literally. For `ifOf` and `runOf` the
+// defect is reading a neighbouring key at another depth as the step's own, and
+// reporting a step that has no `if:` as one whose condition is empty. The
+// fixture is inline, so the suite never reads a real workflow.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { escapeRegExp, jobBlock, stepNamed } from './workflow-yaml.ts';
+import {
+  escapeRegExp,
+  ifOf,
+  jobBlock,
+  runOf,
+  stepNamed,
+} from './workflow-yaml.ts';
 
 // `env:` carries a `test:` key ahead of `jobs:`, so a search not anchored under
 // `jobs:` would return that block instead of the real `test` job.
@@ -100,5 +108,41 @@ test('stepNamed matches a name containing regex metacharacters literally', () =>
   assert.throws(
     () => stepNamed(TEST, 'Run (axb) suite'),
     /no step named exactly "Run \(axb\) suite"/,
+  );
+});
+
+test("ifOf reads a step's own condition and is undefined when it has none", () => {
+  assert.equal(ifOf(stepNamed(SETUP, 'Lint')), 'always()');
+  assert.equal(
+    ifOf(stepNamed(SETUP, 'Lint affected projects')),
+    'github.event_name == 1',
+  );
+  assert.equal(ifOf(stepNamed(TEST, 'Run (a.b) suite')), undefined);
+});
+
+test('ifOf ignores a condition nested deeper than the step', () => {
+  const step = [
+    '      - name: Guarded',
+    '        uses: some/action@v1',
+    '        with:',
+    '          if: not-the-step-condition',
+    '',
+  ].join('\n');
+
+  assert.equal(ifOf(step), undefined);
+});
+
+test('runOf reads a single-line run and is empty for a block scalar', () => {
+  assert.equal(runOf(stepNamed(TEST, 'Run (a.b) suite')), 'run-suite');
+  assert.equal(
+    runOf(
+      [
+        '      - name: Scripted',
+        '        run: |',
+        '          echo hi',
+        '',
+      ].join('\n'),
+    ),
+    '',
   );
 });

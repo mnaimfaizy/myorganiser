@@ -48,9 +48,6 @@ export interface ActionsCache {
   size_in_bytes?: number;
 }
 
-/** The ref a push to the default branch saves its caches under. */
-export const MAIN_REF = 'refs/heads/main';
-
 /**
  * How a cache key splits into the family it belongs to and the variant that
  * makes this entry one copy of it.
@@ -90,12 +87,6 @@ export function cacheFamily(key: string): string | undefined {
 export function pullRequestOf(ref: string): number | undefined {
   const number = PULL_REQUEST_REF.exec(ref)?.groups?.number;
   return number === undefined ? undefined : Number(number);
-}
-
-/** The two refs a pull request's runs save caches under. */
-export function pullRequestRefs(pullRequest: number): string[] {
-  assertPullRequest(pullRequest);
-  return [`refs/pull/${pullRequest}/merge`, `refs/pull/${pullRequest}/head`];
 }
 
 function assertPullRequest(pullRequest: number): void {
@@ -327,23 +318,44 @@ export function formatBytes(bytes: number): string {
  * What it kept is printed beside what it deleted on purpose: "deleted 11
  * entries" is unreadable as evidence, while "kept Linux-nx-22-test @ <sha>"
  * is the line that shows the baseline survived.
+ *
+ * `deleted` is how many of the plan's entries the run actually removed, and
+ * it is what decides the headline's voice. Leaving it out means "all of
+ * them", for a caller that only has a plan. The three-way split exists
+ * because a run can stop partway — a token refused halfway through is not a
+ * dry run and not a completed one, and a summary that called it either would
+ * be naming entries as deleted that are still there, or the reverse.
  */
 export function formatCleanupSummary(
   plan: CacheCleanupPlan,
-  { dryRun = false }: { dryRun?: boolean } = {},
+  { dryRun = false, deleted }: { dryRun?: boolean; deleted?: number } = {},
 ): string {
   const lines = ['## Actions cache cleanup', ''];
-  const verb = dryRun ? 'Would delete' : 'Deleted';
+  const planned = plan.deletions.length;
+  const done = dryRun ? 0 : (deleted ?? planned);
 
-  if (plan.deletions.length === 0) {
+  if (planned === 0) {
     lines.push('Nothing to delete.');
   } else {
-    lines.push(
-      `${verb} ${plan.deletions.length} cache ${
-        plan.deletions.length === 1 ? 'entry' : 'entries'
-      }, freeing ${formatBytes(plan.freedBytes)}:`,
-      '',
-    );
+    const noun = planned === 1 ? 'entry' : 'entries';
+    if (dryRun) {
+      lines.push(
+        `Would delete ${planned} cache ${noun}, freeing ${formatBytes(plan.freedBytes)}:`,
+        '',
+      );
+    } else if (done === 0) {
+      lines.push(`Deleted none of the ${planned} cache ${noun} planned:`, '');
+    } else if (done < planned) {
+      lines.push(
+        `Deleted ${done} of ${planned} planned cache entries, then stopped:`,
+        '',
+      );
+    } else {
+      lines.push(
+        `Deleted ${planned} cache ${noun}, freeing ${formatBytes(plan.freedBytes)}:`,
+        '',
+      );
+    }
     for (const { cache, reason } of plan.deletions) {
       lines.push(`- \`${cache.key}\` (${cache.ref}) — ${reason}`);
     }

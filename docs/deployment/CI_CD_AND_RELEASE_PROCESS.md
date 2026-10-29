@@ -33,7 +33,8 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
 ## Workflows
 
 - `.github/workflows/ci.yml` (name: `CI`)
-  - A pull request runs `lint`, `test` and `build` using `nx affected`. A push runs `nx run-many` over the whole tree, so every `main` commit carries the whole-tree guarantee before a release is cut from it.
+  - **Lint and test.** A pull request runs `nx affected`; a push runs `nx run-many` over the whole tree, so every `main` commit is linted and tested whole before a release is cut from it.
+  - **The builds.** `build-backend`, `build-frontend` and `build-mobile` each run one `nx build <project>` and are selected by `needs.setup.outputs.affected_projects` on a push as well as on a pull request — a push that affects none of them builds none of them. Widening that is slice #1396's job, not the caching change's.
   - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
   - **Caching.** Two caches, both `actions/cache` with no write mode and no `pull_request_target` anywhere: the dependency cache (`<os>-node-22-deps-<lockfile digest>`, restored by exact key) and the Nx computation cache (`<os>-nx-22-<target>-<commit>`, restored through a `<os>-nx-22-<target>-` prefix). A pull request writes only into its own `refs/pull/<n>/merge` scope and reads `main`'s as a fallback, which is GitHub's own scoping and not something the workflow arranges.

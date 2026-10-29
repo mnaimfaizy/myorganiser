@@ -200,6 +200,47 @@ test('pruneActionsCaches stops after the first 403 and does not attempt the rest
   assert.equal(calls.length, 1);
 });
 
+// The state the summary's voice has to survive: the token deleted one entry
+// and was then refused. Reporting the whole plan as deleted names an entry
+// that is still there; reporting none hides the one that is gone.
+test('pruneActionsCaches reports a refusal that arrives after a successful delete as a partial run', () => {
+  const caches = [
+    { ...mainEntry(1), created_at: '2026-10-01T12:00:00Z' },
+    {
+      ...mainEntry(2),
+      key: `Linux-node-22-deps-${'a'.repeat(64)}`,
+      created_at: '2026-10-01T12:00:00Z',
+    },
+    {
+      ...mainEntry(3),
+      created_at: '2026-10-05T12:00:00Z',
+    },
+    {
+      ...mainEntry(4),
+      key: `Linux-node-22-deps-${'b'.repeat(64)}`,
+      created_at: '2026-10-05T12:00:00Z',
+    },
+  ];
+  let attempts = 0;
+  const result = pruneActionsCaches({
+    repository: REPO,
+    pruneRef: 'refs/heads/main',
+    ghJsonCall: pagedStub([caches]).ghJsonCall,
+    ghCall: () => {
+      attempts += 1;
+      if (attempts === 1) return '';
+      throw new Error('gh: Resource not accessible by integration (HTTP 403)');
+    },
+    log: () => undefined,
+  });
+
+  assert.equal(result.plan.deletions.length, 2);
+  assert.equal(result.deleted, 1);
+  assert.equal(result.permissionDenied, true);
+  assert.match(result.summary, /Deleted 1 of 2 planned cache entries/);
+  assert.doesNotMatch(result.summary, /Would delete/);
+});
+
 test('pruneActionsCaches propagates a delete failure that is not a permission problem', () => {
   assert.throws(
     () =>
@@ -593,16 +634,18 @@ test('the CLI with --dry-run deletes nothing and says it would', (t) => {
   assert.match(run.stdout, /Would delete 1 cache entry/);
 });
 
-// A read-only token deleted nothing, so the summary must not claim it did.
-test('the CLI reports a 403 run in the "would delete" voice', (t) => {
+// A read-only token deleted nothing, so the summary must not claim it did —
+// and must not call it a dry run either, which is a different thing an
+// operator may have asked for.
+test('the CLI reports a refused run as having deleted none of its plan', (t) => {
   const run = runCli(t, {
     listing: SUPERSEDED_LISTING,
     onDelete:
       "echo 'gh: Resource not accessible by integration (HTTP 403)' >&2; exit 1",
     args: ['--prune-ref', 'refs/heads/main'],
   });
-  assert.match(run.stdout, /Would delete/);
-  assert.doesNotMatch(run.stdout, /^Deleted /m);
+  assert.match(run.stdout, /Deleted none of the 1 cache entry planned/);
+  assert.doesNotMatch(run.stdout, /Would delete/);
 });
 
 // The summary reaches the job through the script, not through a `tee`

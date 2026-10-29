@@ -16,13 +16,15 @@ on:
 # A pull request cancels its own superseded runs: nobody is waiting on the
 # result of a commit that has already been pushed over.
 #
-# A push to `main` does not. Every `main` commit carries the whole-tree
-# guarantee before a release is cut from it, and — the reason this changed —
-# a cancelled run saves no cache: `actions/cache` writes in a job's post
-# step, so a cancelled `main` run leaves the Nx baseline at whatever the last
-# uncancelled push managed to save. That baseline is what every pull request
-# restores from, and a `main` that cancels itself under a burst of merges is
-# how it went stale. Superseded entries are pruned afterwards by
+# A push to `main` does not. Every `main` commit is linted and tested over
+# the whole tree before a release is cut from it (the builds are still
+# selected by the affected set — see the Workflows section of
+# docs/deployment/CI_CD_AND_RELEASE_PROCESS.md), and — the reason this
+# changed — a cancelled run saves no cache: `actions/cache` writes in a job's
+# post step, so a cancelled `main` run leaves the Nx baseline at whatever the
+# last uncancelled push managed to save. That baseline is what every pull
+# request restores from, and a `main` that cancels itself under a burst of
+# merges is how it went stale. Superseded entries are pruned afterwards by
 # cache-cleanup.yml rather than by refusing to save them.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
