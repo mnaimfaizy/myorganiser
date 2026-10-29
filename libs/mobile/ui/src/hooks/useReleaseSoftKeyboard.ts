@@ -1,28 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
-import {
-  Platform,
-  TextInput,
-  codegenNativeCommands,
-  type TextInputInstance,
-} from 'react-native';
-
-interface InputCommands {
-  blur: (input: TextInputInstance) => void;
-}
-
-let commands: InputCommands | null = null;
-
-/**
- * Sends Android's text input its `blur` command, which hides the soft
- * keyboard whether or not the input still holds focus. Made on first use:
- * `codegenNativeCommands` is not something the web build has.
- */
-function hideSoftKeyboard(input: TextInputInstance): void {
-  commands ??= codegenNativeCommands<InputCommands>({
-    supportedCommands: ['blur'],
-  });
-  commands.blur(input);
-}
+import { Platform, TextInput, type TextInputInstance } from 'react-native';
+import { hideSoftKeyboard } from './hideSoftKeyboard';
 
 /**
  * Closes the soft keyboard once a text input has lost focus to something
