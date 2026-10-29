@@ -39,7 +39,7 @@
     "design-tokens:check": "nx run design-tokens:check",
     "openapi:artifacts": "node tools/scripts/check-openapi-artifacts.ts",
     "storybook": "nx storybook web-ui",
-    "build-storybook": "nx build-storybook web-ui --stats-json --skip-nx-cache",
+    "build-storybook": "nx build-storybook web-ui",
     "test-storybook": "test-storybook --config-dir libs/web/ui/.storybook",
     "lint": "nx run-many -t lint",
     "graph": "nx graph",

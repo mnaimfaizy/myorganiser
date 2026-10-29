@@ -1256,3 +1256,47 @@ jobs:
 
       - name: Build mobile web target
         run: corepack yarn nx build mobile
+
+  # Chromatic's publish job was the only CI step that built Storybook (ADR 0139).
+  # This keeps that build as a check: a story that fails to compile fails here.
+  # Unconditional, as the publish job was: stories live in several libraries,
+  # so no single affected project stands for all of them.
+  build-storybook:
+    name: Build Storybook
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: prepare-dependencies
+
+    env:
+      STORYBOOK_BUILD_TIMEOUT: '900000'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Build Storybook
+        run: corepack yarn build-storybook

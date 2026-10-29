@@ -17,9 +17,13 @@ happening for the remainder of that month, repeatedly. A paid Chromatic plan is 
 
 ## Decision
 
-Chromatic is retired from this repository. Storybook stays, as the component catalogue, with its
-existing `build-storybook` and `test-storybook` checks in CI unchanged. No job publishes to
-Chromatic, and nothing requires its **UI Tests** status.
+Chromatic is retired from this repository. Storybook stays, as the component catalogue. No job
+publishes to Chromatic, and nothing requires its **UI Tests** status.
+
+The Chromatic job was the only CI step that built Storybook, so a `build-storybook` job ("Build
+Storybook") takes over that one check: on every CI run, `yarn build-storybook` must succeed, so a
+story that no longer compiles fails CI. It does not run `test-storybook`; play functions run only
+locally, as before.
 
 Removed with Chromatic:
 
@@ -29,6 +33,8 @@ Removed with Chromatic:
 - The `.gitignore` entries for its local artifacts (`chromatic.log`, `chromatic-build-*.xml`,
   `chromatic-diagnostics.json`).
 - Its entry in `tools/config/review-tier-paths.json`.
+- The `--stats-json` and `--skip-nx-cache` flags on the `build-storybook` script. TurboSnap needed
+  the stats file, and Chromatic built into `os.tmpdir()`, which Nx cannot cache.
 
 `parameters.chromatic` is removed from every story that carried it. Where a viewport parameter
 documented real intent, it is kept using Storybook's own `parameters.viewport` — every story that

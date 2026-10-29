@@ -34,6 +34,7 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
 
 - `.github/workflows/ci.yml` (name: `CI`)
   - Runs `lint`, `test`, `build` using `nx affected`.
+  - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
 
 - `.github/workflows/deploy-staging.yml` (name: `Deploy Staging`)
