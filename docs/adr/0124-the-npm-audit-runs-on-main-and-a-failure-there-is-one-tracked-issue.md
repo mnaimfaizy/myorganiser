@@ -40,3 +40,14 @@ The decisions live in `tools/scripts/lib/npm-audit-issue.ts`. `yarn npm-audit:is
 - Yarn reports a vulnerable range and no patched version. The report carries the range; the first version outside it is the fix.
 - While the audit is red, every failing push adds a comment to the issue. The comments stop at the first green push.
 - The two report jobs hold `issues: write`. `Secure Install Review`, which installs dependencies, does not.
+
+## Amendment (2026-10-29)
+
+Issue #1390, cut from the "Faster PR CI" PRD (#1387). `Secure Install Review` ran the script-free install and the frozen-lockfile check on every pull request, even one that changed no dependency — paying the prelude's cost on a pull request the audit itself would go on to skip. Item 6's hold-back (a failed audit skips every job after it) is unchanged; what moved is which pull requests pay for the install at all.
+
+- **The dependency-manifest detector now gates the install and the lockfile check, not only the audit.** `Check whether dependency manifests changed` runs before `Install dependency metadata without scripts`, and that step, `Verify frozen lockfile` and `Run Yarn npm audit` now share one `if:`: a push (or any non-pull-request event) runs all three unconditionally; a pull request runs them only when the detector reports a dependency change or the detector itself errors.
+- **A detector error still means the full review, not a skip.** The detector's `if ! result=...` branch writes `run_audit=true` on failure, the same flag a real dependency change sets, so an unreadable or crashing detector falls back to running everything rather than skipping it.
+- **The pull request explains what it skipped.** `Explain skipped install review` (renamed from `Explain skipped npm audit`) writes to the step summary that the install, the lockfile check and the audit were all skipped, and why.
+- **The job stays required and keeps its place in the chain.** `secure-install-review` is unchanged as a job: same `needs`, same outputs, same downstream `report-audit-failure` / `report-audit-success` wiring. Only the ordering and gating of its own steps moved.
+
+`tools/scripts/ci/secure-install-review-workflow.test.ts` pins the ordering, the shared gate, the fail-open branch, and the skipped-review explanation.

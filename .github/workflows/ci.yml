@@ -163,13 +163,10 @@ jobs:
         with:
           node-version: '22.18'
 
-      - name: Install dependency metadata without scripts
-        run: corepack yarn install --immutable --mode=skip-build
-
-      - name: Verify frozen lockfile
-        run: |
-          git diff --ignore-cr-at-eol --exit-code -- yarn.lock
-
+      # Runs before the install, so a pull request that changes no dependency
+      # can skip the script-free install and the frozen-lockfile check below
+      # as well as the audit, instead of paying for an install it then throws
+      # away (ADR 0124 amendment).
       - name: Check whether dependency manifests changed
         id: dependency-files
         if: github.event_name == 'pull_request'
@@ -198,6 +195,18 @@ jobs:
             echo 'run_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
+      # Pull requests install and verify the lockfile only when they change
+      # dependencies, or when the detector above errored; a push always does
+      # both, so a new advisory still surfaces on main. See ADR 0124.
+      - name: Install dependency metadata without scripts
+        if: github.event_name != 'pull_request' || steps.dependency-files.outputs.run_audit == 'true'
+        run: corepack yarn install --immutable --mode=skip-build
+
+      - name: Verify frozen lockfile
+        if: github.event_name != 'pull_request' || steps.dependency-files.outputs.run_audit == 'true'
+        run: |
+          git diff --ignore-cr-at-eol --exit-code -- yarn.lock
+
       # Pull requests audit only when they change dependencies; a push audits
       # unconditionally, so a new advisory surfaces on main and not on an
       # unrelated pull request. See ADR 0124.
@@ -219,11 +228,11 @@ jobs:
           corepack yarn npm audit --all --recursive --severity high --json > "$RUNNER_TEMP/npm-audit.ndjson" || true
           echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.ts < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
 
-      - name: Explain skipped npm audit
+      - name: Explain skipped install review
         if: github.event_name == 'pull_request' && steps.dependency-files.outputs.run_audit != 'true'
         shell: bash
         run: |
-          echo 'Skipped npm audit because this pull request changes no dependencies: yarn.lock and .yarnrc.yml are untouched, and any package.json edits were confined to non-dependency fields such as `scripts`.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Skipped the script-free install, the frozen-lockfile check and the npm audit because this pull request changes no dependencies: yarn.lock and .yarnrc.yml are untouched, and any package.json edits were confined to non-dependency fields such as `scripts`.' >> "$GITHUB_STEP_SUMMARY"
 
   # Push to main only (ADR 0124). A pull request that fails the audit already
   # shows its author the red check, and a workflow_dispatch failure is a person

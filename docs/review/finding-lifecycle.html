@@ -1199,9 +1199,9 @@
           <code>Authoritative Lockfile Policy</code>, <code>Secure Install
           Review</code>, <code>Prepare Dependency Cache</code>,
           <code>Setup Affected Context</code>, <code>Lint</code>,
-          <code>Test</code> (<code>ci.yml:25, :144, :413, :448, :587, :639</code>). The
+          <code>Test</code> (<code>ci.yml:25, :144, :422, :457, :596, :648</code>). The
           <code>Test</code> job sets <code>DATABASE_URL</code>
-          (<code>ci.yml:665</code>) and starts a throwaway Postgres service for
+          (<code>ci.yml:674</code>) and starts a throwaway Postgres service for
           migrate deploy/diff; affected Jest still runs against mocks without
           needing that service &mdash; which is why the Reviewer's
           <code>executed</code> evidence is feasible in CI, in the same
@@ -1823,23 +1823,23 @@
         "file": ".github/workflows/ci.yml",
         "start": "name: Secure Install Review"
       },
-      "ci.yml:413": {
+      "ci.yml:422": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Prepare Dependency Cache"
       },
-      "ci.yml:448": {
+      "ci.yml:457": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Setup Affected Context"
       },
-      "ci.yml:587": {
+      "ci.yml:596": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Lint"
       },
-      "ci.yml:639": {
+      "ci.yml:648": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Test"
       },
-      "ci.yml:665": {
+      "ci.yml:674": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser"
       },
