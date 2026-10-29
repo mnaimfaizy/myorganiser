@@ -317,11 +317,10 @@ export const ButtonOrder: Story = {
 };
 
 // Below md the default size is 48px. This play asserts that height, so the
-// viewport has to be declared for both the test-runner and Chromatic.
+// viewport has to be declared for the test-runner.
 export const PhoneViewport: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   render: () => <Button>Save</Button>,
   play: async ({ canvasElement }) => {

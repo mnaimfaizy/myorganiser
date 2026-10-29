@@ -433,7 +433,6 @@ export const GroupedCard: Story = {
 export const PhoneLists: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   render: function Render() {
     return <PhoneListsExample />;

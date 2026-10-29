@@ -172,7 +172,7 @@ for its area — restating them here is how they go stale, so this table points 
 | [docs/agents/model-governance.md](docs/agents/model-governance.md)                           | Sub-agent fleet, model governance, orchestration                               |
 | [docs/features/README.md](docs/features/README.md)                                           | Feature integration index                                                      |
 | [docs/testing/README.md](docs/testing/README.md)                                             | Testing strategy and per-project tooling                                       |
-| [docs/storybook/README.md](docs/storybook/README.md)                                         | Storybook and Chromatic setup                                                  |
+| [docs/storybook/README.md](docs/storybook/README.md)                                         | Storybook setup                                                                |
 | [docs/deployment/CI_CD_AND_RELEASE_PROCESS.md](docs/deployment/CI_CD_AND_RELEASE_PROCESS.md) | CI/CD and release process                                                      |
 | [docs/sandcastle/RUNBOOK.md](docs/sandcastle/RUNBOOK.md)                                     | Autonomous agent dispatch                                                      |
 | [libs/design-tokens/DESIGN.md](libs/design-tokens/DESIGN.md)                                 | Design system and token reference                                              |

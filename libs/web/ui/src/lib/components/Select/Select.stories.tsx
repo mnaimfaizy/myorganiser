@@ -15,7 +15,7 @@ import {
 } from './Select';
 import { isPhoneWidth } from '../../storybook/viewport';
 
-// Fixed ids keep Chromatic snapshots deterministic. The Label htmlFor/id pair
+// Fixed ids keep snapshots deterministic. The Label htmlFor/id pair
 // gives the trigger its accessible name; aria-describedby points at the helper
 // or error text below it.
 const TRIGGER_ID = 'billing-cycle';
@@ -237,7 +237,6 @@ export const Phone: Story = {
   render: () => <SelectExample />,
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
     // The dev Storybook has no viewport addon; see storybook/viewport.ts.

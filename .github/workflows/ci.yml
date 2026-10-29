@@ -444,103 +444,6 @@ jobs:
         if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: git diff --exit-code -- yarn.lock
 
-  chromatic:
-    name: Publish to Chromatic
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    needs: prepare-dependencies
-
-    env:
-      STORYBOOK_BUILD_TIMEOUT: '900000'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22.18'
-
-      - name: Restore dependency cache
-        id: dependency-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .yarn/install-state.gz
-            node_modules
-          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
-
-      - name: Install dependencies
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: corepack yarn install --immutable
-
-      - name: Verify frozen lockfile
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: git diff --exit-code -- yarn.lock
-
-      - name: Publish Storybook to Chromatic
-        env:
-          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          CHROMATIC_AUTO_ACCEPT: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) }}
-          EVENT_NAME: ${{ github.event_name }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BRANCH: ${{ github.head_ref }}
-          REPO: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -u
-
-          if [ -z "${CHROMATIC_PROJECT_TOKEN}" ]; then
-            echo '::error title=Missing Chromatic token::Add repository secret CHROMATIC_PROJECT_TOKEN (HITL) before this job can run. See docs/storybook/README.md and ADR 0027.'
-            exit 1
-          fi
-
-          extra=(--exit-zero-on-changes)
-          if [ "${CHROMATIC_AUTO_ACCEPT}" = 'true' ]; then
-            extra+=(--auto-accept-changes)
-          fi
-
-          if [ "${EVENT_NAME}" = 'pull_request' ]; then
-            export CHROMATIC_SHA="${PR_SHA}"
-            export CHROMATIC_BRANCH="${PR_BRANCH}"
-            export CHROMATIC_SLUG="${REPO}"
-          fi
-
-          set +e
-          corepack yarn chromatic "${extra[@]}"
-          code=$?
-          set -e
-
-          if [ "${code}" -eq 11 ]; then
-            echo '::warning title=Chromatic quota reached::Free-plan snapshot cap reached (CLI exit 11). Visual tests are paused until the next billing cycle. CI continues per ADR 0027.'
-            {
-              echo '## Publish to Chromatic'
-              echo
-              echo 'Snapshot quota reached (`ACCOUNT_QUOTA_REACHED`, exit 11). Job passed by policy so the rest of CI is not frozen for the rest of the month.'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          # BUILD_HAS_CHANGES: capture succeeded; review lives on Chromatic's "UI Tests"
-          # GitHub status (pending until Accept/Deny). Do not fail this job — a re-run
-          # recaptures snapshots and burns free-tier quota.
-          if [ "${code}" -eq 1 ]; then
-            echo '::notice title=Visual changes awaiting review::Accept or Deny in Chromatic. The UI Tests check stays pending until then. Do not re-run this job.'
-            {
-              echo '## Publish to Chromatic'
-              echo
-              echo 'Unreviewed visual changes (`BUILD_HAS_CHANGES`). This job passed so snapshots are not recaptured.'
-              echo 'Watch Chromatic’s **UI Tests** check: pending until Accept (green) or Deny (red).'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          exit "${code}"
-
   setup:
     name: Setup Affected Context
     runs-on: ubuntu-24.04
@@ -1353,3 +1256,47 @@ jobs:
 
       - name: Build mobile web target
         run: corepack yarn nx build mobile
+
+  # Chromatic's publish job was the only CI step that built Storybook (ADR 0139).
+  # This keeps that build as a check: a story that fails to compile fails here.
+  # Unconditional, as the publish job was: stories live in several libraries,
+  # so no single affected project stands for all of them.
+  build-storybook:
+    name: Build Storybook
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: prepare-dependencies
+
+    env:
+      STORYBOOK_BUILD_TIMEOUT: '900000'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Build Storybook
+        run: corepack yarn build-storybook

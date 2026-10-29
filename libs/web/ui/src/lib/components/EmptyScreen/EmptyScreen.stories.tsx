@@ -31,9 +31,8 @@ const meta: Meta<typeof EmptyScreen> = {
       },
     },
     // Every EmptyScreen is a phone screen, so the phone width applies to the
-    // whole file. The test-runner reads `viewport`; Chromatic reads `chromatic`.
+    // whole file. The test-runner reads `viewport`.
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   argTypes: {
     illustration: {

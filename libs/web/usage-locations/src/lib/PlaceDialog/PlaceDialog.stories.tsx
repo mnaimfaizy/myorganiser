@@ -22,7 +22,7 @@ function PlaceDialogHarness(props: PlaceDialogHarnessProps) {
   return <PlaceDialog {...props} open={open} onOpenChange={setOpen} />;
 }
 
-// Fixed records. Every date is pinned so Chromatic diffs stay deterministic.
+// Fixed records. Every date is pinned so the rendered output stays deterministic.
 const BANK_PLACE: UsageLocationRecord = {
   id: 'place-bank',
   organisationName: 'Bank',
@@ -270,7 +270,6 @@ export const PhoneViewport: Story = {
   },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async () => {
     await enterArtboardDuplicate();

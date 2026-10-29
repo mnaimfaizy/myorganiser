@@ -1,5 +1,10 @@
 # Chromatic UI Tests run inside CI, with TurboSnap, on the free plan
 
+> **Superseded by [ADR 0139](0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).**
+> The free plan's monthly snapshot cap started pausing visual review too often to keep a reliable
+> baseline, and a paid plan was not wanted. Chromatic is removed from CI, from the dependency
+> tree, and from every story's `parameters`; Storybook stays with its existing checks.
+
 Visual regression for UI Primitives and Vault UI Components was set up locally in #12 and never connected to Chromatic cloud. We **publish** Storybook from a job in `.github/workflows/ci.yml` (after `prepare-dependencies`) so “CI passed” means the upload ran. The visual **review** gate is Chromatic’s own GitHub status **UI Tests**, which stays **pending** until a maintainer Accepts (green) or Denies (red). Accept/Deny updates that check in place and does **not** recapture snapshots. The job calls `yarn chromatic` with repo secret `CHROMATIC_PROJECT_TOKEN`.
 
 Pushes to `main` and `release/**` auto-accept so each line’s baseline moves after merge. TurboSnap (`onlyChanged`) is on in config: affected stories are captured (1 billed snapshot); unchanged stories are copied (0.2). Chromatic unlocks TurboSnap only after **ten successful CI builds**; until then every story is captured (expected on a new project). We stay on Chromatic’s free plan (5,000 billed snapshots/month, Chrome only): no extra browsers, viewports, modes, or Chromatic accessibility snapshots. If that monthly cap is hit, the CLI exits `11`; the publish job **warns and exits green** so a quota pause cannot freeze the rest of `CI`. Missing token, CLI failure, or Chromatic outage still fail the publish job. The Chromatic project, GitHub secret, required **UI Tests** check, and a usage alert (~4,000 billed) are HITL and must exist **before** this job is merged to `main`.
@@ -8,7 +13,7 @@ Pushes to `main` and `release/**` auto-accept so each line’s baseline moves af
 
 ## Status
 
-accepted
+superseded by ADR 0139
 
 ## Considered Options
 

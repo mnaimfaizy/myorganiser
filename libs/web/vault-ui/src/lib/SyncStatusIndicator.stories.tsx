@@ -18,7 +18,7 @@ void VAULT_BLOB_TYPES;
  *
  * Both render an empty container holding an empty screen-reader paragraph, so
  * a story of either is a blank canvas — indistinguishable from a story that
- * failed to load, identical to the other, and a Chromatic snapshot that
+ * failed to load, identical to the other, and a snapshot that
  * asserts nothing. That the component adds no chrome when sync is healthy is
  * a real contract, and it is asserted in `SyncStatusIndicator.spec.tsx`,
  * which is where an assertion belongs. See STORYBOOK-PATTERNS.md §8.

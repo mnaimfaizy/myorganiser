@@ -181,13 +181,12 @@ export const LongDescription: Story = {
 };
 
 // Phone: the cards stack in one column below md. The viewport parameter is
-// read by the test-runner preVisit hook; chromatic.viewports makes Chromatic
-// render the same 320px width. The play function asserts the stacking itself.
+// read by the test-runner preVisit hook. The play function asserts the stacking
+// itself.
 export const Phone: Story = {
   render: () => <FeedbackKindExample />,
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
     // The dev Storybook has no viewport addon; see storybook/viewport.ts.

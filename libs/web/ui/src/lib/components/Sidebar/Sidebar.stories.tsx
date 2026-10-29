@@ -298,9 +298,6 @@ export const OpenMobile: Story = {
     viewport: {
       defaultViewport: 'mobile1',
     },
-    chromatic: {
-      viewports: [320],
-    },
   },
 };
 
@@ -311,9 +308,6 @@ export const OpensOnClick: Story = {
   parameters: {
     viewport: {
       defaultViewport: 'mobile1',
-    },
-    chromatic: {
-      viewports: [320],
     },
   },
   play: async ({ canvasElement }) => {

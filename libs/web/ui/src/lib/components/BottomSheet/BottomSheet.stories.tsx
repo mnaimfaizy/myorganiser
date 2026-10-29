@@ -55,15 +55,11 @@ export const ActionSheet: Story = {
 };
 
 /*
- * The play closes the sheet, so the final frame has no sheet in it. Chromatic
- * would snapshot that as a blank canvas, so this story is interaction-only.
- * The visual state is ActionSheet above.
+ * The play closes the sheet, so the final frame has no sheet in it and there is
+ * nothing to look at. The visual state is ActionSheet above.
  */
 export const ActivatingActionClosesSheet: Story = {
   args: { defaultOpen: true },
-  parameters: {
-    chromatic: { disableSnapshot: true },
-  },
   play: async () => {
     await userEvent.click(
       within(document.body).getByRole('button', { name: 'Rename list' }),
@@ -80,6 +76,5 @@ export const Phone: Story = {
   args: { defaultOpen: true },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
 };

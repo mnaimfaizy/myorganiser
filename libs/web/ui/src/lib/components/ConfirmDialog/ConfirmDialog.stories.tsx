@@ -78,7 +78,6 @@ export const DefaultTone: Story = {
 export const Phone: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async () => {
     // The dev Storybook has no viewport addon; see storybook/viewport.ts.

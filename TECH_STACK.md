@@ -3,7 +3,7 @@
 > **Single source of truth** for installed package versions and canonical technology choices.
 > All agent instruction files and documentation must reference this file rather than declaring versions inline.
 > Owned and kept current by the **DepSync** agent/skill — do not edit versions manually.
-> Last synced from `package.json` on 2026-10-24.
+> Last synced from `package.json` on 2026-10-29.
 
 > **Reading this file as an agent:** it is a lookup table, not a briefing. Read
 > the one section you need. Component work needs
@@ -272,7 +272,7 @@
 
 ---
 
-## Storybook & Visual Testing
+## Storybook
 
 | Package                         | Version | Purpose                                                                                                           |
 | ------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -284,7 +284,6 @@
 | `@storybook/core-server`        | 8.6.19  | Storybook server core                                                                                             |
 | `@storybook/test`               | 8.6.19  | Storybook testing utilities (interaction tests)                                                                   |
 | `@storybook/test-runner`        | 0.23.0  | Runs Storybook stories as tests via Playwright                                                                    |
-| `chromatic`                     | 13.3.5  | Visual regression testing and Storybook hosting                                                                   |
 | `vite`                          | 6.4.4   | Build tool — used by Storybook and mobile web                                                                     |
 
 ---

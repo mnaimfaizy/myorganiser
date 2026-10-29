@@ -35,7 +35,7 @@ function Row({ id, label, ...checkboxProps }: RowProps) {
   );
 }
 
-// Fixed ids keep Chromatic snapshots deterministic.
+// Fixed ids keep snapshots deterministic.
 const TERMS_ID = 'privacy-notice';
 const TERMS_ERROR_ID = 'privacy-notice-error';
 
