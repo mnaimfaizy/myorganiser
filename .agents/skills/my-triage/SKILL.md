@@ -43,6 +43,8 @@ Remove any other kind label the issue already carries. The branch type takes the
 
 **State** — exactly one of `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, or closed `wontfix`.
 
+The orchestrator moves an issue from `ready-for-agent` to `ready-for-human` itself when a standalone run finishes with a passing gate (ADR 0138): its branch is waiting for a person to review it and open the PR. Its latest comment names the branch. Move it back to `ready-for-agent`, with a `## Maintainer Review` comment, only to send it to an agent again.
+
 `qa` and `grilling` are orchestration labels, not states (ADR 0049). Remove `grilling` once the grilling is done.
 
 ## Invocation

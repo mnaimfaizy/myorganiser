@@ -2065,7 +2065,7 @@
                 Standalone / sweep: comment
               </text>
               <text class="nc mono" x="34" y="1077">
-                stays open &middot; never status:done
+                &#8594; ready-for-human &middot; never done
               </text>
               <g class="mk mk-write" transform="translate(222,1033.5)">
                 <rect
@@ -2889,10 +2889,12 @@
             item, and its dependents are <b>not</b> unblocked. The run reports
             it as <code>integrated, held for a person</code>. A person releases
             the slices behind it by resolving the items and closing the issue.
-            Standalone and sweep only comment and leave the issue open &mdash;
-            marking work done that exists on an unpushed local branch would be a
-            claim nobody can check &mdash; and, when the run was not clean, the
-            comment appends the outstanding list.
+            Standalone and sweep leave the issue open and never mark it
+            <code>status:done</code> &mdash; that would count work on an unpushed
+            local branch as a finished dependency. When the gate passes they swap
+            <code>ready-for-agent</code> for <code>ready-for-human</code>, so a
+            re-run does not dispatch it again (ADR 0138), and comment with the
+            branch, appending the outstanding list when the run was not clean.
           </dd>
 
           <dt>reportFeatureGate</dt>
@@ -2951,7 +2953,7 @@
   <section class="panel" aria-labelledby="modes-h">
     <div class="phead">
       <h2 id="modes-h">Three modes</h2>
-      <span class="src">main.mts:837-957, :899-905, :3277-3349</span>
+      <span class="src">main.mts:839-959, :901-907, :3279-3351</span>
     </div>
     <div class="pbody">
       <div class="scrollx">
@@ -3035,9 +3037,11 @@
                 <code>ready-for-human</code>, dependents not unblocked
               </td>
               <td>
-                <code>status:in-progress</code> removed + a comment. Issue stays
-                <b>open</b>, <b>not</b> <code>status:done</code>. The comment
-                lists what the agent left outstanding when the run was not clean
+                <code>status:in-progress</code> removed + a comment. On a green
+                gate <code>ready-for-agent</code> becomes
+                <code>ready-for-human</code> (ADR 0138). Issue stays <b>open</b>,
+                <b>not</b> <code>status:done</code>. The comment lists what the
+                agent left outstanding when the run was not clean
               </td>
               <td>same as standalone</td>
             </tr>
@@ -3058,8 +3062,9 @@
           last iteration printed the completion promise and listed nothing
           <code>OUTSTANDING:</code>. A slice that did not is held open as
           <code>ready-for-human</code> with that list, and the slices behind it
-          wait. Standalone runs stay open because marking them done would assert
-          completion of work that exists only on an unpushed local branch.
+          wait. Standalone runs stay open, as <code>ready-for-human</code> once
+          the gate passes, because marking them done would assert completion of
+          work that exists only on an unpushed local branch.
         </p>
       </div>
       <p class="small muted">
@@ -3075,7 +3080,7 @@
   <section class="panel" aria-labelledby="gate-h">
     <div class="phead">
       <h2 id="gate-h">The gate &mdash; two project scopes</h2>
-      <span class="src">main.mts:255-316, :1890-2056</span>
+      <span class="src">main.mts:257-318, :1892-2058</span>
     </div>
     <div class="pbody">
       <p>
@@ -3430,7 +3435,7 @@
     <div class="phead">
       <h2 id="cont-h">What crosses the container boundary</h2>
       <span class="src"
-        >main.mts:1215-1237, :2802-2816 &middot; .sandcastle/Dockerfile</span
+        >main.mts:1217-1239, :2804-2818 &middot; .sandcastle/Dockerfile</span
       >
     </div>
     <div class="pbody">
@@ -3564,7 +3569,7 @@
   <section class="panel" aria-labelledby="routing-h">
     <div class="phead">
       <h2 id="routing-h">Routing: labels in, behaviour out</h2>
-      <span class="src">main.mts:1356-1362, :1430-1454, :2402-2406</span>
+      <span class="src">main.mts:1358-1364, :1432-1456, :2404-2408</span>
     </div>
     <div class="pbody">
       <p class="small">
@@ -3785,52 +3790,52 @@
   {
     "note": "Expected-content anchors for file:line citations on this page, verified 2026-09-30 against .sandcastle/main.mts, .sandcastle/dispatch-waves.mts, and tools/scripts/lib/sandcastle-resume.ts. See ADR 0085.",
     "anchors": {
-      "main.mts:837-957": {
+      "main.mts:839-959": {
         "file": ".sandcastle/main.mts",
         "start": "`  [#${completed.number}] #${dependentNumber} still blocked by ${unfinished",
         "end": "// label is NOT explained that way stays out: it means something this code cannot"
       },
-      "main.mts:899-905": {
+      "main.mts:901-907": {
         "file": ".sandcastle/main.mts",
         "start": "'issue',",
         "end": "'title,body',"
       },
-      "main.mts:255-316": {
+      "main.mts:257-318": {
         "file": ".sandcastle/main.mts",
         "start": "}",
         "end": "/**"
       },
-      "main.mts:1890-2056": {
+      "main.mts:1892-2058": {
         "file": ".sandcastle/main.mts",
         "start": "`Refs #${issue.number}`,",
         "end": "): boolean {"
       },
-      "main.mts:1215-1237": {
+      "main.mts:1217-1239": {
         "file": ".sandcastle/main.mts",
         "start": "// run whose sub-agent behaviour you most want to read. A mount sidesteps the ordering",
         "end": "// Absent, no mount is added and CodeExplorer falls back to Glob/Grep as already"
       },
-      "main.mts:2802-2816": {
+      "main.mts:2804-2818": {
         "file": ".sandcastle/main.mts",
         "start": "* Sessions are selected by mtime against the moment this run started rather than by id.",
         "end": "'.sandcastle',"
       },
-      "main.mts:1356-1362": {
+      "main.mts:1358-1364": {
         "file": ".sandcastle/main.mts",
         "start": "function modelFor(issue: Issue): string {",
         "end": "return sandcastleModels.claudeByComplexity.low;"
       },
-      "main.mts:1430-1454": {
+      "main.mts:1432-1456": {
         "file": ".sandcastle/main.mts",
         "start": "// does, not merely which issue it came from — see AGENTS.md \"Branch naming\". First",
         "end": "return 'chore';"
       },
-      "main.mts:3277-3349": {
+      "main.mts:3279-3351": {
         "file": ".sandcastle/main.mts",
         "start": "const outcome = judgeRunOutcome(",
         "end": "unblockDependents(issue);"
       },
-      "main.mts:2402-2406": {
+      "main.mts:2404-2408": {
         "file": ".sandcastle/main.mts",
         "start": "function resolveGate(issue: Issue): 'mechanical' | 'standard' | 'full' {",
         "end": "return 'standard';"
@@ -4109,7 +4114,7 @@
       14: 'Anything the agent left uncommitted is swept in. Zero commits ahead means no work, and fails.',
       15: 'The gate, and it forks by mode: standalone runs it here and a red gate blocks; PRD defers it to one gate on the assembled branch. gates.html draws both.',
       16: 'A local fast-forward of a branch that is not checked out. It refuses a non-descendant — and in PRD mode nothing else refuses it.',
-      17: 'Writeback, and it differs by mode. PRD marks the slice status:done, then closes it only if the run ended clean; otherwise it holds it open as ready-for-human with the agent’s list. Standalone only comments.',
+      17: 'Writeback, and it differs by mode. PRD marks the slice status:done, then closes it only if the run ended clean; otherwise it holds it open as ready-for-human with the agent’s list. Standalone hands a green run to ready-for-human and comments; it never marks status:done.',
       18: 'Dependents are unblocked only when the slice closed clean — a held slice releases nothing. The loop moves to the next slice either way.',
       19: 'The run ends. In PRD mode the gate verdict is commented on the PRD issue — the seventh GitHub write. Nothing has been pushed.',
       20: 'Alternative branch, taken from step 12: the agent threw. For an overnight run this is the expected path, not the exception.',

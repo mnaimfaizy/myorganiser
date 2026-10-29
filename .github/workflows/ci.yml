@@ -1309,3 +1309,47 @@ jobs:
       # logout spec above is unaffected.
       - name: Run live account deletion spec
         run: corepack yarn nx e2e web-e2e --grep="deletes the account against the real backend"
+
+  # The mobile app's react-native-web target. Nothing else builds it, so a
+  # native-only import in shared mobile source broke it unnoticed (#1048).
+  # Appended last so the line citations in release-pipeline.html stay valid.
+  build-mobile:
+    name: Build Mobile (web)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'mobile') }}
+    needs:
+      - setup
+      - lint
+      - test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Build mobile web target
+        run: corepack yarn nx build mobile

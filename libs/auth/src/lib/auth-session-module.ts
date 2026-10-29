@@ -2,7 +2,7 @@ import type {
   AuthenticationApi,
   ConfirmResetPasswordBody,
 } from '@myorganiser/app-api-client';
-import axios, { type AxiosInstance } from 'axios';
+import axios, { type AxiosError, type AxiosInstance } from 'axios';
 
 import { toAuthError, toAuthErrorFromMessage } from './auth-error-mapping';
 import type { AuthSessionStorageAdapter } from './auth-session-storage-adapter';
@@ -42,11 +42,37 @@ function toSessionData(
   };
 }
 
+// The server's own body message, when the error is an axios error carrying one.
+function extractBodyMessage(err: unknown): string | undefined {
+  if (!axios.isAxiosError(err)) return undefined;
+  const data = err.response?.data as { message?: string } | undefined;
+  return data?.message && typeof data.message === 'string'
+    ? data.message
+    : undefined;
+}
+
 function extractMessage(err: unknown): string {
   if (!axios.isAxiosError(err)) return 'Unexpected error.';
-  const data = err.response?.data as { message?: string } | undefined;
-  if (data?.message && typeof data.message === 'string') return data.message;
-  return err.message || 'Request failed.';
+  return extractBodyMessage(err) ?? (err.message || 'Request failed.');
+}
+
+const RESEND_VERIFICATION_FALLBACK_MESSAGE =
+  'Unable to resend the verification email. Please try again.';
+
+// Reads the server's body message first, like `extractMessage`. Differs only
+// in its fallback: a response with no body message falls back to this clear
+// message rather than axios's own "Request failed with status code …", which
+// is what #1239 showed the user. A request that never got a response (a
+// network error) still surfaces `err.message` so it keeps classifying as
+// `network_error`. Only axios errors come here; any other error keeps
+// `toAuthError`'s message and code.
+function extractResendErrorMessage(err: AxiosError): string {
+  const bodyMessage = extractBodyMessage(err);
+  if (bodyMessage) return bodyMessage;
+  if (!err.response) {
+    return err.message || RESEND_VERIFICATION_FALLBACK_MESSAGE;
+  }
+  return RESEND_VERIFICATION_FALLBACK_MESSAGE;
 }
 
 export interface AuthSessionModule {
@@ -263,7 +289,12 @@ export function createAuthSessionModule(deps: {
         });
         return { ok: true, value: res.data as { message: string } };
       } catch (err) {
-        return { ok: false, error: toAuthError(err) };
+        return {
+          ok: false,
+          error: axios.isAxiosError(err)
+            ? toAuthErrorFromMessage(extractResendErrorMessage(err))
+            : toAuthError(err),
+        };
       }
     },
 

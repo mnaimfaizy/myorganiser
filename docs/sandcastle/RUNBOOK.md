@@ -186,9 +186,12 @@ Standalone specifics:
 - **No `## Blocked by` ordering** and no dependent unblocking — that vocabulary belongs to a PRD.
 - **The branch is the deliverable.** `<type>/<n>-<slug>` is left exactly as the agent committed it.
   Nothing is fast-forwarded anywhere and nothing is pushed, per `docs/adr/0010`.
-- **The issue stays open** and is **not** labelled `status:done`. The orchestrator only removes
-  `status:in-progress` and comments with the branch name and gate verdict — marking it done would
-  claim work that exists solely on an unpushed local branch. Close it when the PR merges.
+- **The issue stays open** and is **not** labelled `status:done`, which would count it as a
+  finished dependency for work that exists solely on an unpushed local branch. When the gate
+  passes, the orchestrator swaps `ready-for-agent` for `ready-for-human`, removes
+  `status:in-progress`, and comments with the branch name and anything left outstanding, so a
+  re-run does not dispatch it again ([ADR 0138](../adr/0138-a-finished-standalone-run-hands-its-issue-to-a-person.md)). The PR's `Closes #<n>` closes it on merge.
+  A failed gate or a run with no commits keeps `ready-for-agent`, so a re-run resumes it.
 - Branch namespaces are separate (`<type>/` vs `slice/`), so a standalone run and a later PRD run
   of the same issue can never collide on a branch, worktree, or gate path.
 - Re-running an issue whose labels changed since last time also cleans up the branch and worktree

@@ -12720,7 +12720,7 @@
       "start": "            storage.clearSession();",
       "end": "              sessionEnded?.emit({ reason: 'refresh_rejected' });"
     },
-    "auth-session-module.ts:159-167": {
+    "auth-session-module.ts:185-193": {
       "file": "libs/auth/src/lib/auth-session-module.ts",
       "start": "      } catch (err) {",
       "end": "        return { kind: 'session_cleared' };"
@@ -12730,7 +12730,7 @@
       "start": "    onSignedOutElsewhere(listener: () => void): () => void {",
       "end": "    onSignedOutElsewhere(listener: () => void): () => void {"
     },
-    "auth-session-module.ts:324": {
+    "auth-session-module.ts:355": {
       "file": "libs/auth/src/lib/auth-session-module.ts",
       "start": "    onSessionEnded(listener: SessionEndedListener): () => void {",
       "end": "    onSessionEnded(listener: SessionEndedListener): () => void {"
@@ -12745,7 +12745,7 @@
       "start": "      subscribeToEnd={onSessionEnded}",
       "end": "      subscribeToEnd={onSessionEnded}"
     },
-    "auth-session-module.ts:131-141": {
+    "auth-session-module.ts:157-167": {
       "file": "libs/auth/src/lib/auth-session-module.ts",
       "start": "    getSnapshot(): SessionSnapshot {",
       "end": "      return { status: 'guest' };"
@@ -14248,7 +14248,7 @@ data:  { password: hash, reset_password_token: null }
                 <span class="card-title">The client's three-state session</span>
                 <p class="card-body">
                   <code>getSnapshot</code> returns one of three
-                  (<code>auth-session-module.ts:131-141</code>):
+                  (<code>auth-session-module.ts:157-167</code>):
                 </p>
                 <div style="display: flex; flex-direction: column; gap: 6px">
                   <div
@@ -14417,7 +14417,7 @@ data:  { password: hash, reset_password_token: null }
                   <code>refresh_rejected</code>
                   (<code>auth-session-transport-adapter.ts:138-140</code>);
                   <code>restoreSession</code> does the same
-                  (<code>auth-session-module.ts:159-167</code>). A refresh with
+                  (<code>auth-session-module.ts:185-193</code>). A refresh with
                   no server answer, a 5xx, 408 or 429 keeps the session and
                   emits nothing: the request rejects and the next 401 tries
                   again, and <code>restoreSession</code> answers
@@ -14428,7 +14428,7 @@ data:  { password: hash, reset_password_token: null }
                   (<code>onSignedOutElsewhere</code>,
                   <code>auth-session-storage-adapter.ts:125</code>;
                   <code>onSessionEnded</code>,
-                  <code>auth-session-module.ts:324</code>).
+                  <code>auth-session-module.ts:355</code>).
                   <code>DashboardGuard.tsx:36</code> and
                   <code>AdminGuard.tsx:46</code> subscribe once the user is let
                   in, and on the signal stop rendering and

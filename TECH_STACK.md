@@ -376,7 +376,6 @@ These transitive dependencies are explicitly resolved to patched versions via Ya
 
 Advisories deliberately ignored via `npmAuditIgnoreAdvisories` in `.yarnrc.yml`. Each needs a reachability argument, a revisit condition, and an open tracking issue — an exception with no issue behind it has no way of being reconsidered.
 
-| Advisory IDs | Package           | Why it is not fixable now                                                                                                                                                                                                  | Revisit when                              | Tracking                                                       |
-| ------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------- |
-| 1124334      | `brace-expansion` | Superseded ReDoS variant; kept for history.                                                                                                                                                                                | —                                         | —                                                              |
-| 1240992      | `braces`          | No patched release: 3.0.3 is the latest and GHSA-vfj7-8cjw-p6xm lists no fix. Reaches the tree only through `micromatch` and `chokidar` in dev and build tooling, whose patterns come from repo config, not request input. | A `braces` release above 3.0.3 patches it | [#1099](https://github.com/mnaimfaizy/myorganiser/issues/1099) |
+| Advisory IDs | Package           | Why it is not fixable now                   | Revisit when | Tracking |
+| ------------ | ----------------- | ------------------------------------------- | ------------ | -------- |
+| 1124334      | `brace-expansion` | Superseded ReDoS variant; kept for history. | —            | —        |
