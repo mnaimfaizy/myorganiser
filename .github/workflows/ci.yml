@@ -750,6 +750,26 @@ jobs:
         # against the roster exactly once, here.
         run: corepack yarn design:hygiene --all
 
+      # Every cheap, file-reading Assertion Gate checker in `tools/scripts/lib/gate-manifest.ts`
+      # (ADR 0043) — the roster this job used to run as ~33 separate named
+      # steps, one `corepack yarn` line apiece. Each `corepack yarn` invocation
+      # costs roughly 1.3s of process overhead, so that roster cost over a
+      # minute to do a few seconds of real checking. One step keeps every
+      # failure readable: `yarn gates:run` wraps each gate's output in its own
+      # collapsible `::group::` and raises a named `::error` annotation for
+      # each one that fails, so a failure is still identifiable without
+      # opening a log. A checker's own "why" lives in its header comment, not
+      # here. The three hygiene checks above and `libs:markdown:check` /
+      # `docs:notes:check` below stay their own steps rather than joining this
+      # manifest: Husky's `gates:run` line (`.husky/pre-commit`) already runs
+      # the whole manifest unconditionally on every local commit, and these
+      # five either need a `--staged`-vs-`--all` distinction the manifest has
+      # no way to express, or (for the two zero-arg checks) would simply run
+      # twice — either way, changing what gets folded in here must not change
+      # what Husky runs (issue #1389's "pre-commit behaviour is unchanged").
+      - name: Run cheap Assertion Gates
+        run: corepack yarn gates:run
+
       # Project names, roots, and targets. `backend:generate-types` only writes
       # the Prisma client, and no Nx plugin infers a project or target from
       # that output, so this file stays valid for the checkers after generate.
@@ -795,16 +815,6 @@ jobs:
       - name: Check docs notes routing
         run: corepack yarn docs:notes:check
 
-      # ADR numbers collide across concurrent branches, not within one commit:
-      # git merges two differently-named files cleanly. This runs in Test
-      # because that job checks out refs/pull/N/merge — the merged tree, the
-      # only vantage point where both files exist.
-      - name: Check ADR numbering
-        run: corepack yarn adr:numbering:check
-
-      - name: Check ADR status
-        run: corepack yarn adr:status:check
-
       # A fix names the change that introduced its defect, or declares that
       # nothing can be named (ADR 0100) — the line the escaped-defect rate is
       # built from. Pull requests only: a push has no head branch to type.
@@ -818,12 +828,6 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: corepack yarn fix:attribution:check --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$HEAD_REF" --title "$PR_TITLE"
-
-      - name: Check documented commands resolve
-        run: corepack yarn docs:commands:check
-
-      - name: Check documented file-refs resolve
-        run: corepack yarn docs:file-refs:check
 
       # Asserts every `nx run <project>:<target>` and `nx <target> <project>` in
       # tracked Markdown resolves in the project graph. DEVELOPMENT.md taught two
@@ -839,108 +843,6 @@ jobs:
         if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
         run: corepack yarn upstream:briefs:test
 
-      # The meta-gate: asserts every check-*.ts is invoked by some hook or
-      # workflow, resolving one level of indirection through the aggregate's
-      # manifest, rejects any check-*.mjs, and asserts every *.test.ts
-      # Contract Suite is reached by the wired `tools:test` glob (ADR 0135).
-      # Nine checkers ran nowhere when ADR 0043 was written; six suites ran
-      # nowhere when the suite rule was added, before that glob was the one
-      # runner.
-      - name: Check gate coverage
-        run: corepack yarn gates:coverage:check
-
-      # Path-gating a heavy suite adds a second way for a gate to run nowhere
-      # that reading its name cannot see: the step is here, the workflow does
-      # invoke it, and its `if:` was false for this pull request. This asserts
-      # that a path-gated Covering Gate's triggers still cover every trigger
-      # path of a review obligation that names it, so a finding can never be
-      # suppressed on a gate the path gate skipped (ADR 0074, ADR 0140).
-      - name: Check path-gated Covering Gates cover their obligations
-        run: corepack yarn covering-gates:check
-
-      # The checks below also run through `yarn gates:run` in the pre-commit
-      # hook (ADR 0043). CI runs each as its own named step instead of the
-      # aggregate so a failure is identifiable without opening a log.
-
-      # An instruction the reviewer is refused permission to follow is an
-      # instruction nothing can carry out, and it is not free: run 45's guard
-      # case spent 26 permission denials of an 81-turn budget and wrote no
-      # report at all. This ran CI-only while it still failed on the tree that
-      # introduced it, because the aggregate is what `.husky/pre-commit` calls
-      # and wiring it there sooner would have blocked every commit in the
-      # repository. It has passed since the contradiction was fixed, so it now
-      # sits in `tools/scripts/lib/gate-manifest.ts` with the rest.
-      - name: Check the reviewer may run what it is told to run
-        run: corepack yarn review:allowlist:check
-
-      - name: Check the review checklist against the obligation catalogue
-        run: corepack yarn review:checklist:check
-
-      - name: Check root README
-        run: corepack yarn readme:check
-
-      - name: Check OpenAPI generated artifacts
-        run: corepack yarn openapi:artifacts
-
-      - name: Check backend env vars are declared in .env.example
-        run: corepack yarn env:declared:check
-
-      - name: Check deployment doc env vars are declared in .env.example
-        run: corepack yarn env:deployment:check
-
-      - name: Check feature index against dashboard routes
-        run: corepack yarn feature-index:check
-
-      - name: Check agent orchestration map
-        run: corepack yarn agents:map:check
-
-      - name: Check vault diagram pages
-        run: corepack yarn vault:pages:check
-
-      - name: Check auth diagram pages
-        run: corepack yarn auth:pages:check
-
-      - name: Check Nx project tags
-        run: corepack yarn nx:tags:check
-
-      - name: Check review pipeline page
-        run: corepack yarn review:pages:check
-
-      - name: Check the code-review golden set
-        run: corepack yarn review:golden:check
-
-      - name: Check the golden replay results record
-        run: corepack yarn review:golden:results:check
-
-      - name: Check release pipeline page
-        run: corepack yarn deploy:pages:check
-
-      - name: Check Host Apply workflow wiring
-        run: corepack yarn host-apply:workflow:check
-
-      - name: Check sub-agent sync
-        run: corepack yarn agents:sync:check
-
-      # A fan-out over a guarded domain enum must reach its pinned table
-      # rather than hand-enumerate the members (ADR 0053). TypeScript catches
-      # the omission only at call sites written to be caught; this catches the
-      # ones that were not.
-      - name: Check guarded enum fan-outs are pinned
-        run: corepack yarn enum:fanout:check
-
-      # Tailwind silently drops a class name it cannot resolve, so a colour
-      # utility that paints nothing ships without a build error (issue #632).
-      - name: Check Tailwind colour utilities resolve
-        run: corepack yarn tailwind:classes:check
-
-      # A Storybook stories glob or Tailwind content glob that matches nothing
-      # drops stories or classes without an error (issue #898).
-      - name: Check Storybook and Tailwind globs match files
-        run: corepack yarn content-globs:check
-
-      # A bare `react-native/…` subpath import is deprecated at 0.80 with
-      # removal planned; browser globals are scanned in all mobile source, and
-      # mobile must reach shared libraries through Portable Entry Points (ADR 0103).
       # ADR 0064: the Escape Copy must be openable by a tool that needs nothing
       # of ours, and a gate must assert the tool still opens a freshly produced
       # envelope. This builds the reader and runs it against an envelope the
@@ -950,33 +852,6 @@ jobs:
       # pre-commit aggregate is for.
       - name: Check the Escape Copy reader opens a fresh envelope
         run: corepack yarn escape-copy-reader:check
-
-      - name: Check web app icons match the shield and tokens
-        run: corepack yarn web:app-icons:check
-
-      - name: Check mobile app icon matches the shield and tokens
-        run: corepack yarn mobile:app-icon:check
-
-      - name: Check mobile platform rules
-        run: corepack yarn mobile-platform:check
-
-      # Why a committed keystore is unrecoverable: see the checker's header.
-      - name: Check no signing material is committed
-        run: corepack yarn signing-material:check
-
-      # The file-reading half of the Prisma migration gate (ADR 0094). The
-      # half that needs a database is the "Apply Prisma migrations and check
-      # schema drift" step above, against this job's Postgres service.
-      - name: Check Prisma migration history
-        run: corepack yarn prisma:migrations:check
-
-      # A committed Upstream Brief report is frozen at its date, so its local
-      # evidence is checked against the commit it records rather than the tree
-      # in front of it. That is what lets a frozen brief stay checkable — and
-      # what makes a citation that stopped matching a fact worth failing on
-      # (ADR 0084 item 10).
-      - name: Check committed Upstream Brief reports
-        run: corepack yarn upstream:briefs:check
 
       - name: Restore Nx computation cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -989,9 +864,6 @@ jobs:
 
       - name: Test affected projects
         run: corepack yarn nx affected -t test --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
-
-      - name: Check workflow jobs pin ubuntu-24.04
-        run: corepack yarn runner-image:check
 
   e2e:
     name: E2E Chromium (shard ${{ matrix.shard }}/3)

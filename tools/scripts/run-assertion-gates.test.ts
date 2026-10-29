@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -201,6 +201,129 @@ test('a yarn line per checker fails the bound', (t) => {
     `expected a yarn line per checker to exceed the bound; took ` +
       describe(costMs),
   );
+});
+
+// Issue #1389 folded each of these ids' standalone named CI step into this
+// one aggregate step. Before this slice, deleting one of these entries from
+// GATE_MANIFEST would still have been caught by its own CI step going missing
+// (a reviewer would notice "Check root README" vanish from the workflow); now
+// the only CI-side signal is this list, plus gates:coverage:check if nothing
+// else wires the checker either. This is a frozen pin for this migration, not
+// a mirror of GATE_MANIFEST's current membership (contrast the test above).
+const FOLDED_OUT_OF_CI_BY_1389 = [
+  'readme:check',
+  'openapi:artifacts',
+  'env:declared:check',
+  'env:deployment:check',
+  'feature-index:check',
+  'agents:map:check',
+  'vault:pages:check',
+  'auth:pages:check',
+  'nx:tags:check',
+  'review:allowlist:check',
+  'review:checklist:check',
+  'review:pages:check',
+  'review:golden:check',
+  'review:golden:results:check',
+  'deploy:pages:check',
+  'host-apply:workflow:check',
+  'agents:sync:check (subagents)',
+  'agents:sync:check (models)',
+  'adr:numbering:check',
+  'adr:status:check',
+  'docs:commands:check',
+  'docs:file-refs:check',
+  'enum:fanout:check',
+  'tailwind:classes:check',
+  'content-globs:check',
+  'web:app-icons:check',
+  'mobile:app-icon:check',
+  'mobile-platform:check',
+  'signing-material:check',
+  'prisma:migrations:check',
+  'upstream:briefs:check',
+  'gates:coverage:check',
+  'covering-gates:check',
+  'runner-image:check',
+];
+
+test('every checker whose own CI step issue #1389 removed is still in the manifest', () => {
+  const ids = new Set(GATE_MANIFEST.map((entry) => entry.id));
+  for (const id of FOLDED_OUT_OF_CI_BY_1389) {
+    assert.ok(ids.has(id), `${id} is missing from GATE_MANIFEST`);
+  }
+});
+
+// Under GITHUB_ACTIONS every gate gets its own ::group:: pair and every failing
+// gate its own ::error annotation; outside Actions (Husky's pre-commit) neither
+// token may appear. Two stubs fail, so the run must keep going past the first.
+test('gates:run groups every gate and annotates each failure only inside GitHub Actions', (t) => {
+  const workspace = createGateManifestWorkspace(t, {
+    prefix: 'gate-output-format-',
+    scripts: [...new Set(GATE_MANIFEST.map(({ script }) => script))],
+  });
+  copyFileSync(
+    join(REPO_ROOT, 'package.json'),
+    join(workspace, 'package.json'),
+  );
+
+  const [first, second] = GATE_MANIFEST;
+  assert.notEqual(first.script, second.script);
+  for (const entry of [first, second]) {
+    writeFileSync(
+      join(workspace, entry.script),
+      "console.error('boom');\nprocess.exit(1);\n",
+    );
+  }
+
+  const total = GATE_MANIFEST.length;
+  const count = (text: string, token: string) => text.split(token).length - 1;
+
+  const inActionsEnv = { ...process.env, GITHUB_ACTIONS: 'true' };
+  const actions = spawnSync(process.execPath, [RUNNER], {
+    cwd: workspace,
+    encoding: 'utf8',
+    env: inActionsEnv,
+  });
+
+  assert.equal(actions.status, 1, `${actions.stdout}\n${actions.stderr}`);
+  assert.equal(count(actions.stdout, '::group::'), total);
+  assert.equal(count(actions.stdout, '::endgroup::'), total);
+  for (const { id } of [first, second]) {
+    assert.ok(
+      actions.stdout.includes(`::group::${id}`),
+      `${id} has no group:\n${actions.stdout}`,
+    );
+    assert.ok(
+      actions.stderr.includes(`✗ ${id} (exit 1)`),
+      `${id} did not report a failure:\n${actions.stderr}`,
+    );
+  }
+  assert.equal(count(actions.stdout, '::error title='), 2);
+  assert.match(
+    actions.stdout,
+    new RegExp(`gates: ${total - 2}/${total} checks passed`),
+  );
+
+  const plainEnv: NodeJS.ProcessEnv = { ...process.env };
+  delete plainEnv.GITHUB_ACTIONS;
+  const plain = spawnSync(process.execPath, [RUNNER], {
+    cwd: workspace,
+    encoding: 'utf8',
+    env: plainEnv,
+  });
+
+  const plainOutput = `${plain.stdout}${plain.stderr}`;
+  assert.equal(plain.status, 1, plainOutput);
+  assert.equal(count(plainOutput, '::group::'), 0);
+  assert.equal(count(plainOutput, '::endgroup::'), 0);
+  assert.equal(count(plainOutput, '::error'), 0);
+  for (const { id } of [first, second]) {
+    assert.ok(
+      plain.stderr.includes(`✗ ${id} (exit 1)`),
+      `${id} did not report a failure outside Actions:\n${plainOutput}`,
+    );
+  }
 });
 
 test('per-checker cost does not rise when the roster grows', (t) => {
