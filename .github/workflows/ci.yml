@@ -13,9 +13,20 @@ on:
       - 'release/**'
   workflow_dispatch:
 
+# A pull request cancels its own superseded runs: nobody is waiting on the
+# result of a commit that has already been pushed over.
+#
+# A push to `main` does not. Every `main` commit carries the whole-tree
+# guarantee before a release is cut from it, and — the reason this changed —
+# a cancelled run saves no cache: `actions/cache` writes in a job's post
+# step, so a cancelled `main` run leaves the Nx baseline at whatever the last
+# uncancelled push managed to save. That baseline is what every pull request
+# restores from, and a `main` that cancels itself under a burst of merges is
+# how it went stale. Superseded entries are pruned afterwards by
+# cache-cleanup.yml rather than by refusing to save them.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -641,8 +652,19 @@ jobs:
             ${{ runner.os }}-nx-22-lint-
             ${{ runner.os }}-nx-22-
 
+      # A pull request lints what it can have broken; a push lints the whole
+      # tree. The whole-tree run is not only `main`'s guarantee before a
+      # release — it is also the only thing that writes a *complete* Nx cache
+      # baseline for a pull request to restore from. An affected-only push
+      # caches only what that push happened to touch, which is why the
+      # computation cache barely helped before this (issue #1382).
       - name: Lint affected projects
+        if: github.event_name == 'pull_request'
         run: corepack yarn nx affected -t lint --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Lint every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t lint
 
   test:
     name: Test
@@ -871,8 +893,16 @@ jobs:
             ${{ runner.os }}-nx-22-test-
             ${{ runner.os }}-nx-22-
 
+      # Affected on a pull request, whole tree on a push — the same split as
+      # Lint above, and for the same two reasons: `main`'s guarantee, and a
+      # full Nx cache baseline for pull requests to restore from.
       - name: Test affected projects
+        if: github.event_name == 'pull_request'
         run: corepack yarn nx affected -t test --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Test every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t test
 
   e2e:
     name: E2E Chromium (shard ${{ matrix.shard }}/3)

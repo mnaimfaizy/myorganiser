@@ -764,6 +764,14 @@ _Avoid_: path filter, affected paths, watch globs, trigger paths (for the review
 The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. It rejects a `check-*.mjs` by name, since a checker is TypeScript, and it asserts every Contract Suite is wired: a `*.test.ts` under `tools/scripts` that `tools:test`'s own glob does not reach, or that it reaches while `tools:test` itself is wired nowhere, fails by name (ADR 0135). An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker or suite it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
 _Avoid_: gate-of-gates, master gate, gate linter
 
+**Cache Baseline**:
+The Nx computation cache a push to `main` saves, over the whole tree rather than over what that push affected. It is what a Pull Request's `nx affected` run restores from, so its completeness is the whole point: an affected-only push caches only the projects that push happened to touch, and a Pull Request then recomputes everything else. Push-to-`main` runs `run-many` and does not cancel superseded runs for this reason — a cancelled run saves nothing, because `actions/cache` writes in a job's post step.
+_Avoid_: warm cache, shared cache, cache seed, main cache (for the dependency cache too)
+
+**Cache Family**:
+The GitHub Actions cache entries on one ref that are copies of one cache, differing only in the variant that dates them — a lockfile digest for the dependency cache, a commit for a Cache Baseline. Only the newest copy of a family is ever restored, which is what makes every older copy safe to delete and keeps the repository under GitHub's 10 GB limit. Deleting the newest copy is not a slow cache but a cold one, so no cleanup selects it; a key whose shape names no family is left alone rather than guessed at.
+_Avoid_: cache group, stale cache, duplicate cache, cache generation
+
 **Unasserted Claim**:
 A fact about the tree that an artifact states and nothing checks. Distinct from prose a gate cannot reach: an Unasserted Claim is one an extractor could have read — a count, a source citation, a version — that simply has none, so it drifts silently while the page around it stays green. The defect is the gap between what an artifact states and what it asserts, which is why it applies equally to a page whose manifest omits a number it prints and to a checker whose header claims a direction its code does not run.
 _Avoid_: stale doc, prose drift, uncovered fact, documentation rot

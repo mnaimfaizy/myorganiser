@@ -1,0 +1,137 @@
+name: Cache Cleanup
+
+# runs-on is pinned to ubuntu-24.04. See docs/deployment/CI_CD_AND_RELEASE_PROCESS.md#runner-image.
+
+# Keeps the repository under GitHub's 10 GB Actions cache limit, which it had
+# gone past — the dependency cache alone measured ~9.96 GB — so that useful
+# entries stopped surviving long enough for a pull request to restore them.
+# The entries deleted here are the ones nothing can restore from any more: a
+# closed pull request's scope, and the copies of a Cache Family on `main`
+# that a newer copy has replaced. What counts as replaced is decided by
+# tools/scripts/lib/actions-cache-cleanup.ts, and its one invariant is that
+# the newest copy of a family is never deleted — on `main` that copy is the
+# baseline every pull request restores from, which is why push-to-`main` CI
+# stopped cancelling itself (ci.yml's `cancel-in-progress`).
+#
+# Three triggers, one per thing that can make an entry dead:
+#
+#   * `pull_request: closed` — the moment a pull request closes, its whole
+#     `refs/pull/<n>/merge` scope is unreachable. Not `pull_request_target`:
+#     that would run this repository's workflow with a write token against a
+#     fork's head, and no cache cleanup is worth that. The cost is that a
+#     fork's (and Dependabot's) read-only token cannot delete, which the
+#     script reports as a warning rather than a failure.
+#   * `workflow_run` on CI completing on `main` — a baseline is superseded
+#     only once the newer one is *saved*, and `actions/cache` saves in a
+#     job's post step. Waiting for the whole CI run to complete is the only
+#     trigger that is reliably after that; a `push` trigger would race the
+#     run it was triggered by and leave the previous baseline in place for
+#     one more push.
+#   * `workflow_dispatch` — the manual recovery, with a dry run, for the
+#     first use and for whenever a `workflow_run` event is missed.
+on:
+  pull_request:
+    types:
+      - closed
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be deleted without deleting it'
+        type: boolean
+        default: false
+
+# Queued, never cancelled: a cancelled cleanup is a half-applied plan, and
+# there is nothing to gain from racing two of them over the same listing.
+concurrency:
+  group: cache-cleanup-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Every cache entry a closed pull request's runs saved. Scoped by ref, so
+  # this can never reach `main`'s baseline or another pull request's entries.
+  prune-closed-pull-request:
+    name: Prune Closed Pull Request Caches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+
+    # Job permissions replace the workflow set. `actions: write` is what
+    # deleting a cache entry needs; `contents: read` is restated for the
+    # checkout. Nothing else.
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      # No `yarn install`: the script imports only Node built-ins and two
+      # modules from this repository, so the cleanup never waits on the
+      # dependency cache it is pruning.
+      - name: Delete this pull request's cache entries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          node tools/scripts/ci/prune-actions-caches.ts \
+            --closed-pull-request '${{ github.event.pull_request.number }}'
+
+  # `main`'s superseded entries: dependency caches whose lockfile hash has
+  # moved on, and Nx baselines a newer commit's baseline for the same target
+  # has replaced.
+  prune-main-baselines:
+    name: Prune Superseded Main Caches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: github.event_name != 'pull_request'
+
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      # `--keep-key` is the dependency cache key a run on `main` would restore
+      # right now, spelled exactly as ci.yml spells it (the Contract Suite
+      # fails if the two drift). The dependency cache is restored by exact key
+      # with no restore-keys, so "newest" is not enough on its own: a reverted
+      # lockfile makes the key CI needs an older entry than the one saved
+      # before the revert, and that entry must survive the prune.
+      - name: Delete superseded main cache entries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          node tools/scripts/ci/prune-actions-caches.ts \
+            --prune-ref refs/heads/main \
+            --keep-key '${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}' \
+            ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}

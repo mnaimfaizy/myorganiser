@@ -33,9 +33,16 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
 ## Workflows
 
 - `.github/workflows/ci.yml` (name: `CI`)
-  - Runs `lint`, `test`, `build` using `nx affected`.
+  - A pull request runs `lint`, `test` and `build` using `nx affected`. A push runs `nx run-many` over the whole tree, so every `main` commit carries the whole-tree guarantee before a release is cut from it.
   - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
+  - **Caching.** Two caches, both `actions/cache` with no write mode and no `pull_request_target` anywhere: the dependency cache (`<os>-node-22-deps-<lockfile digest>`, restored by exact key) and the Nx computation cache (`<os>-nx-22-<target>-<commit>`, restored through a `<os>-nx-22-<target>-` prefix). A pull request writes only into its own `refs/pull/<n>/merge` scope and reads `main`'s as a fallback, which is GitHub's own scoping and not something the workflow arranges.
+  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. Superseded entries are pruned afterwards by `cache-cleanup.yml` instead.
+
+- `.github/workflows/cache-cleanup.yml` (name: `Cache Cleanup`)
+  - Deletes the Actions cache entries nothing can restore from, so the repository stays under GitHub's 10 GB cache limit (past which useful entries are evicted within days).
+  - Fires on `pull_request: closed` (that pull request's whole `refs/pull/<n>/merge` scope), on `workflow_run` when `CI` completes on `main` (the superseded dependency keys and the superseded Nx baseline for each target), and on `workflow_dispatch` with a `dry_run` input.
+  - Selection is pure in `tools/scripts/lib/actions-cache-cleanup.ts` and never selects the newest entry of a Cache Family; `tools/scripts/ci/prune-actions-caches.ts` lists, deletes and reports. A read-only token — a fork's or Dependabot's on a closed pull request — is a warning, not a failure, because `pull_request_target` is deliberately not used.
 
 - `.github/workflows/deploy-staging.yml` (name: `Deploy Staging`)
   - Runs on a daily schedule (`0 16 * * *`, 16:00 UTC) and on `workflow_dispatch`. It does not run after `CI` or on a push.
