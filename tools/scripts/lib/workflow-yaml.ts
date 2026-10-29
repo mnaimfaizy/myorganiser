@@ -1,14 +1,18 @@
 /**
- * The one home for slicing a GitHub Actions workflow into the job and step
- * blocks a checker or Contract Suite wants to assert against.
+ * Slices a GitHub Actions workflow into the job and step blocks a checker or
+ * Contract Suite wants to assert against.
  *
- * It exists for the reason `lib/glob.ts` gives for its own contents: the
- * shape had been written out by hand in seven places — two Contract Suites
- * and five checkers — and a copy of a rule is where the rule drifts. The
- * `stepNamed` copies had already drifted: one matched a step name with
+ * It exists for the reason `lib/glob.ts` gives for its own contents: a copy
+ * of a rule is where the rule drifts, and this shape had already drifted
+ * where it was written out by hand — one `stepNamed` matched a step name with
  * `indexOf`, so `- name: Lint` also matched `- name: Lint affected
  * projects`, and a suite asserting the wrong step's `if:` passes while
- * asserting nothing.
+ * asserting nothing. That drift is why `stepNamed` here matches exactly.
+ *
+ * Hand-written copies of the shape remain elsewhere under `tools/scripts`.
+ * Nothing asserts that this module is their only home, so it does not claim
+ * to be one: retargeting a checker onto it is a deliberate change with that
+ * checker's own gate to re-run, not a cleanup to do in passing.
  *
  * Text slicing rather than a YAML parse is deliberate, and matches the
  * existing checkers: these assertions are about the workflow as written —

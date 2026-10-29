@@ -5,24 +5,11 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { jobBlock } from './workflow-yaml.ts';
+import { jobBlock, stepNamed } from './workflow-yaml.ts';
 
 const REVIEW_TIER = readFileSync('.github/workflows/review-tier.yml', 'utf8');
 const CODE_REVIEW = readFileSync('.github/workflows/code-review.yml', 'utf8');
 const ACTION = readFileSync('.github/actions/code-reviewer/action.yml', 'utf8');
-
-// `jobBlock` is the shared one (tools/scripts/lib/workflow-yaml.ts); it had
-// been written out by hand here and in six other files. `stepNamed` below is
-// this suite's own looser, prefix-matching version and stays local until it
-// is retargeted deliberately — the shared one matches a step name exactly,
-// which is a different question from the one these assertions ask.
-const stepNamed = (job: string, name: string) => {
-  const start = job.indexOf(`- name: ${name}`);
-  assert.notEqual(start, -1, `no step named ${name}`);
-  const rest = job.slice(start);
-  const next = rest.search(/\n {6}- name: /);
-  return next === -1 ? rest : rest.slice(0, next);
-};
 
 test('applying the review:* label cannot fail the Review Tier check', () => {
   const classify = jobBlock(REVIEW_TIER, 'classify');

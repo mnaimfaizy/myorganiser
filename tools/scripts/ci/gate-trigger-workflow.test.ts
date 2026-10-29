@@ -27,9 +27,9 @@ import {
   readGateTriggers,
   type GateTriggerSuite,
 } from '../lib/gate-triggers.ts';
-// The job/step slicing shape had seven hand-written copies, and the
-// `stepNamed` ones had already drifted into matching a step name by prefix.
-// One home: tools/scripts/lib/workflow-yaml.ts.
+// `jobBlock` and `stepNamed` come from the shared slicer in
+// tools/scripts/lib/workflow-yaml.ts. Exact step-name matching is the point: a
+// renamed step fails here rather than matching the step beside it.
 import { escapeRegExp, jobBlock, stepNamed } from '../lib/workflow-yaml.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
