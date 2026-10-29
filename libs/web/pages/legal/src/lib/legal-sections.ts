@@ -106,4 +106,4 @@ export function legalSectionAccessors<Id extends string>(
 export const PRIVACY_POLICY_LAST_UPDATED = '15 October 2026';
 
 /** When these terms last changed. Update it with every change to the wording. */
-export const TERMS_OF_SERVICE_LAST_UPDATED = '14 October 2026';
+export const TERMS_OF_SERVICE_LAST_UPDATED = '16 October 2026';

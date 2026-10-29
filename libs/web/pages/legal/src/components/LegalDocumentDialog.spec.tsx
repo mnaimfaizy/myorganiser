@@ -320,7 +320,7 @@ describe('LegalDocumentDialog', () => {
       const dialog = await openDialog('Terms', 'Terms of Service');
 
       expect(
-        within(dialog).getByText('Last updated: 14 October 2026'),
+        within(dialog).getByText('Last updated: 16 October 2026'),
       ).toBeInTheDocument();
       expect(dialog.querySelectorAll('section h3')).toHaveLength(7);
       expect(dialog.querySelector('section h2')).toBeNull();

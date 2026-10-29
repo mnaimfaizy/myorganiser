@@ -273,7 +273,7 @@ describe('TermsOfServicePage', () => {
     it('should show the Last updated date exactly once', () => {
       const { container } = render(<TermsOfServicePage />);
       expect(
-        screen.getByText('Last updated: 14 October 2026'),
+        screen.getByText('Last updated: 16 October 2026'),
       ).toBeInTheDocument();
       expect(container.textContent?.match(/Last updated/g)).toHaveLength(1);
     });
