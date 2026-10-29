@@ -18,7 +18,10 @@
  *     helper — exists.
  *   - A tools/scripts Contract Suite (any *.test.ts under tools/scripts,
  *     ADR 0135): only that at least one assert()/assert.<method>()/
- *     t.assert… call exists. The Jest rules above do not apply — jest.mock(),
+ *     t.assert… call exists, directly or via an asserting local helper. An
+ *     assert call counts only under the name the module imports node:assert
+ *     or node:assert/strict as; console.assert() and other member .assert()
+ *     calls never count. The Jest rules above do not apply — jest.mock(),
  *     beforeAll(), and expect() are not part of node --test.
  *   - apps/web-e2e specs: not asserted here at all. Their structural rules
  *     are a judgment call TestReviewer makes by reading the file against
@@ -58,7 +61,9 @@ own rules in .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
 A tools/scripts Contract Suite (ADR 0135) is not a Jest spec — it is a
 node --test suite that asserts with node:assert, not expect() — so the Jest
 rules above do not run against it. It is still required to assert something:
-a Contract Suite with no assert()/assert.<method>()/t.assert… call fails.
+a Contract Suite with no node:assert or t.assert… call fails. An assert call
+counts only under the name the file imports node:assert as, so console.assert()
+does not count.
 `;
 
 const TEST_PATHS = [
@@ -358,13 +363,18 @@ function importedBindings(raw: string, code: string): ImportedBinding[] {
   return bindings;
 }
 
+/** The assertion calls one source file can make, read from its unmasked
+ *  source (string contents, such as an import specifier, survive there). */
+type AssertionPattern = (raw: string) => RegExp;
+
 /** An `expect(` call, credited to a Jest spec that calls this helper. */
 const EXPECT_RE = /\bexpect\s*\(/;
+const expectPattern: AssertionPattern = () => EXPECT_RE;
 
 function exportedHelperHasAssertion(
   raw: string,
   exportedName: string,
-  assertionRe: RegExp,
+  assertionPattern: AssertionPattern,
 ) {
   const code = maskNonCode(raw);
   const escapedName = exportedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -376,17 +386,19 @@ function exportedHelperHasAssertion(
   );
   const declaration = declarationRe.exec(code);
   if (!declaration) return false;
-  return assertionRe.test(signatureBodyAfter(code, declaration.index));
+  return assertionPattern(raw).test(
+    signatureBodyAfter(code, declaration.index),
+  );
 }
 
 /** Credits a call to a local helper whose exported body itself asserts —
- *  with `expect(` for a Jest spec, or with `assertionRe` for a Contract
- *  Suite's node:assert / test-context calls. */
+ *  with `expect(` for a Jest spec, or for a Contract Suite with the
+ *  node:assert / test-context calls its own module imports. */
 async function countCalledLocalAssertionHelpers(
   file: string,
   raw: string,
   code: string,
-  assertionRe: RegExp,
+  assertionPattern: AssertionPattern,
 ) {
   let count = 0;
   const moduleCache = new Map<string, string>();
@@ -405,7 +417,11 @@ async function countCalledLocalAssertionHelpers(
       moduleCache.set(modulePath, moduleSource);
     }
     if (
-      exportedHelperHasAssertion(moduleSource, binding.imported, assertionRe)
+      exportedHelperHasAssertion(
+        moduleSource,
+        binding.imported,
+        assertionPattern,
+      )
     ) {
       count += callCount;
     }
@@ -414,24 +430,25 @@ async function countCalledLocalAssertionHelpers(
   return count;
 }
 
-/** Assertions matching `assertionRe`, found directly in the file plus any
+/** Assertions matching `assertionPattern`, found directly in the file plus any
  *  reached through a called local helper whose exported body asserts with
  *  the same pattern. Shared by the Jest no-assertions/vacuous-ratio check
  *  and the Contract Suite's no-assertions check (ADR 0135): both ask the
  *  same "did anything assert here, directly or through a credited helper"
- *  question, against a different assertionRe. */
+ *  question, against a different assertionPattern. */
 async function countAssertions(
   file: string,
   raw: string,
   code: string,
-  assertionRe: RegExp,
+  assertionPattern: AssertionPattern,
 ): Promise<number> {
-  const direct = (code.match(new RegExp(assertionRe, 'g')) ?? []).length;
+  const direct = (code.match(new RegExp(assertionPattern(raw), 'g')) ?? [])
+    .length;
   const helperAssertions = await countCalledLocalAssertionHelpers(
     file,
     raw,
     code,
-    assertionRe,
+    assertionPattern,
   );
   return direct + helperAssertions;
 }
@@ -441,16 +458,38 @@ async function inspect(file: string): Promise<Finding[]> {
   const code = maskNonCode(raw);
   const findings: Finding[] = [];
   for (const check of CHECKS) check(code, raw, findings);
-  const total = await countAssertions(file, raw, code, EXPECT_RE);
+  const total = await countAssertions(file, raw, code, expectPattern);
   checkVacuousAssertions(code, raw, findings, total);
   findings.sort((a, b) => a.line - b.line);
   return findings;
 }
 
-/** An assert()/assert.<method>() call from node:assert or node:assert/strict
- *  (however the import is named), or a t.assert… call on the test context. */
-const CONTRACT_SUITE_ASSERTION_RE =
-  /\bassert\s*\.\s*[A-Za-z_$][\w$]*\s*\(|\bassert\s*\(|\bt\s*\.\s*assert\b/;
+// `import assert from 'node:assert'`, `import { strict as assert } from
+// 'node:assert'`, `import * as assert from 'assert/strict'`: the local name the
+// module gives node:assert, read from the unmasked source.
+const NODE_ASSERT_IMPORT_RE =
+  /\bimport\s+(?:\*\s+as\s+([A-Za-z_$][\w$]*)|([A-Za-z_$][\w$]*)|\{\s*strict\s+as\s+([A-Za-z_$][\w$]*)\s*\})\s+from\s+(['"])(?:node:)?assert(?:\/strict)?\4/g;
+
+function nodeAssertNames(raw: string): string[] {
+  return [...raw.matchAll(NODE_ASSERT_IMPORT_RE)].map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  );
+}
+
+/** A call on the test context, `t.assert…`, which needs no import. */
+const TEST_CONTEXT_ASSERTION = String.raw`(?<![.\w$])t\s*\.\s*assert\b`;
+
+/** An `<name>(…)` or `<name>.<method>(…)` call, where `<name>` is what this
+ *  module imported node:assert or node:assert/strict as, or a `t.assert…`
+ *  call on the test context. A member access such as `console.assert(` or
+ *  `foo.assert(` is not one, and neither is a bare `assert(` in a module that
+ *  never imports node:assert. */
+const contractSuitePattern: AssertionPattern = (raw) => {
+  const calls = nodeAssertNames(raw).map(
+    (name) => String.raw`(?<![.\w$])${name}\s*(?:\.\s*[A-Za-z_$][\w$]*\s*)?\(`,
+  );
+  return new RegExp([...calls, TEST_CONTEXT_ASSERTION].join('|'));
+};
 
 /** A tools/scripts Contract Suite's only mechanical rule (ADR 0135): it must
  *  call an assertion somewhere, directly or through a local helper (such as
@@ -460,12 +499,7 @@ const CONTRACT_SUITE_ASSERTION_RE =
 async function inspectContractSuite(file: string): Promise<Finding[]> {
   const raw = normalize(await fs.readFile(file, 'utf8'));
   const code = maskNonCode(raw);
-  const total = await countAssertions(
-    file,
-    raw,
-    code,
-    CONTRACT_SUITE_ASSERTION_RE,
-  );
+  const total = await countAssertions(file, raw, code, contractSuitePattern);
   if (total > 0) return [];
   return [
     {

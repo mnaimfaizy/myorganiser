@@ -409,6 +409,93 @@ test('a tools/scripts Contract Suite asserting via the test-context t.assert pas
   assert.match(result.stdout, /PASS — asserts with node:assert/);
 });
 
+test('a tools/scripts Contract Suite whose only call is console.assert fails', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "test('widget', () => { console.assert(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+});
+
+test('a tools/scripts Contract Suite that calls only foo.assert fails even when it imports node:assert', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import assert from 'node:assert/strict';\n" +
+      "import test from 'node:test';\n" +
+      'const foo = { assert: () => true };\n' +
+      "test('widget', () => { foo.assert(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+});
+
+test('a tools/scripts Contract Suite with a bare assert() and no node:assert import fails', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "test('widget', () => { assert(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+});
+
+test('a tools/scripts Contract Suite honours a node:assert import under a renamed local name', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import { strict as check } from 'node:assert';\n" +
+      "import test from 'node:test';\n" +
+      "test('widget', () => { check.equal(1, 1); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /PASS — asserts with node:assert/);
+});
+
+test('a tools/scripts Contract Suite is not credited for a helper whose body calls console.assert', (t) => {
+  const workspace = createWorkspace(t);
+  writeFixture(
+    workspace,
+    'tools/scripts/lib/harness.ts',
+    "import assert from 'node:assert/strict';\n" +
+      'export function expectAllowed(value: string): void {\n' +
+      "  console.assert(value === 'allowed');\n" +
+      '}\n',
+  );
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "import { expectAllowed } from './harness.ts';\n\n" +
+      "test('widget', () => { expectAllowed('allowed'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+});
+
 test('a Jest spec under tools/scripts is unaffected by the Contract Suite assertion rule', (t) => {
   const workspace = createWorkspace(t);
   const file = writeFixture(
