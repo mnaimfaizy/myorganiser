@@ -1,6 +1,9 @@
 import { Button } from '@myorganiser/web-ui';
 import Link from 'next/link';
-import { TERMS_OF_SERVICE_SECTIONS } from '../lib/legal-sections';
+import {
+  TERMS_OF_SERVICE_LAST_UPDATED,
+  TERMS_OF_SERVICE_SECTIONS,
+} from '../lib/legal-sections';
 import { LegalPageActions } from './LegalPageActions';
 import { LegalPageBody } from './LegalPageBody';
 import { LegalPageFooter } from './LegalPageFooter';
@@ -16,7 +19,11 @@ export default function TermsOfServicePage() {
   return (
     <LegalPageLayout>
       <LegalPageHeader current="terms" />
-      <LegalPageHero title="Terms of Service" illustration="tasks" />
+      <LegalPageHero
+        title="Terms of Service"
+        illustration="tasks"
+        lastUpdated={TERMS_OF_SERVICE_LAST_UPDATED}
+      />
       <LegalPageBody toc={toc}>
         <TermsOfServiceContent
           operatorContact={

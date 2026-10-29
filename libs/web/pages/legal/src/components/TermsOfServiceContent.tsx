@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import {
   legalSectionAccessors,
   type LegalVariant,
+  TERMS_OF_SERVICE_LAST_UPDATED,
   TERMS_OF_SERVICE_SECTIONS,
   type TermsOfServiceSectionId,
 } from '../lib/legal-sections';
@@ -33,6 +34,11 @@ export function TermsOfServiceContent({
 
   return (
     <>
+      {variant === 'dialog' && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Last updated: {TERMS_OF_SERVICE_LAST_UPDATED}
+        </p>
+      )}
       <LegalSection
         id="acceptance"
         title={title('acceptance')}

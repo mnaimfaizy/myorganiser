@@ -270,9 +270,12 @@ describe('TermsOfServicePage', () => {
       ).toBeInTheDocument();
     });
 
-    it('should render no Last updated line', () => {
-      render(<TermsOfServicePage />);
-      expect(screen.queryByText(/Last updated/)).toBeNull();
+    it('should show the Last updated date exactly once', () => {
+      const { container } = render(<TermsOfServicePage />);
+      expect(
+        screen.getByText('Last updated: 15 October 2026'),
+      ).toBeInTheDocument();
+      expect(container.textContent?.match(/Last updated/g)).toHaveLength(1);
     });
   });
 });

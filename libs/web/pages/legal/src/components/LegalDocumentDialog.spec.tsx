@@ -314,11 +314,14 @@ describe('LegalDocumentDialog', () => {
   });
 
   describe('dialog variant', () => {
-    it('renders each Terms section as an h3 inside a section, with no numbered badge', async () => {
+    it('renders each Terms section as an h3 inside a section, with no numbered badge, and shows the Last updated line', async () => {
       render(<LegalDocumentDialog kind="terms">Terms</LegalDocumentDialog>);
 
       const dialog = await openDialog('Terms', 'Terms of Service');
 
+      expect(
+        within(dialog).getByText('Last updated: 15 October 2026'),
+      ).toBeInTheDocument();
       expect(dialog.querySelectorAll('section h3')).toHaveLength(7);
       expect(dialog.querySelector('section h2')).toBeNull();
       expect(within(dialog).queryByText(/^0[1-9]$/)).toBeNull();
