@@ -737,7 +737,7 @@ The set of projects a gate actually reaches, which is not the set its command ap
 _Avoid_: test coverage, CI coverage, gate scope, covering gate (for this sense)
 
 **Covering Gate**:
-The gate that asserts the artifact a given change invalidates. It is named against the change's _trigger_ rather than against the diff, because the artifact at risk is usually not in the diff at all: a version bump in `package.json` invalidates the OpenAPI spec and the generated client, so the Covering Gate is the OpenAPI drift check and not any gate over `package.json`. Being the Covering Gate says nothing about whether the gate is wired, and being wired says nothing about whether it covers anything — a truthful answer about a gate that covers something else is the failure mode this term exists to name.
+The gate that asserts the artifact a given change invalidates. It is named against the change's _trigger_ rather than against the diff, because the artifact at risk is usually not in the diff at all: a version bump in `package.json` invalidates the OpenAPI spec and the generated client, so the Covering Gate is the OpenAPI drift check and not any gate over `package.json`. Being the Covering Gate says nothing about whether the gate is wired, and being wired says nothing about whether it covers anything — a truthful answer about a gate that covers something else is the failure mode this term exists to name. A Covering Gate that is also a Heavy Suite is found by name in the workflow whether or not its Gate Trigger fired, so its triggers are asserted to be a superset of the obligation triggers naming it rather than left to the reviewer to notice (ADR 0140, under the suppression rule ADR 0074 states).
 _Avoid_: gate coverage (a different question), relevant gate, responsible check, the gate for this file
 
 **Assertion Gate**:
@@ -751,6 +751,14 @@ _Avoid_: enabled gate, active check, gate coverage (for this sense)
 **Contract Suite**:
 The test suite that proves a tooling script does what its header claims — for a checker, that it actually fails on the drift it says it catches. It is wired or it is not, independently of the script it tests: a Wired Gate whose Contract Suite runs nowhere is a header nothing asserts, and a Contract Suite running green says nothing about whether its checker is wired.
 _Avoid_: checker test, script test, unit test (for this sense)
+
+**Heavy Suite**:
+A gate CI pays minutes for rather than milliseconds — a Contract Suite set, or a drift check that regenerates an artifact — and therefore one a Pull Request runs only when its own Gate Triggers match a changed path (ADR 0140). The distinction is cost, not importance: the cheap file-reading Assertion Gates all run over the whole tree on every Pull Request because deciding whether to run one would cost more than running it. A push to `main` runs every Heavy Suite.
+_Avoid_: slow test, expensive check, optional gate, conditional gate
+
+**Gate Trigger**:
+The globs that select a Heavy Suite, held in one config rather than in a workflow condition. A changed path matching a suite's triggers runs it; a changed path matching a **Shared Input** — a workflow file, `package.json`, `yarn.lock`, `tsconfig.base.json`, `nx.json`, the config itself — runs every suite, because no per-suite glob can bound a change with repo-wide reach. Distinct from a review obligation's trigger, which selects a question for the reviewer rather than a step for CI; the two meet in the rule that a path-gated Covering Gate's triggers are a superset of the obligation triggers naming it (ADR 0140, ADR 0074).
+_Avoid_: path filter, affected paths, watch globs, trigger paths (for the review sense)
 
 **Meta-Gate**:
 The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. It rejects a `check-*.mjs` by name, since a checker is TypeScript, and it asserts every Contract Suite is wired: a `*.test.ts` under `tools/scripts` that `tools:test`'s own glob does not reach, or that it reaches while `tools:test` itself is wired nowhere, fails by name (ADR 0135). An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker or suite it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.

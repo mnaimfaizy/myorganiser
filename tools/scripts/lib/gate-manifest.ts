@@ -265,6 +265,18 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
     script: 'tools/scripts/check-gate-coverage.ts',
     args: [],
   },
+  // Path-gating a heavy suite (ADR 0140) adds a second way for a gate to run
+  // nowhere that reading its name cannot see: the step exists, the workflow
+  // invokes it, and its `if:` was false for this pull request. This asserts
+  // that a path-gated Covering Gate's triggers still cover every trigger path
+  // of a review obligation that names it (ADR 0074). File-reading and cheap,
+  // so it belongs here rather than only in CI.
+  {
+    id: 'covering-gates:check',
+    npmScript: 'covering-gates:check',
+    script: 'tools/scripts/check-covering-gates.ts',
+    args: [],
+  },
   {
     id: 'checker-contracts:check',
     npmScript: 'checker-contracts:check',

@@ -86,6 +86,7 @@
     "qa:accounts:seed": "node tools/scripts/qa-accounts.ts seed",
     "gates:run": "node tools/scripts/run-assertion-gates.ts",
     "gates:coverage:check": "node tools/scripts/check-gate-coverage.ts",
+    "covering-gates:check": "node tools/scripts/check-covering-gates.ts",
     "tools:test": "node --test 'tools/scripts/**/*.test.ts'",
     "tools:test:staged": "node tools/scripts/run-tools-test-selection.ts",
     "upstream:briefs:check": "node tools/scripts/check-upstream-briefs.ts",

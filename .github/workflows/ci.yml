@@ -454,6 +454,16 @@ jobs:
       nx_base: ${{ steps.affected.outputs.nx_base }}
       nx_head: ${{ steps.affected.outputs.nx_head }}
       affected_projects: ${{ steps.projects.outputs.affected_projects }}
+      # Which heavy `Test` suites this run pays for (ADR 0140). `run_all` is
+      # set for a push, a manual run, and any resolver failure, so every
+      # condition below is `run_all or my own flag` and the fallback is always
+      # to run more. The flag names come from
+      # `flagName` in tools/scripts/lib/gate-triggers.ts over the suite ids in
+      # tools/config/gate-triggers.json — add a suite there, not here.
+      gate_run_all: ${{ steps.gate-triggers.outputs.run_all }}
+      gate_tools_test: ${{ steps.gate-triggers.outputs.run_tools_test }}
+      gate_upstream_briefs_test: ${{ steps.gate-triggers.outputs.run_upstream_briefs_test }}
+      gate_openapi_check: ${{ steps.gate-triggers.outputs.run_openapi_check }}
 
     steps:
       - name: Checkout repository
@@ -521,6 +531,48 @@ jobs:
 
           echo "affected_projects=$AFFECTED_JSON" >> "$GITHUB_OUTPUT"
           echo "Affected projects: $AFFECTED_JSON"
+
+      # A pull request pays for a heavy suite only when its own trigger globs
+      # match a changed path; a push to `main` or a manual run pays for all of
+      # them, so `main` keeps its whole-tree guarantee before a release is cut
+      # (ADR 0140). The globs live in tools/config/gate-triggers.json and the
+      # filter is our own code rather than a marketplace path-filter action,
+      # because `covering-gates:check` asserts the same globs against the
+      # review-obligation catalogue (ADR 0074).
+      #
+      # The resolver answers a failure it can describe with every flag set and
+      # exit 0. The one it cannot — a config it cannot parse, so it does not
+      # know the flag names — exits non-zero, and `run_all=true` here is the
+      # same fallback by another route. Never skip on error.
+      - name: Resolve heavy gate triggers
+        id: gate-triggers
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ steps.affected.outputs.nx_base }}
+          HEAD_SHA: ${{ steps.affected.outputs.nx_head }}
+        run: |
+          set -uo pipefail
+
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            set -- "$BASE_SHA" "$HEAD_SHA"
+          else
+            set -- --all
+          fi
+
+          if ! flags="$(node tools/scripts/ci/resolve-gate-triggers.ts "$@")"; then
+            echo '::warning title=Gate trigger resolution failed::Running every heavy suite.'
+            echo 'run_all=true' >> "$GITHUB_OUTPUT"
+            echo 'Gate trigger resolution failed; running every heavy suite.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          printf '%s\n' "$flags" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Heavy gate suites'
+            echo
+            printf '%s\n' "$flags" | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   lint:
     name: Lint
@@ -618,6 +670,9 @@ jobs:
         # openapi:check regenerates the client via openapi-generator-cli, which is
         # a Java tool. Pinned explicitly rather than relying on the runner image's
         # preinstalled JDK, which is not part of the runner's stability contract.
+        # Nothing else in this job needs a JDK, so it is set up exactly when
+        # openapi:check runs (ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -649,12 +704,22 @@ jobs:
       # upstream:briefs:test still runs on its own further
       # down: it also runs suites under .agents/skills/upstream-brief, which
       # this glob does not reach.
+      #
+      # Path-gated on a pull request (ADR 0140): a suite proves its checker
+      # works, and the checkers themselves still run over the whole tree
+      # through the steps below. `tools:test` stays spelled exactly here, so
+      # the Meta-Gate still reads this job as the glob runner's wiring.
       - name: Run tools/scripts contract suites
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true'
         run: corepack yarn tools:test
 
       - name: Check OpenAPI spec and generated client are in sync
         # Regenerates the spec and client, then asserts a clean tree. Runs before
         # the hygiene steps so an unrelated step cannot dirty the tree first.
+        # The Covering Gate for the generated API surface, so its triggers are
+        # asserted against the review-obligation catalogue by
+        # `yarn covering-gates:check` (ADR 0074, ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
         run: corepack yarn openapi:check
 
       - name: Check design token outputs are in sync
@@ -758,7 +823,11 @@ jobs:
       - name: Check documented Nx targets resolve
         run: corepack yarn docs:nx-targets:check "$NX_GRAPH_FILE"
 
+      # These suites ship beside the upstream-brief Skill rather than under
+      # tools/scripts, so `tools:test`'s glob does not reach them — which is
+      # also why they are their own path-gated suite (ADR 0140).
       - name: Upstream Brief report contract and checker contracts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
         run: corepack yarn upstream:briefs:test
 
       # The meta-gate: asserts every check-*.ts is invoked by some hook or
@@ -770,6 +839,15 @@ jobs:
       # runner.
       - name: Check gate coverage
         run: corepack yarn gates:coverage:check
+
+      # Path-gating a heavy suite adds a second way for a gate to run nowhere
+      # that reading its name cannot see: the step is here, the workflow does
+      # invoke it, and its `if:` was false for this pull request. This asserts
+      # that a path-gated Covering Gate's triggers still cover every trigger
+      # path of a review obligation that names it, so a finding can never be
+      # suppressed on a gate the path gate skipped (ADR 0074, ADR 0140).
+      - name: Check path-gated Covering Gates cover their obligations
+        run: corepack yarn covering-gates:check
 
       # The checks below also run through `yarn gates:run` in the pre-commit
       # hook (ADR 0043). CI runs each as its own named step instead of the
