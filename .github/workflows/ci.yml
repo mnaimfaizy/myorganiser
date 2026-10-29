@@ -536,7 +536,8 @@ jobs:
       # match a changed path; a push to `main` or a manual run pays for all of
       # them, so `main` keeps its whole-tree guarantee before a release is cut
       # (ADR 0140). The globs live in tools/config/gate-triggers.json and the
-      # filter is our own code rather than a marketplace path-filter action,
+      # Gate Trigger resolver is our own code rather than a marketplace
+      # path-filter action,
       # because `covering-gates:check` asserts the same globs against the
       # review-obligation catalogue (ADR 0074).
       #
@@ -544,6 +545,12 @@ jobs:
       # exit 0. The one it cannot — a config it cannot parse, so it does not
       # know the flag names — exits non-zero, and `run_all=true` here is the
       # same fallback by another route. Never skip on error.
+      #
+      # Exit 0 alone is not enough to trust the output: a resolver that exits
+      # 0 having printed nothing would write no flags, leaving every `if:`
+      # below false and skipping every heavy suite silently — fewer suites on
+      # an error, which is the one thing ADR 0140 item 3 forbids. So the
+      # output has to carry a `run_all=` line to count as a resolution.
       - name: Resolve heavy gate triggers
         id: gate-triggers
         shell: bash
@@ -560,7 +567,9 @@ jobs:
             set -- --all
           fi
 
-          if ! flags="$(node tools/scripts/ci/resolve-gate-triggers.ts "$@")"; then
+          flags="$(node tools/scripts/ci/resolve-gate-triggers.ts "$@")" || flags=''
+
+          if ! printf '%s\n' "$flags" | grep -q '^run_all='; then
             echo '::warning title=Gate trigger resolution failed::Running every heavy suite.'
             echo 'run_all=true' >> "$GITHUB_OUTPUT"
             echo 'Gate trigger resolution failed; running every heavy suite.' >> "$GITHUB_STEP_SUMMARY"

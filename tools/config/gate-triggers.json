@@ -13,13 +13,17 @@
     {
       "id": "tools:test",
       "ciStep": "Run tools/scripts contract suites",
-      "why": "Every Contract Suite under tools/scripts in one `node --test` run (ADR 0135) — the checker contracts, the review pipeline, the release and staging deploy contracts, and the sandcastle decisions. The triggers are the trees those suites compile and read: tools/ itself, the Husky hooks and workflow files whose wiring several suites assert, the skills and agent bodies they import, the sandcastle inputs tools/scripts/lib/sandcastle-cli-version.test.ts reads, and the deployment pages tools/scripts/check-deploy-pipeline.test.ts copies. A suite proves its checker works; the checker itself still runs over the whole tree on every pull request through `yarn gates:run`, so skipping the suite never skips the gate.",
+      "why": "Every Contract Suite under tools/scripts in one `node --test` run (ADR 0135) — the checker contracts, the review pipeline, the release and staging deploy contracts, and the sandcastle decisions. The triggers are every tree those suites compile or read from the real repository, not just tools/ itself: the Husky hooks and workflow files whose wiring several suites assert, the composite action tools/scripts/lib/review-tier-workflow.test.ts and tools/scripts/review/run-facts-wiring.test.ts read, the skills and agent bodies they import, the sandcastle inputs tools/scripts/lib/sandcastle-cli-version.test.ts reads, the deployment pages tools/scripts/check-deploy-pipeline.test.ts copies, and the brand sources tools/scripts/generate-brand-logos.test.ts, check-web-app-icons.test.ts and check-mobile-app-icon.test.ts read — the brand-logo suite is the only thing in the tree that asserts those token names, since its generator is reached by no gate. A suite proves its checker works, and the checker itself still runs over the whole tree on every pull request through `yarn gates:run`; what this list must not omit is a tree a suite reads with no checker standing behind it.",
       "triggers": [
         "tools/**",
         ".husky/**",
         ".agents/**",
         ".sandcastle/**",
-        "docs/deployment/**"
+        ".github/actions/**",
+        "docs/deployment/**",
+        "libs/design-tokens/src/generated/**",
+        "libs/web/ui/src/lib/components/AppLogo/**",
+        "libs/mobile/ui/src/components/BrandMark.tsx"
       ]
     },
     {
@@ -34,9 +38,10 @@
     {
       "id": "openapi:check",
       "ciStep": "Check OpenAPI spec and generated client are in sync",
-      "why": "Regenerates the TSOA spec and the generated client, then asserts a clean tree — the Covering Gate for the generated API surface (ADR 0074's worked example, issue #408). Triggered by the backend sources the spec is generated from, the spec project, the generated client, and the generator config. `package.json` is a shared input, which is how a release version bump — the change that originally left the client stale — still runs it.",
+      "why": "Regenerates the TSOA spec and the generated client, then asserts a clean tree — the Covering Gate for the generated API surface (ADR 0074's worked example, issue #408). The triggers are every input of the chain `api-specs:sync` runs: `apps/backend/**` rather than `apps/backend/src/**`, because `apps/backend/tsoa.json` is the generator config itself and holds the servers, securityDefinitions, specVersion and controller globs the spec is built from; then the sync script that rewrites the spec into libs/api-specs, the spec project, the generated client, and the generator config. `package.json` is a shared input, which is how a release version bump — the change that originally left the client stale — still runs it.",
       "triggers": [
-        "apps/backend/src/**",
+        "apps/backend/**",
+        "tools/scripts/sync-openapi-spec.ts",
         "libs/api-specs/**",
         "libs/app-api-client/**",
         "openapitools.json"

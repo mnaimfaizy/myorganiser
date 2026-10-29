@@ -18,35 +18,15 @@ import {
   readGateTriggers,
   type GateTriggerSuite,
 } from '../lib/gate-triggers.ts';
+// The job/step slicing shape had seven hand-written copies, and the
+// `stepNamed` ones had already drifted into matching a step name by prefix.
+// One home: tools/scripts/lib/workflow-yaml.ts.
+import { escapeRegExp, jobBlock, stepNamed } from '../lib/workflow-yaml.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
 const CI = readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
 const config = readGateTriggers({ cwd: REPO_ROOT });
-
-const escapeRegExp = (text: string): string =>
-  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const jobBlock = (source: string, jobId: string): string => {
-  const jobsAt = source.search(/^jobs:\s*$/m);
-  if (jobsAt === -1) throw new Error('workflow has no jobs:');
-  const body = source.slice(jobsAt);
-  const start = body.search(new RegExp(`^ {2}${jobId}:\\s*$`, 'm'));
-  if (start === -1) throw new Error(`no job named ${jobId}`);
-  const rest = body.slice(start + 1);
-  const next = rest.search(/^ {2}[a-z0-9][a-z0-9-]*:\s*$/m);
-  return next === -1 ? rest : rest.slice(0, next);
-};
-
-/** A step is matched on its exact name, so a rename cannot hide behind a prefix. */
-const stepNamed = (job: string, name: string): string => {
-  const header = new RegExp(`^ {6}- name: ${escapeRegExp(name)}\\s*$`, 'm');
-  const match = header.exec(job);
-  if (!match) throw new Error(`no step named exactly "${name}"`);
-  const rest = job.slice(match.index);
-  const next = rest.slice(1).search(/\n {6}- name: /);
-  return next === -1 ? rest : rest.slice(0, next + 1);
-};
 
 const ifOf = (step: string): string | undefined =>
   step.match(/^ {8}if: (.+)$/m)?.[1];
@@ -113,8 +93,13 @@ test('the setup job resolves gate triggers with the resolver and falls back to r
   );
   assert.match(
     step,
-    /if ! flags="\$\(node tools\/scripts\/ci\/resolve-gate-triggers\.ts[\s\S]*?echo 'run_all=true' >> "\$GITHUB_OUTPUT"/,
-    'a resolver that exits non-zero must write run_all=true, never skip',
+    /flags="\$\(node tools\/scripts\/ci\/resolve-gate-triggers\.ts "\$@"\)" \|\| flags=''/,
+    'a resolver that exits non-zero must not be read as a resolution: its output is discarded',
+  );
+  assert.match(
+    step,
+    /if ! printf '%s\\n' "\$flags" \| grep -q '\^run_all='; then[\s\S]*?echo 'run_all=true' >> "\$GITHUB_OUTPUT"/,
+    'output that carries no run_all= line must write run_all=true, never be appended as flags',
   );
 });
 

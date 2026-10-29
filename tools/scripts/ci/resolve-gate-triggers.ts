@@ -17,11 +17,11 @@
  * each heavy step in `Test` runs when `run_all` or its own flag is set. A
  * push to `main` uses `--all`, so `main` keeps its whole-tree guarantee.
  *
- * The path filter is this file rather than a third-party path-filter action
- * on purpose: the globs it reads are the same artifact `covering-gates:check`
- * asserts against the review-obligation catalogue (ADR 0074), and a decision
- * two gates depend on is not something to delegate to an unpinned marketplace
- * action.
+ * The Gate Trigger resolver is this file rather than a third-party
+ * path-filter action on purpose: the globs it reads are the same artifact
+ * `covering-gates:check` asserts against the review-obligation catalogue
+ * (ADR 0074), and a decision two gates depend on is not something to
+ * delegate to an unpinned marketplace action.
  *
  * **The fallback is always to run more.** A failure this script can describe
  * — git cannot diff the range, a path is unreadable — prints `run_all=true`
@@ -37,6 +37,7 @@
 
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import { errorMessage } from '../lib/error-message.ts';
 import {
@@ -149,6 +150,16 @@ function main(): void {
 // Guarded so a suite can import `parseNameStatus` without the CLI running
 // itself and exiting the test process, the way
 // tools/scripts/run-tools-test-selection.ts guards its own entry point.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+//
+// `pathToFileURL`, not a `file://` template: `import.meta.url` percent-encodes
+// the path, so a checkout under a directory with a space in it compared
+// unequal, `main()` never ran, and the script exited 0 having printed no
+// flags at all — every heavy suite skipped, which is the one outcome this
+// file exists to make impossible. The workflow's own empty-output guard is
+// the second line of defence (ADR 0140 item 3).
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main();
 }

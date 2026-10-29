@@ -9,9 +9,10 @@ accepted
 Measured over 100 pull request runs (2026-10-17 → 10-29), a successful CI run took 11.3 min at the
 median and 17.1 min at p90 even when the pull request touched a single library. The `Test` job was
 7.4 min of that, and the affected Jest tests were 14s of the 7.4. Most of the rest was spent on
-checks the change could not break: the `tools:test` Contract Suites at about 122s on every pull
-request, `openapi:check` at about 44s plus a Java toolchain setup, and the Upstream Brief and
-checker contract suites.
+checks the change could not break: the `tools:test` Contract Suites at about 122s of CI step time on
+every pull request (the same glob runs in about 34s locally, which is the figure
+[the command reference](../agents/command-reference.md) quotes), `openapi:check` at about 44s plus a
+Java toolchain setup, and the Upstream Brief and checker contract suites.
 
 [ADR 0043](0043-gates-assert-facts.md) settles what a gate is: it compares two artifacts and fails
 on a factual mismatch. It says nothing about when CI should pay for one, and the implicit answer
@@ -52,7 +53,7 @@ the grep says the gate is there.
    `run_all` is set. A heavy suite is added to that config, never as an `if:` expression written by
    hand.
 
-2. **The filter is our own code.** `tools/scripts/ci/resolve-gate-triggers.ts`, over the pure
+2. **The Gate Trigger resolver is our own code.** `tools/scripts/ci/resolve-gate-triggers.ts`, over the pure
    decision in `tools/scripts/lib/gate-triggers.ts`, with a Contract Suite in temporary git
    repositories. No third-party path-filter action: these globs are an artifact two gates read, and
    the glob→RegExp compiler is the repository's one copy (`tools/scripts/lib/glob.ts`).
