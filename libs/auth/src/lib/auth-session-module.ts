@@ -2,9 +2,9 @@ import type {
   AuthenticationApi,
   ConfirmResetPasswordBody,
 } from '@myorganiser/app-api-client';
-import axios, { type AxiosInstance } from 'axios';
+import axios, { type AxiosError, type AxiosInstance } from 'axios';
 
-import { toAuthErrorFromMessage } from './auth-error-mapping';
+import { toAuthError, toAuthErrorFromMessage } from './auth-error-mapping';
 import type { AuthSessionStorageAdapter } from './auth-session-storage-adapter';
 import { createBrowserAuthSessionStorageAdapter } from './auth-session-storage-adapter';
 import type { AuthSessionTransportAdapter } from './auth-session-transport-adapter';
@@ -64,9 +64,9 @@ const RESEND_VERIFICATION_FALLBACK_MESSAGE =
 // message rather than axios's own "Request failed with status code …", which
 // is what #1239 showed the user. A request that never got a response (a
 // network error) still surfaces `err.message` so it keeps classifying as
-// `network_error`.
-function extractResendErrorMessage(err: unknown): string {
-  if (!axios.isAxiosError(err)) return RESEND_VERIFICATION_FALLBACK_MESSAGE;
+// `network_error`. Only axios errors come here; any other error keeps
+// `toAuthError`'s message and code.
+function extractResendErrorMessage(err: AxiosError): string {
   const bodyMessage = extractBodyMessage(err);
   if (bodyMessage) return bodyMessage;
   if (!err.response) {
@@ -291,7 +291,9 @@ export function createAuthSessionModule(deps: {
       } catch (err) {
         return {
           ok: false,
-          error: toAuthErrorFromMessage(extractResendErrorMessage(err)),
+          error: axios.isAxiosError(err)
+            ? toAuthErrorFromMessage(extractResendErrorMessage(err))
+            : toAuthError(err),
         };
       }
     },
