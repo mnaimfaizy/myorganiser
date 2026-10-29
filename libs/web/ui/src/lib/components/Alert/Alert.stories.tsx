@@ -162,7 +162,6 @@ export const BarBackOnline: Story = {
 export const Phone: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   render: () => (
     <Alert variant="bar" tone="warning">

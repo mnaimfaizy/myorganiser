@@ -78,7 +78,6 @@ export const PHONE_PARAMETERS = {
       },
     },
   },
-  chromatic: { viewports: [390] },
 };
 
 /** Desktop shell: wide enough for the `md:` header and sidebar. */
@@ -92,7 +91,6 @@ export const DESKTOP_PARAMETERS = {
       },
     },
   },
-  chromatic: { viewports: [1280] },
 };
 
 /**

@@ -1,7 +1,7 @@
 # Storybook Authoring Patterns
 
 > Code-level patterns for writing `*.stories.tsx` in this repo.
-> Setup, Chromatic, and commands live in [`docs/storybook/README.md`](../storybook/README.md).
+> Setup and commands live in [`docs/storybook/README.md`](../storybook/README.md).
 > Component rules live in [`GUIDELINES.md`](./GUIDELINES.md).
 > This file is the single home for story patterns — `StorybookCurator` reads it instead of carrying copies in its prompt.
 
@@ -154,7 +154,6 @@ export const ShowsToast: Story = {
 Consequences to plan for:
 
 - The autodocs snapshot shows **only the trigger** — the interesting part is invisible until opened.
-- Chromatic captures the closed state unless the story opens the content.
 
 To show the open state, either set the primitive's `open`/`defaultOpen` prop in the wrapper, or drive it with a `play` function (§7). Prefer `defaultOpen` for a pure visual story; use `play` when the opening interaction itself is what you are documenting.
 
@@ -203,7 +202,7 @@ Long-content and empty states are the two most often skipped and the two that mo
 
 The table above says which states are worth showing. It does not say every state is. **If a state renders no visible output, it does not get a story** — delete it rather than explaining it.
 
-A story of such a state is a blank canvas. It is indistinguishable from a story that failed to load, it is identical to every other state that also renders nothing, and it spends a Chromatic snapshot asserting the absence of pixels. Two blank stories side by side are worse still: a reviewer cannot tell them apart, so the catalogue implies a difference it cannot show.
+A story of such a state is a blank canvas. It is indistinguishable from a story that failed to load, and it is identical to every other state that also renders nothing. Two blank stories side by side are worse still: a reviewer cannot tell them apart, so the catalogue implies a difference it cannot show.
 
 Rendering nothing is often a real contract — a healthy status indicator that deliberately adds no chrome, a banner that stays absent until something is wrong. Assert it in the component's spec, where an assertion can name the DOM it expects. Storybook is a visual catalogue; a thing with no appearance has no entry in it.
 
@@ -240,7 +239,7 @@ Also: label every form input in a story the way a real page would, and prefer `l
 
 ## 10. Determinism
 
-Stories are rendered by Chromatic and the test-runner, so anything non-deterministic becomes a flaky diff.
+Stories are rendered by the test-runner, so anything non-deterministic becomes a flaky diff.
 
 - No `fetch`, no API clients, no `@myorganiser/app-api-client`. Pass data as props.
 - No `new Date()`, `Date.now()`, `Math.random()`, or `crypto.randomUUID()` — pin a fixed date and fixed ids.
@@ -249,13 +248,12 @@ Stories are rendered by Chromatic and the test-runner, so anything non-determini
 
 ## 11. Viewport-dependent stories
 
-A story whose behaviour depends on width declares it twice — once for the test-runner, once for Chromatic:
+A story whose behaviour depends on width declares it with `parameters.viewport`:
 
 ```tsx
 export const OpensOnClick: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
     /* … */
@@ -263,15 +261,12 @@ export const OpensOnClick: Story = {
 };
 ```
 
-Neither parameter is decoration, and neither one covers the other:
-
-- **`viewport`** is read by the `preVisit` hook in `libs/web/ui/.storybook/test-runner.ts`, which resizes the Playwright page **before** the story renders. Without it the runner loads every story at its own page size, nothing reads `defaultViewport`, and a width-sensitive hook such as `useIsMobile` stays false while a `play` function waits for a mobile-only element. The hook also resets to a desktop size for every story that names no viewport, so a mobile story cannot leak its width into the next one on the same page.
-- **`chromatic.viewports`** is read by Chromatic, which builds the Storybook from `main.ts` and `preview.ts` and never loads `test-runner.ts`. A `play` function that needs a narrow width fails in Chromatic without it. Give it one width, not a list — each extra width is another snapshot against the plan cap (ADR 0027).
+**`viewport`** is not decoration. It is read by the `preVisit` hook in `libs/web/ui/.storybook/test-runner.ts`, which resizes the Playwright page **before** the story renders. Without it the runner loads every story at its own page size, nothing reads `defaultViewport`, and a width-sensitive hook such as `useIsMobile` stays false while a `play` function waits for a mobile-only element. The hook also resets to a desktop size for every story that names no viewport, so a mobile story cannot leak its width into the next one on the same page.
 
 Consequences for authors:
 
 - Named viewports must be one of `mobile1`, `mobile2`, `tablet`, or declared inline under `parameters.viewport.viewports` with `px` dimensions. Anything else fails the story loudly rather than silently rendering at desktop width.
-- Do not assert on width in a `play` function without declaring both parameters — the runner default is 1280×720 and the Chromatic default is wider still.
+- Do not assert on width in a `play` function without declaring `parameters.viewport` — the runner default is 1280×720.
 - The resolver behind the hook is unit tested in `libs/web/ui/.storybook/viewport-page-size.test.ts`.
 
 Running the play tests locally: see [`docs/storybook/README.md`](../storybook/README.md).
@@ -288,7 +283,7 @@ Running the play tests locally: see [`docs/storybook/README.md`](../storybook/RE
 | Only a `Default` story                                                   | Reviewers cannot see the states that break                           | Coverage table (§8)                                              |
 | Emoji or bare icon as the whole button label                             | No accessible name                                                   | Icon + `aria-label` (§9)                                         |
 | Skipping `Toaster` because it is a mount point                           | Never tests GUIDELINES §1 for that primitive                         | `play` that calls `toast()` (§5)                                 |
-| Fetching or generating data in a story                                   | Non-deterministic Chromatic diffs                                    | Fixed props (§10)                                                |
+| Fetching or generating data in a story                                   | Non-deterministic, flaky test-runner diffs                           | Fixed props (§10)                                                |
 | `play` asserting mobile behaviour with no `viewport` parameter           | Page renders at 1280×720; the assertion times out                    | Declare `parameters.viewport` (§11)                              |
 | A story for a `libs/web/pages/` component no issue asked for             | Depends on domain state; tests cover it                              | Test it, or promote it to a primitive or Vault UI Component (§1) |
 | A story for a state that renders nothing                                 | Blank canvas; reads as broken, and two of them are indistinguishable | Delete it; assert the absence in the spec (§8)                   |

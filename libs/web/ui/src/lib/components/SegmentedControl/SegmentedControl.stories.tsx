@@ -181,8 +181,8 @@ export const LongLabels: Story = {
 };
 
 // Phone: the segments are 44px tall below md. The viewport parameter is read by
-// the test-runner preVisit hook; chromatic.viewports renders the same 320px width
-// in Chromatic. The play function asserts the touch-target height itself.
+// the test-runner preVisit hook. The play function asserts the touch-target
+// height itself.
 export const Phone: Story = {
   args: {
     name: 'how-to-update-phone',
@@ -192,7 +192,6 @@ export const Phone: Story = {
   },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
     // The dev Storybook has no viewport addon; see storybook/viewport.ts.

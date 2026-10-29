@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { Calendar } from './Calendar';
 
-/** Pinned June 2024 — deterministic for Chromatic and test-runner. */
+/** Pinned June 2024 — deterministic for the test-runner. */
 const PINNED_YEAR = 2024;
 const PINNED_MONTH_INDEX = 5;
 const PINNED_DAY = 15;

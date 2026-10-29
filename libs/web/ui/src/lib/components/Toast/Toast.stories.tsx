@@ -223,6 +223,5 @@ export const PhoneSnackbar: Story = {
   },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
 };

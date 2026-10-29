@@ -59,8 +59,8 @@ export const Unlocked: Story = {
 
 /**
  * The confirmation dialog shown after clicking "I already have it". Dialog
- * content is portalled to document.body, so a play function opens it for
- * Chromatic and the interaction test-runner.
+ * content is portalled to document.body, so a play function opens it for the
+ * interaction test-runner.
  */
 export const ConfirmationDialogOpen: Story = {
   args: {
@@ -92,6 +92,5 @@ export const FactWrapsOnNarrowViewport: Story = {
   },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
 };

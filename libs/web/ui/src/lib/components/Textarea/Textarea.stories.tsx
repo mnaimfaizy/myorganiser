@@ -189,7 +189,6 @@ export const Phone: Story = {
   },
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
-    chromatic: { viewports: [320] },
   },
   play: async ({ canvasElement }) => {
     // The dev Storybook has no viewport addon; see storybook/viewport.ts.

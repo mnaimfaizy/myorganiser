@@ -4,7 +4,7 @@ import { renderEmailShell, type RenderedEmail } from '@myorganiser/email-shell';
 /**
  * The shell references its inline logo as `cid:<id>` — a MIME Content-ID that
  * only resolves inside a mail client's parser. This bridges it to a `data:`
- * URI so the browser (and Chromatic) can actually paint it; nothing else
+ * URI so the browser can actually paint it; nothing else
  * about `html` is touched.
  */
 function resolveInlineImages({ html, attachments }: RenderedEmail): string {

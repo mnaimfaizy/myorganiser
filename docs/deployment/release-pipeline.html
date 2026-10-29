@@ -1621,8 +1621,8 @@
         <dt>ci</dt>
         <dd id="note-ci">
           Authoritative Lockfile Policy &#8594; Secure Install Review &#8594;
-          Prepare Dependency Cache &#8594; Chromatic + Setup Affected Context
-          &#8594; Lint + Test &#8594; Build Backend / Build Frontend
+          Prepare Dependency Cache &#8594; Setup Affected Context &#8594;
+          Lint + Test &#8594; Build Backend / Build Frontend
           (<code>ci.yml</code>). Which target ran on which project, and why a
           red one blocks in one mode and only reports in another, is
           <a href="../sandcastle/gates.html">docs/sandcastle/gates.html</a>
@@ -2256,18 +2256,17 @@
           above <span class="cite">:416</span>
         </li>
         <li>
-          Publish to Chromatic <span class="cite">:447</span> and Setup
-          Affected Context <span class="cite">:544</span>, in parallel
+          Setup Affected Context <span class="cite">:447</span>
         </li>
         <li>
-          Lint <span class="cite">:622</span> and Test
-          <span class="cite">:674</span>
+          Lint <span class="cite">:525</span> and Test
+          <span class="cite">:577</span>
         </li>
         <li>
-          Build Backend <span class="cite">:1137</span>, only when
-          <code>backend</code> is affected <span class="cite">:1141</span>, and
-          Build Frontend <span class="cite">:1183</span>,
-          <span class="cite">:1187</span>
+          Build Backend <span class="cite">:1040</span>, only when
+          <code>backend</code> is affected <span class="cite">:1044</span>, and
+          Build Frontend <span class="cite">:1086</span>,
+          <span class="cite">:1090</span>
         </li>
       </ol>
       <p class="small muted">
@@ -2799,14 +2798,13 @@
       "ci.yml:146": { "file": ".github/workflows/ci.yml", "start": "needs: authoritative-lockfile-policy" },
       "ci.yml:412": { "file": ".github/workflows/ci.yml", "start": "prepare-dependencies:" },
       "ci.yml:416": { "file": ".github/workflows/ci.yml", "start": "needs: secure-install-review" },
-      "ci.yml:447": { "file": ".github/workflows/ci.yml", "start": "chromatic:" },
-      "ci.yml:544": { "file": ".github/workflows/ci.yml", "start": "setup:" },
-      "ci.yml:622": { "file": ".github/workflows/ci.yml", "start": "lint:" },
-      "ci.yml:674": { "file": ".github/workflows/ci.yml", "start": "test:" },
-      "ci.yml:1137": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1141": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1183": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1187": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:447": { "file": ".github/workflows/ci.yml", "start": "setup:" },
+      "ci.yml:525": { "file": ".github/workflows/ci.yml", "start": "lint:" },
+      "ci.yml:577": { "file": ".github/workflows/ci.yml", "start": "test:" },
+      "ci.yml:1040": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1044": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1086": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1090": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },

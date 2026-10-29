@@ -6,8 +6,7 @@
 //
 // Both tools treat a glob that matches nothing as an empty answer, not an
 // error. A stories glob left pointing at a moved library makes its stories
-// vanish from Storybook, and Chromatic runs with `--exit-zero-on-changes`, so
-// the job reports them as removed and still passes. A content glob that
+// vanish from Storybook silently — nothing else notices. A content glob that
 // matches nothing makes Tailwind drop every class in the files it missed —
 // the silent failure ADR 0065 records for the groceries pages (#632). Moving
 // web libraries under `libs/web/` (#165) rewrote exactly these globs.

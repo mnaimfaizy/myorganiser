@@ -48,8 +48,8 @@ export const Disabled: Story = {
 /**
  * Opens from a pinned value on purpose. `DatePicker` passes no `defaultMonth`
  * to `Calendar`, so with an empty value react-day-picker falls back to the
- * current month and marks today — which re-snapshots in Chromatic every day
- * and every month rollover. A selected date fixes the displayed month, so the
+ * current month and marks today — which would change what the story renders
+ * every day and every month rollover. A selected date fixes the displayed month, so the
  * open calendar is deterministic. The empty placeholder state stays covered by
  * `Interactive`, which never opens the popover.
  */

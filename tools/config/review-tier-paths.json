@@ -149,7 +149,6 @@
         ".vscode/**",
         ".github/**",
         "docker-compose.yml",
-        "chromatic.config.json",
         "component.json",
         "CHANGELOG.md",
         "RELEASE_NOTES.md"

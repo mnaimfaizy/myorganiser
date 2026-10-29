@@ -16,7 +16,7 @@ All MyOrganiser email renders inside one **Email Shell** that owns the logo, bra
 
 The shell is **parameterised by email class, not uniform**. A Transactional Email must never carry an unsubscribe link — a User who opts out of password-reset mail can lock themselves out of their account — while a Notification Email must always carry one. Making the caller declare its class is what prevents the shell from ever putting an unsubscribe on mail a User cannot afford to lose.
 
-The shell lives in a shared library rendering to an HTML string, consumed by the backend. It carries Storybook stories with fixture data, which places it under the existing Chromatic visual gate.
+The shell lives in a shared library rendering to an HTML string, consumed by the backend. It carries Storybook stories with fixture data.
 
 The **CID linkage invariant belongs to the shell, not the sender**: a message's attachments and the body it ships with must describe the same set of Content-IDs. The shell returns its attachments alongside its HTML and asserts the two match on every render. The alternative — validating in the shared mail sender — was rejected because the sender is a pass-through that never sees how a body was built, so all it can check is that two things it was handed happen to agree; a caller that hands it a matched-but-wrong pair passes. The shell is the only place that knows what it just referenced.
 
@@ -34,11 +34,9 @@ Emails are built to **degrade into correct, not into broken**:
 
 **Dark-mode support** was rejected. Gmail and Outlook force their own colour inversion regardless of what the message specifies, and `prefers-color-scheme` is honoured by very few clients that matter. Chasing it yields fragile CSS fighting the client. Colours are chosen to survive inversion instead, and a single logo is used that reads on light and dark backgrounds rather than a light/dark pair.
 
-**A skill, hook, or sub-agent monitoring pull requests that touch email templates** was requested in the originating issue and is deliberately rejected. It watches the wrong thing. These templates were broken on the day they were committed and no pull request touched them for three months, so such a monitor would never once have fired. The failure was invisibility, not careless edits — the emails could not be seen without sending them. Storybook stories under the existing Chromatic gate address the actual cause and need no new machinery.
+**A skill, hook, or sub-agent monitoring pull requests that touch email templates** was requested in the originating issue and is deliberately rejected. It watches the wrong thing. These templates were broken on the day they were committed and no pull request touched them for three months, so such a monitor would never once have fired. The failure was invisibility, not careless edits — the emails could not be seen without sending them. Storybook stories address the actual cause and need no new machinery.
 
 ## Consequences
-
-Email stories consume Chromatic snapshots against a free-plan cap of 5,000 per month shared with 127 existing stories. The cost is small but real.
 
 Stories render in a browser, which is not an email client. They will catch a missing logo or a wrong footer; they will never catch Outlook's Word rendering engine dropping a style. Testing against real clients remains a manual step before significant email changes.
 

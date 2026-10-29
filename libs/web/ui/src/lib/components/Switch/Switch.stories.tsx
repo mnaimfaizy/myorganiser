@@ -18,7 +18,7 @@ const DIGEST_LABEL = 'Weekly digest';
 const DIGEST_DESCRIPTION = 'Email on Sundays';
 const DESCRIPTION_CLASS = 'text-caption text-muted-foreground';
 
-// Fixed ids keep Chromatic snapshots deterministic. The Label htmlFor/id pair
+// Fixed ids keep snapshots deterministic. The Label htmlFor/id pair
 // gives the switch its accessible name, the same wiring a settings page uses.
 const LABELLED_ID = 'weekly-digest';
 const ROW_SWITCH_ID = 'weekly-digest-row';
