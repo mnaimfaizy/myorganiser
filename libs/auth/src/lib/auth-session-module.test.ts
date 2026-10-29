@@ -562,6 +562,98 @@ describe('createAuthSessionModule', () => {
 
       expect(result.ok).toBe(false);
     });
+
+    // #1239: the server's JSON body message must reach the user, not axios's
+    // generic transport text. Real axios errors carry `isAxiosError: true`,
+    // which the production `axios.isAxiosError()` check requires.
+    it('surfaces the server body message on a rate-limited resend', async () => {
+      const mockAxios = { post: jest.fn() };
+      mockTransport.getAuthAxios.mockReturnValue(
+        mockAxios as unknown as ReturnType<typeof mockTransport.getAuthAxios>,
+      );
+
+      const serverMessage =
+        'A verification email was already sent recently. Please check your inbox and try again later.';
+      mockAxios.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Request failed with status code 429',
+        response: { status: 429, data: { message: serverMessage } },
+      });
+
+      const result = await module.resendVerificationEmail('test@example.com');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe(serverMessage);
+      }
+    });
+
+    it('falls back to the clear resend message, not transport text, when the response has no body message', async () => {
+      const mockAxios = { post: jest.fn() };
+      mockTransport.getAuthAxios.mockReturnValue(
+        mockAxios as unknown as ReturnType<typeof mockTransport.getAuthAxios>,
+      );
+
+      mockAxios.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Request failed with status code 500',
+        response: { status: 500, data: {} },
+      });
+
+      const result = await module.resendVerificationEmail('test@example.com');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe(
+          'Unable to resend the verification email. Please try again.',
+        );
+        expect(result.error.message).not.toContain(
+          'Request failed with status code',
+        );
+      }
+    });
+
+    it('preserves the network error message for a request that never got a response', async () => {
+      const mockAxios = { post: jest.fn() };
+      mockTransport.getAuthAxios.mockReturnValue(
+        mockAxios as unknown as ReturnType<typeof mockTransport.getAuthAxios>,
+      );
+
+      mockAxios.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Network Error',
+      });
+
+      const result = await module.resendVerificationEmail('test@example.com');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe('Network Error');
+        expect(result.error.code).toBe('network_error');
+      }
+    });
+
+    // #1239: only axios errors take the resend-specific mapping. Any other
+    // rejection keeps `toAuthError`'s own message and classification.
+    it('keeps the message and classification of a non-axios error', async () => {
+      const mockAxios = { post: jest.fn() };
+      mockTransport.getAuthAxios.mockReturnValue(
+        mockAxios as unknown as ReturnType<typeof mockTransport.getAuthAxios>,
+      );
+
+      mockAxios.post.mockRejectedValue(new Error('Network Error'));
+
+      const result = await module.resendVerificationEmail('test@example.com');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe('Network Error');
+        expect(result.error.message).not.toBe(
+          'Unable to resend the verification email. Please try again.',
+        );
+        expect(result.error.code).toBe('network_error');
+      }
+    });
   });
 
   describe('requestPasswordReset', () => {
