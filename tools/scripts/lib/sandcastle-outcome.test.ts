@@ -4,6 +4,8 @@ import test from 'node:test';
 import {
   COMPLETION_PROMISE,
   formatHeldComment,
+  formatStandaloneReadyComment,
+  STANDALONE_HANDOFF_LABELS,
   judgeRunOutcome,
   lastIterationOutput,
   NEEDS_HUMAN_LABEL,
@@ -220,4 +222,43 @@ test('the held comment names the label, the branch, and every item', () => {
   assert.match(body, new RegExp(NEEDS_HUMAN_LABEL));
   assert.match(body, /^- keep-awake not wired$/m);
   assert.match(body, /^- device QA pending$/m);
+});
+
+test('a finished standalone run leaves the sweep for a person, never status:done', () => {
+  assert.deepEqual(STANDALONE_HANDOFF_LABELS.remove, [
+    'status:in-progress',
+    'ready-for-agent',
+  ]);
+  assert.deepEqual(STANDALONE_HANDOFF_LABELS.add, [NEEDS_HUMAN_LABEL]);
+  assert.ok(
+    !(STANDALONE_HANDOFF_LABELS.add as readonly string[]).includes(
+      'status:done',
+    ),
+  );
+});
+
+test('the standalone comment names the branch, its base, and the label', () => {
+  const body = formatStandaloneReadyComment({
+    outstanding: [],
+    sliceBranch: 'fix/1239-resend-message',
+    baseRef: 'origin/main',
+    commits: 2,
+  });
+  assert.match(body, /2 commit\(s\)/);
+  assert.match(body, /`fix\/1239-resend-message`/);
+  assert.match(body, /`origin\/main`/);
+  assert.match(body, new RegExp(`\`${NEEDS_HUMAN_LABEL}\``));
+  assert.doesNotMatch(body, /did not finish/);
+});
+
+test('the standalone comment lists every item the agent left outstanding', () => {
+  const body = formatStandaloneReadyComment({
+    outstanding: ['device QA pending', 'design re-export'],
+    sliceBranch: 'feat/12-x',
+    baseRef: 'origin/main',
+    commits: 1,
+  });
+  assert.match(body, /did not finish or could not verify/);
+  assert.match(body, /^- device QA pending$/m);
+  assert.match(body, /^- design re-export$/m);
 });

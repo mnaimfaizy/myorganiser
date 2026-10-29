@@ -154,3 +154,47 @@ export function formatHeldComment({
     ...outstanding.map((item) => `- ${item}`),
   ].join('\n');
 }
+
+export interface FinishedStandaloneRun {
+  outstanding: readonly string[];
+  sliceBranch: string;
+  baseRef: string;
+  commits: number;
+}
+
+/**
+ * The labels a standalone run edits when it finishes with a passing gate.
+ *
+ * The issue leaves the sweep: `ready-for-agent` gives way to `ready-for-human`,
+ * because a person reviews the branch and opens its PR next. It does not take
+ * `status:done`, which says the work reached a feature branch and counts as a
+ * finished dependency (ADR 0002); this work is on one unpushed local branch.
+ */
+export const STANDALONE_HANDOFF_LABELS = {
+  remove: ['status:in-progress', 'ready-for-agent'],
+  add: [NEEDS_HUMAN_LABEL],
+} as const;
+
+/**
+ * The comment a finished standalone run gets: where the work is, and who acts
+ * next.
+ */
+export function formatStandaloneReadyComment({
+  outstanding,
+  sliceBranch,
+  baseRef,
+  commits,
+}: FinishedStandaloneRun): string {
+  return [
+    `Agent completed and the build gate passed. ${commits} commit(s) on the local branch \`${sliceBranch}\` (based on \`${baseRef}\`).`,
+    `Nothing was pushed. Moved to \`${NEEDS_HUMAN_LABEL}\` so a re-run will not dispatch it again: a person reviews the branch and opens its PR, and the PR closes this issue when it merges.`,
+    ...(outstanding.length === 0
+      ? []
+      : [
+          ``,
+          `**The agent listed work it did not finish or could not verify** (ADR 0111):`,
+          ``,
+          ...outstanding.map((item) => `- ${item}`),
+        ]),
+  ].join('\n');
+}

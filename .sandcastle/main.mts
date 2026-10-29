@@ -71,6 +71,8 @@ import {
   NEEDS_HUMAN_LABEL,
   OUTSTANDING_MARKER,
   formatHeldComment,
+  formatStandaloneReadyComment,
+  STANDALONE_HANDOFF_LABELS,
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
 import {
@@ -3348,17 +3350,23 @@ while (pendingSlices.length > 0) {
       ]);
       unblockDependents(issue);
     } else if (mergeOk) {
-      // Standalone success. The issue stays OPEN and is NOT marked status:done —
-      // nothing has reached `main` yet, and marking it done here would lie about
-      // work that only exists on an unpushed local branch.
+      // Standalone success. The issue stays open, handed to a person rather than
+      // marked status:done: nothing has reached `main`, and status:done would
+      // count it as a finished dependency for work on an unpushed local branch.
       ghSilent([
         'issue',
         'edit',
         String(issue.number),
         '--repo',
         REPO,
-        '--remove-label',
-        'status:in-progress',
+        ...STANDALONE_HANDOFF_LABELS.remove.flatMap((label) => [
+          '--remove-label',
+          label,
+        ]),
+        ...STANDALONE_HANDOFF_LABELS.add.flatMap((label) => [
+          '--add-label',
+          label,
+        ]),
       ]);
       ghSilent([
         'issue',
@@ -3367,12 +3375,12 @@ while (pendingSlices.length > 0) {
         '--repo',
         REPO,
         '--body',
-        `Agent completed and the build gate passed. ${result.commits.length} commit(s) on the local branch \`${sliceBranch}\` (based on \`${baseRef}\`).\n` +
-          `Nothing was pushed. Left open until the branch is reviewed, pushed, and merged via a PR.` +
-          (outcome.clean
-            ? ''
-            : `\n\n**The agent listed work it did not finish or could not verify** (ADR 0111):\n\n` +
-              outcome.outstanding.map((item) => `- ${item}`).join('\n')),
+        formatStandaloneReadyComment({
+          outstanding: outcome.outstanding,
+          sliceBranch,
+          baseRef,
+          commits: result.commits.length,
+        }),
       ]);
     } else {
       ghSilent([
