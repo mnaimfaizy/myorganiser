@@ -194,6 +194,9 @@ test('--all sets run_all and every flag without consulting git', (t) => {
 
   assertFlags(result, ALL_TRUE);
   assert.doesNotMatch(result.stderr, /fatal|Command failed/);
+  // That phrase is written only on the git-error fallback, so its absence shows
+  // --all resolved directly rather than arriving at every flag through an error.
+  assert.doesNotMatch(result.stderr, /running every heavy suite/);
 });
 
 test('a range git cannot diff prints run_all and exits 0', (t) => {

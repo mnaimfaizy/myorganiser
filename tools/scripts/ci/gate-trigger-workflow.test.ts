@@ -7,9 +7,18 @@
 // suite that does not need a JDK. The checks are driven from the config, so
 // adding a suite there without wiring it fails here.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -63,6 +72,65 @@ const expectedTerms = (suite: GateTriggerSuite): string[] =>
 const SETUP = jobBlock(CI, 'setup');
 const TEST = jobBlock(CI, 'test');
 
+/**
+ * The `run:` script of a step, dedented. A block scalar runs until the first
+ * non-blank line indented less than its ten-space body.
+ */
+function runScriptOf(step: string): string {
+  const header = step.search(/^ {8}run: \|\s*$/m);
+  assert.notEqual(header, -1, 'step has no run: | block');
+  const lines: string[] = [];
+  for (const line of step.slice(step.indexOf('\n', header) + 1).split('\n')) {
+    if (line.trim() !== '' && !line.startsWith(' '.repeat(10))) break;
+    lines.push(line.slice(10));
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Runs the gate-trigger step's own script under bash, with `resolverBody` as
+ * the `node` on PATH, so the resolver call is the stub and nothing else
+ * changes. `eventName` is the GitHub event the step sees; a pull request is
+ * the default. Returns what the step wrote to $GITHUB_OUTPUT.
+ */
+function runGateTriggerStep(
+  t: TestContext,
+  resolverBody: string,
+  eventName = 'pull_request',
+): string {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-trigger-step-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const bin = join(dir, 'bin');
+  const stub = join(bin, 'node');
+  const script = join(dir, 'step.sh');
+  const output = join(dir, 'github-output');
+  const summary = join(dir, 'github-step-summary');
+  mkdirSync(bin);
+  writeFileSync(stub, `#!/bin/sh\n${resolverBody}\n`);
+  chmodSync(stub, 0o755);
+  writeFileSync(
+    script,
+    runScriptOf(stepNamed(SETUP, 'Resolve heavy gate triggers')),
+  );
+  writeFileSync(output, '');
+  writeFileSync(summary, '');
+
+  const result = spawnSync('bash', [script], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+      EVENT_NAME: eventName,
+      BASE_SHA: 'base',
+      HEAD_SHA: 'head',
+      GITHUB_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: summary,
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return readFileSync(output, 'utf8');
+}
+
 test('the setup job resolves gate triggers with the resolver and falls back to run_all', () => {
   const step = stepNamed(SETUP, 'Resolve heavy gate triggers');
 
@@ -96,10 +164,51 @@ test('the setup job resolves gate triggers with the resolver and falls back to r
     /flags="\$\(node tools\/scripts\/ci\/resolve-gate-triggers\.ts "\$@"\)" \|\| flags=''/,
     'a resolver that exits non-zero must not be read as a resolution: its output is discarded',
   );
-  assert.match(
-    step,
-    /if ! printf '%s\\n' "\$flags" \| grep -q '\^run_all='; then[\s\S]*?echo 'run_all=true' >> "\$GITHUB_OUTPUT"/,
-    'output that carries no run_all= line must write run_all=true, never be appended as flags',
+});
+
+// The fallback is run, not pattern-matched: a `run_all=true` echo moved below
+// the closing `fi` would pass every regex above while every PR ran everything.
+test('the gate-trigger step writes run_all=true when the resolver exits 2 with no output', (t) => {
+  assert.equal(runGateTriggerStep(t, 'exit 2'), 'run_all=true\n');
+});
+
+test('the gate-trigger step writes run_all=true when the resolver prints no run_all line', (t) => {
+  assert.equal(
+    runGateTriggerStep(t, "echo 'garbage'\nexit 0"),
+    'run_all=true\n',
+  );
+});
+
+// A push to main must resolve with --all, not the SHA range: the `else` branch
+// is the only thing giving main its whole-tree run. A regex over the YAML would
+// still pass if the `set -- --all` line sat outside the branch, so the stub
+// echoes the arguments the step actually passed to the resolver.
+test('the gate-trigger step resolves a push with --all and not the SHA range', (t) => {
+  assert.equal(
+    runGateTriggerStep(
+      t,
+      'shift\nprintf \'run_all=false\\nargs=%s\\n\' "$*"',
+      'push',
+    ),
+    'run_all=false\nargs=--all\n',
+  );
+});
+
+test('the gate-trigger step resolves a pull request with its base and head SHAs', (t) => {
+  assert.equal(
+    runGateTriggerStep(
+      t,
+      'shift\nprintf \'run_all=false\\nargs=%s\\n\' "$*"',
+      'pull_request',
+    ),
+    'run_all=false\nargs=base head\n',
+  );
+});
+
+test('the gate-trigger step writes the resolver flags and no run_all fallback when they carry one', (t) => {
+  assert.equal(
+    runGateTriggerStep(t, "printf 'run_all=false\\nrun_tools_test=true\\n'"),
+    'run_all=false\nrun_tools_test=true\n',
   );
 });
 

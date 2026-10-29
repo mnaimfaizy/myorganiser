@@ -173,5 +173,18 @@ test('the real tree passes: every path-gated Covering Gate covers its obligation
   const result = runChecker(REPO_ROOT);
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /obligation trigger\(s\) covered/);
+  // A zero count means the checker compared nothing, so it must be non-zero.
+  assert.match(result.stdout, /[1-9]\d* obligation trigger\(s\) covered/);
+});
+
+test('the real tree compares openapi:check against the live swagger glob', () => {
+  const result = runChecker(REPO_ROOT, ['--print']);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    new RegExp(
+      `openapi:check must cover apps/backend/src/swagger/\\*\\* \\(${OBLIGATION_ID}\\)`,
+    ),
+  );
 });
