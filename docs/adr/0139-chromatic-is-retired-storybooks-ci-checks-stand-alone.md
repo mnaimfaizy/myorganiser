@@ -7,8 +7,8 @@ accepted
 ## Context
 
 [ADR 0027](0027-chromatic-ci-visual-tests.md) connected this repo's Storybook (UI Primitives +
-Vault UI Components) to Chromatic cloud, gating merges on Chromatic's **UI Tests** status and
-scoped to the free plan's 5,000 billed snapshots/month with TurboSnap. That plan was sized against
+Vault UI Components) to Chromatic cloud, with Chromatic's **UI Tests** status meant as the review
+gate, scoped to the free plan's 5,000 billed snapshots/month with TurboSnap. That plan was sized against
 usage at the time, but the monthly cap (CLI exit `11`, `ACCOUNT_QUOTA_REACHED`) now reaches before
 the billing cycle resets often enough that the gate gives no reliable baseline: once the cap hits,
 the `chromatic` job in `.github/workflows/ci.yml` warns and exits green by design — ADR 0027's own
@@ -39,9 +39,10 @@ decision.
 
 ## Consequences
 
-- A person removes the required **UI Tests** status check from `main`'s branch protection, deletes
-  the `CHROMATIC_PROJECT_TOKEN` repository secret, and archives or deletes the Chromatic project —
-  none of this is reachable from inside the repository.
+- **UI Tests** was never added to the required checks of `main`'s ruleset (checked 2026-10-29), so
+  merging needs no settings change. A person deletes the `CHROMATIC_PROJECT_TOKEN` repository
+  secret and archives or deletes the Chromatic project; neither is reachable from inside the
+  repository.
 - [ADR 0027](0027-chromatic-ci-visual-tests.md) is superseded by this ADR; its setup and quota
   detail describe a tool no longer wired into CI.
 - [docs/research/2026-08-18-chromatic-free-tier-ci.md](../research/2026-08-18-chromatic-free-tier-ci.md)
