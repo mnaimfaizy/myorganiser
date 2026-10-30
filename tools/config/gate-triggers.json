@@ -57,10 +57,12 @@
       "id": "prisma:migration:drift",
       "ciStep": "Apply Prisma migrations and check schema drift",
       "job": "prisma-migration-gate",
-      "why": "Tier 2 of the Prisma migration gate (ADR 0094): applies the migration history to an ephemeral Postgres and asserts applying it reproduces the schema. Unlike the other suites here it carries its own job rather than a step in `Test`, so a pull request that cannot have broken a migration never pays for the Postgres service start (ADR 0140, issue #1394). The triggers are the schema and migrations a changed path could actually drift: the Prisma schema directory, including its migrations, and the config file `migrate diff --from-config-datasource` reads its datasource from.",
+      "why": "Tier 2 of the Prisma migration gate (ADR 0094): applies the migration history to an ephemeral Postgres and asserts applying it reproduces the schema. Unlike the other suites here it carries its own job rather than a step in `Test`, so a pull request that cannot have broken a migration never pays for the Postgres service start (ADR 0140, issue #1394). The triggers are the schema and migrations a changed path could actually drift: the Prisma schema directory, including its migrations, and the config file `migrate diff --from-config-datasource` reads its datasource from. The job also runs the migration backfill test, which `Test` excludes because `Test` carries no database, so that test file and the backend Jest config it runs under are triggers too: a pull request editing only the test would otherwise run it nowhere.",
       "triggers": [
         "apps/backend/src/prisma/**",
-        "apps/backend/src/prisma.config.ts"
+        "apps/backend/src/prisma.config.ts",
+        "apps/backend/src/testing/backfillUserCreatedAt.int.test.ts",
+        "apps/backend/jest.config.ts"
       ]
     }
   ]
