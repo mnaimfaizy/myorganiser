@@ -1,5 +1,11 @@
 import { Button } from '@myorganiser/web-ui';
 
+import {
+  TASKS_EMPTY_ACTION_ROW,
+  TASKS_EMPTY_DESKTOP_CARD,
+  TASKS_EMPTY_PHONE_WRAPPER,
+} from './tasks-all-clear';
+
 interface TasksFilteredEmptyProps {
   /** Resets the status filter to Open and the context filter to All. */
   onClearFilters: () => void;
@@ -18,7 +24,7 @@ const TasksFilteredEmpty = ({
 }: TasksFilteredEmptyProps) => {
   if (variant === 'phone') {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-30 text-center">
+      <div className={TASKS_EMPTY_PHONE_WRAPPER}>
         <p className="text-body-sm text-foreground-supporting">
           No tasks match these filters.
         </p>
@@ -30,11 +36,11 @@ const TasksFilteredEmpty = ({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-panel border border-border bg-raised-surface px-6 py-12 text-center">
+    <div className={TASKS_EMPTY_DESKTOP_CARD}>
       <p className="text-body text-foreground-supporting">
         No tasks match these filters.
       </p>
-      <div className="mt-1.5 flex flex-wrap justify-center gap-2.5">
+      <div className={TASKS_EMPTY_ACTION_ROW}>
         <Button variant="outline" onClick={onClearFilters}>
           Clear filters
         </Button>

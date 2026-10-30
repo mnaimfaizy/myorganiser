@@ -1,5 +1,13 @@
 import { Button, Illustration } from '@myorganiser/web-ui';
 
+/** Shared with `TasksFilteredEmpty`: the two board-level in-list empty states. */
+export const TASKS_EMPTY_PHONE_WRAPPER =
+  'flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-30 text-center';
+export const TASKS_EMPTY_DESKTOP_CARD =
+  'flex flex-col items-center gap-3 rounded-panel border border-border bg-raised-surface px-6 py-12 text-center';
+export const TASKS_EMPTY_ACTION_ROW =
+  'mt-1.5 flex flex-wrap justify-center gap-2.5';
+
 interface TasksAllClearProps {
   /** Tasks done this week, for the sentence under the heading. */
   doneThisWeek: number;
@@ -32,7 +40,7 @@ const TasksAllClear = ({
 
   if (variant === 'phone') {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-30 text-center">
+      <div className={TASKS_EMPTY_PHONE_WRAPPER}>
         <Illustration kind="tasks" size={96} />
         <h2 className="m-0 font-display text-title text-foreground">
           All clear
@@ -46,13 +54,13 @@ const TasksAllClear = ({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-panel border border-border bg-raised-surface px-6 py-12 text-center">
+    <div className={TASKS_EMPTY_DESKTOP_CARD}>
       <Illustration kind="tasks" size={112} />
       <h2 className="m-0 font-display text-title-lg text-foreground">
         All clear
       </h2>
       <p className="text-body text-foreground-supporting">{sentence}</p>
-      <div className="mt-1.5 flex flex-wrap justify-center gap-2.5">
+      <div className={TASKS_EMPTY_ACTION_ROW}>
         <Button variant="outline" onClick={onShowDone}>
           Show done
         </Button>
