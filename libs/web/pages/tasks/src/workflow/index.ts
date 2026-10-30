@@ -17,6 +17,8 @@ export {
   archiveTaskInWorkflow,
   deleteTaskFromWorkflow,
   loadTasksFromVault,
+  type LoadTasksOptions,
+  type TasksLoadOutcome,
   unarchiveTaskInWorkflow,
   updateTaskInWorkflow,
 } from './task-workflow';

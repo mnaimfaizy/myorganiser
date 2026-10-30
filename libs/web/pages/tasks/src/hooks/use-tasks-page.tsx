@@ -41,10 +41,12 @@ function toUpdateInput(task: Task): TaskUpdateInput {
  * mutation, and reports each outcome with a toast. Plaintext stays in browser
  * memory; this hook only decides what to save and what to say about it.
  *
- * Mutations are serialised here. The workflow saves the whole array it closed
- * over, so two writes in flight would drop one. While a write is in flight
- * every mutating action resolves `false` without running (`addTask` throws).
- * The one exception is Undo, which waits for the write in flight and then runs.
+ * Mutations are serialised here. The workflow no longer loses a write when two
+ * overlap (#1277); the page keeps one write at a time so the save indicator
+ * speaks for a single outcome and a refused dialog can keep its values. While
+ * a write is in flight every mutating action resolves `false` without running
+ * (`addTask` throws). The one exception is Undo, which waits for the write in
+ * flight and then runs.
  */
 export function useTasksPage(handle: VaultHandle) {
   const { toast } = useToast();

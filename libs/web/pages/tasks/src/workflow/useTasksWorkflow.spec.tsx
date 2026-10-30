@@ -265,4 +265,321 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       expect(savedTasks![0].id).toBe('task-2');
     });
   });
+
+  describe('#1277 overlapping writes: each write starts from what the last one saved', () => {
+    /**
+     * Holds every load and every Vault write open until the test releases it,
+     * so a second call can be started while the first is still pending.
+     */
+    class HeldTasksVaultAdapter extends InMemoryTasksVaultAdapter {
+      private readonly heldLoads: Array<(tasks: Task[] | null) => void> = [];
+      private readonly heldWrites: Array<() => void> = [];
+
+      loadTasks(): Promise<Task[] | null> {
+        return new Promise((resolve) => {
+          this.heldLoads.push(resolve);
+        });
+      }
+
+      saveTasks(tasks: Task[]): Promise<void> {
+        return this.hold().then(() => super.saveTasks(tasks));
+      }
+
+      deleteTask(
+        tasks: Task[],
+        taskId: string,
+        deletedAt: string,
+      ): Promise<Task[]> {
+        return this.hold().then(() =>
+          super.deleteTask(tasks, taskId, deletedAt),
+        );
+      }
+
+      pendingLoadCount(): number {
+        return this.heldLoads.length;
+      }
+
+      pendingWriteCount(): number {
+        return this.heldWrites.length;
+      }
+
+      resolveNextLoad(tasks: Task[] | null): void {
+        this.heldLoads.shift()?.(tasks);
+      }
+
+      releaseNextWrite(): void {
+        this.heldWrites.shift()?.();
+      }
+
+      private hold(): Promise<void> {
+        return new Promise((resolve) => {
+          this.heldWrites.push(resolve);
+        });
+      }
+    }
+
+    async function settleLoad(
+      adapter: HeldTasksVaultAdapter,
+      tasks: Task[] | null,
+    ): Promise<void> {
+      await waitFor(() => expect(adapter.pendingLoadCount()).toBe(1));
+      await act(async () => {
+        adapter.resolveNextLoad(tasks);
+      });
+    }
+
+    async function releaseWrite(adapter: HeldTasksVaultAdapter): Promise<void> {
+      await act(async () => {
+        adapter.releaseNextWrite();
+      });
+    }
+
+    it('two archives called before the first save settles both survive', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await settleLoad(adapter, [
+        makeTask({ id: 'a', title: 'A' }),
+        makeTask({ id: 'b', title: 'B' }),
+      ]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Both calls come from the same render, and neither has saved yet.
+      const archiveA = result.current.archiveTask('a');
+      const archiveB = result.current.archiveTask('b');
+
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+
+      await expect(archiveA).resolves.toEqual({ ok: true, kind: 'archived' });
+      await expect(archiveB).resolves.toEqual({ ok: true, kind: 'archived' });
+
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved).toHaveLength(2);
+      expect(saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'a', archived: true }),
+          expect.objectContaining({ id: 'b', archived: true }),
+        ]),
+      );
+      await waitFor(() =>
+        expect(result.current.tasks.every((t) => t.archived)).toBe(true),
+      );
+    });
+
+    it('add overlapping an update keeps the updated task and the new one', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await settleLoad(adapter, [
+        makeTask({ id: 'task-1', title: 'Existing' }),
+      ]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const update = result.current.updateTask('task-1', {
+        title: 'Renamed',
+        priority: 'high',
+        status: 'pending',
+      });
+      const add = result.current.addTask({
+        title: 'New task',
+        priority: 'low',
+        status: 'pending',
+      });
+
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+
+      await expect(update).resolves.toEqual({ ok: true, kind: 'updated' });
+      await expect(add).resolves.toEqual({ ok: true, kind: 'created' });
+
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved).toHaveLength(2);
+      expect(saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'task-1',
+            title: 'Renamed',
+            priority: 'high',
+          }),
+          expect.objectContaining({ title: 'New task', priority: 'low' }),
+        ]),
+      );
+    });
+
+    it('delete overlapping an archive removes one task, archives the other, and logs the deletion', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await settleLoad(adapter, [
+        makeTask({ id: 'a', title: 'A' }),
+        makeTask({ id: 'b', title: 'B' }),
+      ]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const remove = result.current.deleteTask('a');
+      const archive = result.current.archiveTask('b');
+
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+
+      await expect(remove).resolves.toEqual({ ok: true, kind: 'deleted' });
+      await expect(archive).resolves.toEqual({ ok: true, kind: 'archived' });
+
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved.map((t) => t.id)).toEqual(['b']);
+      expect(saved[0].archived).toBe(true);
+      expect(adapter.getSavedDeletions()).toEqual({ a: FIXED_NOW });
+    });
+
+    it('unarchive overlapping an update keeps both changes', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await settleLoad(adapter, [
+        makeTask({ id: 'task-1', title: 'Archived one', archived: true }),
+        makeTask({ id: 'task-2', title: 'Pending one' }),
+      ]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const unarchive = result.current.unarchiveTask('task-1');
+      const update = result.current.updateTask('task-2', {
+        title: 'Renamed',
+        priority: 'medium',
+        status: 'pending',
+      });
+
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+
+      await expect(unarchive).resolves.toEqual({
+        ok: true,
+        kind: 'unarchived',
+      });
+      await expect(update).resolves.toEqual({ ok: true, kind: 'updated' });
+
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'task-1', archived: false }),
+          expect.objectContaining({ id: 'task-2', title: 'Renamed' }),
+        ]),
+      );
+    });
+
+    it('a load superseded by a newer revision neither applies nor writes back', async () => {
+      const staleTask = makeTask({
+        id: 'task-1',
+        title: 'Stale copy',
+        priority: 'urgent' as Task['priority'],
+      });
+      const newerTask = makeTask({ id: 'task-2', title: 'Current copy' });
+      const adapter = new HeldTasksVaultAdapter({ tasks: [newerTask] });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      (useLocalVaultRevision as jest.Mock).mockReturnValue(0);
+      const { result, rerender } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+
+      // The first load is in flight when the revision moves on.
+      await waitFor(() => expect(adapter.pendingLoadCount()).toBe(1));
+      (useLocalVaultRevision as jest.Mock).mockReturnValue(1);
+      rerender();
+
+      // The older read resolves with a copy that would need normalising.
+      await settleLoad(adapter, [staleTask]);
+      expect(result.current.loading).toBe(true);
+
+      // Only the newer load's read is applied.
+      await settleLoad(adapter, [newerTask]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.tasks).toEqual([newerTask]);
+
+      expect(saveSpy).not.toHaveBeenCalled();
+      expect(adapter.getSavedTasks()).toEqual([newerTask]);
+    });
+
+    it('a load write-back still pending holds a mutation behind it', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      // The stored copy needs normalising, so the load writes it back.
+      await settleLoad(adapter, [
+        makeTask({
+          id: 'task-1',
+          title: 'Old copy',
+          priority: 'urgent' as Task['priority'],
+        }),
+      ]);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+
+      const added = result.current.addTask({
+        title: 'New task',
+        priority: 'low',
+        status: 'pending',
+      });
+
+      // Let any unqueued work run, then check that only the write-back is out.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(adapter.pendingWriteCount()).toBe(1);
+      expect(result.current.tasks).toEqual([]);
+
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+
+      await expect(added).resolves.toEqual({ ok: true, kind: 'created' });
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved).toHaveLength(2);
+      expect(saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'task-1', priority: 'medium' }),
+          expect.objectContaining({ title: 'New task' }),
+        ]),
+      );
+    });
+
+    it('mutation callbacks keep their identity across a re-render that changes tasks', async () => {
+      const adapter = new HeldTasksVaultAdapter();
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await settleLoad(adapter, [makeTask({ id: 'task-1' })]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const before = result.current;
+      const archived = result.current.archiveTask('task-1');
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+      await releaseWrite(adapter);
+      await expect(archived).resolves.toEqual({ ok: true, kind: 'archived' });
+      await waitFor(() => expect(result.current.tasks[0].archived).toBe(true));
+
+      const mutations = [
+        'addTask',
+        'updateTask',
+        'deleteTask',
+        'archiveTask',
+        'unarchiveTask',
+      ] as const;
+      for (const name of mutations) {
+        expect(result.current[name]).toBe(before[name]);
+      }
+    });
+  });
 });
