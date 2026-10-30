@@ -47,11 +47,15 @@ the grep says the gate is there.
 ## Decision
 
 1. **Heavy suites are path-gated from one config.** `tools/config/gate-triggers.json` holds, per
-   heavy suite, the gate name, the `Test` job step it is, the reason for its globs, and its trigger
+   heavy suite, the gate name, the job step it is, the reason for its globs, and its trigger
    globs. `Setup Affected Context` resolves the config against the pull request's changed paths and
-   outputs one `run_<suite>` flag per entry; each suite's step in `Test` runs when that flag or
-   `run_all` is set. A heavy suite is added to that config, never as an `if:` expression written by
-   hand.
+   outputs one `run_<suite>` flag per entry; each suite's step runs when that flag or `run_all` is
+   set. A heavy suite is added to that config, never as an `if:` expression written by hand. A
+   suite's step lives in `Test` by default; an optional `job` field names a different job instead,
+   for a suite whose cost is worth skipping a whole job for rather than one step in it — the
+   Postgres service `prisma:migration:drift` needs, moved out by [#1394](https://github.com/mnaimfaizy/myorganiser/issues/1394). That suite's condition sits on the job itself, not on its
+   step: a job's `services:` start whenever the job runs, whatever a step's own `if:` says, so only a
+   job-level condition actually skips the Postgres start.
 
 2. **The Gate Trigger resolver is our own code.** `tools/scripts/ci/resolve-gate-triggers.ts`, over the pure
    decision in `tools/scripts/lib/gate-triggers.ts`, with a Contract Suite in temporary git

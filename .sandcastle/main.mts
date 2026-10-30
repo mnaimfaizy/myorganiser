@@ -1322,14 +1322,11 @@ const GATE_DB_LABEL = 'sandcastle.gate-db=1';
 // PrismaClient at module scope, so a suite importing one throws without any value.
 const GATE_PLACEHOLDER_DATABASE_URL = 'postgresql://localhost:5432/myorganiser';
 
-// Same commands, same order, as CI's "Apply Prisma migrations and check schema
-// drift" step. Runs inside the gate container after install.
-const GATE_DB_PREPARE = [
-  'cd apps/backend/src',
-  'node ../../../node_modules/.bin/prisma migrate deploy --schema prisma/schema',
-  'node ../../../node_modules/.bin/prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code',
-  'cd /home/agent/workspace',
-].join(' && ');
+// Same script CI's "Apply Prisma migrations and check schema drift" step
+// calls, so the two commands it runs can't drift apart between here and
+// there. Runs inside the gate container after install, which is what makes
+// `corepack` available here.
+const GATE_DB_PREPARE = 'corepack yarn prisma:migration:drift';
 
 if (gateOnly) {
   if (integrationBranch === null) {

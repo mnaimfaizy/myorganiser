@@ -5,8 +5,9 @@
 // drifting back into `Test` or losing its job-level `if:`, so the Postgres
 // container starts on every pull request again; a `Test` job that keeps a
 // service container it no longer needs; or the drift step running before the
-// Prisma client it needs is generated, or re-inlining the npx commands in place
-// of the package.json script the config's suite id must name. The `if:` sits at
+// Prisma client it needs is generated, the backfill step moving before the
+// drift step or losing its one-file selector, or re-inlining the npx commands
+// in place of the package.json script the config's suite id must name. The `if:` sits at
 // job level, so it is read here with its own helper: the shared slicer's
 // `ifOf` reads a step's eight-space `if:` and would miss it.
 import assert from 'node:assert/strict';
@@ -108,6 +109,21 @@ test('Generate Prisma client runs before the drift check', () => {
   assert.ok(
     stepAt(GATE, GENERATE) < stepAt(GATE, drift.ciStep),
     'the drift check needs the generated Prisma client, so generation must run first',
+  );
+});
+
+test('the backfill test runs after the drift step and selects only its one file', () => {
+  const drift = driftSuite();
+  const backfill = 'Run Prisma migration backfill test';
+  assert.ok(
+    stepAt(GATE, backfill) > stepAt(GATE, drift.ciStep),
+    'the backfill test needs the migrations the drift step applies, so it must run after it',
+  );
+  assert.ok(
+    stepNamed(GATE, backfill).includes(
+      "--testPathPatterns='backfillUserCreatedAt\\.int\\.test\\.ts$'",
+    ),
+    'the backfill step must select exactly backfillUserCreatedAt.int.test.ts',
   );
 });
 
