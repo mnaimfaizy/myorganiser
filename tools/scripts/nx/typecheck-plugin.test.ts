@@ -30,6 +30,8 @@ import {
   PRODUCTION_CONFIG_NAMES,
   SPEC_CONFIG_NAME,
   createNodesV2,
+  outsideRootExtends,
+  parseTsconfig,
   typecheckConfigsFor,
   typecheckTargetFor,
   type TypecheckPluginOptions,
@@ -211,6 +213,288 @@ test('the cache inputs read the project, its dependencies, and the two workspace
     !inputs.includes('production'),
     'the project inputs must be `default`, not `production`',
   );
+});
+
+// ---------------------------------------------------------------------------
+// Configs outside the project root: the chain a program's options come from.
+// ---------------------------------------------------------------------------
+
+test('outsideRootExtends follows a chain to the one link outside the project root', (t) => {
+  // libs/mobile/core shape: the program extends an in-root config, which
+  // extends a config in the parent directory. tsconfig.base.json is dropped
+  // because the target adds it as its own input.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json': '{ "extends": "./tsconfig.json" }\n',
+    'libs/m/a/tsconfig.json': '{ "extends": "../tsconfig.shared.json" }\n',
+    'libs/m/tsconfig.shared.json':
+      '{ "extends": "../../../tsconfig.base.json" }\n',
+    'tsconfig.base.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    ['libs/m/tsconfig.shared.json'],
+  );
+});
+
+test('outsideRootExtends leaves out a link that stays inside the project root', (t) => {
+  // `default` already covers files under the project root.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json': '{ "extends": "./tsconfig.inner.json" }\n',
+    'libs/m/a/tsconfig.inner.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    [],
+  );
+});
+
+test('outsideRootExtends ignores a bare package specifier, which yarn.lock pins', (t) => {
+  // `@tsconfig/node22/tsconfig.json` resolves into node_modules, and the
+  // yarn.lock input already covers that tree.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json':
+      '{ "extends": "@tsconfig/node22/tsconfig.json" }\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    [],
+  );
+});
+
+test('outsideRootExtends contributes every out-of-root link of an array extends', (t) => {
+  // TypeScript 5.0+ accepts an array. The bare specifier in the array is
+  // ignored, the two relative links are both kept.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json':
+      '{ "extends": ["../tsconfig.one.json", "../tsconfig.two.json", "@x/y"] }\n',
+    'libs/m/tsconfig.one.json': '{}\n',
+    'libs/m/tsconfig.two.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    ['libs/m/tsconfig.one.json', 'libs/m/tsconfig.two.json'],
+  );
+});
+
+test('outsideRootExtends skips an unreadable out-of-root link, trying each form TypeScript accepts, and does not throw', () => {
+  // A link that reads as nothing is not guessed at: it is left out, and the
+  // walk does not continue past it. The reader is asked for the path as
+  // written, with `.json` appended, and as a directory's tsconfig.json.
+  // `tsc` fails loudly on the missing file.
+  const reads: string[] = [];
+  const result = outsideRootExtends({
+    workspaceRoot: '/ws',
+    projectRoot: 'libs/m/a',
+    configs: ['tsconfig.lib.json'],
+    readConfig: (path) => {
+      reads.push(path.replace(/^\/ws\//, ''));
+      return path.endsWith('tsconfig.lib.json')
+        ? '{ "extends": "../tsconfig.gone.json" }'
+        : null;
+    },
+  });
+
+  assert.deepEqual(result, []);
+  assert.deepEqual(reads, [
+    'libs/m/a/tsconfig.lib.json',
+    'libs/m/tsconfig.gone.json',
+    'libs/m/tsconfig.gone.json.json',
+    'libs/m/tsconfig.gone.json/tsconfig.json',
+  ]);
+});
+
+test(
+  'outsideRootExtends terminates on a cycle among out-of-root configs',
+  { timeout: 10_000 },
+  (t) => {
+    // A hang here would wedge every `nx` command, because this runs while the
+    // project graph is being built. The timeout turns a regression into a
+    // failure rather than a stalled run.
+    const root = workspaceWith(t, {
+      'libs/m/a/tsconfig.lib.json': '{ "extends": "../tsconfig.x.json" }\n',
+      'libs/m/tsconfig.x.json': '{ "extends": "./tsconfig.y.json" }\n',
+      'libs/m/tsconfig.y.json': '{ "extends": "./tsconfig.x.json" }\n',
+    });
+
+    assert.deepEqual(
+      outsideRootExtends({
+        workspaceRoot: root,
+        projectRoot: 'libs/m/a',
+        configs: ['tsconfig.lib.json'],
+      }),
+      ['libs/m/tsconfig.x.json', 'libs/m/tsconfig.y.json'],
+    );
+  },
+);
+
+test('outsideRootExtends sorts and deduplicates the links two configs of one project share', (t) => {
+  // The target's input list is part of the cache key. Two configs reaching
+  // the same file must yield one entry, and the order must not depend on
+  // discovery order, or the key would move between runs and miss every entry
+  // the other run wrote.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json':
+      '{ "extends": ["../tsconfig.zeta.json", "../tsconfig.shared.json"] }\n',
+    'libs/m/a/tsconfig.spec.json':
+      '{ "extends": ["../tsconfig.shared.json", "../tsconfig.alpha.json"] }\n',
+    'libs/m/tsconfig.zeta.json': '{}\n',
+    'libs/m/tsconfig.shared.json': '{}\n',
+    'libs/m/tsconfig.alpha.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json', 'tsconfig.spec.json'],
+    }),
+    [
+      'libs/m/tsconfig.alpha.json',
+      'libs/m/tsconfig.shared.json',
+      'libs/m/tsconfig.zeta.json',
+    ],
+  );
+});
+
+test('outsideRootExtends records an extension-less link as the file that actually read', (t) => {
+  // A link this function fails to read silently leaves the cache key, which is
+  // the defect class it exists to close. So `../tsconfig.shared` must resolve
+  // to the `.json` file on disk, and the recorded name is that file's name, not
+  // the string as written.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json': '{ "extends": "../tsconfig.shared" }\n',
+    'libs/m/tsconfig.shared.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    ['libs/m/tsconfig.shared.json'],
+  );
+});
+
+test('outsideRootExtends resolves a directory extends to the tsconfig.json inside it', (t) => {
+  // TypeScript treats `"../shared"` as `../shared/tsconfig.json`.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json': '{ "extends": "../shared" }\n',
+    'libs/m/shared/tsconfig.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    ['libs/m/shared/tsconfig.json'],
+  );
+});
+
+test('outsideRootExtends resolves a second hop from the file that read, not the path as written', (t) => {
+  // `./tsconfig.deeper.json` is written in libs/m/tsconfig.shared.json, so it
+  // resolves to libs/m/tsconfig.deeper.json. Resolved from the first hop's
+  // written path (libs/m/a/) it would land inside the project root and be
+  // dropped, so both links appearing pins where `dirname` comes from.
+  const root = workspaceWith(t, {
+    'libs/m/a/tsconfig.lib.json': '{ "extends": "../tsconfig.shared" }\n',
+    'libs/m/tsconfig.shared.json': '{ "extends": "./tsconfig.deeper.json" }\n',
+    'libs/m/tsconfig.deeper.json': '{}\n',
+  });
+
+  assert.deepEqual(
+    outsideRootExtends({
+      workspaceRoot: root,
+      projectRoot: 'libs/m/a',
+      configs: ['tsconfig.lib.json'],
+    }),
+    ['libs/m/tsconfig.deeper.json', 'libs/m/tsconfig.shared.json'],
+  );
+});
+
+test('parseTsconfig reads line comments, block comments and trailing commas', () => {
+  // Most tsconfigs in this workspace carry a comment; JSON.parse would reject
+  // them all and silently drop their extends links.
+  const parsed = parseTsconfig(`{
+  // a line comment
+  "extends": "./a.json", /* a block comment */
+  "compilerOptions": { "strict": true, },
+}
+`);
+
+  assert.deepEqual(parsed, {
+    extends: './a.json',
+    compilerOptions: { strict: true },
+  });
+});
+
+test('parseTsconfig does not read a // inside a string value as a comment', () => {
+  // A path or URL in a value is common. Stripping `//` everywhere would cut
+  // the rest of the line, and the extends link on it, out of the parse.
+  assert.deepEqual(
+    parseTsconfig('{"extends": "./a.json", "x": "https://example.com"}'),
+    { extends: './a.json', x: 'https://example.com' },
+  );
+});
+
+test('parseTsconfig leaves a string value containing ,] or ,} exactly as written', () => {
+  // A path whose text happens to hold a comma before a closer. The earlier
+  // whole-text trailing-comma pass rewrote that run inside the string, so
+  // `./a,].json` came back as `./a].json`. outsideRootExtends would then
+  // resolve a file that does not exist, and the real file would drop out of
+  // the cache key.
+  const link = './a,].json';
+  const parsed = parseTsconfig(`{"extends": "${link}"}`) as { extends: string };
+
+  assert.equal(parsed.extends, link);
+  assert.deepEqual(parseTsconfig('{"extends": "./a,}.json"}'), {
+    extends: './a,}.json',
+  });
+});
+
+test('parseTsconfig returns null for text that is not JSON', () => {
+  assert.equal(parseTsconfig('not json at all'), null);
+  assert.equal(parseTsconfig('{ "extends": '), null);
+});
+
+test('typecheckTargetFor puts the out-of-root extends between tsconfig.base.json and yarn.lock, in order', () => {
+  // The exact array, because the order is part of the cache key.
+  const target = typecheckTargetFor({
+    projectRoot: 'libs/m/a',
+    configs: ['tsconfig.lib.json'],
+    extendsOutsideRoot: ['libs/m/tsconfig.shared.json'],
+  });
+
+  assert.deepEqual(target?.inputs, [
+    'default',
+    '^production',
+    '{workspaceRoot}/tsconfig.base.json',
+    '{workspaceRoot}/libs/m/tsconfig.shared.json',
+    '{workspaceRoot}/yarn.lock',
+    { externalDependencies: ['typescript'] },
+  ]);
 });
 
 test('dependsOn is generate-types only when the project.json declares it', async (t) => {
@@ -452,4 +736,19 @@ test('mobile typecheck compiles app, web and spec, and the plugin wins the merge
     pluginAt > viteAt,
     'the typecheck plugin must come after @nx/vite/plugin in nx.json',
   );
+});
+
+test('mobile-core typecheck takes libs/mobile/tsconfig.mobile.json as a cache input, the regression this guards', () => {
+  // libs/mobile/core extends ./tsconfig.json, which extends
+  // ../tsconfig.mobile.json. That file enforces ADR 0120's `types: []` and
+  // ADR 0103's `lib: ["esnext"]` for every libs/mobile program. Under no
+  // project root, it reached the cache key only through this input.
+  const inputs = liveTypecheckOf('mobile-core')?.inputs ?? [];
+
+  assert.ok(
+    inputs.includes('{workspaceRoot}/libs/mobile/tsconfig.mobile.json'),
+    'mobile-core must key its cache on libs/mobile/tsconfig.mobile.json',
+  );
+  assert.ok(inputs.includes('{workspaceRoot}/tsconfig.base.json'));
+  assert.ok(inputs.includes('{workspaceRoot}/yarn.lock'));
 });

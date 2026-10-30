@@ -61,13 +61,40 @@ carry a `typecheck` target that owns `tools/scripts/tsconfig.json`.
    Every project in this workspace is defined by a committed `project.json`, including every one
    Nx's generators produce, so the glob reaches all of them and nothing else.
 
-4. **The cache inputs are the project's own files, its dependencies' production files, and two
-   workspace files.** `default` rather than `production`, because `production` excludes exactly
-   the spec sources, spec config and test setup that item 2 compiles. `^production`, because a
-   type error can arrive from a dependency's public surface. `{workspaceRoot}/tsconfig.base.json`,
-   which holds every `paths` alias and the global `types`, and `{workspaceRoot}/yarn.lock`, which
-   pins the TypeScript version and every `@types` package — neither sits under a project root, so
-   neither reaches the cache key any other way.
+4. **The cache inputs are the project's own files, its dependencies' production files, and every
+   file outside the project root that its programs' meaning depends on.** `default` rather than
+   `production`, because `production` excludes exactly the spec sources, spec config and test
+   setup that item 2 compiles. `^production`, because a type error can arrive from a dependency's
+   public surface. `{workspaceRoot}/tsconfig.base.json`, which holds every `paths` alias and the
+   global `types`, and `{workspaceRoot}/yarn.lock`, which pins the TypeScript version and every
+   `@types` package — neither sits under a project root, so neither reaches the cache key any
+   other way.
+
+   So does every other config the compiled programs `extends` from outside the root, resolved
+   transitively by the plugin. `tsconfig.base.json` is not the only such file:
+   `libs/mobile/core/tsconfig.lib.json` extends `./tsconfig.json`, which extends
+   `../tsconfig.mobile.json`, and that is where ADR 0120's `types: []` and ADR 0103's
+   `lib: ["esnext"]` are actually enforced for all seven `libs/mobile/*` programs.
+   `libs/mobile` is under no project root, so an edit there would otherwise leave every mobile
+   library's result in the cache and let the gate those two ADRs name pass without applying the
+   new options — and `main` is no backstop, because the push run restores from the same cache
+   keys. A link inside the project root is left out, since `default` covers it; a link that is a
+   bare package specifier is left out, since it resolves into `node_modules`, which `yarn.lock`
+   pins. An `extends` is resolved through all three forms TypeScript accepts — as written, with
+   `.json` appended, and as a directory holding a `tsconfig.json` — and the file that actually
+   read is what becomes the input, because a link the plugin fails to read is a link that leaves
+   the cache key silently.
+
+   What this does not resolve is a file a program reaches through `include`, `files` or `types`
+   rather than `extends`. Bounding that means reimplementing the compiler's file resolution, and
+   the one case this repo anticipates — the Hermes-globals declaration
+   [ADR 0120](0120-a-mobile-program-gets-node-types-only-if-it-runs-on-node.md) asks for under
+   `libs/mobile/`, with its first entry — arrives by editing `tsconfig.mobile.json`, which is an
+   input.
+
+   The input list is built in a fixed order, and the resolved configs arrive sorted, because the
+   list is itself part of the cache key: an order that moved between two runs would miss every
+   entry the other wrote.
 
 5. **A project whose `project.json` declares `generate-types` gets `dependsOn: ['generate-types']`.**
    `apps/backend/src/prisma` is generated and gitignored, so a fresh checkout has no

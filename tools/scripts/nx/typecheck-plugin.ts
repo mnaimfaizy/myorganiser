@@ -29,7 +29,7 @@
 // project graph, before any workspace tooling is available, so it imports
 // nothing but node builtins and types.
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 import type { CreateNodesV2, TargetConfiguration } from '@nx/devkit';
 
@@ -115,6 +115,187 @@ export function typecheckConfigsFor(
 }
 
 /**
+ * Always an input, whether or not a config's `extends` chain reaches it. It
+ * holds every `paths` alias and the global `types`, so no program in this
+ * workspace is independent of it, and {@link outsideRootExtends} failing to
+ * read one link of one chain must not be able to drop it.
+ */
+export const BASE_CONFIG_PATH = 'tsconfig.base.json';
+
+/** Reads a file, or returns null when it cannot be read. */
+export type ReadConfig = (path: string) => string | null;
+
+const readOrNull: ReadConfig = (path) => {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Reads the config an `extends` path names, trying the forms TypeScript
+ * accepts: the path as written, the path with `.json` appended, and the path
+ * as a directory holding a `tsconfig.json`. Every `extends` in this workspace
+ * currently spells the `.json`, but the two shorter forms are legal, and a
+ * config this function failed to read is a config whose `extends` link would
+ * silently leave the cache key — the defect the caller exists to prevent.
+ *
+ * @returns the path that read and its text, or null when none of them read
+ */
+function readConfigLink(
+  base: string,
+  readConfig: ReadConfig,
+): { path: string; text: string } | null {
+  for (const candidate of [base, `${base}.json`, join(base, 'tsconfig.json')]) {
+    const text = readConfig(candidate);
+    if (text !== null) return { path: candidate, text };
+  }
+  return null;
+}
+
+/**
+ * Parses a tsconfig, which is JSON with comments and trailing commas.
+ *
+ * `JSON.parse` rejects both, and most tsconfigs in this workspace carry a
+ * comment explaining an option — so a plain parse would silently treat the
+ * common case as an unreadable config and drop its `extends` link from the
+ * cache key, which is the one failure this whole function exists to avoid.
+ * The scan tracks string literals rather than stripping `//` everywhere,
+ * because a config value is often a path.
+ *
+ * @returns the parsed value, or null when it is not JSON even after stripping
+ */
+export function parseTsconfig(text: string): unknown {
+  let out = '';
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '"') {
+      const start = index;
+      index += 1;
+      while (index < text.length) {
+        if (text[index] === '\\') {
+          index += 2;
+          continue;
+        }
+        if (text[index] === '"') {
+          index += 1;
+          break;
+        }
+        index += 1;
+      }
+      out += text.slice(start, index);
+      continue;
+    }
+    if (char === '/' && text[index + 1] === '/') {
+      while (index < text.length && text[index] !== '\n') index += 1;
+      continue;
+    }
+    if (char === '/' && text[index + 1] === '*') {
+      const end = text.indexOf('*/', index + 2);
+      index = end === -1 ? text.length : end + 2;
+      continue;
+    }
+    // A trailing comma is dropped here rather than by a regex over the
+    // finished text, for the same reason the comments are: `out` holds whole
+    // string literals, so a closer reached outside one can only ever strip a
+    // comma that is itself outside one. A regex pass would rewrite
+    // `{"x": "a,]"}` to `{"x": "a]"}` — a path value quietly altered.
+    if (char === '}' || char === ']') out = out.replace(/,\s*$/, '');
+    out += char;
+    index += 1;
+  }
+  try {
+    return JSON.parse(out);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Every config a project's programs `extends`, transitively, that sits
+ * outside the project root — as workspace-relative paths, sorted.
+ *
+ * A config's options are not all written in the file the target compiles.
+ * `libs/mobile/core/tsconfig.lib.json` extends `./tsconfig.json`, which
+ * extends `../tsconfig.mobile.json`, which is where ADR 0120's `types: []`
+ * and ADR 0103's `lib: ["esnext"]` are actually enforced for all seven
+ * `libs/mobile/*` programs — and `libs/mobile` is under no project root, so
+ * `default` does not reach it. Without this, editing that file left every
+ * mobile library's result in the cache and the gate those two ADRs name
+ * passed without ever applying the new options.
+ *
+ * A link inside the project root is left out: `default` already covers it.
+ * A link that is a bare package specifier (`@tsconfig/node22/tsconfig.json`)
+ * is left out too — it resolves into `node_modules`, which `yarn.lock`
+ * pins.
+ *
+ * A link that reads under none of the three forms is skipped rather than
+ * guessed at, which leaves it out of the cache key — safely, because `tsc`
+ * rejects a config whose `extends` resolves to nothing, so that run fails and
+ * Nx caches no result for it. The day the file appears there is no green
+ * entry to restore, and the target recompiles.
+ *
+ * @param workspaceRoot absolute path to the workspace root
+ * @param projectRoot project root, relative to the workspace root
+ * @param configs config file names, relative to the project root
+ * @param readConfig file reader, injected so the Contract Suite uses fixtures
+ */
+export function outsideRootExtends({
+  workspaceRoot,
+  projectRoot,
+  configs,
+  readConfig = readOrNull,
+}: {
+  workspaceRoot: string;
+  projectRoot: string;
+  configs: string[];
+  readConfig?: ReadConfig;
+}): string[] {
+  const projectDir = resolve(workspaceRoot, projectRoot);
+  const seen = new Set<string>();
+  const outside = new Set<string>();
+  // `isLink` is false for the project's own compiled configs, which `default`
+  // covers, and true for everything reached through an `extends`. `seen`
+  // bounds the walk: a config that extends one already visited — a cycle, or
+  // two of a project's programs sharing a base — stops here rather than
+  // looping, and a hang would wedge every `nx` command, because this runs
+  // while the project graph is being built.
+  const queue = configs.map((config) => ({
+    base: resolve(projectDir, config),
+    isLink: false,
+  }));
+
+  for (let item = queue.shift(); item; item = queue.shift()) {
+    if (seen.has(item.base)) continue;
+    seen.add(item.base);
+
+    const read = readConfigLink(item.base, readConfig);
+    if (read === null) continue;
+
+    if (item.isLink && relative(projectDir, read.path).startsWith('..')) {
+      outside.add(relative(workspaceRoot, read.path).replace(/\\/g, '/'));
+    }
+
+    const parsed = parseTsconfig(read.text);
+    if (parsed === null || typeof parsed !== 'object') continue;
+
+    const raw = (parsed as { extends?: unknown }).extends;
+    const links = (Array.isArray(raw) ? raw : [raw]).filter(
+      (link): link is string => typeof link === 'string' && link.length > 0,
+    );
+    for (const link of links) {
+      if (!link.startsWith('.')) continue;
+      queue.push({ base: resolve(dirname(read.path), link), isLink: true });
+    }
+  }
+
+  outside.delete(BASE_CONFIG_PATH);
+  return [...outside].sort();
+}
+
+/**
  * The `typecheck` target for a project, or `undefined` when it has no config
  * to compile.
  *
@@ -122,24 +303,35 @@ export function typecheckConfigsFor(
  * spec program is in scope, and `production` excludes exactly the spec
  * sources, spec config and test setup it compiles), its dependencies'
  * production files (`^production`, because a type error can arrive from a
- * dependency's public surface), and the two workspace files a program's
- * meaning depends on without importing: `tsconfig.base.json`, which holds
- * every `paths` alias and the global `types`, and `yarn.lock`, which pins the
- * TypeScript version and every `@types` package. Neither is under a project
- * root, so neither reaches the cache key through `default`.
+ * dependency's public surface), and the files outside the project root that a
+ * program's meaning depends on without importing: `tsconfig.base.json`, which
+ * holds every `paths` alias and the global `types`; every other config the
+ * programs `extends` from outside the root (`extendsOutsideRoot`, from
+ * {@link outsideRootExtends}); and `yarn.lock`, which pins the TypeScript
+ * version and every `@types` package. None of them is under a project root,
+ * so none reaches the cache key through `default`.
+ *
+ * The list is built in a fixed order, and `extendsOutsideRoot` arrives
+ * sorted, because the input list is itself part of the cache key: a set
+ * whose order moved between two runs would miss every cache entry the other
+ * run wrote.
  *
  * @param projectRoot project root, relative to the workspace root
  * @param configs config file names from `typecheckConfigsFor`
+ * @param extendsOutsideRoot workspace-relative configs from
+ *   {@link outsideRootExtends}
  * @param declaredTargets the project.json `targets` block, read for
  *   {@link GENERATED_TYPES_TARGET}
  */
 export function typecheckTargetFor({
   projectRoot,
   configs,
+  extendsOutsideRoot = [],
   declaredTargets = {},
 }: {
   projectRoot: string;
   configs: string[];
+  extendsOutsideRoot?: string[];
   declaredTargets?: Record<string, unknown>;
 }): TargetConfiguration | undefined {
   if (configs.length === 0) return undefined;
@@ -150,7 +342,8 @@ export function typecheckTargetFor({
     inputs: [
       'default',
       '^production',
-      '{workspaceRoot}/tsconfig.base.json',
+      `{workspaceRoot}/${BASE_CONFIG_PATH}`,
+      ...extendsOutsideRoot.map((path) => `{workspaceRoot}/${path}`),
       '{workspaceRoot}/yarn.lock',
       { externalDependencies: ['typescript'] },
     ],
@@ -208,6 +401,11 @@ export const createNodesV2: CreateNodesV2<TypecheckPluginOptions> = [
       const target = typecheckTargetFor({
         projectRoot,
         configs,
+        extendsOutsideRoot: outsideRootExtends({
+          workspaceRoot: context.workspaceRoot,
+          projectRoot,
+          configs,
+        }),
         declaredTargets: declaredTargetsOf(
           join(context.workspaceRoot, configFile),
         ),
