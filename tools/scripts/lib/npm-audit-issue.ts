@@ -27,8 +27,13 @@
  */
 
 import {
+  issueStateMarker,
+  type ReportedStateInput,
+} from './issue-state-marker.ts';
+import {
   findOpenRotIssue,
   recoveryAction,
+  recoveryOutcomeSentence,
   type RecoveryAction,
   type RotIssueCandidate,
 } from './nightly-e2e-rot-issue.ts';
@@ -46,14 +51,18 @@ export const AUDIT_ISSUE_CREATE_LABELS = ['needs-triage', 'github-actions'];
 /** Rows the failure report prints before it counts the rest. */
 export const AUDIT_ADVISORY_LIMIT = 50;
 
-// Anchored to the start of a body: every report opens with its marker, and
-// advisory text further down a report can never be read as one.
-const STATE_MARKER = /^<!-- npm-audit-issue:(failing|recovered) -->/;
-
 /** Which of the two states a report on the issue recorded. */
 export type ReportedState = 'failing' | 'recovered';
 
-const marker = (state: ReportedState) => `<!-- npm-audit-issue:${state} -->`;
+// An issue with no report at all — opened by hand under the title — is
+// `failing`: it is open and waiting to hear that the audit passed.
+const state = issueStateMarker<ReportedState>({
+  prefix: 'npm-audit-issue',
+  states: ['failing', 'recovered'],
+  fallback: 'failing',
+});
+
+const marker = state.marker;
 
 /**
  * The open issue this automation owns.
@@ -230,10 +239,7 @@ export function recoveryComment({
   date,
   sha,
 }: RecoveryCommentInput): string {
-  const outcome =
-    action === 'close'
-      ? 'This issue had no triage state label, so this recovery closes it.'
-      : 'This issue carries a triage state label, so it stays open for the triaged work.';
+  const outcome = recoveryOutcomeSentence(action);
   return [
     marker('recovered'),
     `The npm audit passed on \`main\` at ${sha} on ${date}.`,
@@ -244,23 +250,11 @@ export function recoveryComment({
   ].join('\n');
 }
 
-/**
- * The state the newest report on the issue recorded, reading the body and
- * then the comments in the order the API returns them (oldest first). An
- * issue with no report at all — opened by hand under the title — is
- * `failing`: it is open and waiting to hear that the audit passed.
- */
-export interface ReportedStateInput {
-  body?: string | null;
-  comments?: readonly { body?: string | null }[] | null;
-}
+export type { ReportedStateInput };
 
-export function lastReportedState({
-  body,
-  comments,
-}: ReportedStateInput): ReportedState {
-  const states = [body, ...(comments ?? []).map((comment) => comment?.body)]
-    .map((text) => (text ?? '').match(STATE_MARKER)?.[1])
-    .filter((state): state is ReportedState => Boolean(state));
-  return states.at(-1) ?? 'failing';
-}
+/**
+ * The state the newest report on the issue recorded. The marker's own rules —
+ * body first, then comments oldest to newest, anchored to the start of a
+ * body — are `issueStateMarker`'s, shared with the PR CI duration watch.
+ */
+export const lastReportedState = state.lastReportedState;

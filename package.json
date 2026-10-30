@@ -117,6 +117,7 @@
     "review:tier:replay": "node tools/scripts/review/replay-review-tier.ts",
     "review:escaped:measure": "node tools/scripts/review/measure-escaped-defects.ts",
     "review:noise:measure": "node tools/scripts/review/measure-noise.ts",
+    "ci:duration:measure": "node tools/scripts/ci/measure-ci-duration.ts",
     "review:concurrency:check": "node tools/scripts/check-review-concurrency.ts",
     "review:pages:check": "node tools/scripts/check-review-pages.ts",
     "deploy:pages:check": "node tools/scripts/check-deploy-pipeline.ts",

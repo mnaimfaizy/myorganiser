@@ -19,6 +19,10 @@
       "reason": "Not a gate. It measures the effective-false-positive rate over the review's stored report artifacts — per rule, the share of findings raised and still there on the next push — so its subject is weeks of other branches' pushes, not the commit in front of it, and no rule is disabled on the result. It also reads `gh` and downloads artifacts, which a hook must not depend on. The rate is published in docs/review/effective-false-positive-rate.md and kept current by running it; its reasoning is a frozen Research Brief."
     },
     {
+      "check": "ci:duration:measure",
+      "reason": "Not a gate. It measures how long a pull request waited for CI over a fortnight of other branches' runs — the Single-Library Pull Request p50 and p90 the five-minute target is defined by, plus the five revisit signals — so its subject is weeks of Actions history, not the commit in front of it, and no threshold a change could cross fails here. It also reads `gh` and the Actions API, which a hook must not depend on. `.github/workflows/pr-ci-duration-watch.yml` runs it weekly and reports a breach on one tracked issue instead."
+    },
+    {
       "check": "graphify:project-edges",
       "reason": "Not a gate. It benchmarks graphify project-edge extraction and reports timings, so it has no fact to fail on and no threshold a commit could cross. Run it by hand when tuning extraction."
     }

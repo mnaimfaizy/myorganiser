@@ -91,6 +91,18 @@ export interface RecoveryCommentInput {
 }
 
 /**
+ * The sentence a recovery report ends on, explaining what it did with the
+ * issue. Shared with every other automation reporting on its own fixed-title
+ * issue: what `recoveryAction` decided is one rule, so how that decision is
+ * explained to a reader is one sentence.
+ */
+export function recoveryOutcomeSentence(action: RecoveryAction): string {
+  return action === 'close'
+    ? 'This issue had no triage state label, so this recovery closes it.'
+    : 'This issue carries a triage state label, so it stays open for the triaged work.';
+}
+
+/**
  * Comment body for a green run. Both outcomes name the run; only `close`
  * is followed by an issues.update in the workflow.
  */
@@ -99,10 +111,7 @@ export function recoveryComment({
   runUrl,
   date,
 }: RecoveryCommentInput): string {
-  const outcome =
-    action === 'close'
-      ? 'This issue had no triage state label, so this recovery closes it.'
-      : 'This issue carries a triage state label, so it stays open for the triaged work.';
+  const outcome = recoveryOutcomeSentence(action);
   return [
     `The nightly Playwright run succeeded on ${date}.`,
     '',
