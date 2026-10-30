@@ -33,9 +33,22 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
 ## Workflows
 
 - `.github/workflows/ci.yml` (name: `CI`)
-  - Runs `lint`, `test`, `build` using `nx affected`.
+  - **Lint and test.** A pull request runs `nx affected`; a push runs `nx run-many` over the whole tree, so the commit a release is cut from is linted and tested whole. It is not a per-commit guarantee — see `cancel-in-progress` below.
+  - **Parallel jobs after Setup.** `Lint`, `Test` (Jest and the cheap Assertion Gates), `Typecheck` and `Tool Suites` (the path-gated `tools:test`, `openapi:check` and `upstream:briefs:test`) each need only `setup`, so on a whole-tree run they overlap instead of running in series. `Tool Suites` is skipped when none of its suites is selected. Build Frontend and Build Mobile also wait on `Lint`, `Test` and `Typecheck`.
+  - **The builds.** `build-backend` and `build-mobile` each run one `nx build <project>` and are selected by `needs.setup.outputs.affected_projects`, on a push as well as on a pull request — a push that affects none of them builds none of them. `build-frontend` only runs on a push, not a pull request: each E2E shard already runs `nx build web` itself, since `web-e2e` depends on `web` (issue #1396).
   - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
+  - **Caching.** Two caches, both `actions/cache` with no write mode and no `pull_request_target` anywhere: the dependency cache (`<os>-node-22-deps-<lockfile digest>`, restored by exact key) and the Nx computation cache (`<os>-nx-22-<target>-<commit>`, restored through a `<os>-nx-22-<target>-` prefix). A pull request writes only into its own `refs/pull/<n>/merge` scope and reads `main`'s as a fallback, which is GitHub's own scoping and not something the workflow arranges.
+  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. What it buys is that a `main` run already under way always finishes and saves its full baseline; GitHub still keeps only one run pending per concurrency group, so a third push cancels the run queued behind the one in progress and that commit is covered by the next run rather than by its own. Superseded entries are pruned afterwards by `cache-cleanup.yml` instead.
+
+- `.github/workflows/cache-cleanup.yml` (name: `Cache Cleanup`)
+  - Deletes the Actions cache entries nothing can restore from, so the repository stays under GitHub's 10 GB cache limit (past which useful entries are evicted within days).
+  - Fires on `pull_request: closed` (that pull request's whole `refs/pull/<n>/merge` scope), on `workflow_run` when `CI` completes on `main` (the superseded dependency keys and the superseded Nx baseline for each target), and on `workflow_dispatch` with a `dry_run` input.
+  - Selection is pure in `tools/scripts/lib/actions-cache-cleanup.ts` and never selects the newest entry of a Cache Family; `tools/scripts/ci/prune-actions-caches.ts` lists, deletes and reports. A read-only token — a fork's or Dependabot's on a closed pull request — is a warning, not a failure, because `pull_request_target` is deliberately not used.
+
+- `.github/workflows/pr-ci-duration-watch.yml` (name: `PR CI Duration Watch`)
+  - Watches the five-minute PR CI target (PRD #1387): runs `yarn ci:duration:measure` over the last fortnight on a weekly schedule (Monday 09:23 UTC) and on `workflow_dispatch`.
+  - Reports through one Automation Issue (`CONTEXT.md`): it comments on the open issue while the target keeps slipping, opens one when there is none, and records the recovery once. A window with fewer than ten Single-Library Pull Request runs measured nothing and leaves the issue alone.
 
 - `.github/workflows/deploy-staging.yml` (name: `Deploy Staging`)
   - Runs on a daily schedule (`0 16 * * *`, 16:00 UTC) and on `workflow_dispatch`. It does not run after `CI` or on a push.

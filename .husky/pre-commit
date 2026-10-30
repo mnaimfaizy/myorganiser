@@ -18,7 +18,9 @@ corepack yarn docs:notes:check
 # invocation costs roughly 1.3s of overhead against roughly 350ms of actual
 # checker work, so wiring these as separate hook lines would add about ten
 # seconds to every commit to do about two seconds of checking (ADR 0043).
-# The per-check npm scripts remain for isolated runs and readable CI steps.
+# CI runs this same aggregate rather than one named step per checker (issue
+# #1389), with a `::group::` per gate and a named `::error` annotation on
+# each failure. The per-check npm scripts remain for isolated runs.
 corepack yarn gates:run
 # The skill atlas asserts counts and verbatim descriptions about the skill system, so it rots
 # the moment a skill is added, renamed, or given a new description. Gated on the sources it

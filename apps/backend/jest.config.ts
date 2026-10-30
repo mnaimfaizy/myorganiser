@@ -9,4 +9,16 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/backend',
+  // Every other *.int.test.ts avoids a live database too, most by mocking
+  // the service layer above ../prisma rather than ../prisma itself; this one
+  // deliberately does neither — it runs a landed migration's real SQL against
+  // a live Postgres inside a rolled-back transaction. The `Test` job carries
+  // no database (ADR 0094,
+  // ADR 0140, issue #1394), so this file is excluded here and run instead as
+  // its own step in the `Prisma Migration Gate` job, which still has one and
+  // has already applied the migration history by the time it runs.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/src/testing/backfillUserCreatedAt.int.test.ts',
+  ],
 };

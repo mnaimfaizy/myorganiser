@@ -92,6 +92,12 @@
         "buildDepsTargetName": "build-deps",
         "watchDepsTargetName": "watch-deps"
       }
+    },
+    {
+      "plugin": "./tools/scripts/nx/typecheck-plugin.ts",
+      "options": {
+        "targetName": "typecheck"
+      }
     }
   ],
   "targetDefaults": {

@@ -29,12 +29,17 @@ comments are stripped, that no other `.sql` file sits beside it, and that `migra
 provider agrees with the schema's datasource (`postgres` and `postgresql` normalized, since the
 schema spells it one way and the lock file the other).
 
-**Tier 2 — a database.** The `Test` job in `.github/workflows/ci.yml` runs
+**Tier 2 — a database.** The `Prisma Migration Gate` job in `.github/workflows/ci.yml` runs
 `prisma migrate deploy` followed by `prisma migrate diff --from-config-datasource --to-schema
-prisma/schema --exit-code` against its ephemeral `postgres:16` service. That is what answers
+prisma/schema --exit-code` against its own ephemeral `postgres:16` service. That is what answers
 whether the SQL parses, whether the history applies to an empty database, and whether applying
 it reproduces the schema — the drift that #437 is a record of. It stays in CI and out of the
 pre-commit aggregate, which is for cheap file-reading checkers ([ADR 0043](0043-gates-assert-facts.md)).
+That job is path-gated on the Prisma schema and migration directories — or on a push to
+`main` — through `tools/config/gate-triggers.json`
+([ADR 0140](0140-a-heavy-assertion-gate-is-path-gated-and-a-covering-gate-is-a-trigger-superset.md),
+issue #1394), so a pull request that cannot have touched a migration never pays for the
+Postgres service start.
 
 Tier 1 does **not** wait on tier 2 and is not a scaled-down version of it. The timestamp
 collision it catches is a real hazard tier 2 cannot see at all: two branches that each write a

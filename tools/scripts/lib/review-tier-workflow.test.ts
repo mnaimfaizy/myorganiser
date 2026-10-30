@@ -5,28 +5,11 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { jobBlock, stepNamed } from './workflow-yaml.ts';
+
 const REVIEW_TIER = readFileSync('.github/workflows/review-tier.yml', 'utf8');
 const CODE_REVIEW = readFileSync('.github/workflows/code-review.yml', 'utf8');
 const ACTION = readFileSync('.github/actions/code-reviewer/action.yml', 'utf8');
-
-const jobBlock = (source: string, jobId: string) => {
-  const jobsAt = source.search(/^jobs:\s*$/m);
-  assert.notEqual(jobsAt, -1, 'workflow has no jobs:');
-  const body = source.slice(jobsAt);
-  const start = body.search(new RegExp(`^ {2}${jobId}:\\s*$`, 'm'));
-  assert.notEqual(start, -1, `no job named ${jobId}`);
-  const rest = body.slice(start + 1);
-  const next = rest.search(/^ {2}[a-z0-9][a-z0-9-]*:\s*$/m);
-  return next === -1 ? rest : rest.slice(0, next);
-};
-
-const stepNamed = (job: string, name: string) => {
-  const start = job.indexOf(`- name: ${name}`);
-  assert.notEqual(start, -1, `no step named ${name}`);
-  const rest = job.slice(start);
-  const next = rest.search(/\n {6}- name: /);
-  return next === -1 ? rest : rest.slice(0, next);
-};
 
 test('applying the review:* label cannot fail the Review Tier check', () => {
   const classify = jobBlock(REVIEW_TIER, 'classify');

@@ -618,17 +618,35 @@ do the generators. Aliases added by hand stay wherever they were typed unless yo
 
 #### Type Checking
 
-`yarn typecheck:check` compiles each project's lib, app, web, and spec tsconfig, wherever one
-exists, and is the command CI runs. A project with no lib, app, or web config, such as the
-Next.js app, is compiled from its `tsconfig.json`. Only `mobile` has a per-project `typecheck`
-target.
+Every project that carries one of the recognised tsconfig names gets a cacheable `typecheck`
+target, inferred by the local Nx plugin at `tools/scripts/nx/typecheck-plugin.ts`
+([ADR 0141](docs/adr/0141-typecheck-is-a-cached-per-project-inferred-target.md)), with no
+per-project wiring — a newly generated project included. It compiles each project's lib, app, web,
+and spec tsconfig, wherever one exists; a project with no lib, app, or web config, such as the
+Next.js app, is compiled from its `tsconfig.json`.
+
+A project with none of those configs gets no target, and `yarn nx run <project>:typecheck` does not
+resolve for it: `api-specs` and `app-api-client` are generated and synced outputs with no tsconfig
+of their own.
+
+`yarn typecheck:check` is the whole-tree command: `nx run-many -t typecheck` plus
+`tools/scripts/tsconfig.json`, which is a fixed job because `tools/scripts` carries no
+`project.json` on purpose ([ADR 0135](docs/adr/0135-tooling-scripts-are-typescript-run-by-node-and-tested-by-node-test.md))
+and the plugin keys inference on that file.
+CI runs `nx affected -t typecheck` on a pull request and the whole tree on a push to `main`, with
+the fixed job as its own path-gated step, `yarn typecheck:tools-scripts`.
 
 ```bash
-# apps/backend/src/prisma is generated and gitignored, so a fresh checkout needs it first
+# apps/backend/src/prisma is generated and gitignored, so a fresh checkout needs it first.
+# The backend's typecheck target declares this dependency, so nx generates it for you.
 yarn nx run backend:generate-types
 
 # Check types across the workspace
 yarn typecheck:check
+
+# Just one project, or just the projects your branch can reach
+yarn nx run web-pages-legal:typecheck
+yarn nx affected -t typecheck
 ```
 
 ## Creating Issues and Pull Requests

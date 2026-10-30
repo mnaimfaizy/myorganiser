@@ -55,15 +55,35 @@ export const AGENT_REVIEW_RAN_CHECK = 'Agent Review Ran';
 /**
  * The status-check contexts the `*main*` ruleset requires. The ruleset lives
  * in GitHub, not in a file, so this list is the repo-side statement of it; the
- * page asserts the same six, and each must still be a job name in ci.yml.
+ * page asserts the same set, and each must still be a job name in ci.yml.
+ *
+ * `Prepare Dependency Cache` dropped out when issue #1396 merged it into
+ * `Setup Affected Context`: that job no longer exists, so a context named
+ * for it can never report and would wedge every pull request. The live
+ * ruleset still has to be edited to match — that is issue #1397, blocked on
+ * this list changing first (ADR 0073 item 4: the ruleset and this statement
+ * of it change together, and this file's own sanity check is what forces
+ * this list to move first).
+ *
+ * `E2E Report` joined when #1397 made ADR 0050's blocking lane required.
+ * `Typecheck` and `Tool Suites` joined when they were split out of `Test` to
+ * run beside it: each held checks `Test` used to block on, so leaving them
+ * unrequired would let a type error or a failing contract suite merge. A
+ * `Tool Suites` run that its triggers skip reports as skipped, which the
+ * ruleset reads as passing. `Prisma Migration Gate` joined for the same
+ * reason: the migration drift check used to run inside `Test`, and it is
+ * path-gated the same way.
  */
 export const REQUIRED_CHECK_CONTEXTS = [
   'Authoritative Lockfile Policy',
   'Secure Install Review',
-  'Prepare Dependency Cache',
   'Setup Affected Context',
   'Lint',
   'Test',
+  'Typecheck',
+  'Tool Suites',
+  'Prisma Migration Gate',
+  'E2E Report',
 ];
 
 const fail: (msg: string) => never = (msg) => {

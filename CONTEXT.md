@@ -725,7 +725,7 @@ A specialist chain that retries between agents until a reviewer or runner verdic
 _Avoid_: review loop, QA cycle, writer-reviewer loop
 
 **Inferred Target**:
-An Nx target a registered plugin derives from a tool's own config file in the project root, with nothing written in `project.json`. The target state for every target a plugin can derive (ADR 0082).
+An Nx target a registered plugin derives from a file in the project root, and that is not written in that project's `targets` block. Usually the config of the tool the target runs (`jest.config.ts` for `test`); where the rule is about the project rather than about one tool, it is `project.json` itself, which is what the local typecheck plugin keys on so that a tsconfig outside any project cannot invent one (ADR 0141). The target state for every target a plugin can derive (ADR 0082).
 _Avoid_: plugin target, crystal target
 
 **Declared Target**:
@@ -737,7 +737,7 @@ The set of projects a gate actually reaches, which is not the set its command ap
 _Avoid_: test coverage, CI coverage, gate scope, covering gate (for this sense)
 
 **Covering Gate**:
-The gate that asserts the artifact a given change invalidates. It is named against the change's _trigger_ rather than against the diff, because the artifact at risk is usually not in the diff at all: a version bump in `package.json` invalidates the OpenAPI spec and the generated client, so the Covering Gate is the OpenAPI drift check and not any gate over `package.json`. Being the Covering Gate says nothing about whether the gate is wired, and being wired says nothing about whether it covers anything — a truthful answer about a gate that covers something else is the failure mode this term exists to name.
+The gate that asserts the artifact a given change invalidates. It is named against the change's _trigger_ rather than against the diff, because the artifact at risk is usually not in the diff at all: a version bump in `package.json` invalidates the OpenAPI spec and the generated client, so the Covering Gate is the OpenAPI drift check and not any gate over `package.json`. Being the Covering Gate says nothing about whether the gate is wired, and being wired says nothing about whether it covers anything — a truthful answer about a gate that covers something else is the failure mode this term exists to name. A Covering Gate that is also a Heavy Suite is found by name in the workflow whether or not its Gate Trigger fired, so its triggers are asserted to be a superset of the obligation triggers naming it rather than left to the reviewer to notice (ADR 0140, under the suppression rule ADR 0074 states).
 _Avoid_: gate coverage (a different question), relevant gate, responsible check, the gate for this file
 
 **Assertion Gate**:
@@ -752,9 +752,33 @@ _Avoid_: enabled gate, active check, gate coverage (for this sense)
 The test suite that proves a tooling script does what its header claims — for a checker, that it actually fails on the drift it says it catches. It is wired or it is not, independently of the script it tests: a Wired Gate whose Contract Suite runs nowhere is a header nothing asserts, and a Contract Suite running green says nothing about whether its checker is wired.
 _Avoid_: checker test, script test, unit test (for this sense)
 
+**Heavy Suite**:
+A gate CI pays minutes for rather than milliseconds — a Contract Suite set, or a drift check that regenerates an artifact — and therefore one a Pull Request runs only when its own Gate Triggers match a changed path (ADR 0140). The distinction is cost, not importance: the cheap file-reading Assertion Gates all run over the whole tree on every Pull Request because deciding whether to run one would cost more than running it. A push to `main` runs every Heavy Suite.
+_Avoid_: slow test, expensive check, optional gate, conditional gate
+
+**Gate Trigger**:
+The globs that select a Heavy Suite, held in one config rather than in a workflow condition. A changed path matching a suite's triggers runs it; a changed path matching a **Shared Input** — a workflow file, `package.json`, `yarn.lock`, `tsconfig.base.json`, `nx.json`, the config itself — runs every suite, because no per-suite glob can bound a change with repo-wide reach. Distinct from a review obligation's trigger, which selects a question for the reviewer rather than a step for CI; the two meet in the rule that a path-gated Covering Gate's triggers are a superset of the obligation triggers naming it (ADR 0140, ADR 0074).
+_Avoid_: path filter, affected paths, watch globs, trigger paths (for the review sense)
+
 **Meta-Gate**:
 The gate whose asserted artifacts are the other gates: `gates:coverage:check` compares the checkers on disk against the ones hooks and workflows invoke, and fails naming each checker that is not a Wired Gate. It rejects a `check-*.mjs` by name, since a checker is TypeScript, and it asserts every Contract Suite is wired: a `*.test.ts` under `tools/scripts` that `tools:test`'s own glob does not reach, or that it reaches while `tools:test` itself is wired nowhere, fails by name (ADR 0135). An ordinary Assertion Gate in shape — its subject is simply the gate set rather than a document. A checker or suite it must not fail is not silently skipped; it carries an entry with a written reason in `tools/config/gate-coverage-optout.json`.
 _Avoid_: gate-of-gates, master gate, gate linter
+
+**Cache Baseline**:
+The Nx computation cache a push to `main` saves, over the whole tree rather than over what that push affected. It is what a Pull Request's `nx affected` run restores from, so its completeness is the whole point: an affected-only push caches only the projects that push happened to touch, and a Pull Request then recomputes everything else. Push-to-`main` runs `run-many` and never cancels a run already under way for this reason — a cancelled run saves nothing, because `actions/cache` writes in a job's post step. It is the newest baseline that is guaranteed, not one per commit: GitHub holds one run pending per concurrency group, so a run still queued when the next push arrives is cancelled before it starts.
+_Avoid_: warm cache, shared cache, cache seed, main cache (for the dependency cache too)
+
+**Cache Family**:
+The GitHub Actions cache entries on one ref that are copies of one cache, differing only in the variant that dates them — a lockfile digest for the dependency cache, a commit for a Cache Baseline. The newest copy is the one a prefix restore resolves to, which is what makes an older copy safe to delete and keeps the repository under GitHub's 10 GB limit. Deleting the newest copy is not a slow cache but a cold one, so no cleanup selects it; a copy an exact-key restore still names is kept besides, which is why pruning the dependency cache on a ref is told that ref's current key; and a key whose shape names no family is left alone rather than guessed at.
+_Avoid_: cache group, stale cache, duplicate cache, cache generation
+
+**Single-Library Pull Request**:
+A pull request whose every changed file sits under a single Nx project's root. It is the population the five-minute CI target is defined over (PRD #1387): the longest matching project root claims each file, because project roots nest, and one project claiming all of them is the whole test. A pull request that touches a root file — `package.json`, `tsconfig.base.json`, a workflow — or files under two project roots is **not** one, is reported separately, and is outside the target: no affected-only selection can bound a change with repo-wide reach. The term says nothing about the size of the diff, and nothing about whether the pull request is good; it names the one shape whose CI cost is supposed to be small. A run whose changed files could not be read is unclassified rather than counted either way, since the flattering reading is the one a measurement must never take by default.
+_Avoid_: small PR, single-project PR, one-lib change, affected PR, trivial PR
+
+**Automation Issue**:
+The one open GitHub issue a scheduled or `main`-push automation owns under a fixed title, reporting on one thing it watches: the nightly E2E run (ADR 0050), the npm audit on `main` (ADR 0124), the five-minute PR CI target (PRD #1387). While the thing stays broken the automation comments on that issue rather than opening another, so the issue is the whole history of one outage. It is born in the triage queue. When the thing recovers, the recovery is recorded once, and the issue closes only if it carries no triage state — once a person has taken it over, it stays open and the work stays theirs. Distinct from a Tracking Issue, which an admin links Feedback Reports to; an Automation Issue is opened and worded by the automation, and no person files one.
+_Avoid_: tracking issue, rot issue (for the general sense), alert issue, bot issue
 
 **Unasserted Claim**:
 A fact about the tree that an artifact states and nothing checks. Distinct from prose a gate cannot reach: an Unasserted Claim is one an extractor could have read — a count, a source citation, a version — that simply has none, so it drifts silently while the page around it stays green. The defect is the gap between what an artifact states and what it asserts, which is why it applies equally to a page whose manifest omits a number it prints and to a checker whose header claims a direction its code does not run.

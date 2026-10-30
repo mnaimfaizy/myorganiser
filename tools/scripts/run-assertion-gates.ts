@@ -18,12 +18,18 @@
 // Each checker still runs as its own `node` subprocess rather than an
 // in-process import: several call `process.exit` directly on failure, which
 // would kill the aggregate itself before the remaining checkers ran. The
-// per-check npm scripts remain for isolated runs, and CI still invokes each
-// check as its own named step for a readable failure.
+// per-check npm scripts remain for isolated runs.
 //
 // The manifest (tools/scripts/lib/gate-manifest.ts) is asserted against
 // package.json before anything runs: a checker quietly dropped from it would
 // be exactly the unwired-gate defect this file exists to close.
+//
+// CI runs this as one step over the whole tree rather than one named step per
+// checker (ADR 0043, issue #1389): under `GITHUB_ACTIONS`, each gate's output
+// is wrapped in its own collapsible `::group::` and a failing gate raises its
+// own named `::error` annotation, so one step stays as readable as the ~33
+// named steps it replaced. Outside Actions — Husky's pre-commit hook — the
+// output is unchanged.
 //
 // Exit 0 = every checker passed. Exit 1 = at least one checker found drift.
 // Exit 2 = the manifest itself no longer matches package.json / disk.
@@ -34,6 +40,7 @@ import {
   assertManifestAgainstDisk,
   runGateManifest,
 } from './lib/gate-manifest.ts';
+import { formatGateResult } from './lib/gate-run-output.ts';
 
 const cwd = process.cwd();
 const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')) as {
@@ -54,25 +61,20 @@ if (!manifestCheck.ok) {
 }
 
 const results = runGateManifest(GATE_MANIFEST, { cwd });
+const inActions = process.env.GITHUB_ACTIONS === 'true';
 
 let failed = 0;
-for (const { entry, status, stdout, stderr } of results) {
-  if (status === 0) {
-    console.log(`  ✓ ${entry.id}`);
-    continue;
+for (const result of results) {
+  const formatted = formatGateResult(result, { inActions });
+  if (formatted.groupStart) console.log(formatted.groupStart);
+  if (formatted.isFailure) {
+    failed += 1;
+    for (const line of formatted.body) console.error(line);
+  } else {
+    for (const line of formatted.body) console.log(line);
   }
-  failed += 1;
-  console.error(`  ✗ ${entry.id} (exit ${status})`);
-  if (stdout.trim()) console.error(indent(stdout));
-  if (stderr.trim()) console.error(indent(stderr));
-}
-
-function indent(text: string): string {
-  return text
-    .trimEnd()
-    .split('\n')
-    .map((line) => `      ${line}`)
-    .join('\n');
+  if (formatted.groupEnd) console.log(formatted.groupEnd);
+  if (formatted.errorAnnotation) console.log(formatted.errorAnnotation);
 }
 
 console.log(

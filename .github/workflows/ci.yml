@@ -13,9 +13,25 @@ on:
       - 'release/**'
   workflow_dispatch:
 
+# A pull request cancels its own superseded runs: nobody is waiting on the
+# result of a commit that has already been pushed over.
+#
+# A push to `main` does not. The run in progress always finishes, and that
+# run lints and tests the whole tree (the builds are still selected by the
+# affected set — see the Workflows section of
+# docs/deployment/CI_CD_AND_RELEASE_PROCESS.md). The reason this changed is
+# the cache: `actions/cache` writes in a job's post step, so a cancelled run
+# saves nothing and leaves the Nx baseline at whatever the last uncancelled
+# push managed to save. That baseline is what every pull request restores
+# from, and a `main` that cancels itself under a burst of merges is how it
+# went stale. It is not a per-commit guarantee: GitHub keeps one run pending
+# per concurrency group, so a third push still cancels the run queued behind
+# the one in progress, and that commit is covered by the next run rather than
+# by its own. Superseded entries are pruned afterwards by cache-cleanup.yml
+# rather than by refusing to save them.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -163,13 +179,10 @@ jobs:
         with:
           node-version: '22.18'
 
-      - name: Install dependency metadata without scripts
-        run: corepack yarn install --immutable --mode=skip-build
-
-      - name: Verify frozen lockfile
-        run: |
-          git diff --ignore-cr-at-eol --exit-code -- yarn.lock
-
+      # Runs before the install, so a pull request that changes no dependency
+      # can skip the script-free install and the frozen-lockfile check below
+      # as well as the audit, instead of paying for an install it then throws
+      # away (ADR 0124 amendment).
       - name: Check whether dependency manifests changed
         id: dependency-files
         if: github.event_name == 'pull_request'
@@ -198,6 +211,18 @@ jobs:
             echo 'run_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
+      # Pull requests install and verify the lockfile only when they change
+      # dependencies, or when the detector above errored; a push always does
+      # both, so a new advisory still surfaces on main. See ADR 0124.
+      - name: Install dependency metadata without scripts
+        if: github.event_name != 'pull_request' || steps.dependency-files.outputs.run_audit == 'true'
+        run: corepack yarn install --immutable --mode=skip-build
+
+      - name: Verify frozen lockfile
+        if: github.event_name != 'pull_request' || steps.dependency-files.outputs.run_audit == 'true'
+        run: |
+          git diff --ignore-cr-at-eol --exit-code -- yarn.lock
+
       # Pull requests audit only when they change dependencies; a push audits
       # unconditionally, so a new advisory surfaces on main and not on an
       # unrelated pull request. See ADR 0124.
@@ -219,11 +244,11 @@ jobs:
           corepack yarn npm audit --all --recursive --severity high --json > "$RUNNER_TEMP/npm-audit.ndjson" || true
           echo "advisories=$(node tools/scripts/ci/npm-audit-advisories.ts < "$RUNNER_TEMP/npm-audit.ndjson")" >> "$GITHUB_OUTPUT"
 
-      - name: Explain skipped npm audit
+      - name: Explain skipped install review
         if: github.event_name == 'pull_request' && steps.dependency-files.outputs.run_audit != 'true'
         shell: bash
         run: |
-          echo 'Skipped npm audit because this pull request changes no dependencies: yarn.lock and .yarnrc.yml are untouched, and any package.json edits were confined to non-dependency fields such as `scripts`.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Skipped the script-free install, the frozen-lockfile check and the npm audit because this pull request changes no dependencies: yarn.lock and .yarnrc.yml are untouched, and any package.json edits were confined to non-dependency fields such as `scripts`.' >> "$GITHUB_STEP_SUMMARY"
 
   # Push to main only (ADR 0124). A pull request that fails the audit already
   # shows its author the red check, and a workflow_dispatch failure is a person
@@ -409,51 +434,28 @@ jobs:
 
             core.info(`Audit recovered; left triaged issue #${match.number} open`);
 
-  prepare-dependencies:
-    name: Prepare Dependency Cache
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    needs: secure-install-review
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22.18'
-
-      # We intentionally avoid setup-node's Yarn cache integration here.
-      # In this repo it can invoke the runner's global Yarn 1 binary before
-      # Corepack has a chance to resolve the pinned Yarn 4 version.
-      - name: Restore dependency cache
-        id: dependency-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .yarn/install-state.gz
-            node_modules
-          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
-
-      - name: Install dependencies
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: corepack yarn install --immutable
-
-      - name: Verify frozen lockfile
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: git diff --exit-code -- yarn.lock
-
   setup:
     name: Setup Affected Context
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: prepare-dependencies
+    needs: secure-install-review
 
     outputs:
       nx_base: ${{ steps.affected.outputs.nx_base }}
       nx_head: ${{ steps.affected.outputs.nx_head }}
       affected_projects: ${{ steps.projects.outputs.affected_projects }}
+      # Which heavy `Test` suites this run pays for (ADR 0140). `run_all` is
+      # set for a push, a manual run, and any resolver failure, so every
+      # condition below is `run_all or my own flag` and the fallback is always
+      # to run more. The flag names come from
+      # `flagName` in tools/scripts/lib/gate-triggers.ts over the suite ids in
+      # tools/config/gate-triggers.json — add a suite there, not here.
+      gate_run_all: ${{ steps.gate-triggers.outputs.run_all }}
+      gate_tools_test: ${{ steps.gate-triggers.outputs.run_tools_test }}
+      gate_upstream_briefs_test: ${{ steps.gate-triggers.outputs.run_upstream_briefs_test }}
+      gate_openapi_check: ${{ steps.gate-triggers.outputs.run_openapi_check }}
+      gate_prisma_migration_drift: ${{ steps.gate-triggers.outputs.run_prisma_migration_drift }}
+      gate_typecheck_tools_scripts: ${{ steps.gate-triggers.outputs.run_typecheck_tools_scripts }}
 
     steps:
       - name: Checkout repository
@@ -466,6 +468,13 @@ jobs:
         with:
           node-version: '22.18'
 
+      # We intentionally avoid setup-node's Yarn cache integration here.
+      # In this repo it can invoke the runner's global Yarn 1 binary before
+      # Corepack has a chance to resolve the pinned Yarn 4 version. This job
+      # is the one that restores or installs and so saves the cache (via
+      # actions/cache's post step) that every other job below only restores
+      # (issue #1396 merges this job with what used to be the separate
+      # `Prepare Dependency Cache` job).
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -522,6 +531,57 @@ jobs:
           echo "affected_projects=$AFFECTED_JSON" >> "$GITHUB_OUTPUT"
           echo "Affected projects: $AFFECTED_JSON"
 
+      # A pull request pays for a heavy suite only when its own trigger globs
+      # match a changed path; a push to `main` or a manual run pays for all of
+      # them, so `main` keeps its whole-tree guarantee before a release is cut
+      # (ADR 0140). The globs live in tools/config/gate-triggers.json and the
+      # Gate Trigger resolver is our own code rather than a marketplace
+      # path-filter action,
+      # because `covering-gates:check` asserts the same globs against the
+      # review-obligation catalogue (ADR 0074).
+      #
+      # The resolver answers a failure it can describe with every flag set and
+      # exit 0. The one it cannot — a config it cannot parse, so it does not
+      # know the flag names — exits non-zero, and `run_all=true` here is the
+      # same fallback by another route. Never skip on error.
+      #
+      # Exit 0 alone is not enough to trust the output: a resolver that exits
+      # 0 having printed nothing would write no flags, leaving every `if:`
+      # below false and skipping every heavy suite silently — fewer suites on
+      # an error, which is the one thing ADR 0140 item 3 forbids. So the
+      # output has to carry a `run_all=` line to count as a resolution.
+      - name: Resolve heavy gate triggers
+        id: gate-triggers
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ steps.affected.outputs.nx_base }}
+          HEAD_SHA: ${{ steps.affected.outputs.nx_head }}
+        run: |
+          set -uo pipefail
+
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            set -- "$BASE_SHA" "$HEAD_SHA"
+          else
+            set -- --all
+          fi
+
+          flags="$(node tools/scripts/ci/resolve-gate-triggers.ts "$@")" || flags=''
+
+          if ! printf '%s\n' "$flags" | grep -q '^run_all='; then
+            echo '::warning title=Gate trigger resolution failed::Running every heavy suite.'
+            echo 'run_all=true' >> "$GITHUB_OUTPUT"
+            echo 'Gate trigger resolution failed; running every heavy suite.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          printf '%s\n' "$flags" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Heavy gate suites'
+            echo
+            printf '%s\n' "$flags" | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -571,8 +631,19 @@ jobs:
             ${{ runner.os }}-nx-22-lint-
             ${{ runner.os }}-nx-22-
 
+      # A pull request lints what it can have broken; a push lints the whole
+      # tree. The whole-tree run is not only `main`'s guarantee before a
+      # release — it is also the only thing that writes a *complete* Nx cache
+      # baseline for a pull request to restore from. An affected-only push
+      # caches only what that push happened to touch, which is why the
+      # computation cache barely helped before this (issue #1382).
       - name: Lint affected projects
+        if: github.event_name == 'pull_request'
         run: corepack yarn nx affected -t lint --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Lint every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t lint
 
   test:
     name: Test
@@ -580,28 +651,268 @@ jobs:
     timeout-minutes: 30
     needs: setup
 
-    services:
-      postgres:
-        image: postgres:16
+    env:
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. Nothing else in this job touches a database: the
+      # drift check that needs a live Postgres is its own path-gated
+      # `Prisma Migration Gate` job below, so this job carries no service
+      # container (ADR 0094, ADR 0140, issue #1394).
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Check design token outputs are in sync
+        # Same shape as openapi:check and for the same reason: src/generated is
+        # derived from tokens.json, and nothing asserted the two agreed until
+        # ADR 0098 needed a Covering Gate for the tokens trigger. Runs next to
+        # openapi:check so both regenerate before anything else can dirty the tree.
+        run: corepack yarn design-tokens:check
+
+      - name: Check component hygiene
+        run: corepack yarn component:hygiene --all --max-warnings=0
+
+      - name: Check Jest test hygiene
+        run: corepack yarn test:hygiene --all
+
+      - name: Check House Explainer Page hygiene
+        # --all also fails on a page under docs/ that is in neither ROSTER nor
+        # LEGACY, which is the half Husky cannot see: a new page is unstaged
+        # against the roster exactly once, here.
+        run: corepack yarn design:hygiene --all
+
+      # Every cheap, file-reading Assertion Gate checker in `tools/scripts/lib/gate-manifest.ts`
+      # (ADR 0043) — the roster this job used to run as ~33 separate named
+      # steps, one `corepack yarn` line apiece. Each `corepack yarn` invocation
+      # costs roughly 1.3s of process overhead, so that roster cost over a
+      # minute to do a few seconds of real checking. One step keeps every
+      # failure readable: `yarn gates:run` wraps each gate's output in its own
+      # collapsible `::group::` and raises a named `::error` annotation for
+      # each one that fails, so a failure is still identifiable without
+      # opening a log. A checker's own "why" lives in its header comment, not
+      # here. The three hygiene checks above and `libs:markdown:check` /
+      # `docs:notes:check` below stay their own steps rather than joining this
+      # manifest: Husky's `gates:run` line (`.husky/pre-commit`) already runs
+      # the whole manifest unconditionally on every local commit, and these
+      # five either need a `--staged`-vs-`--all` distinction the manifest has
+      # no way to express, or (for the two zero-arg checks) would simply run
+      # twice — either way, changing what gets folded in here must not change
+      # what Husky runs (issue #1389's "pre-commit behaviour is unchanged").
+      - name: Run cheap Assertion Gates
+        run: corepack yarn gates:run
+
+      # Project names, roots, and targets. `backend:generate-types` only writes
+      # the Prisma client, and no Nx plugin infers a project or target from
+      # that output, so this file stays valid for the checkers after generate.
+      # Review Tier is a separate workflow and its only graph consumer, so it
+      # still builds its own. Each checker used to spawn `nx graph` itself;
+      # that build is the slow part (ADR 0043 records the lint checker at 19s).
+      # One graph for the two checkers in this job that read it (issue #1061):
+      # typecheck stopped reading it when it became a per-project Nx target
+      # (ADR 0141).
+      # A missing or mistyped path fails the checker; it does not rebuild.
+      # The path goes through GITHUB_ENV because job-level `env` cannot read the
+      # `runner` context: `${{ runner.temp }}` there rejects the whole workflow.
+      - name: Build the Nx project graph
+        run: |
+          echo "NX_GRAPH_FILE=$RUNNER_TEMP/nx-graph.json" >> "$GITHUB_ENV"
+          corepack yarn nx graph --file "$RUNNER_TEMP/nx-graph.json"
+
+      # Asserts every project Nx can lint is reachable as `lint`, the target the
+      # lint job selects. Five projects were outside it until #426.
+      - name: Check lint gate coverage
+        run: corepack yarn lint:coverage:check "$NX_GRAPH_FILE"
+
+      # Restored before the first Nx task this job runs, so the generated
+      # Prisma client and every `test` result a pull request's diff cannot
+      # reach come out of the cache. `Typecheck` restores its own family.
+      - name: Restore Nx computation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-22-test-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-22-test-
+            ${{ runner.os }}-nx-22-
+
+      # apps/backend/src/prisma is generated and gitignored, so a fresh runner
+      # has no @prisma/client to compile against. backend:test declares this
+      # same dependency, so Nx would run it before `backend:test` anyway; this
+      # step runs it up front so the backend suites start without it in the
+      # affected graph. The `Typecheck` job gets it the same way, through the
+      # inferred `typecheck` target's own dependency (ADR 0141).
+      - name: Generate Prisma client
+        run: corepack yarn nx run backend:generate-types
+
+      - name: Check libs markdown allowlist
+        run: corepack yarn libs:markdown:check
+
+      - name: Check docs notes routing
+        run: corepack yarn docs:notes:check
+
+      # A fix names the change that introduced its defect, or declares that
+      # nothing can be named (ADR 0100) — the line the escaped-defect rate is
+      # built from. Pull requests only: a push has no head branch to type.
+      # Branch and title reach the script through env and are never
+      # interpolated into the shell, because both are author-controlled text.
+      - name: Check a fix names its origin
+        if: github.event_name == 'pull_request'
         env:
-          POSTGRES_USER: postgres
-          # Throwaway runner service. Trust avoids storing a credential in the
-          # workflow; this database is never reachable off the job.
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: myorganiser
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: corepack yarn fix:attribution:check --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$HEAD_REF" --title "$PR_TITLE"
+
+      # Asserts every `nx run <project>:<target>` and `nx <target> <project>` in
+      # tracked Markdown resolves in the project graph. DEVELOPMENT.md taught two
+      # targets that never existed until #980. Reads the graph built once above,
+      # so CI only — Husky does not run it.
+      - name: Check documented Nx targets resolve
+        run: corepack yarn docs:nx-targets:check "$NX_GRAPH_FILE"
+
+      # ADR 0064: the Escape Copy must be openable by a tool that needs nothing
+      # of ours, and a gate must assert the tool still opens a freshly produced
+      # envelope. This builds the reader and runs it against an envelope the
+      # real exporter produces here, so a schema move that outruns the reader
+      # fails now rather than on the day somebody needs it. CI-only: it builds
+      # a 500 KB page and runs PBKDF2 four times, which is more than the
+      # pre-commit aggregate is for.
+      - name: Check the Escape Copy reader opens a fresh envelope
+        run: corepack yarn escape-copy-reader:check
+
+      # Affected on a pull request, whole tree on a push — the same split as
+      # Lint above, and for the same two reasons: `main`'s guarantee, and a
+      # full Nx cache baseline for pull requests to restore from.
+      - name: Test affected projects
+        if: github.event_name == 'pull_request'
+        run: corepack yarn nx affected -t test --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Test every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t test
+
+  # Split out of `Test` so it runs beside it rather than before it: on a
+  # whole-tree run (every push to `main`, and every pull request that touches
+  # a shared input) typecheck and Jest each take minutes, and one job ran
+  # them back to back.
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: setup
 
     env:
-      # Prisma generate reads this without connecting; migrate deploy and
-      # migrate diff use the service above so a migration that fails to apply,
-      # or a schema that has drifted from the migrations, fails before merge.
-      DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. No step here touches a database.
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Restore Nx computation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-22-typecheck-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-22-typecheck-
+            ${{ runner.os }}-nx-22-
+
+      # Each project's production and spec programs, as one cacheable Nx task
+      # per project (ADR 0141). Affected on a pull request, whole tree on a
+      # push — the same split as Lint and the Jest step in `Test`, and for the same
+      # two reasons: `main`'s guarantee, and a full Nx cache baseline for pull
+      # requests to restore from. Compiling all 73 configs in one workspace
+      # script cost 200s on every pull request however small the diff; a
+      # single-library change now compiles that library and its dependents.
+      - name: Typecheck affected projects
+        if: github.event_name == 'pull_request'
+        run: corepack yarn nx affected -t typecheck --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Typecheck every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t typecheck
+
+      # tools/scripts has no project.json on purpose (ADR 0135), and the
+      # plugin keys inference on project.json, so the `scripts` node Nx infers
+      # there from its package.json carries no typecheck target and neither
+      # `affected` nor `run-many` above reaches its config. It is a fixed job,
+      # path-gated like every other heavy suite (ADR 0140): `run_all` is set
+      # on every push and on any resolver failure, so `main` still pays for
+      # it. The command is the gate id's own script, which is what
+      # tools/config/gate-triggers.json requires of a suite. `typecheck:check`
+      # with no flag runs this half and `run-many` together, and is the
+      # whole-tree command to run locally.
+      - name: Typecheck tools/scripts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_typecheck_tools_scripts == 'true'
+        run: corepack yarn typecheck:tools-scripts
+
+  # The path-gated heavy suites that prove tooling rather than the app
+  # (ADR 0140), split out of `Test` so they run beside it. The job is skipped
+  # when none of them is selected, and a skipped job reads as passing to the
+  # ruleset, so a pull request that cannot reach them never waits on a runner.
+  tool-suites:
+    name: Tool Suites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: setup
+    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' }}
+
+    env:
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. No step here touches a database.
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
 
     steps:
       - name: Checkout repository
@@ -618,6 +929,9 @@ jobs:
         # openapi:check regenerates the client via openapi-generator-cli, which is
         # a Java tool. Pinned explicitly rather than relying on the runner image's
         # preinstalled JDK, which is not part of the runner's stability contract.
+        # Nothing else in this job needs a JDK, so it is set up exactly when
+        # openapi:check runs (ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -646,265 +960,121 @@ jobs:
       # tools/scripts/lib/sandcastle-*.test.ts like any other suite here.
       # This glob is the only thing that wires a suite (the gate-coverage
       # meta-gate below); run one in isolation with `node --test <file>`.
-      # upstream:briefs:test still runs on its own further
-      # down: it also runs suites under .agents/skills/upstream-brief, which
+      # upstream:briefs:test still runs on its own below: it also runs suites under .agents/skills/upstream-brief, which
       # this glob does not reach.
+      #
+      # Path-gated on a pull request (ADR 0140): a suite proves its checker
+      # works, and the checkers themselves still run over the whole tree
+      # through the `Test` job. `tools:test` stays spelled exactly here, so
+      # the Meta-Gate still reads this job as the glob runner's wiring.
       - name: Run tools/scripts contract suites
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true'
         run: corepack yarn tools:test
 
       - name: Check OpenAPI spec and generated client are in sync
-        # Regenerates the spec and client, then asserts a clean tree. Runs before
-        # the hygiene steps so an unrelated step cannot dirty the tree first.
+        # Regenerates the spec and client, then asserts a clean tree. It shares
+        # this job only with suites that write nothing to the tree.
+        # The Covering Gate for the generated API surface, so its triggers are
+        # asserted against the review-obligation catalogue by
+        # `yarn covering-gates:check` (ADR 0074, ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
         run: corepack yarn openapi:check
 
-      - name: Check design token outputs are in sync
-        # Same shape as openapi:check and for the same reason: src/generated is
-        # derived from tokens.json, and nothing asserted the two agreed until
-        # ADR 0098 needed a Covering Gate for the tokens trigger. Runs next to
-        # openapi:check so both regenerate before anything else can dirty the tree.
-        run: corepack yarn design-tokens:check
+      # These suites ship beside the upstream-brief Skill rather than under
+      # tools/scripts, so `tools:test`'s glob does not reach them — which is
+      # also why they are their own path-gated suite (ADR 0140).
+      - name: Upstream Brief report contract and checker contracts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
+        run: corepack yarn upstream:briefs:test
 
-      - name: Check component hygiene
-        run: corepack yarn component:hygiene --all --max-warnings=0
+  # Tier 2 of the Prisma migration gate (ADR 0094): applies the migration
+  # history to an ephemeral Postgres and asserts applying it reproduces the
+  # schema. Split out of `Test` into its own job so a pull request that
+  # cannot have touched a migration never pays for the ~23s Postgres
+  # container start (ADR 0140, issue #1394) — the condition below is what
+  # keeps the service from even starting on a run that skips it. `main`
+  # always runs it, through the same `gate_run_all` fallback every other
+  # heavy suite in tools/config/gate-triggers.json uses.
+  prisma-migration-gate:
+    name: Prisma Migration Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_prisma_migration_drift == 'true' }}
+    needs: setup
 
-      - name: Check Jest test hygiene
-        run: corepack yarn test:hygiene --all
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          # Throwaway runner service. Trust avoids storing a credential in the
+          # workflow; this database is never reachable off the job.
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: myorganiser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      - name: Check House Explainer Page hygiene
-        # --all also fails on a page under docs/ that is in neither ROSTER nor
-        # LEGACY, which is the half Husky cannot see: a new page is unstaged
-        # against the roster exactly once, here.
-        run: corepack yarn design:hygiene --all
+    env:
+      # migrate deploy and migrate diff use the service above, so a migration
+      # that fails to apply, or a schema that has drifted from the
+      # migrations, fails before merge.
+      DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser
 
-      # Project names, roots, and targets. `backend:generate-types` only writes
-      # the Prisma client, and no Nx plugin infers a project or target from
-      # that output, so this file stays valid for the checkers after generate.
-      # Review Tier is a separate workflow and its only graph consumer, so it
-      # still builds its own. Each checker used to spawn `nx graph` itself;
-      # that build is the slow part (ADR 0043 records the lint checker at 19s).
-      # One graph for the three checkers in this job that read it (issue #1061).
-      # A missing or mistyped path fails the checker; it does not rebuild.
-      # The path goes through GITHUB_ENV because job-level `env` cannot read the
-      # `runner` context: `${{ runner.temp }}` there rejects the whole workflow.
-      - name: Build the Nx project graph
-        run: |
-          echo "NX_GRAPH_FILE=$RUNNER_TEMP/nx-graph.json" >> "$GITHUB_ENV"
-          corepack yarn nx graph --file "$RUNNER_TEMP/nx-graph.json"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-      # Asserts every project Nx can lint is reachable as `lint`, the target the
-      # lint job selects. Five projects were outside it until #426.
-      - name: Check lint gate coverage
-        run: corepack yarn lint:coverage:check "$NX_GRAPH_FILE"
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
 
-      # apps/backend/src/prisma is generated and gitignored, so a fresh runner
-      # has no @prisma/client to compile against. backend:test declares this
-      # same dependency; typechecking needs it just as much, and runs first.
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      # This job has its own checkout, so it needs its own generated client —
+      # the same dependency the Test job's typecheck steps have, generated
+      # there for that job rather than shared across jobs.
       - name: Generate Prisma client
         run: corepack yarn nx run backend:generate-types
 
       - name: Apply Prisma migrations and check schema drift
-        working-directory: apps/backend/src
+        run: corepack yarn prisma:migration:drift
+
+      # The one backend *.int.test.ts that does not mock ../prisma: it replays
+      # a landed migration's real SQL inside a rolled-back transaction, so it
+      # needs the schema the deploy above just applied. `Test` carries no
+      # database (ADR 0094, ADR 0140, issue #1394), so this file is excluded
+      # from its jest run (apps/backend/jest.config.ts) and run here instead,
+      # with the config's own ignore list overridden back to its default so
+      # this one file is no longer skipped.
+      - name: Run Prisma migration backfill test
         run: |
-          npx prisma migrate deploy --schema prisma/schema
-          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code
-
-      # Compiles each project's production and spec programs. Nothing ran
-      # TypeScript in CI before this, so two type errors had reached main.
-      # The graph was built above; this step needs the generated Prisma client,
-      # not a second graph.
-      - name: Typecheck all projects
-        run: corepack yarn typecheck:check "$NX_GRAPH_FILE"
-
-      - name: Check libs markdown allowlist
-        run: corepack yarn libs:markdown:check
-
-      - name: Check docs notes routing
-        run: corepack yarn docs:notes:check
-
-      # ADR numbers collide across concurrent branches, not within one commit:
-      # git merges two differently-named files cleanly. This runs in Test
-      # because that job checks out refs/pull/N/merge — the merged tree, the
-      # only vantage point where both files exist.
-      - name: Check ADR numbering
-        run: corepack yarn adr:numbering:check
-
-      - name: Check ADR status
-        run: corepack yarn adr:status:check
-
-      # A fix names the change that introduced its defect, or declares that
-      # nothing can be named (ADR 0100) — the line the escaped-defect rate is
-      # built from. Pull requests only: a push has no head branch to type.
-      # Branch and title reach the script through env and are never
-      # interpolated into the shell, because both are author-controlled text.
-      - name: Check a fix names its origin
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.head_ref }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: corepack yarn fix:attribution:check --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$HEAD_REF" --title "$PR_TITLE"
-
-      - name: Check documented commands resolve
-        run: corepack yarn docs:commands:check
-
-      - name: Check documented file-refs resolve
-        run: corepack yarn docs:file-refs:check
-
-      # Asserts every `nx run <project>:<target>` and `nx <target> <project>` in
-      # tracked Markdown resolves in the project graph. DEVELOPMENT.md taught two
-      # targets that never existed until #980. Reads the graph built once above,
-      # so CI only — Husky does not run it.
-      - name: Check documented Nx targets resolve
-        run: corepack yarn docs:nx-targets:check "$NX_GRAPH_FILE"
-
-      - name: Upstream Brief report contract and checker contracts
-        run: corepack yarn upstream:briefs:test
-
-      # The meta-gate: asserts every check-*.ts is invoked by some hook or
-      # workflow, resolving one level of indirection through the aggregate's
-      # manifest, rejects any check-*.mjs, and asserts every *.test.ts
-      # Contract Suite is reached by the wired `tools:test` glob (ADR 0135).
-      # Nine checkers ran nowhere when ADR 0043 was written; six suites ran
-      # nowhere when the suite rule was added, before that glob was the one
-      # runner.
-      - name: Check gate coverage
-        run: corepack yarn gates:coverage:check
-
-      # The checks below also run through `yarn gates:run` in the pre-commit
-      # hook (ADR 0043). CI runs each as its own named step instead of the
-      # aggregate so a failure is identifiable without opening a log.
-
-      # An instruction the reviewer is refused permission to follow is an
-      # instruction nothing can carry out, and it is not free: run 45's guard
-      # case spent 26 permission denials of an 81-turn budget and wrote no
-      # report at all. This ran CI-only while it still failed on the tree that
-      # introduced it, because the aggregate is what `.husky/pre-commit` calls
-      # and wiring it there sooner would have blocked every commit in the
-      # repository. It has passed since the contradiction was fixed, so it now
-      # sits in `tools/scripts/lib/gate-manifest.ts` with the rest.
-      - name: Check the reviewer may run what it is told to run
-        run: corepack yarn review:allowlist:check
-
-      - name: Check the review checklist against the obligation catalogue
-        run: corepack yarn review:checklist:check
-
-      - name: Check root README
-        run: corepack yarn readme:check
-
-      - name: Check OpenAPI generated artifacts
-        run: corepack yarn openapi:artifacts
-
-      - name: Check backend env vars are declared in .env.example
-        run: corepack yarn env:declared:check
-
-      - name: Check deployment doc env vars are declared in .env.example
-        run: corepack yarn env:deployment:check
-
-      - name: Check feature index against dashboard routes
-        run: corepack yarn feature-index:check
-
-      - name: Check agent orchestration map
-        run: corepack yarn agents:map:check
-
-      - name: Check vault diagram pages
-        run: corepack yarn vault:pages:check
-
-      - name: Check auth diagram pages
-        run: corepack yarn auth:pages:check
-
-      - name: Check Nx project tags
-        run: corepack yarn nx:tags:check
-
-      - name: Check review pipeline page
-        run: corepack yarn review:pages:check
-
-      - name: Check the code-review golden set
-        run: corepack yarn review:golden:check
-
-      - name: Check the golden replay results record
-        run: corepack yarn review:golden:results:check
-
-      - name: Check release pipeline page
-        run: corepack yarn deploy:pages:check
-
-      - name: Check Host Apply workflow wiring
-        run: corepack yarn host-apply:workflow:check
-
-      - name: Check sub-agent sync
-        run: corepack yarn agents:sync:check
-
-      # A fan-out over a guarded domain enum must reach its pinned table
-      # rather than hand-enumerate the members (ADR 0053). TypeScript catches
-      # the omission only at call sites written to be caught; this catches the
-      # ones that were not.
-      - name: Check guarded enum fan-outs are pinned
-        run: corepack yarn enum:fanout:check
-
-      # Tailwind silently drops a class name it cannot resolve, so a colour
-      # utility that paints nothing ships without a build error (issue #632).
-      - name: Check Tailwind colour utilities resolve
-        run: corepack yarn tailwind:classes:check
-
-      # A Storybook stories glob or Tailwind content glob that matches nothing
-      # drops stories or classes without an error (issue #898).
-      - name: Check Storybook and Tailwind globs match files
-        run: corepack yarn content-globs:check
-
-      # A bare `react-native/…` subpath import is deprecated at 0.80 with
-      # removal planned; browser globals are scanned in all mobile source, and
-      # mobile must reach shared libraries through Portable Entry Points (ADR 0103).
-      # ADR 0064: the Escape Copy must be openable by a tool that needs nothing
-      # of ours, and a gate must assert the tool still opens a freshly produced
-      # envelope. This builds the reader and runs it against an envelope the
-      # real exporter produces here, so a schema move that outruns the reader
-      # fails now rather than on the day somebody needs it. CI-only: it builds
-      # a 500 KB page and runs PBKDF2 four times, which is more than the
-      # pre-commit aggregate is for.
-      - name: Check the Escape Copy reader opens a fresh envelope
-        run: corepack yarn escape-copy-reader:check
-
-      - name: Check web app icons match the shield and tokens
-        run: corepack yarn web:app-icons:check
-
-      - name: Check mobile app icon matches the shield and tokens
-        run: corepack yarn mobile:app-icon:check
-
-      - name: Check mobile platform rules
-        run: corepack yarn mobile-platform:check
-
-      # Why a committed keystore is unrecoverable: see the checker's header.
-      - name: Check no signing material is committed
-        run: corepack yarn signing-material:check
-
-      # The file-reading half of the Prisma migration gate (ADR 0094). The
-      # half that needs a database is the "Apply Prisma migrations and check
-      # schema drift" step above, against this job's Postgres service.
-      - name: Check Prisma migration history
-        run: corepack yarn prisma:migrations:check
-
-      # A committed Upstream Brief report is frozen at its date, so its local
-      # evidence is checked against the commit it records rather than the tree
-      # in front of it. That is what lets a frozen brief stay checkable — and
-      # what makes a citation that stopped matching a fact worth failing on
-      # (ADR 0084 item 10).
-      - name: Check committed Upstream Brief reports
-        run: corepack yarn upstream:briefs:check
-
-      - name: Restore Nx computation cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .nx/cache
-          key: ${{ runner.os }}-nx-22-test-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-nx-22-test-
-            ${{ runner.os }}-nx-22-
-
-      - name: Test affected projects
-        run: corepack yarn nx affected -t test --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
-
-      - name: Check workflow jobs pin ubuntu-24.04
-        run: corepack yarn runner-image:check
+          node node_modules/.bin/jest --config=apps/backend/jest.config.ts \
+            --testPathIgnorePatterns='/node_modules/' \
+            --testPathPatterns='backfillUserCreatedAt\.int\.test\.ts$' \
+            --no-coverage --forceExit
 
   e2e:
     name: E2E Chromium (shard ${{ matrix.shard }}/3)
@@ -913,14 +1083,13 @@ jobs:
     # Pull requests only: the same commits ran this seconds earlier on the PR,
     # and the nightly workflow covers `main`. See ADR 0050.
     if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}
-    # Deliberately NOT gated on `test`, unlike build-backend/build-frontend.
-    # Waiting for the unit tests serialised E2E behind them and put the critical
-    # path at 11 minutes; running alongside them brings it back to ~8. The cost
-    # is that E2E still burns a runner when the unit tests are already failing,
-    # which is free on a public repository. See ADR 0050.
+    # Needs only `setup`, not `lint` or `test` (issue #1396). Waiting for
+    # either of them queued E2E behind the unit tests and put the critical
+    # path at 11 minutes; starting alongside them brings it back down. The
+    # cost is that E2E still burns a runner when Lint or Test are already
+    # failing, which is free on a public repository. See ADR 0050.
     needs:
       - setup
-      - lint
 
     strategy:
       fail-fast: false
@@ -1042,10 +1211,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}
+    # Needs only `setup` (issue #1396): waiting for Lint or Test queued this
+    # build behind them for no reason — a build failure here is distinct from
+    # either and does not need them to have finished first.
     needs:
       - setup
-      - lint
-      - test
 
     env:
       # Required for Prisma v7 config loading during `prisma generate`.
@@ -1087,11 +1257,16 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}
+    # Pull requests no longer run this job (issue #1396): each E2E shard's own
+    # `nx build web` is the build check there, because `web-e2e` depends on
+    # `web`. Push to `main` keeps running it, for the whole-tree guarantee a
+    # pull request's affected-only E2E run cannot give.
+    if: ${{ github.event_name != 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}
     needs:
       - setup
       - lint
       - test
+      - typecheck
 
     steps:
       - name: Checkout repository
@@ -1132,9 +1307,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}
+    # Needs only `setup` (issue #1396), the same change as the `e2e` job above.
     needs:
       - setup
-      - lint
 
     services:
       postgres:
@@ -1225,6 +1400,7 @@ jobs:
       - setup
       - lint
       - test
+      - typecheck
 
     steps:
       - name: Checkout repository
@@ -1265,7 +1441,9 @@ jobs:
     name: Build Storybook
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: prepare-dependencies
+    # `prepare-dependencies` merged into `setup` (issue #1396); this job only
+    # needs the dependency cache that job restores or installs and saves.
+    needs: setup
 
     env:
       STORYBOOK_BUILD_TIMEOUT: '900000'

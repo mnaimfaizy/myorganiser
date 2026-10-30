@@ -47,8 +47,8 @@
 // parses, that the history applies cleanly to an empty database, or that
 // applying it reproduces the schema. Those are the expensive half, and they
 // are asserted by the `Apply Prisma migrations and check schema drift` step
-// of the `Test` job in .github/workflows/ci.yml, against that job's
-// ephemeral Postgres service. Passing this check is not evidence
+// of the path-gated `Prisma Migration Gate` job in .github/workflows/ci.yml,
+// against that job's own ephemeral Postgres service. Passing this check is not evidence
 // that a migration works; it is evidence that the history is well-formed
 // enough for the job that decides whether it works to be able to run it.
 //

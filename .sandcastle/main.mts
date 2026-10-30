@@ -1304,9 +1304,10 @@ const HOST_GID = process.getgid?.() ?? 1000;
 
 const worktreesDir = join(process.cwd(), '.sandcastle', 'worktrees');
 
-// The CI Test job runs `nx affected -t test` against a `postgres:16` service with
-// trust auth and this database name, after `prisma migrate deploy` and a drift
-// check (.github/workflows/ci.yml). The gate reproduces that service when
+// CI's `Prisma Migration Gate` job runs `prisma migrate deploy` and a drift
+// check against a `postgres:16` service with trust auth and this database name
+// (.github/workflows/ci.yml); the `Test` job itself carries no database (ADR
+// 0094, ADR 0140, issue #1394). The gate reproduces that service when
 // `backend:test` is in scope, so a database-backed suite fails here only when it
 // would fail on the PR.
 //
@@ -1321,14 +1322,11 @@ const GATE_DB_LABEL = 'sandcastle.gate-db=1';
 // PrismaClient at module scope, so a suite importing one throws without any value.
 const GATE_PLACEHOLDER_DATABASE_URL = 'postgresql://localhost:5432/myorganiser';
 
-// Same commands, same order, as CI's "Apply Prisma migrations and check schema
-// drift" step. Runs inside the gate container after install.
-const GATE_DB_PREPARE = [
-  'cd apps/backend/src',
-  'node ../../../node_modules/.bin/prisma migrate deploy --schema prisma/schema',
-  'node ../../../node_modules/.bin/prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code',
-  'cd /home/agent/workspace',
-].join(' && ');
+// Same script CI's "Apply Prisma migrations and check schema drift" step
+// calls, so the two commands it runs can't drift apart between here and
+// there. Runs inside the gate container after install, which is what makes
+// `corepack` available here.
+const GATE_DB_PREPARE = 'corepack yarn prisma:migration:drift';
 
 if (gateOnly) {
   if (integrationBranch === null) {
@@ -2174,8 +2172,9 @@ function runGate(
     console.log(`  [${label}] gate: installing + running ...`);
     // Database, decided per run. An operator-supplied SLICE_GATE_DATABASE_URL wins
     // and is used as-is. Otherwise, when backend:test is in scope, the gate brings
-    // up the same Postgres CI's Test job has; with no backend tests, nothing
-    // connects and the placeholder is enough.
+    // up the same Postgres CI's `Prisma Migration Gate` job has, and runs
+    // GATE_DB_PREPARE against it the same way that job does; with no backend
+    // tests, nothing connects and the placeholder is enough.
     const testProjects = runs
       .filter((run) => run.targets.includes('test'))
       .flatMap((run) => run.projects);
@@ -2183,7 +2182,7 @@ function runGate(
     let database: GateDatabase | null = null;
     if (!operatorDatabaseUrl && testProjects.includes('backend')) {
       console.log(
-        `  [${label}] gate: backend:test in scope — starting a throwaway ${GATE_DB_IMAGE} (as CI's Test job) ...`,
+        `  [${label}] gate: backend:test in scope — starting a throwaway ${GATE_DB_IMAGE} (as CI's Prisma Migration Gate job) ...`,
       );
       database = startGateDatabase(label);
       if (database === null) {

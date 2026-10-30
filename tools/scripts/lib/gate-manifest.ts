@@ -238,8 +238,8 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   // The file-reading half of the Prisma migration gate (ADR 0094). Whether
   // the history applies and reproduces the schema needs a database, so that
   // half is the `Apply Prisma migrations and check schema drift` step of the
-  // `Test` job in .github/workflows/ci.yml, and is
-  // deliberately not here — this aggregate is cheap, file-reading checkers.
+  // path-gated `Prisma Migration Gate` job in .github/workflows/ci.yml, and
+  // is deliberately not here — this aggregate is cheap, file-reading checkers.
   {
     id: 'prisma:migrations:check',
     npmScript: 'prisma:migrations:check',
@@ -263,6 +263,18 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
     id: 'gates:coverage:check',
     npmScript: 'gates:coverage:check',
     script: 'tools/scripts/check-gate-coverage.ts',
+    args: [],
+  },
+  // Path-gating a heavy suite (ADR 0140) adds a second way for a gate to run
+  // nowhere that reading its name cannot see: the step exists, the workflow
+  // invokes it, and its `if:` was false for this pull request. This asserts
+  // that a path-gated Covering Gate's triggers still cover every trigger path
+  // of a review obligation that names it (ADR 0074). File-reading and cheap,
+  // so it belongs here rather than only in CI.
+  {
+    id: 'covering-gates:check',
+    npmScript: 'covering-gates:check',
+    script: 'tools/scripts/check-covering-gates.ts',
     args: [],
   },
   {

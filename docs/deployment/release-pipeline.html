@@ -1621,8 +1621,10 @@
         <dt>ci</dt>
         <dd id="note-ci">
           Authoritative Lockfile Policy &#8594; Secure Install Review &#8594;
-          Prepare Dependency Cache &#8594; Setup Affected Context &#8594;
-          Lint + Test &#8594; Build Backend / Build Frontend
+          Setup Affected Context &#8594; Lint, Test, Typecheck, E2E and Build
+          Backend fan out from Setup; Build Frontend joins after Lint + Test +
+          Typecheck, on a
+          push to <code>main</code> only
           (<code>ci.yml</code>). Which target ran on which project, and why a
           red one blocks in one mode and only reports in another, is
           <a href="../sandcastle/gates.html">docs/sandcastle/gates.html</a>
@@ -2245,33 +2247,67 @@
     <div class="pbody">
       <ol class="chain">
         <li>
-          Authoritative Lockfile Policy <span class="cite">:24</span>
+          Authoritative Lockfile Policy <span class="cite">:40</span>
         </li>
         <li>
-          Secure Install Review <span class="cite">:143</span>, needs the
-          above <span class="cite">:146</span>
+          Secure Install Review <span class="cite">:159</span>, needs the
+          above <span class="cite">:162</span>
         </li>
         <li>
-          Prepare Dependency Cache <span class="cite">:412</span>, needs the
-          above <span class="cite">:416</span>
+          Setup Affected Context <span class="cite">:437</span>, needs
+          Secure Install Review <span class="cite">:441</span>. This is the
+          one job everything below waits on.
         </li>
         <li>
-          Setup Affected Context <span class="cite">:447</span>
+          <b>Wait on Setup alone</b> (<code>needs: setup</code>, not one
+          another):
+          Lint <span class="cite">:585</span>, <span class="cite">:589</span>;
+          Test <span class="cite">:648</span>, <span class="cite">:652</span>;
+          Typecheck <span class="cite">:824</span>,
+          <span class="cite">:828</span>;
+          Tool Suites <span class="cite">:905</span>,
+          <span class="cite">:909</span>, which runs only when one of its
+          suites (<code>tools:test</code>, <code>openapi:check</code>,
+          <code>upstream:briefs:test</code>) or a gate run-all flag is
+          selected <span class="cite">:910</span>; a skipped job reads as
+          passing;
+          Prisma Migration Gate <span class="cite">:998</span>, only when a
+          gate run-all or migration-drift flag is set
+          <span class="cite">:1002</span>, <span class="cite">:1003</span>;
+          Build Backend <span class="cite">:1209</span>, only when
+          <code>backend</code> is affected <span class="cite">:1213</span>,
+          <span class="cite">:1217-1218</span>;
+          Build Storybook <span class="cite">:1440</span>,
+          <span class="cite">:1446</span>
         </li>
         <li>
-          Lint <span class="cite">:525</span> and Test
-          <span class="cite">:577</span>
+          <b>Pull requests only, wait on Setup alone:</b>
+          E2E Chromium (3 shards) <span class="cite">:1079</span>, when
+          <code>web-e2e</code> is affected <span class="cite">:1085</span>,
+          <span class="cite">:1091-1092</span>,
+          then E2E Report <span class="cite">:1162</span>, which needs E2E
+          <span class="cite">:1167-1168</span>; and E2E live logout
+          <span class="cite">:1305</span>, <span class="cite">:1309</span>,
+          <span class="cite">:1311-1312</span>. The pull request&#8217;s
+          frontend build check is each E2E shard&#8217;s own
+          <code>nx build web</code> step
+          <span class="cite">:1148</span>, because <code>web-e2e</code>
+          depends on <code>web</code> <span class="cite">:1260</span>.
         </li>
         <li>
-          Build Backend <span class="cite">:1040</span>, only when
-          <code>backend</code> is affected <span class="cite">:1044</span>, and
-          Build Frontend <span class="cite">:1086</span>,
-          <span class="cite">:1090</span>
+          <b>Also wait on Lint, Test and Typecheck, not Setup alone:</b>
+          Build Frontend <span class="cite">:1256</span>, which runs only
+          off a pull request (a push to <code>main</code>), when
+          <code>web</code> is affected <span class="cite">:1264</span>,
+          <span class="cite">:1265-1269</span>; and Build Mobile (web)
+          <span class="cite">:1394</span>, when <code>mobile</code> is
+          affected <span class="cite">:1398</span>,
+          <span class="cite">:1399-1403</span>
         </li>
       </ol>
       <p class="small muted">
         Dependency Review runs on pull requests only
-        (<code>:79</code>, <code>:81</code>). This is context for the word
+        (<code>:95</code>, <code>:97</code>). This is context for the word
         &#8220;green,&#8221; not a second hero &mdash; the gate-tier story
         belongs to <a href="../sandcastle/gates.html">gates.html</a> and
         ADR&nbsp;0012.
@@ -2281,7 +2317,7 @@
 
   <footer class="foot">
     <div>
-      <b>Read from source on 2026-10-13</b>, from
+      <b>Read from source on 2026-10-30</b>, from
       <code>.github/workflows/ci.yml</code>,
       <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>,
       <code>dispatch-production-deploy.yml</code>,
@@ -2788,23 +2824,49 @@
 
 <script type="application/json" id="citation-anchors">
   {
-    "note": "Expected-content anchors for every file:line citation on this page (ADR 0085). Key is name:line or name:start-end with the name the citation resolves to, which is not always the name the page prints: most citations here are bare (\":183\", \":126-141\") and inherit the last file named ahead of them. \"file\" resolves that name to a repo-relative path; \"start\" is the text at that line and \"end\" the text at the last line of a range, both whitespace-normalised on comparison. Verified against the tree on 2026-09-15.",
+    "note": "Expected-content anchors for every file:line citation on this page (ADR 0085). Key is name:line or name:start-end with the name the citation resolves to, which is not always the name the page prints: most citations here are bare (\":183\", \":126-141\") and inherit the last file named ahead of them. \"file\" resolves that name to a repo-relative path; \"start\" is the text at that line and \"end\" the text at the last line of a range, both whitespace-normalised on comparison. Verified against the tree on 2026-09-15 (ci.yml anchors re-verified 2026-10-30).",
     "anchors": {
       "ci.yml:5-14": { "file": ".github/workflows/ci.yml", "start": "on:", "end": "workflow_dispatch:" },
-      "ci.yml:24": { "file": ".github/workflows/ci.yml", "start": "authoritative-lockfile-policy:" },
-      "ci.yml:79": { "file": ".github/workflows/ci.yml", "start": "dependency-review:" },
-      "ci.yml:81": { "file": ".github/workflows/ci.yml", "start": "if: github.event_name == 'pull_request'" },
-      "ci.yml:143": { "file": ".github/workflows/ci.yml", "start": "secure-install-review:" },
-      "ci.yml:146": { "file": ".github/workflows/ci.yml", "start": "needs: authoritative-lockfile-policy" },
-      "ci.yml:412": { "file": ".github/workflows/ci.yml", "start": "prepare-dependencies:" },
-      "ci.yml:416": { "file": ".github/workflows/ci.yml", "start": "needs: secure-install-review" },
-      "ci.yml:447": { "file": ".github/workflows/ci.yml", "start": "setup:" },
-      "ci.yml:525": { "file": ".github/workflows/ci.yml", "start": "lint:" },
-      "ci.yml:577": { "file": ".github/workflows/ci.yml", "start": "test:" },
-      "ci.yml:1040": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1044": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1086": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1090": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:40": { "file": ".github/workflows/ci.yml", "start": "authoritative-lockfile-policy:" },
+      "ci.yml:95": { "file": ".github/workflows/ci.yml", "start": "dependency-review:" },
+      "ci.yml:97": { "file": ".github/workflows/ci.yml", "start": "if: github.event_name == 'pull_request'" },
+      "ci.yml:159": { "file": ".github/workflows/ci.yml", "start": "secure-install-review:" },
+      "ci.yml:162": { "file": ".github/workflows/ci.yml", "start": "needs: authoritative-lockfile-policy" },
+      "ci.yml:437": { "file": ".github/workflows/ci.yml", "start": "setup:" },
+      "ci.yml:441": { "file": ".github/workflows/ci.yml", "start": "needs: secure-install-review" },
+      "ci.yml:585": { "file": ".github/workflows/ci.yml", "start": "lint:" },
+      "ci.yml:589": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:648": { "file": ".github/workflows/ci.yml", "start": "test:" },
+      "ci.yml:652": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:824": { "file": ".github/workflows/ci.yml", "start": "typecheck:" },
+      "ci.yml:828": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:905": { "file": ".github/workflows/ci.yml", "start": "tool-suites:" },
+      "ci.yml:909": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:910": { "file": ".github/workflows/ci.yml", "start": "if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' }}" },
+      "ci.yml:998": { "file": ".github/workflows/ci.yml", "start": "prisma-migration-gate:" },
+      "ci.yml:1002": { "file": ".github/workflows/ci.yml", "start": "if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_prisma_migration_drift == 'true' }}" },
+      "ci.yml:1003": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:1079": { "file": ".github/workflows/ci.yml", "start": "e2e:" },
+      "ci.yml:1085": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
+      "ci.yml:1091-1092": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1148": { "file": ".github/workflows/ci.yml", "start": "- name: Build frontend for E2E" },
+      "ci.yml:1162": { "file": ".github/workflows/ci.yml", "start": "e2e-report:" },
+      "ci.yml:1167-1168": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- e2e" },
+      "ci.yml:1209": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1213": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1217-1218": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1256": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1260": { "file": ".github/workflows/ci.yml", "start": "# Pull requests no longer run this job (issue #1396): each E2E shard's own" },
+      "ci.yml:1264": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name != 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:1265-1269": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
+      "ci.yml:1305": { "file": ".github/workflows/ci.yml", "start": "e2e-live-logout:" },
+      "ci.yml:1309": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
+      "ci.yml:1311-1312": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1394": { "file": ".github/workflows/ci.yml", "start": "build-mobile:" },
+      "ci.yml:1398": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'mobile') }}" },
+      "ci.yml:1399-1403": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
+      "ci.yml:1440": { "file": ".github/workflows/ci.yml", "start": "build-storybook:" },
+      "ci.yml:1446": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },

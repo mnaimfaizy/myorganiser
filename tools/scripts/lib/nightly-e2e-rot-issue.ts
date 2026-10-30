@@ -6,69 +6,53 @@
  * red. Report Success is the other half: a later green scheduled run has to
  * act on that same issue, or it stays open through every recovery (#858).
  *
- * Triage state is the triage skill's state roles. None of them, and the
- * issue is the automation talking to itself, so recovery closes it. Any one
- * of them, and someone has already put the issue in a queue — including
- * `needs-triage`, which is what a newly created rot issue wears — so
- * recovery comments and leaves the work where it is. Area labels such as
- * `github-actions` are not state and do not keep the issue open.
+ * What this module holds is the nightly half: its title, the labels its own
+ * issue is created with, and the comment a green run leaves. The rules it
+ * shares with every other automation reporting on a fixed-title issue — the
+ * triage state labels, what a recovery does about them, and the sentence
+ * explaining that outcome — are `automation-issue.ts`, because three
+ * automations read them and a rule three callers read is not this file's.
  *
- * The workflow jobs import this module. A second copy of the label list in
- * YAML would be the drift this file exists to prevent.
+ * The shared names are re-exported here on purpose: the workflow jobs import
+ * them from this path by file URL, and the nightly's own vocabulary
+ * (`findOpenRotIssue`) is what that YAML and this module's suite ask for. A
+ * second copy of the label list in YAML would be the drift this file exists
+ * to prevent.
  *
  * Run the tests with: node --test tools/scripts/lib/nightly-e2e-rot-issue.test.ts
  */
 
-export const ROT_ISSUE_TITLE = '[automation] Nightly E2E suite is failing';
+import {
+  AUTOMATION_ISSUE_CREATE_LABELS,
+  findOpenAutomationIssue,
+  recoveryOutcomeSentence,
+  type AutomationIssueCandidate,
+  type RecoveryAction,
+} from './automation-issue.ts';
 
-/** Triage skill state roles. Presence of any one keeps the rot issue open. */
-export const TRIAGE_STATE_LABELS = [
-  'needs-triage',
-  'needs-info',
-  'ready-for-agent',
-  'ready-for-human',
-  'wontfix',
-];
+export {
+  labelNames,
+  recoveryAction,
+  recoveryOutcomeSentence,
+  TRIAGE_STATE_LABELS,
+  type IssueLabel,
+  type RecoveryAction,
+} from './automation-issue.ts';
+
+export const ROT_ISSUE_TITLE = '[automation] Nightly E2E suite is failing';
 
 /**
  * Applied only when Report Failure creates the issue. `needs-triage` is also
  * a state label, so the next green nightly comments instead of closing it.
  */
-export const ROT_ISSUE_CREATE_LABELS = ['needs-triage', 'github-actions'];
-
-export type IssueLabel = string | { name?: string };
+export const ROT_ISSUE_CREATE_LABELS = AUTOMATION_ISSUE_CREATE_LABELS;
 
 /**
- * Issue list payloads use `{ name }` label objects. A caller that already
- * mapped them to strings is accepted too.
+ * The candidate shape an issue listing hands this module. Named for the rot
+ * issue because that is what the nightly's callers are looking for; it is
+ * the shared `AutomationIssueCandidate`.
  */
-export function labelNames(
-  labels: readonly IssueLabel[] | null | undefined,
-): string[] {
-  return (labels ?? []).flatMap((label) => {
-    if (typeof label === 'string') return [label];
-    if (label && typeof label.name === 'string') return [label.name];
-    return [];
-  });
-}
-
-export type RecoveryAction = 'close' | 'comment';
-
-/** What a green scheduled nightly does with the open rot issue. */
-export function recoveryAction(
-  labels: readonly IssueLabel[] | null | undefined,
-): RecoveryAction {
-  const names = new Set(labelNames(labels));
-  const triaged = TRIAGE_STATE_LABELS.some((name) => names.has(name));
-  return triaged ? 'comment' : 'close';
-}
-
-export interface RotIssueCandidate {
-  title?: string;
-  state?: string;
-  pull_request?: unknown;
-  [key: string]: unknown;
-}
+export type RotIssueCandidate = AutomationIssueCandidate;
 
 /**
  * The open issue this automation owns. Pull requests are issues in the
@@ -78,10 +62,7 @@ export function findOpenRotIssue<T extends RotIssueCandidate>(
   issues: readonly T[],
   title: string = ROT_ISSUE_TITLE,
 ): T | undefined {
-  return issues.find(
-    (issue) =>
-      issue.state !== 'closed' && !issue.pull_request && issue.title === title,
-  );
+  return findOpenAutomationIssue(issues, title);
 }
 
 export interface RecoveryCommentInput {
@@ -99,10 +80,7 @@ export function recoveryComment({
   runUrl,
   date,
 }: RecoveryCommentInput): string {
-  const outcome =
-    action === 'close'
-      ? 'This issue had no triage state label, so this recovery closes it.'
-      : 'This issue carries a triage state label, so it stays open for the triaged work.';
+  const outcome = recoveryOutcomeSentence(action);
   return [
     `The nightly Playwright run succeeded on ${date}.`,
     '',

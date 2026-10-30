@@ -1071,7 +1071,7 @@
               <circle class="tipdot" cx="612" cy="608" r="4" />
               <text class="title" x="342" y="626">Concurrency</text>
               <text x="342" y="646">one group per PR, supersede cancels</text>
-              <text class="src" x="342" y="664">ci.yml:18</text>
+              <text class="src" x="342" y="664">ci.yml:34</text>
             </g>
             <path class="flow ci" d="M 500 600 C 560 500, 620 400, 700 340" />
 
@@ -1188,22 +1188,32 @@
         <dd id="note-ci-concurrency">
           One concurrency group per Pull Request, so a superseded run is
           cancelled &mdash; the existing workflow already does this at
-          <code>ci.yml:18</code>.
+          <code>ci.yml:34</code>.
         </dd>
         <dt>checks</dt>
         <dd id="note-checks">
-          The six contexts the main-branch <b>ruleset</b> already requires
-          &mdash; not classic branch protection: <code>GET
+          The nine contexts the main-branch <b>ruleset</b> is meant to require,
+          as stated in <code>REQUIRED_CHECK_CONTEXTS</code>
+          (<code>tools/scripts/check-review-pages.ts</code>); that list moves
+          first, and the live ruleset is updated to match as a separate manual
+          step. That is a ruleset, not classic branch protection: <code>GET
           /branches/main/protection</code> returns 404, and the rules live in
           ruleset <code>*main*</code>, id 22235792, read via the GitHub API.
           <code>Authoritative Lockfile Policy</code>, <code>Secure Install
-          Review</code>, <code>Prepare Dependency Cache</code>,
-          <code>Setup Affected Context</code>, <code>Lint</code>,
-          <code>Test</code> (<code>ci.yml:25, :144, :413, :448, :526, :578</code>). The
-          <code>Test</code> job sets <code>DATABASE_URL</code>
-          (<code>ci.yml:604</code>) and starts a throwaway Postgres service for
-          migrate deploy/diff; affected Jest still runs against mocks without
-          needing that service &mdash; which is why the Reviewer's
+          Review</code>, <code>Setup Affected Context</code>,
+          <code>Lint</code>, <code>Test</code>, <code>Typecheck</code>,
+          <code>Tool Suites</code>, <code>Prisma Migration Gate</code>,
+          <code>E2E Report</code>
+          (<code>ci.yml:41, :160, :438, :586, :649, :825, :906, :999, :1163</code>).
+          <code>Tool Suites</code> and <code>Prisma Migration Gate</code> are
+          path-gated: when their triggers skip them they report as skipped,
+          and a skipped job reads as passing. The
+          <code>Test</code> job sets a dummy <code>DATABASE_URL</code> for
+          Prisma config loading only (<code>ci.yml:660</code>); the
+          path-gated <code>Prisma Migration Gate</code> job starts a
+          throwaway Postgres service and runs migrate deploy/diff separately
+          (<code>ci.yml:1026</code>). Affected Jest runs against mocks without
+          needing either service &mdash; which is why the Reviewer's
           <code>executed</code> evidence is feasible in CI, in the same
           environment.
         </dd>
@@ -1762,10 +1772,13 @@
     "requiredCheckContexts": [
       "Authoritative Lockfile Policy",
       "Secure Install Review",
-      "Prepare Dependency Cache",
       "Setup Affected Context",
       "Lint",
-      "Test"
+      "Test",
+      "Typecheck",
+      "Tool Suites",
+      "Prisma Migration Gate",
+      "E2E Report"
     ],
     "gateTierLabels": ["gate:mechanical", "gate:standard", "gate:full"],
     "agentVerdictCheck": "Agent Verdict",
@@ -1775,7 +1788,7 @@
 
 <script type="application/json" id="citation-anchors">
   {
-    "note": "Expected-content anchors for finding-lifecycle.html, verified against source on 2026-10-08",
+    "note": "Expected-content anchors for finding-lifecycle.html, verified against source on 2026-10-30",
     "anchors": {
       "SKILL.md:14-15": {
         "file": ".agents/skills/code-review/SKILL.md",
@@ -1811,35 +1824,51 @@
         "file": "AGENTS.md",
         "start": "Format: `<type>/<issue-number>-<short-slug>`. The issue number comes **first**, right after the"
       },
-      "ci.yml:18": {
+      "ci.yml:34": {
         "file": ".github/workflows/ci.yml",
-        "start": "cancel-in-progress: true"
+        "start": "cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}"
       },
-      "ci.yml:25": {
+      "ci.yml:41": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Authoritative Lockfile Policy"
       },
-      "ci.yml:144": {
+      "ci.yml:160": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Secure Install Review"
       },
-      "ci.yml:413": {
-        "file": ".github/workflows/ci.yml",
-        "start": "name: Prepare Dependency Cache"
-      },
-      "ci.yml:448": {
+      "ci.yml:438": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Setup Affected Context"
       },
-      "ci.yml:526": {
+      "ci.yml:586": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Lint"
       },
-      "ci.yml:578": {
+      "ci.yml:649": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Test"
       },
-      "ci.yml:604": {
+      "ci.yml:660": {
+        "file": ".github/workflows/ci.yml",
+        "start": "DATABASE_URL: postgresql://localhost:5432/myorganiser"
+      },
+      "ci.yml:825": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: Typecheck"
+      },
+      "ci.yml:906": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: Tool Suites"
+      },
+      "ci.yml:999": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: Prisma Migration Gate"
+      },
+      "ci.yml:1163": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: E2E Report"
+      },
+      "ci.yml:1026": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser"
       },

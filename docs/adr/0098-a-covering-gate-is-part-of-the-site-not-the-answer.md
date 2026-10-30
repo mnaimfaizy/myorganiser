@@ -100,12 +100,19 @@ Two of the six were not clean, and both are recorded rather than smoothed over.
 **The Prisma trigger narrowed** from `apps/backend/src/prisma/**` to
 `apps/backend/src/prisma/migrations/**`. `prisma:migrations:check` covers the migration _history_;
 per [ADR 0094](0094-a-prisma-migration-is-gated-on-the-tree-and-against-a-database.md) the
-schema-versus-database question is a different artifact answered by `prisma migrate deploy` and
-`prisma migrate diff --exit-code` in the `Test` job — which is a job step, not a `*:check` script,
-and so is not nameable here. Rather than let one trigger point at a gate covering half of it, the
-trigger was narrowed to the half the named gate actually covers. A bare `schema/` edit no longer
-fires this obligation; it is gated by ADR 0094 tier 2, which is where that question was already
-decided to live.
+schema-versus-database question is a different artifact, answered at the time by `prisma migrate
+deploy` and `prisma migrate diff --exit-code` as an anonymous job step — not a `*:check` script,
+and so not nameable here. Rather than let one trigger point at a gate covering half of it, the
+trigger was narrowed to the half the named gate actually covers. A bare `schema/` edit did not
+fire this obligation; it was gated by ADR 0094 tier 2 alone, which is where that question was
+already decided to live.
+
+That step later gained a name of its own: [#1394](https://github.com/mnaimfaizy/myorganiser/issues/1394)
+wraps it as the `prisma:migration:drift` script and registers it in
+`tools/config/gate-triggers.json` (ADR 0140), so it is nameable now. The trigger here stays
+narrowed anyway — widening it to name `prisma:migration:drift` as the Covering Gate for
+`apps/backend/src/prisma/**` is a deliberate call this ADR leaves open rather than makes in
+passing, since it changes what `/code-review` asks about on every schema-only change.
 
 **`design-tokens:check` did not exist.** `libs/design-tokens` declared one target, `build-tokens`,
 and nothing asserted that `src/generated/` matches `tokens.json` — a token whose value changed

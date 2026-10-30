@@ -1,0 +1,195 @@
+name: PR CI Duration Watch
+
+# runs-on is pinned to ubuntu-24.04. See docs/deployment/CI_CD_AND_RELEASE_PROCESS.md#runner-image.
+
+# Watches the five-minute PR CI target (PRD #1387, issue #1393) so a
+# regression is noticed within a week instead of whenever somebody happens to
+# look. It runs tools/scripts/ci/measure-ci-duration.ts — the same
+# measurement a person runs as `yarn ci:duration:measure` — over the last
+# fortnight, and reports through one fixed-title issue, following the
+# nightly E2E rot issue (ADR
+# 0050) and the npm audit issue (ADR 0124): comment on the open issue while
+# the target keeps slipping, create one when there is none, and record the
+# recovery once when the window comes back clean.
+#
+# A window with fewer than ten Single-Library Pull Request runs measured
+# nothing. That is written to the run's step summary and the issue is left
+# alone — a quiet week is not a regression, and it is not a recovery either.
+#
+# 09:23 UTC on Monday: scheduled workflows on public repositories are delayed
+# at peak times, so an off-peak odd minute is the standard mitigation, as in
+# nightly-e2e.yml and monthly-agent-model-audit.yml. Monday morning means the
+# fortnight being reported always includes the week just ended.
+on:
+  schedule:
+    - cron: '23 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Window in days (default 14)'
+        type: string
+        default: '14'
+
+# Queued, never cancelled. Two runs reporting on the same issue from the same
+# measurement is the one outcome worth avoiding here, and a cancelled watch
+# simply reports next week.
+concurrency:
+  group: pr-ci-duration-watch
+  cancel-in-progress: false
+
+# The watch reads runs and writes to one issue. `contents: read` is the
+# checkout; `actions: read` is the job and step timestamps the measurement is
+# computed from; `issues: write` is the report. Nothing else — this workflow
+# never touches a pull request, a deployment, or the cache.
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  watch:
+    name: Measure PR CI duration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      # No `yarn install`, the same way cache-cleanup.yml runs its script: the
+      # measurement is a `tools/scripts` TypeScript file run by Node's type
+      # stripping (ADR 0135) whose import graph is Node built-ins and modules
+      # from this repository, and the only thing it reads besides them is
+      # `gh`, which the runner already has. `yarn ci:duration:measure` is the
+      # same command for a person; the Contract Suite asserts the two name
+      # the same file so the documented command and this step cannot drift.
+      - name: Measure PR CI duration
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOW_DAYS: ${{ inputs.days || '14' }}
+        run: |
+          set -euo pipefail
+
+          node tools/scripts/ci/measure-ci-duration.ts \
+            --days "$WINDOW_DAYS" \
+            --out ci-duration.md \
+            --json ci-duration.json
+
+      - name: Publish the measurement to the run summary
+        if: ${{ !cancelled() }}
+        run: cat ci-duration.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One open issue that gets commented on, rather than a new issue every
+      # week the target keeps slipping. The title, the label list, the report
+      # bodies and the "is this a breach, a recovery, or a quiet week"
+      # decision all live in tools/scripts/lib/ci-duration-watch-issue.ts —
+      # not a second copy here.
+      - name: Report through the watch issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { readFileSync } = require('node:fs');
+            const { pathToFileURL } = require('node:url');
+            const {
+              WATCH_ISSUE_TITLE,
+              WATCH_ISSUE_CREATE_LABELS,
+              breachReport,
+              findOpenWatchIssue,
+              lastReportedState,
+              notEnoughDataNote,
+              recoveryAction,
+              recoveryComment,
+              watchAction,
+            } = await import(
+              pathToFileURL(
+                `${process.env.GITHUB_WORKSPACE}/tools/scripts/lib/ci-duration-watch-issue.ts`,
+              ).href
+            );
+
+            const summary = JSON.parse(readFileSync('ci-duration.json', 'utf8'));
+            const action = watchAction(summary);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const date = new Date().toISOString().slice(0, 10);
+
+            if (action === 'none') {
+              const note = notEnoughDataNote(summary);
+              core.info(note);
+              await core.summary.addRaw(`\n${note}\n`).write();
+              return;
+            }
+
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const match = findOpenWatchIssue(existing);
+
+            if (action === 'report') {
+              const body = breachReport({ summary, runUrl, date });
+              if (match) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: match.number,
+                  body,
+                });
+                core.info(`Commented on existing issue #${match.number}`);
+                return;
+              }
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: WATCH_ISSUE_TITLE,
+                body,
+                labels: [...WATCH_ISSUE_CREATE_LABELS],
+              });
+              core.info(`Created issue #${created.data.number}`);
+              return;
+            }
+
+            if (!match) {
+              core.info(`No open issue titled ${WATCH_ISSUE_TITLE}`);
+              return;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              per_page: 100,
+            });
+
+            if (lastReportedState({ body: match.body, comments }) === 'recovered') {
+              core.info(`Recovery already recorded on issue #${match.number}`);
+              return;
+            }
+
+            const recovery = recoveryAction(match.labels);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: match.number,
+              body: recoveryComment({ action: recovery, summary, runUrl, date }),
+            });
+
+            if (recovery === 'close') {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+              core.info(`Closed watch issue #${match.number}`);
+              return;
+            }
+
+            core.info(`Target met; left triaged issue #${match.number} open`);

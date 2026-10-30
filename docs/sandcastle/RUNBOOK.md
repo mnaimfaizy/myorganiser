@@ -338,13 +338,13 @@ which CI runs.
 
 #### The gate database
 
-When `backend:test` is in the gate's test scope, the gate gives it the database CI's Test job
-has, so a database-backed suite (for example `backfillUserCreatedAt.int.test.ts`) fails here only
-when it would fail on the PR:
+When `backend:test` is in the gate's test scope, the gate gives it the same database CI's
+`Prisma Migration Gate` job has — the `Test` job itself carries no database (ADR 0094, ADR 0140,
+issue #1394):
 
 1. It creates a private Docker network and starts `postgres:16` on it, with the same user, trust
-   auth and database name as the `services:` block in `.github/workflows/ci.yml`. No port is
-   published to the host.
+   auth and database name as the `prisma-migration-gate` job's `services:` block in
+   `.github/workflows/ci.yml`. No port is published to the host.
 2. It waits up to 60s for the server to accept TCP connections.
 3. After `yarn install`, the gate container runs CI's "Apply Prisma migrations and check schema
    drift" step: `prisma migrate deploy`, then `prisma migrate diff … --exit-code`. A migration
