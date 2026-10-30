@@ -179,6 +179,134 @@ test('the report step calls the recovery path: gate, comment and close', () => {
     /issues\.createComment\(\{(?:(?!\}\);)[\s\S])*?body: recoveryComment\(\{/,
   );
   assert.match(REPORT_STEP, /issues\.update\(\{[\s\S]*?state: 'closed'/);
+  // The close is the recovery's own branch, with the reason the issue shows.
+  const close = REPORT_STEP.indexOf("if (recovery === 'close') {");
+  assert.notEqual(close, -1, 'the recovery path has no close branch');
+  const closeEnd = REPORT_STEP.indexOf('\n            }', close);
+  assert.notEqual(
+    closeEnd,
+    -1,
+    'the close branch is not closed at the expected indentation',
+  );
+  const update = REPORT_STEP.indexOf('issues.update({', close);
+  assert.ok(
+    update > close && update < closeEnd,
+    'issues.update is not inside the close branch',
+  );
+  const updateEnd = REPORT_STEP.indexOf('});', update);
+  assert.notEqual(updateEnd, -1, 'the issues.update call is not closed');
+  const updateCall = REPORT_STEP.slice(update, updateEnd);
+  assert.match(
+    updateCall,
+    /^\s*issue_number: match\.number,$/m,
+    'the close does not target the matched issue',
+  );
+  assert.match(
+    updateCall,
+    /^\s*state_reason: 'completed',$/m,
+    'the close does not pass state_reason completed',
+  );
+});
+
+test('the sparse window returns before any issue write', () => {
+  // A quiet week is neither a breach nor a recovery, so the block ends the
+  // step before the first `issues.` call (the read that finds the open issue).
+  const sparse = REPORT_STEP.indexOf("if (action === 'none') {");
+  assert.notEqual(sparse, -1, 'the report step has no sparse-window block');
+  const end = REPORT_STEP.indexOf('\n            }', sparse);
+  assert.notEqual(
+    end,
+    -1,
+    'the sparse-window block is not closed at the expected indentation',
+  );
+  assert.match(
+    REPORT_STEP.slice(sparse, end),
+    /\breturn;/,
+    'the sparse-window block does not return',
+  );
+  const firstIssuesCall = REPORT_STEP.indexOf('issues.');
+  assert.ok(
+    end < firstIssuesCall,
+    'the sparse-window block closes after an issues. call',
+  );
+});
+
+test('a breach comments on the open watch issue, and creates one only when none is open', () => {
+  const report = REPORT_STEP.indexOf("if (action === 'report') {");
+  assert.notEqual(report, -1, 'the report step has no report block');
+  const match = REPORT_STEP.indexOf('if (match) {', report);
+  assert.notEqual(match, -1, 'the report block has no if (match) branch');
+  const matchEnd = REPORT_STEP.indexOf('\n              }', match);
+  assert.notEqual(
+    matchEnd,
+    -1,
+    'the match branch is not closed at the expected indentation',
+  );
+  assert.match(
+    REPORT_STEP.slice(match, matchEnd),
+    /\breturn;/,
+    'the match branch does not return, so the create runs after the comment',
+  );
+  const comment = REPORT_STEP.indexOf('issues.createComment({', match);
+  const create = REPORT_STEP.indexOf('issues.create({', report);
+  assert.ok(
+    comment > match && comment < matchEnd,
+    'the match branch does not comment on the open issue',
+  );
+  assert.ok(create > matchEnd, 'the create call is not after the match branch');
+  const commentEnd = REPORT_STEP.indexOf('});', comment);
+  assert.notEqual(
+    commentEnd,
+    -1,
+    'the issues.createComment call is not closed',
+  );
+  const commentCall = REPORT_STEP.slice(comment, commentEnd);
+  assert.match(
+    commentCall,
+    /^\s*issue_number: match\.number,$/m,
+    'the comment is not posted to match.number',
+  );
+});
+
+test('a created watch issue keeps its fixed title, its create labels and the report body', () => {
+  const start = REPORT_STEP.indexOf('issues.create({');
+  assert.notEqual(start, -1, 'the report step has no issues.create call');
+  const callEnd = REPORT_STEP.indexOf('});', start);
+  assert.notEqual(callEnd, -1, 'the issues.create call is not closed');
+  const call = REPORT_STEP.slice(start, callEnd);
+  assert.match(
+    call,
+    /^\s*title: WATCH_ISSUE_TITLE,$/m,
+    'the create call does not pass the fixed title',
+  );
+  assert.match(
+    call,
+    /^\s*labels: \[\.\.\.WATCH_ISSUE_CREATE_LABELS\],$/m,
+    'the create call does not pass the create labels',
+  );
+  assert.match(call, /^\s*body,$/m, 'the create call does not pass the body');
+});
+
+test('the recovery path returns before reading comments when no watch issue is open', () => {
+  const guard = REPORT_STEP.indexOf('if (!match) {');
+  assert.notEqual(guard, -1, 'the recovery path has no if (!match) guard');
+  const end = REPORT_STEP.indexOf('\n            }', guard);
+  assert.notEqual(
+    end,
+    -1,
+    'the if (!match) guard is not closed at the expected indentation',
+  );
+  assert.match(
+    REPORT_STEP.slice(guard, end),
+    /\breturn;/,
+    'the if (!match) guard does not return',
+  );
+  const listComments = REPORT_STEP.indexOf('issues.listComments');
+  assert.notEqual(listComments, -1, 'the report step never lists comments');
+  assert.ok(
+    end < listComments,
+    'comments are listed before the no-issue guard returns',
+  );
 });
 
 test('package.json defines ci:duration:measure over the measure script', () => {
