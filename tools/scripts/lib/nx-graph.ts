@@ -1,12 +1,14 @@
 // Loads the Nx project graph for the workspace-level check scripts.
 //
-// Both `check-lint-coverage.ts` and `check-typecheck.ts` need the same thing:
+// `check-lint-coverage.ts` and `check-doc-nx-targets.ts` need the same thing:
 // every project's name, root, and targets, in one read rather than one
 // `nx show project` per project. `nx graph --file` gives that in a single call.
+// `check-typecheck.ts` was a third reader until ADR 0141 made typecheck a
+// per-project Nx target, which Nx selects and caches without a graph file.
 //
 // The graph path is overridable so a checker can be exercised against a fixture
 // without an Nx workspace. CI's Test job builds one file and passes it to
-// lint coverage, typecheck, and documented Nx targets (issue #1061); omitting
+// lint coverage and documented Nx targets (issue #1061); omitting
 // the path still generates a graph, which is how a local run and Review Tier
 // work. When the path is omitted the temp directory is removed on every path,
 // including a failed `nx graph` or a file that is not JSON.

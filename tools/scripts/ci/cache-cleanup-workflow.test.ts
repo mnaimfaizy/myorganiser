@@ -190,6 +190,130 @@ test('ci.yml test job runs affected projects on a pull request and the whole tre
   assert.doesNotMatch(runOf(every), /affected|--base/);
 });
 
+// The defect worth catching: a whole-tree typecheck on a pull request. The
+// affected step is the only one that may run on a pull request, and it must
+// diff the same range the Jest step diffs: a wrong --base or --head selects the
+// wrong projects and passes silently.
+test('ci.yml test job typechecks affected projects on a pull request and the whole tree otherwise', () => {
+  const job = jobBlock(CI, 'test');
+  const affected = stepNamed(job, 'Typecheck affected projects');
+  assert.equal(ifOf(affected), "github.event_name == 'pull_request'");
+  assert.match(runOf(affected), /nx affected -t typecheck/);
+  assert.match(
+    runOf(affected),
+    /--base=\$\{\{ needs\.setup\.outputs\.nx_base \}\}/,
+    'the affected typecheck must diff from the same base the Jest step uses',
+  );
+  assert.match(
+    runOf(affected),
+    /--head=\$\{\{ needs\.setup\.outputs\.nx_head \}\}/,
+    'the affected typecheck must diff to the same head the Jest step uses',
+  );
+
+  const every = stepNamed(job, 'Typecheck every project');
+  assert.equal(ifOf(every), "github.event_name != 'pull_request'");
+  assert.match(runOf(every), /nx run-many -t typecheck/);
+  assert.doesNotMatch(runOf(every), /affected|--base/);
+});
+
+// The defect worth catching: `typecheck` is cacheable per project (ADR 0141),
+// so a restore placed after it leaves a cacheable task with nothing to restore
+// from. Positions come from the exact `- name:` lines, so a renamed step reads
+// as missing and a reordered one moves its index past the restore.
+test("ci.yml restores the Nx computation cache before the test job's first cacheable task", () => {
+  const job = jobBlock(CI, 'test');
+  const indexOfStep = (name: string): number => {
+    const line = `      - name: ${name}\n`;
+    const index = job.indexOf(line);
+    assert.notEqual(
+      index,
+      -1,
+      `the test job has no step named exactly "${name}"`,
+    );
+    assert.equal(
+      job.indexOf(line, index + 1),
+      -1,
+      `the test job has two steps named "${name}"`,
+    );
+    return index;
+  };
+  const restore = indexOfStep('Restore Nx computation cache');
+  for (const name of [
+    'Typecheck affected projects',
+    'Typecheck every project',
+    'Typecheck tools/scripts',
+  ]) {
+    assert.ok(
+      restore < indexOfStep(name),
+      `"${name}" runs before the Nx computation cache is restored, so a cacheable typecheck has nothing to restore from`,
+    );
+  }
+});
+
+// The defect worth catching: a whole-tree typecheck on a pull request. Any step
+// that runs `nx run-many -t typecheck` must be excluded from pull requests, and
+// the bare `typecheck:check` compiles the whole tree plus the fixed tools/scripts
+// job, so it must never run in CI on a pull request. The tools/scripts step
+// carries the one flag that narrows it to its own half.
+test('ci.yml does not typecheck the whole tree on a pull request', () => {
+  const job = uncommented(jobBlock(CI, 'test'));
+  for (const step of job.split(/^(?= {6}- name: )/m)) {
+    if (!/nx run-many -t typecheck\b/.test(step)) continue;
+    const name = /^ {6}- name: (.+)$/m.exec(step)?.[1]?.trim() ?? '(unnamed)';
+    assert.match(
+      ifOf(step) ?? '',
+      /github\.event_name != 'pull_request'/,
+      `"${name}" runs nx run-many -t typecheck without an if: that excludes pull_request, so every pull request compiles every project`,
+    );
+  }
+
+  assert.equal(
+    runOf(stepNamed(jobBlock(CI, 'test'), 'Typecheck tools/scripts')),
+    'corepack yarn typecheck:tools-scripts',
+    'the Typecheck tools/scripts step must run the typecheck:tools-scripts script, the only way the fixed job is reached in CI',
+  );
+  assert.doesNotMatch(
+    job,
+    /typecheck:check/,
+    'a step in the test job runs typecheck:check, which compiles the whole tree and the fixed tools/scripts job on a pull request; the whole-tree step must be nx run-many -t typecheck and the fixed job must be typecheck:tools-scripts',
+  );
+});
+
+// The defect worth catching: the step, the gate id and the package.json script
+// are one name. A step that invokes a script that does not exist fails only in
+// CI, and a gate id that drifts from its step names a different script from the
+// one the trigger describes.
+test('the tools/scripts typecheck step runs a package.json script, named by its gate id, that runs check-typecheck with --tools-scripts-only', () => {
+  const invoked = /^corepack yarn (\S+)$/.exec(
+    runOf(stepNamed(jobBlock(CI, 'test'), 'Typecheck tools/scripts')),
+  )?.[1];
+  assert.ok(
+    invoked,
+    'the Typecheck tools/scripts step does not run a yarn script',
+  );
+
+  const pkg = JSON.parse(
+    readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'),
+  ) as { scripts?: Record<string, string> };
+  assert.equal(
+    pkg.scripts?.[invoked],
+    'node tools/scripts/check-typecheck.ts --tools-scripts-only',
+    `package.json has no "${invoked}" script that runs check-typecheck.ts --tools-scripts-only`,
+  );
+
+  const gates = JSON.parse(
+    readFileSync(join(REPO_ROOT, 'tools/config/gate-triggers.json'), 'utf8'),
+  ) as { suites: { id: string; ciStep: string }[] };
+  const gate = gates.suites.find(
+    (suite) => suite.ciStep === 'Typecheck tools/scripts',
+  );
+  assert.equal(
+    gate?.id,
+    invoked,
+    'the gate id for Typecheck tools/scripts must be the script the step runs',
+  );
+});
+
 test('no workflow file declares a pull_request_target trigger', () => {
   for (const file of WORKFLOW_FILES) {
     const on = onBlockOf(readFileSync(join(WORKFLOWS, file), 'utf8'));

@@ -490,6 +490,7 @@ jobs:
       gate_upstream_briefs_test: ${{ steps.gate-triggers.outputs.run_upstream_briefs_test }}
       gate_openapi_check: ${{ steps.gate-triggers.outputs.run_openapi_check }}
       gate_prisma_migration_drift: ${{ steps.gate-triggers.outputs.run_prisma_migration_drift }}
+      gate_typecheck_tools_scripts: ${{ steps.gate-triggers.outputs.run_typecheck_tools_scripts }}
 
     steps:
       - name: Checkout repository
@@ -798,7 +799,9 @@ jobs:
       # Review Tier is a separate workflow and its only graph consumer, so it
       # still builds its own. Each checker used to spawn `nx graph` itself;
       # that build is the slow part (ADR 0043 records the lint checker at 19s).
-      # One graph for the three checkers in this job that read it (issue #1061).
+      # One graph for the two checkers in this job that read it (issue #1061):
+      # typecheck stopped reading it when it became a per-project Nx target
+      # (ADR 0141).
       # A missing or mistyped path fails the checker; it does not rebuild.
       # The path goes through GITHUB_ENV because job-level `env` cannot read the
       # `runner` context: `${{ runner.temp }}` there rejects the whole workflow.
@@ -812,18 +815,59 @@ jobs:
       - name: Check lint gate coverage
         run: corepack yarn lint:coverage:check "$NX_GRAPH_FILE"
 
+      # Restored before the first Nx task this job runs, not before the Jest
+      # step: `typecheck` below is cacheable per project (ADR 0141), so a
+      # pull request whose diff cannot reach a project restores that
+      # project's result instead of compiling it. Restoring after the
+      # typecheck steps would leave the whole point of caching them on the
+      # table.
+      - name: Restore Nx computation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-22-test-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-22-test-
+            ${{ runner.os }}-nx-22-
+
       # apps/backend/src/prisma is generated and gitignored, so a fresh runner
       # has no @prisma/client to compile against. backend:test declares this
       # same dependency; typechecking needs it just as much, and runs first.
+      # The inferred `typecheck` target declares it too (ADR 0141), so
+      # `run-many` would generate it anyway — this step keeps it out of the
+      # affected graph, where a pull request that does not reach the backend
+      # should not pay for it either way.
       - name: Generate Prisma client
         run: corepack yarn nx run backend:generate-types
 
-      # Compiles each project's production and spec programs. Nothing ran
-      # TypeScript in CI before this, so two type errors had reached main.
-      # The graph was built above; this step needs the generated Prisma client,
-      # not a second graph.
-      - name: Typecheck all projects
-        run: corepack yarn typecheck:check "$NX_GRAPH_FILE"
+      # Each project's production and spec programs, as one cacheable Nx task
+      # per project (ADR 0141). Affected on a pull request, whole tree on a
+      # push — the same split as Lint and the Jest step below, and for the same
+      # two reasons: `main`'s guarantee, and a full Nx cache baseline for pull
+      # requests to restore from. Compiling all 73 configs in one workspace
+      # script cost 200s on every pull request however small the diff; a
+      # single-library change now compiles that library and its dependents.
+      - name: Typecheck affected projects
+        if: github.event_name == 'pull_request'
+        run: corepack yarn nx affected -t typecheck --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Typecheck every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t typecheck
+
+      # tools/scripts has no project.json on purpose (ADR 0135), and the
+      # plugin keys inference on project.json, so the `scripts` node Nx infers
+      # there from its package.json carries no typecheck target and neither
+      # `affected` nor `run-many` above reaches its config. It is a fixed job,
+      # path-gated like every other heavy suite (ADR 0140): `run_all` is set
+      # on every push and on any resolver failure, so `main` still pays for
+      # it. The command is the gate id's own script, which is what
+      # tools/config/gate-triggers.json requires of a suite. `typecheck:check`
+      # with no flag runs this half and `run-many` together, and is the
+      # whole-tree command to run locally.
+      - name: Typecheck tools/scripts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_typecheck_tools_scripts == 'true'
+        run: corepack yarn typecheck:tools-scripts
 
       - name: Check libs markdown allowlist
         run: corepack yarn libs:markdown:check
@@ -868,15 +912,6 @@ jobs:
       # pre-commit aggregate is for.
       - name: Check the Escape Copy reader opens a fresh envelope
         run: corepack yarn escape-copy-reader:check
-
-      - name: Restore Nx computation cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .nx/cache
-          key: ${{ runner.os }}-nx-22-test-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-nx-22-test-
-            ${{ runner.os }}-nx-22-
 
       # Affected on a pull request, whole tree on a push — the same split as
       # Lint above, and for the same two reasons: `main`'s guarantee, and a
@@ -956,7 +991,7 @@ jobs:
         run: git diff --exit-code -- yarn.lock
 
       # This job has its own checkout, so it needs its own generated client —
-      # the same dependency the Test job's Typecheck step has, generated
+      # the same dependency the Test job's typecheck steps have, generated
       # there for that job rather than shared across jobs.
       - name: Generate Prisma client
         run: corepack yarn nx run backend:generate-types

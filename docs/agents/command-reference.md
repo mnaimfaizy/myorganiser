@@ -21,6 +21,7 @@ The on-demand command catalogue for the root [Agent Guide](../../AGENTS.md#comma
 
 - Root README check: `yarn readme:check`.
 - Nx project tags check: `yarn nx:tags:check` (asserts every `project.json` carries exactly one `type:*`/`scope:*`/`tier:*` tag from `tools/config/nx-project-tags.json`). See [ADR 0070](../adr/0070-a-review-tier-is-a-fact-about-the-diff-and-a-gate-tier-is-a-decision-about-the-work.md).
+- Whole-tree typecheck: `yarn typecheck:check` (`nx run-many -t typecheck` plus the `tools/scripts/tsconfig.json` fixed job; `yarn typecheck:tools-scripts` is `--tools-scripts-only`, just that job, which is what CI's path-gated step invokes; exit 1 on a type error, exit 2 when it cannot run; `node --test tools/scripts/check-typecheck.test.ts` covers it). Every project's `typecheck` target is inferred by `tools/scripts/nx/typecheck-plugin.ts`, so `yarn nx run <project>:typecheck` and `yarn nx affected -t typecheck` work for one project or one branch. See [ADR 0141](../adr/0141-typecheck-is-a-cached-per-project-inferred-target.md).
 - Nx declared-target ratchet check: `yarn nx:targets:check` (asserts every `project.json` target on a deprecated `@nx/*` executor matches the shrink-only baseline `tools/config/nx-declared-targets-baseline.json`; `node --test tools/scripts/check-nx-declared-targets.test.ts` covers it). See [ADR 0082](../adr/0082-nx-targets-are-inferred-and-a-declared-target-is-migration-debt.md) and [ADR 0083](../adr/0083-a-declared-target-is-debt-only-on-an-executor-nx-deprecated.md).
 
 ## Design tokens and styling

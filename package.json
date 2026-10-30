@@ -97,6 +97,7 @@
     "checker-contracts:check": "node tools/scripts/check-checker-contracts.ts",
     "lint:coverage:check": "node tools/scripts/check-lint-coverage.ts",
     "typecheck:check": "node tools/scripts/check-typecheck.ts",
+    "typecheck:tools-scripts": "node tools/scripts/check-typecheck.ts --tools-scripts-only",
     "ts-suppressions:check": "node tools/scripts/check-ts-suppressions.ts",
     "tools:mjs:check": "node tools/scripts/check-tools-mjs.ts",
     "review:validate": "node tools/scripts/review/validate-review-report.ts",

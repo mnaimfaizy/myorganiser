@@ -101,6 +101,10 @@ export const E2E_LANE_JOB = /^E2E(?:\s|$)/;
 export const CACHEABLE_NX_STEPS = [
   'Lint affected projects',
   'Lint every project',
+  // One cacheable `tsc --noEmit` per project since ADR 0141; before that,
+  // typecheck was one workspace script that cached nothing.
+  'Typecheck affected projects',
+  'Typecheck every project',
   'Test affected projects',
   'Test every project',
   'Build frontend for E2E',

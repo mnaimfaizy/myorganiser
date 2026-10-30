@@ -725,7 +725,7 @@ A specialist chain that retries between agents until a reviewer or runner verdic
 _Avoid_: review loop, QA cycle, writer-reviewer loop
 
 **Inferred Target**:
-An Nx target a registered plugin derives from a tool's own config file in the project root, with nothing written in `project.json`. The target state for every target a plugin can derive (ADR 0082).
+An Nx target a registered plugin derives from a file in the project root, and that is not written in that project's `targets` block. Usually the config of the tool the target runs (`jest.config.ts` for `test`); where the rule is about the project rather than about one tool, it is `project.json` itself, which is what the local typecheck plugin keys on so that a tsconfig outside any project cannot invent one (ADR 0141). The target state for every target a plugin can derive (ADR 0082).
 _Avoid_: plugin target, crystal target
 
 **Declared Target**:

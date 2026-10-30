@@ -1,209 +1,233 @@
 #!/usr/bin/env node
-// Typechecks the production and spec programs of every project that has one.
+// Typechecks the whole tree: every project's Inferred Target `typecheck`, plus
+// the `tools/scripts` fixed job.
 //
-// A project's production program is its `tsconfig.lib.json`,
-// `tsconfig.app.json`, or `tsconfig.web.json`; a project with none of those is
-// compiled from its `tsconfig.json`. A project with no tsconfig of any of these
-// names contributes nothing and is not reported.
+//   node tools/scripts/check-typecheck.ts [--tools-scripts-only]
 //
-//   node tools/scripts/check-typecheck.ts [graphFile] [workspaceRoot]
-//
-// Nothing in CI ran TypeScript before this. `.github/workflows/ci.yml` had no
+// Nothing in CI ran TypeScript before this script existed. `ci.yml` had no
 // `typecheck` target, no `tsc`, and no tsconfig reference, and only 1 of 34
 // projects even declared a `typecheck` target. Lint cannot see type errors, and
 // most projects transform with babel-jest, which strips types without checking
 // them — so a type error could reach `main` and stay there. Two did:
 // `libs/mobile/feat/auth` carried a TS2559 pair while `apps/mobile/AGENTS.md`
-// documented typecheck as part of mobile's gate, and
-// `libs/web/pages/groceries` carried four TS2347 errors in its specs. Both were
-// found only by running the compiler by hand.
+// documented typecheck as part of mobile's gate, and `libs/web/pages/groceries`
+// carried four TS2347 errors in its specs. Both were found only by running the
+// compiler by hand.
 //
-// This is a workspace-level script rather than 30-odd new `project.json`
-// targets on purpose. Issue #420 has an open decision about executor-based
-// targets versus inferred plugin targets, and hand-declaring a target per
-// project would prejudge it. It also matches every other `check-*.ts`
-// script.
+// It used to compile all 73 configs itself, in one workspace-level process, on
+// every pull request — 200s whatever the diff touched. ADR 0141 moves that work
+// onto a per-project Inferred Target so Nx can cache and select it, and leaves
+// this script as the whole-tree entry point: `nx run-many -t typecheck` plus
+// the one config no project's target owns. The rules that decide which configs a
+// project compiles moved with the work, to `tools/scripts/nx/typecheck-plugin.ts`;
+// they are not duplicated here.
 //
-// Spec configs are in scope, not just lib/app. The groceries errors lived only
-// in `tsconfig.spec.json`, and `.github/agents/test-reviewer.agent.md` already
-// tells sub-agents to run `tsc` over the spec config — the repo treated it as a
-// real gate, just an unautomated one.
+// `tools/scripts/tsconfig.json` is that fixed job. `tools/scripts` carries no
+// `project.json` on purpose (ADR 0135); Nx does infer a `scripts` node there
+// from its `package.json`, but the plugin keys inference on `project.json`, so
+// that node carries no `typecheck` target and `run-many` cannot reach this
+// config. CI runs this half as its own step, path-gated on the
+// `typecheck:tools-scripts` triggers (ADR 0140) — which is what
+// `--tools-scripts-only` is for, under the `yarn typecheck:tools-scripts`
+// script name a gate id has to be. When that config's `include` matches no file
+// — as it did before ADR 0135's expand step migrated the first script there —
+// `tsc` reports TS18003 ("no inputs were found") rather than a type error;
+// that is nothing to compile, not a failure, so it is normalized to a pass
+// below rather than reported as 1 broken config.
 //
-// `tools/scripts/tsconfig.json` is a fixed job, not one discovered through the
-// Nx project graph (ADR 0135): `tools/scripts` is deliberately not a Declared
-// Nx Target, so it is checked whenever the file exists, outside the
-// project-node loop below. Before any script migrates there, its `include`
-// matches nothing and `tsc` reports TS18003 ("no inputs were found") rather
-// than a type error; that is a vacuous pass, not a failure, so it is
-// normalized to one below rather than reported as 1 broken config.
+// This checker asserts one direction only: a config that does not compile
+// fails. It does not assert that every project *has* a `typecheck` target —
+// that is a fact about the plugin's inference, and
+// `tools/scripts/nx/typecheck-plugin.test.ts` asserts it against the live
+// workspace. What this script does assert is that `run-many` had something to
+// run: a tree where no project carries the target is a vacuous pass, which is
+// the exact defect the script exists for, so it exits 2 rather than 0.
 //
 // Generated code must exist before this runs. `apps/backend/src/prisma` is
-// gitignored, so a fresh checkout has no `@prisma/client` to compile against and
-// backend reports 33 errors that say nothing about the diff. `backend:test`
-// declares that dependency via `dependsOn`; CI runs `backend:generate-types`
-// before this step for the same reason.
+// gitignored, so a fresh checkout has no `@prisma/client` to compile against.
+// The backend's inferred target declares `dependsOn: ['generate-types']`, so
+// `run-many` generates it; the plugin header explains why that rule reads the
+// project's own targets rather than naming the backend.
 //
 // Exit 0 = every config compiles. Exit 1 = type errors. Exit 2 = the check
-// could not run.
-import { spawn } from 'node:child_process';
+// could not run — a missing `tools/scripts/tsconfig.json`, a compiler or an
+// `nx` that would not start, an unreadable project list, or a tree where no
+// project carries the target at all.
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.ts';
+import { errorMessage } from './lib/error-message.ts';
 
-// A project's production programs. Every one that exists is checked.
-//
-// `tsconfig.web.json` is a second production program, not an alias for the
-// app one. apps/mobile targets React Native and react-native-web, and ADR 0103
-// splits its typecheck in two: `tsconfig.app.json` is the native program, with
-// no `dom` and the `.web` Platform Variants excluded, and `tsconfig.web.json`
-// is the only config that compiles those variants (`crypto.web.ts`,
-// `main-web.tsx`) under `moduleSuffixes`. Without it here, the web half would be
-// type-checked only when someone ran `mobile:typecheck` by hand.
-const PRODUCTION_CONFIG_NAMES = [
-  'tsconfig.lib.json',
-  'tsconfig.app.json',
-  'tsconfig.web.json',
-];
-
-// The production program of a project that has none of the above. A Next.js
-// app keeps its one program in `tsconfig.json` because that is the file
-// `next build` reads, so apps/web has no `tsconfig.app.json`, and
-// apps/web-e2e has no other config at all. Matching only the suffixed
-// names compiled the web app's specs and nothing else (#1060).
-//
-// It is a fallback, not a fourth name: beside a production config,
-// `tsconfig.json` is the editor's umbrella over the same files.
-const FALLBACK_CONFIG_NAME = 'tsconfig.json';
-
-// Checked alongside whichever production program a project has, because
-// production code and specs compile under different options.
-const SPEC_CONFIG_NAME = 'tsconfig.spec.json';
-
-// Not an Nx project root, so not discovered by the graph loop below — see the
-// file header. `tools-scripts` is a synthetic project name for this job; it
-// names nothing in the Nx graph.
+/** The one config no project's `typecheck` target owns — see the file header. */
 const TOOLS_SCRIPTS_RELATIVE = join('tools', 'scripts', 'tsconfig.json');
+
+/** The Inferred Target name the plugin registers (`nx.json`). */
+const TARGET = 'typecheck';
+
+const WORKSPACE_ROOT = resolve(process.cwd());
+const TOOLS_SCRIPTS_ONLY = process.argv.includes('--tools-scripts-only');
 
 const fail: (msg: string) => never = (msg) => {
   console.error(`typecheck: ${msg}`);
   process.exit(2);
 };
 
-const GRAPH_ARG = process.argv[2];
-const WORKSPACE_ROOT = resolve(process.argv[3] ?? process.cwd());
-
-let nodes;
-try {
-  ({ nodes } = loadProjectGraph(GRAPH_ARG));
-} catch (error) {
-  if (error instanceof GraphUnavailableError) fail(error.message);
-  throw error;
-}
-
-const jobs = [];
-for (const [name, node] of Object.entries(nodes)) {
-  const root = node.data?.root;
-  if (!root) continue;
-  const has = (config: string) =>
-    existsSync(join(WORKSPACE_ROOT, root, config));
-  const production = PRODUCTION_CONFIG_NAMES.filter(has);
-  const configs = [...production];
-  if (production.length === 0 && has(FALLBACK_CONFIG_NAME)) {
-    configs.push(FALLBACK_CONFIG_NAME);
+/**
+ * Compiles `tools/scripts/tsconfig.json`.
+ *
+ * @returns the number of type errors, 0 when the config compiles clean
+ */
+function runToolsScripts(): number {
+  if (!existsSync(join(WORKSPACE_ROOT, TOOLS_SCRIPTS_RELATIVE))) {
+    fail(`${TOOLS_SCRIPTS_RELATIVE} not found`);
   }
-  if (has(SPEC_CONFIG_NAME)) configs.push(SPEC_CONFIG_NAME);
-  for (const config of configs) {
-    jobs.push({ name, config, relative: join(root, config) });
-  }
-}
 
-if (existsSync(join(WORKSPACE_ROOT, TOOLS_SCRIPTS_RELATIVE))) {
-  jobs.push({
-    name: 'tools-scripts',
-    config: 'tsconfig.json',
-    relative: TOOLS_SCRIPTS_RELATIVE,
-  });
-}
-
-if (jobs.length === 0) fail('no project tsconfigs found');
-
-/** One tsconfig to compile: the project it belongs to and its path from the workspace root. */
-interface TypecheckJob {
-  name: string;
-  config: string;
-  relative: string;
-}
-
-/** A finished job: `status` is tsc's exit code, `errors` the diagnostics counted in `output`. */
-interface TypecheckResult extends TypecheckJob {
-  status: number | null;
-  errors: number;
-  output: string;
-}
-
-function runTsc(job: TypecheckJob): Promise<TypecheckResult> {
-  return new Promise<TypecheckResult>((resolveJob) => {
-    const child = spawn('npx', ['tsc', '-p', job.relative, '--noEmit'], {
+  const result = spawnSync(
+    'npx',
+    ['tsc', '-p', TOOLS_SCRIPTS_RELATIVE, '--noEmit'],
+    {
       cwd: WORKSPACE_ROOT,
+      encoding: 'utf8',
       shell: process.platform === 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let output = '';
-    child.stdout.on('data', (d) => (output += d));
-    child.stderr.on('data', (d) => (output += d));
-    child.on('close', (status) => {
-      const errors = output.match(/error TS\d+/g) ?? [];
-      // TS18003 ("no inputs were found") means this config's `include` matches
-      // no file yet — true of `tools/scripts/tsconfig.json` before any script
-      // migrates there (ADR 0135) — which is nothing to typecheck, not a type
-      // error. Normalized to a pass only when it is the sole diagnostic: a real
-      // type error alongside it still fails the job.
-      if (errors.length === 1 && errors[0] === 'error TS18003') {
-        resolveJob({ ...job, status: 0, errors: 0, output });
-        return;
-      }
-      resolveJob({ ...job, status, errors: errors.length, output });
-    });
-  });
-}
-
-// tsc is single-threaded and each config is independent, so run a pool rather
-// than one compiler after another. Capped to keep CI runners from thrashing.
-const limit = Math.max(2, Math.min(availableParallelism?.() ?? 4, 8));
-const queue = [...jobs];
-const results: TypecheckResult[] = [];
-
-await Promise.all(
-  Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    for (let job = queue.shift(); job; job = queue.shift()) {
-      results.push(await runTsc(job));
-    }
-  }),
-);
-
-const failed = results
-  .filter((r) => r.status !== 0)
-  .sort((a, b) => a.relative.localeCompare(b.relative));
-
-if (failed.length > 0) {
-  const total = failed.reduce((n, r) => n + r.errors, 0);
-  console.error(
-    `typecheck: ${total} error(s) across ${failed.length} of ${results.length} config(s).`,
+    },
   );
-  for (const r of failed) {
-    console.error(`\n  --- ${r.relative} (${r.errors}) ---`);
-    for (const line of r.output.split('\n')) {
-      if (/error TS\d+/.test(line)) console.error(`  ${line.trim()}`);
-    }
+  if (result.error) {
+    fail(`tsc could not run: ${errorMessage(result.error)}`);
+  }
+
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  const errors = output.match(/error TS\d+/g) ?? [];
+
+  // TS18003 ("no inputs were found") means this config's `include` matches no
+  // file yet, which is nothing to typecheck rather than a type error.
+  // Normalized to a pass only when it is the sole diagnostic: any second
+  // diagnostic fails the job. It cannot be a *type* error — a config with no
+  // inputs has nothing to type-check — but it can be a config-level one, and
+  // a broken `tools/scripts/tsconfig.json` that also happens to match no file
+  // must not pass as "nothing to do".
+  if (errors.length === 1 && errors[0] === 'error TS18003') return 0;
+  if (result.status === 0 && errors.length === 0) return 0;
+
+  // Non-zero with no diagnostic is not a type error — it is `tsc` or `npx`
+  // failing to run at all (`could not determine executable`, a signal kill,
+  // an unwritable cwd). Reporting that as 1 would tell the reader their types
+  // are broken when the compiler never looked at them, which is the exact
+  // confusion the exit-2 class exists to prevent.
+  if (errors.length === 0) {
+    fail(
+      `tsc exited ${result.status ?? `on signal ${result.signal}`} with no diagnostic: ${output.trim() || 'no output'}`,
+    );
+  }
+
+  console.error(
+    `typecheck: ${errors.length} error(s) in ${TOOLS_SCRIPTS_RELATIVE}.`,
+  );
+  console.error(`\n  --- ${TOOLS_SCRIPTS_RELATIVE} (${errors.length}) ---`);
+  for (const line of output.split('\n')) {
+    if (/error TS\d+/.test(line)) console.error(`  ${line.trim()}`);
   }
   console.error(
-    `\ntypecheck: reproduce one with \`npx tsc -p <config> --noEmit\`.`,
+    `\ntypecheck: reproduce it with \`npx tsc -p ${TOOLS_SCRIPTS_RELATIVE} --noEmit\`.`,
   );
-  process.exit(1);
+  return errors.length;
 }
 
-console.log(
-  `typecheck: ${results.length} project config(s) compile clean across ${new Set(results.map((r) => r.name)).size} project(s).`,
-);
+/**
+ * Runs the Inferred Target over every project that carries it.
+ *
+ * The project list is read first, and an empty one exits 2: `nx run-many`
+ * over a target no project has succeeds while checking nothing, and a green
+ * result meaning "nothing was looked at" is the defect this script exists for.
+ *
+ * That probe is also what makes a non-zero `run-many` unambiguous. An `nx`
+ * that cannot start, a workspace it cannot read, or a project list it will
+ * not print has already exited 2 by then, so the only thing left for a
+ * non-zero *exit code* is a failed task — a type error, exit 1. Nx prints its
+ * own failure summary naming the project, so nothing is gained by trying to
+ * re-derive it from the exit code here.
+ *
+ * A signal kill is the one case that survives the probe, and it is not a
+ * failed task: an OOM kill or a cancelled runner stopped the compiler rather
+ * than finding anything wrong, so it joins the could-not-run class the same
+ * way the `tsc` branch above treats it.
+ *
+ * @returns true when every project's target passed
+ */
+function runNxTargets(): boolean {
+  const listed = spawnSync(
+    'npx',
+    ['nx', 'show', 'projects', '-t', TARGET, '--json'],
+    {
+      cwd: WORKSPACE_ROOT,
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+    },
+  );
+  if (listed.error) fail(`nx could not run: ${errorMessage(listed.error)}`);
+  if (listed.status !== 0) {
+    fail(
+      `nx show projects -t ${TARGET} failed: ${listed.stderr?.trim() || 'no output'}`,
+    );
+  }
+
+  // `--json` so the list is parsed rather than scraped: `nx show projects`
+  // formats differently for a terminal than for a pipe, and a format change
+  // that silently yielded an empty list would turn the guard below from a
+  // vacuous-pass check into the vacuous pass.
+  const raw = (listed.stdout ?? '').trim();
+  let projects: string[];
+  try {
+    projects = JSON.parse(
+      raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1),
+    ) as string[];
+  } catch (error) {
+    fail(
+      `nx show projects -t ${TARGET} did not print a JSON list: ${errorMessage(error)}`,
+    );
+  }
+  if (!Array.isArray(projects) || projects.length === 0) {
+    fail(
+      `no project has a \`${TARGET}\` target — tools/scripts/nx/typecheck-plugin.ts is not inferring one`,
+    );
+  }
+
+  const run = spawnSync('npx', ['nx', 'run-many', '-t', TARGET], {
+    cwd: WORKSPACE_ROOT,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (run.error) fail(`nx could not run: ${errorMessage(run.error)}`);
+  if (run.status === null) {
+    fail(
+      `nx run-many -t ${TARGET} was killed on signal ${run.signal} — nothing was type-checked to completion`,
+    );
+  }
+
+  if (run.status === 0) {
+    console.log(
+      `typecheck: ${projects.length} project(s) compile clean via \`nx run-many -t ${TARGET}\`.`,
+    );
+    return true;
+  }
+  console.error(
+    `typecheck: \`nx run-many -t ${TARGET}\` failed — reproduce one with \`npx nx run <project>:${TARGET}\`.`,
+  );
+  return false;
+}
+
+if (TOOLS_SCRIPTS_ONLY) {
+  if (runToolsScripts() > 0) process.exit(1);
+  console.log(`typecheck: ${TOOLS_SCRIPTS_RELATIVE} compiles clean.`);
+  process.exit(0);
+}
+
+// Both halves run before either verdict is reported: a type error in
+// tools/scripts must not hide one in a project, or the next push fixes the
+// first and discovers the second.
+const toolsScriptsErrors = runToolsScripts();
+const projectsPassed = runNxTargets();
+
+if (toolsScriptsErrors > 0 || !projectsPassed) process.exit(1);
+
+console.log(`typecheck: ${TOOLS_SCRIPTS_RELATIVE} compiles clean.`);

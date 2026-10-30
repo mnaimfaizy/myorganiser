@@ -48,6 +48,12 @@
       ]
     },
     {
+      "id": "typecheck:tools-scripts",
+      "ciStep": "Typecheck tools/scripts",
+      "why": "The one TypeScript program no Nx project owns. ADR 0141 moves typecheck onto a per-project Inferred Target, so `nx affected -t typecheck` selects the projects a pull request can reach and the Nx computation cache covers the rest — but `tools/scripts` has no `project.json` on purpose (ADR 0135), and the plugin keys inference on `project.json`, so the `scripts` node Nx infers there from its `package.json` carries no `typecheck` target and `run-many` cannot reach its config. It stays the fixed job `check-typecheck.ts` runs, and this is what bounds it: the triggers are the tree `tools/scripts/tsconfig.json` compiles (`include: [\"**/*.ts\"]`, rooted at tools/scripts) and the config itself. That program does not extend `tsconfig.base.json`, so nothing outside tools/scripts changes its meaning except the TypeScript version, which `yarn.lock` and `package.json` already carry as shared inputs.",
+      "triggers": ["tools/scripts/**"]
+    },
+    {
       "id": "prisma:migration:drift",
       "ciStep": "Apply Prisma migrations and check schema drift",
       "job": "prisma-migration-gate",
