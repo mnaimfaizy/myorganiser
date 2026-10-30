@@ -434,46 +434,11 @@ jobs:
 
             core.info(`Audit recovered; left triaged issue #${match.number} open`);
 
-  prepare-dependencies:
-    name: Prepare Dependency Cache
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    needs: secure-install-review
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22.18'
-
-      # We intentionally avoid setup-node's Yarn cache integration here.
-      # In this repo it can invoke the runner's global Yarn 1 binary before
-      # Corepack has a chance to resolve the pinned Yarn 4 version.
-      - name: Restore dependency cache
-        id: dependency-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .yarn/install-state.gz
-            node_modules
-          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
-
-      - name: Install dependencies
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: corepack yarn install --immutable
-
-      - name: Verify frozen lockfile
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: git diff --exit-code -- yarn.lock
-
   setup:
     name: Setup Affected Context
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: prepare-dependencies
+    needs: secure-install-review
 
     outputs:
       nx_base: ${{ steps.affected.outputs.nx_base }}
@@ -503,6 +468,13 @@ jobs:
         with:
           node-version: '22.18'
 
+      # We intentionally avoid setup-node's Yarn cache integration here.
+      # In this repo it can invoke the runner's global Yarn 1 binary before
+      # Corepack has a chance to resolve the pinned Yarn 4 version. This job
+      # is the one that restores or installs and so saves the cache (via
+      # actions/cache's post step) that every other job below only restores
+      # (issue #1396 merges this job with what used to be the separate
+      # `Prepare Dependency Cache` job).
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -1020,14 +992,13 @@ jobs:
     # Pull requests only: the same commits ran this seconds earlier on the PR,
     # and the nightly workflow covers `main`. See ADR 0050.
     if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}
-    # Deliberately NOT gated on `test`, unlike build-backend/build-frontend.
-    # Waiting for the unit tests serialised E2E behind them and put the critical
-    # path at 11 minutes; running alongside them brings it back to ~8. The cost
-    # is that E2E still burns a runner when the unit tests are already failing,
-    # which is free on a public repository. See ADR 0050.
+    # Needs only `setup`, not `lint` or `test` (issue #1396). Waiting for
+    # either of them queued E2E behind the unit tests and put the critical
+    # path at 11 minutes; starting alongside them brings it back down. The
+    # cost is that E2E still burns a runner when Lint or Test are already
+    # failing, which is free on a public repository. See ADR 0050.
     needs:
       - setup
-      - lint
 
     strategy:
       fail-fast: false
@@ -1149,10 +1120,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}
+    # Needs only `setup` (issue #1396): waiting for Lint or Test queued this
+    # build behind them for no reason — a build failure here is distinct from
+    # either and does not need them to have finished first.
     needs:
       - setup
-      - lint
-      - test
 
     env:
       # Required for Prisma v7 config loading during `prisma generate`.
@@ -1194,7 +1166,11 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}
+    # Pull requests no longer run this job (issue #1396): each E2E shard's own
+    # `nx build web` is the build check there, because `web-e2e` depends on
+    # `web`. Push to `main` keeps running it, for the whole-tree guarantee a
+    # pull request's affected-only E2E run cannot give.
+    if: ${{ github.event_name != 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}
     needs:
       - setup
       - lint
@@ -1239,9 +1215,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}
+    # Needs only `setup` (issue #1396), the same change as the `e2e` job above.
     needs:
       - setup
-      - lint
 
     services:
       postgres:
@@ -1372,7 +1348,9 @@ jobs:
     name: Build Storybook
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: prepare-dependencies
+    # `prepare-dependencies` merged into `setup` (issue #1396); this job only
+    # needs the dependency cache that job restores or installs and saves.
+    needs: setup
 
     env:
       STORYBOOK_BUILD_TIMEOUT: '900000'

@@ -55,12 +55,19 @@ export const AGENT_REVIEW_RAN_CHECK = 'Agent Review Ran';
 /**
  * The status-check contexts the `*main*` ruleset requires. The ruleset lives
  * in GitHub, not in a file, so this list is the repo-side statement of it; the
- * page asserts the same six, and each must still be a job name in ci.yml.
+ * page asserts the same set, and each must still be a job name in ci.yml.
+ *
+ * `Prepare Dependency Cache` dropped out when issue #1396 merged it into
+ * `Setup Affected Context`: that job no longer exists, so a context named
+ * for it can never report and would wedge every pull request. The live
+ * ruleset still has to be edited to match — that is issue #1397, blocked on
+ * this list changing first (ADR 0073 item 4: the ruleset and this statement
+ * of it change together, and this file's own sanity check is what forces
+ * this list to move first).
  */
 export const REQUIRED_CHECK_CONTEXTS = [
   'Authoritative Lockfile Policy',
   'Secure Install Review',
-  'Prepare Dependency Cache',
   'Setup Affected Context',
   'Lint',
   'Test',
