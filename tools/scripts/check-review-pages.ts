@@ -70,7 +70,9 @@ export const AGENT_REVIEW_RAN_CHECK = 'Agent Review Ran';
  * run beside it: each held checks `Test` used to block on, so leaving them
  * unrequired would let a type error or a failing contract suite merge. A
  * `Tool Suites` run that its triggers skip reports as skipped, which the
- * ruleset reads as passing.
+ * ruleset reads as passing. `Prisma Migration Gate` joined for the same
+ * reason: the migration drift check used to run inside `Test`, and it is
+ * path-gated the same way.
  */
 export const REQUIRED_CHECK_CONTEXTS = [
   'Authoritative Lockfile Policy',
@@ -80,6 +82,7 @@ export const REQUIRED_CHECK_CONTEXTS = [
   'Test',
   'Typecheck',
   'Tool Suites',
+  'Prisma Migration Gate',
   'E2E Report',
 ];
 
