@@ -200,6 +200,7 @@ describe('useSubscriptionsPage', () => {
           normalized,
         );
       });
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
     });
 
     it('reports a decrypt failure with the destructive toast and stops loading', async () => {
@@ -275,6 +276,49 @@ describe('useSubscriptionsPage', () => {
       expect(result.current.items).toEqual([GYM]);
       expect(result.current.loading).toBe(false);
       expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it('does not write the records of a superseded read back over the newer ones', async () => {
+      const reads: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }> = [];
+      loadDecryptedData.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            reads.push({ resolve, reject });
+          }),
+      );
+      // Only the older read's raw records need repair, so the two reads get different verdicts.
+      const staleRaw = [{ legacy: true }];
+      jest
+        .mocked(normalizeSubscriptions)
+        .mockImplementation((raw) =>
+          raw === staleRaw
+            ? { value: [NETFLIX], changed: true }
+            : { value: raw as SubscriptionRecord[], changed: false },
+        );
+
+      const { result, rerender } = renderHook(() =>
+        useSubscriptionsPage(handle),
+      );
+      await waitFor(() => expect(reads).toHaveLength(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+
+      await act(async () => {
+        reads[1].resolve([GYM]);
+      });
+      await waitFor(() => expect(result.current.items).toEqual([GYM]));
+
+      await act(async () => {
+        reads[0].resolve(staleRaw);
+      });
+
+      expect(saveVaultRecords).not.toHaveBeenCalled();
+      expect(result.current.items).toEqual([GYM]);
     });
   });
 
