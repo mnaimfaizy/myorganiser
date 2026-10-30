@@ -31,7 +31,12 @@ import {
 // `jobBlock` and `stepNamed` come from the shared slicer in
 // tools/scripts/lib/workflow-yaml.ts. Exact step-name matching is the point: a
 // renamed step fails here rather than matching the step beside it.
-import { escapeRegExp, jobBlock, stepNamed } from '../lib/workflow-yaml.ts';
+import {
+  escapeRegExp,
+  jobBlock,
+  orTerms,
+  stepNamed,
+} from '../lib/workflow-yaml.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
@@ -40,24 +45,6 @@ const config = readGateTriggers({ cwd: REPO_ROOT });
 
 const ifOf = (step: string): string | undefined =>
   step.match(/^ {8}if: (.+)$/m)?.[1];
-
-/**
- * The OR-terms of a step's `if:`, normalised so a harmless reformat passes:
- * whitespace collapsed, a `${{ }}` wrapper and parentheses removed, terms
- * sorted. An `&&` stays inside a term, so it fails the comparison.
- */
-const orTerms = (condition: string | undefined): string[] => {
-  assert.ok(condition, 'step has no if:');
-  const unwrapped = condition
-    .trim()
-    .replace(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/, '$1');
-  return unwrapped
-    .replace(/[()]/g, ' ')
-    .split('||')
-    .map((term) => term.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .sort();
-};
 
 /** The two terms a suite's step must OR: the run-all fallback and its own flag. */
 const expectedTerms = (suite: GateTriggerSuite): string[] =>

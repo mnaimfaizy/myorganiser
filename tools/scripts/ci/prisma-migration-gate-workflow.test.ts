@@ -25,7 +25,7 @@ import {
 } from '../lib/gate-triggers.ts';
 // Exact step-name matching is the point: a renamed step fails here rather than
 // matching the step beside it.
-import { jobBlock, runOf, stepNamed } from '../lib/workflow-yaml.ts';
+import { jobBlock, orTerms, runOf, stepNamed } from '../lib/workflow-yaml.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
@@ -49,18 +49,6 @@ const driftSuite = (): GateTriggerSuite => {
 /** A job's own `if:`, unwrapped; a job's `if:` sits at four spaces. */
 const jobIf = (job: string): string | undefined =>
   job.match(/^ {4}if: (.+)$/m)?.[1]?.trim();
-
-/** The OR-terms of a job's `if:`, normalised and sorted so term order does not matter. */
-const orTerms = (condition: string | undefined): string[] => {
-  assert.ok(condition, 'job has no if:');
-  return condition
-    .trim()
-    .replace(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/, '$1')
-    .split('||')
-    .map((term) => term.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .sort();
-};
 
 /** The job-level condition: the run-all fallback OR the suite's own flag. */
 const expectedTerms = (suite: GateTriggerSuite): string[] =>

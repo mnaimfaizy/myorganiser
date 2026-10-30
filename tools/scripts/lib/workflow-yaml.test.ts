@@ -15,6 +15,7 @@ import {
   escapeRegExp,
   ifOf,
   jobBlock,
+  orTerms,
   runOf,
   stepNamed,
 } from './workflow-yaml.ts';
@@ -145,4 +146,39 @@ test('runOf reads a single-line run and is empty for a block scalar', () => {
     ),
     '',
   );
+});
+
+test('orTerms splits on || and sorts the terms so their order does not matter', () => {
+  assert.deepEqual(orTerms("b == 'true' || a == 'true'"), [
+    "a == 'true'",
+    "b == 'true'",
+  ]);
+  assert.deepEqual(
+    orTerms("b == 'true' || a == 'true'"),
+    orTerms("a == 'true' || b == 'true'"),
+  );
+});
+
+test('orTerms strips a ${{ }} wrapper', () => {
+  assert.deepEqual(orTerms("${{ github.event_name == 'push' }}"), [
+    "github.event_name == 'push'",
+  ]);
+});
+
+test('orTerms strips parentheses around each term', () => {
+  assert.deepEqual(orTerms("(a == 'true') || (b == 'true')"), [
+    "a == 'true'",
+    "b == 'true'",
+  ]);
+});
+
+test('orTerms collapses internal whitespace within a term', () => {
+  assert.deepEqual(orTerms("a   ==\n   'true'   ||   b == 'true'"), [
+    "a == 'true'",
+    "b == 'true'",
+  ]);
+});
+
+test('orTerms throws naming the missing if: when given undefined', () => {
+  assert.throws(() => orTerms(undefined), /if: is required/);
 });

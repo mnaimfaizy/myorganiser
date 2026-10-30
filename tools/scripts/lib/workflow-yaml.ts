@@ -93,3 +93,27 @@ export function runOf(step: string): string {
   const run = /^ {8}run: (.+)$/m.exec(step)?.[1]?.trim() ?? '';
   return /^[|>][-+]?$/.test(run) ? '' : run;
 }
+
+/**
+ * The OR-terms of an `if:` condition — a step's (from `ifOf`) or a job's own
+ * (callers read a job's four-space `if:` themselves; this only normalises
+ * the text) — so a harmless reformat still passes: whitespace collapsed, a
+ * `${{ }}` wrapper and parentheses removed, terms sorted. An `&&` stays
+ * inside a term, so it fails the comparison.
+ *
+ * Throws when `condition` is undefined, the same way `jobBlock` and
+ * `stepNamed` throw rather than return null: a missing `if:` is a failed
+ * assertion, and the message naming it is the whole point.
+ */
+export function orTerms(condition: string | undefined): string[] {
+  if (condition === undefined) throw new Error('if: is required');
+  const unwrapped = condition
+    .trim()
+    .replace(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/, '$1');
+  return unwrapped
+    .replace(/[()]/g, ' ')
+    .split('||')
+    .map((term) => term.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .sort();
+}
