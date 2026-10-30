@@ -17,9 +17,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  RUN_ALL_FLAG,
-  flagName,
-  gateOutputOf,
+  expectedGateIfTerms,
   readGateTriggers,
   type GateTriggerSuite,
 } from '../lib/gate-triggers.ts';
@@ -49,13 +47,6 @@ const driftSuite = (): GateTriggerSuite => {
 /** A job's own `if:`, unwrapped; a job's `if:` sits at four spaces. */
 const jobIf = (job: string): string | undefined =>
   job.match(/^ {4}if: (.+)$/m)?.[1]?.trim();
-
-/** The job-level condition: the run-all fallback OR the suite's own flag. */
-const expectedTerms = (suite: GateTriggerSuite): string[] =>
-  [
-    `needs.setup.outputs.${gateOutputOf(RUN_ALL_FLAG)} == 'true'`,
-    `needs.setup.outputs.${gateOutputOf(flagName(suite.id))} == 'true'`,
-  ].sort();
 
 /** The offset of a step header inside the job, matched as a whole line. */
 const stepAt = (job: string, name: string): number => {
@@ -89,7 +80,7 @@ test('the drift step lives in the gate job and not in Test', () => {
 });
 
 test('the gate job runs under the run-all fallback or its own flag', () => {
-  assert.deepEqual(orTerms(jobIf(GATE)), expectedTerms(driftSuite()));
+  assert.deepEqual(orTerms(jobIf(GATE)), expectedGateIfTerms(driftSuite()));
 });
 
 test('Generate Prisma client runs before the drift check', () => {

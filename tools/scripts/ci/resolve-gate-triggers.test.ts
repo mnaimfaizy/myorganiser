@@ -344,7 +344,7 @@ test('parseGateTriggers rejects a suite with no ciStep', () => {
         ...validRaw(),
         suites: [without(suite('alpha:test'), 'ciStep')],
       }),
-    /alpha:test: ciStep names the Test job step/,
+    /alpha:test: ciStep names the step this suite is/,
   );
 });
 

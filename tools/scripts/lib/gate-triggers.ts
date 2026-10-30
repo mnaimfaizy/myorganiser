@@ -101,6 +101,19 @@ export function gateOutputOf(flag: string): string {
     : flag.replace(/^run_/, 'gate_');
 }
 
+/**
+ * The two terms a suite's gated `if:` must OR, sorted: the run-all fallback
+ * and the suite's own flag. One copy, so the workflow-shape suites that
+ * assert a step's or a job's `if:` against this agree with each other on the
+ * expected condition rather than each deriving it by hand.
+ */
+export function expectedGateIfTerms(suite: GateTriggerSuite): string[] {
+  return [
+    `needs.setup.outputs.${gateOutputOf(RUN_ALL_FLAG)} == 'true'`,
+    `needs.setup.outputs.${gateOutputOf(flagName(suite.id))} == 'true'`,
+  ].sort();
+}
+
 const requireGlobList = (value: unknown, where: string): string[] => {
   if (!Array.isArray(value) || value.length === 0)
     throw new Error(`${where}: expected a non-empty array of globs`);
@@ -143,7 +156,9 @@ export function parseGateTriggers(raw: unknown): GateTriggerConfig {
     if (typeof suite.id !== 'string' || !suite.id.trim())
       throw new Error(`${where}: id is the gate name a coveringGate spells`);
     if (typeof suite.ciStep !== 'string' || !suite.ciStep.trim())
-      throw new Error(`${where}: ${suite.id}: ciStep names the Test job step`);
+      throw new Error(
+        `${where}: ${suite.id}: ciStep names the step this suite is`,
+      );
     if (
       suite.job !== undefined &&
       (typeof suite.job !== 'string' || !suite.job.trim())

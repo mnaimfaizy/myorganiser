@@ -23,10 +23,10 @@ import { fileURLToPath } from 'node:url';
 
 import {
   RUN_ALL_FLAG,
+  expectedGateIfTerms,
   flagName,
   gateOutputOf,
   readGateTriggers,
-  type GateTriggerSuite,
 } from '../lib/gate-triggers.ts';
 // `jobBlock` and `stepNamed` come from the shared slicer in
 // tools/scripts/lib/workflow-yaml.ts. Exact step-name matching is the point: a
@@ -45,13 +45,6 @@ const config = readGateTriggers({ cwd: REPO_ROOT });
 
 const ifOf = (step: string): string | undefined =>
   step.match(/^ {8}if: (.+)$/m)?.[1];
-
-/** The two terms a suite's step must OR: the run-all fallback and its own flag. */
-const expectedTerms = (suite: GateTriggerSuite): string[] =>
-  [
-    "needs.setup.outputs.gate_run_all == 'true'",
-    `needs.setup.outputs.${gateOutputOf(flagName(suite.id))} == 'true'`,
-  ].sort();
 
 const SETUP = jobBlock(CI, 'setup');
 const TEST = jobBlock(CI, 'test');
@@ -228,7 +221,7 @@ for (const suite of config.suites) {
 
     assert.deepEqual(
       orTerms(ifOf(step)),
-      expectedTerms(suite),
+      expectedGateIfTerms(suite),
       `the step for ${suite.id} must OR gate_run_all with its own gate output`,
     );
   });
@@ -242,7 +235,7 @@ test('Setup Java 21 is gated on the openapi:check suite and no other', () => {
 
   assert.deepEqual(
     orTerms(ifOf(java)),
-    expectedTerms(openapi),
+    expectedGateIfTerms(openapi),
     'a JDK is needed only where openapi-generator-cli runs (ADR 0140)',
   );
   const setupJavaUses = CI.match(/^ {8}uses: actions\/setup-java@/gm) ?? [];
