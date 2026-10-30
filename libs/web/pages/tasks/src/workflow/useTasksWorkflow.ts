@@ -80,10 +80,11 @@ export function useTasksWorkflow({
   const enqueue = useCallback(<T>(run: () => Promise<T>): Promise<T> => {
     const queued = writeQueueRef.current.then(run);
     // The chain itself must stay fulfilled, or one rejection would strand
-    // every write queued behind it for the life of the page. Nothing reaches
-    // this today — the workflow helpers convert an adapter failure into a
-    // `save_failed` result rather than rejecting — so it guards a future
-    // `run` that throws, and the caller still sees its own rejection.
+    // every write queued behind it for the life of the page. An adapter
+    // failure does not reach this — the workflow helpers turn that into a
+    // `save_failed` result rather than rejecting — but a helper that throws
+    // before its own try/catch does, as `addTaskToWorkflow` would if
+    // `randomId` threw. The caller still sees its own rejection either way.
     writeQueueRef.current = queued.catch(() => undefined);
     return queued;
   }, []);
@@ -107,8 +108,10 @@ export function useTasksWorkflow({
   const revision = useLocalVaultRevision();
 
   useEffect(() => {
-    let current = true;
-    const isCurrent = () => current;
+    // Whether this effect run is still the live one. Named apart from the
+    // `current` a mutation is handed below, which is a `Task[]`, not a flag.
+    let thisLoadIsCurrent = true;
+    const isCurrent = () => thisLoadIsCurrent;
 
     // The load joins the write queue because its normalisation write-back is
     // a whole-array save like any other. A load the revision has superseded
@@ -126,7 +129,7 @@ export function useTasksWorkflow({
     });
 
     return () => {
-      current = false;
+      thisLoadIsCurrent = false;
     };
   }, [applyTasks, enqueue, vaultAdapter, revision]);
 

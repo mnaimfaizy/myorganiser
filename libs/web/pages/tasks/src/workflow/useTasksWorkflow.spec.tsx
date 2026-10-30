@@ -27,7 +27,10 @@ import type { Task } from '@myorganiser/vault-core';
 import { randomId } from '@myorganiser/core';
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 
-import { useTasksWorkflow } from './useTasksWorkflow';
+import {
+  useTasksWorkflow,
+  type UseTasksWorkflowResult,
+} from './useTasksWorkflow';
 import { InMemoryTasksVaultAdapter } from './tasks-vault-adapter';
 
 const FIXED_NOW = '2024-06-15T12:00:00.000Z';
@@ -334,25 +337,42 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       });
     }
 
-    it('two archives called before the first save settles both survive', async () => {
+    /** Mounts the hook on a held adapter and settles its initial load. */
+    async function mountWithLoadedTasks(tasks: Task[]): Promise<{
+      adapter: HeldTasksVaultAdapter;
+      result: { current: UseTasksWorkflowResult };
+    }> {
       const adapter = new HeldTasksVaultAdapter();
       const { result } = renderHook(() =>
         useTasksWorkflow({ handle: null as any, adapter }),
       );
-      await settleLoad(adapter, [
+      await settleLoad(adapter, tasks);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      return { adapter, result };
+    }
+
+    /** Releases the next `count` queued Vault writes, one at a time, in queue order. */
+    async function drainQueuedWrites(
+      adapter: HeldTasksVaultAdapter,
+      count: number,
+    ): Promise<void> {
+      for (let i = 0; i < count; i++) {
+        await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+        await releaseWrite(adapter);
+      }
+    }
+
+    it('two archives called before the first save settles both survive', async () => {
+      const { adapter, result } = await mountWithLoadedTasks([
         makeTask({ id: 'a', title: 'A' }),
         makeTask({ id: 'b', title: 'B' }),
       ]);
-      await waitFor(() => expect(result.current.loading).toBe(false));
 
       // Both calls come from the same render, and neither has saved yet.
       const archiveA = result.current.archiveTask('a');
       const archiveB = result.current.archiveTask('b');
 
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 2);
 
       await expect(archiveA).resolves.toEqual({ ok: true, kind: 'archived' });
       await expect(archiveB).resolves.toEqual({ ok: true, kind: 'archived' });
@@ -365,20 +385,16 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
           expect.objectContaining({ id: 'b', archived: true }),
         ]),
       );
-      await waitFor(() =>
-        expect(result.current.tasks.every((t) => t.archived)).toBe(true),
-      );
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2);
+        expect(result.current.tasks.every((t) => t.archived)).toBe(true);
+      });
     });
 
     it('add overlapping an update keeps the updated task and the new one', async () => {
-      const adapter = new HeldTasksVaultAdapter();
-      const { result } = renderHook(() =>
-        useTasksWorkflow({ handle: null as any, adapter }),
-      );
-      await settleLoad(adapter, [
+      const { adapter, result } = await mountWithLoadedTasks([
         makeTask({ id: 'task-1', title: 'Existing' }),
       ]);
-      await waitFor(() => expect(result.current.loading).toBe(false));
 
       const update = result.current.updateTask('task-1', {
         title: 'Renamed',
@@ -391,10 +407,7 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
         status: 'pending',
       });
 
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 2);
 
       await expect(update).resolves.toEqual({ ok: true, kind: 'updated' });
       await expect(add).resolves.toEqual({ ok: true, kind: 'created' });
@@ -414,23 +427,15 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
     });
 
     it('delete overlapping an archive removes one task, archives the other, and logs the deletion', async () => {
-      const adapter = new HeldTasksVaultAdapter();
-      const { result } = renderHook(() =>
-        useTasksWorkflow({ handle: null as any, adapter }),
-      );
-      await settleLoad(adapter, [
+      const { adapter, result } = await mountWithLoadedTasks([
         makeTask({ id: 'a', title: 'A' }),
         makeTask({ id: 'b', title: 'B' }),
       ]);
-      await waitFor(() => expect(result.current.loading).toBe(false));
 
       const remove = result.current.deleteTask('a');
       const archive = result.current.archiveTask('b');
 
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 2);
 
       await expect(remove).resolves.toEqual({ ok: true, kind: 'deleted' });
       await expect(archive).resolves.toEqual({ ok: true, kind: 'archived' });
@@ -442,15 +447,10 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
     });
 
     it('unarchive overlapping an update keeps both changes', async () => {
-      const adapter = new HeldTasksVaultAdapter();
-      const { result } = renderHook(() =>
-        useTasksWorkflow({ handle: null as any, adapter }),
-      );
-      await settleLoad(adapter, [
+      const { adapter, result } = await mountWithLoadedTasks([
         makeTask({ id: 'task-1', title: 'Archived one', archived: true }),
         makeTask({ id: 'task-2', title: 'Pending one' }),
       ]);
-      await waitFor(() => expect(result.current.loading).toBe(false));
 
       const unarchive = result.current.unarchiveTask('task-1');
       const update = result.current.updateTask('task-2', {
@@ -459,10 +459,7 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
         status: 'pending',
       });
 
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 2);
 
       await expect(unarchive).resolves.toEqual({
         ok: true,
@@ -540,9 +537,7 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       expect(adapter.pendingWriteCount()).toBe(1);
       expect(result.current.tasks).toEqual([]);
 
-      await releaseWrite(adapter);
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 2);
 
       await expect(added).resolves.toEqual({ ok: true, kind: 'created' });
       const saved = adapter.getSavedTasks() ?? [];
@@ -556,17 +551,13 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
     });
 
     it('mutation callbacks keep their identity across a re-render that changes tasks', async () => {
-      const adapter = new HeldTasksVaultAdapter();
-      const { result } = renderHook(() =>
-        useTasksWorkflow({ handle: null as any, adapter }),
-      );
-      await settleLoad(adapter, [makeTask({ id: 'task-1' })]);
-      await waitFor(() => expect(result.current.loading).toBe(false));
+      const { adapter, result } = await mountWithLoadedTasks([
+        makeTask({ id: 'task-1' }),
+      ]);
 
       const before = result.current;
       const archived = result.current.archiveTask('task-1');
-      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
-      await releaseWrite(adapter);
+      await drainQueuedWrites(adapter, 1);
       await expect(archived).resolves.toEqual({ ok: true, kind: 'archived' });
       await waitFor(() => expect(result.current.tasks[0].archived).toBe(true));
 
@@ -580,6 +571,50 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       for (const name of mutations) {
         expect(result.current[name]).toBe(before[name]);
       }
+    });
+
+    it('a write that rejects reaches its caller and does not strand the writes queued behind it', async () => {
+      const { adapter, result } = await mountWithLoadedTasks([
+        makeTask({ id: 'a', title: 'A' }),
+        makeTask({ id: 'b', title: 'B' }),
+      ]);
+
+      // addTaskToWorkflow calls randomId before its own try/catch, so this
+      // throw rejects the add itself rather than becoming a save_failed result.
+      (randomId as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('id source unavailable');
+      });
+
+      const archiveA = result.current.archiveTask('a');
+      const add = result.current.addTask({
+        title: 'New task',
+        priority: 'low',
+        status: 'pending',
+      });
+      const archiveB = result.current.archiveTask('b');
+      // Attached synchronously so the rejection is never unhandled.
+      const addRejection = expect(add).rejects.toThrow('id source unavailable');
+
+      await drainQueuedWrites(adapter, 2);
+
+      await expect(archiveA).resolves.toEqual({ ok: true, kind: 'archived' });
+      await addRejection;
+      await expect(archiveB).resolves.toEqual({ ok: true, kind: 'archived' });
+
+      // The later archive started from what the successful archive of 'a' saved:
+      // no new task, and 'a' still archived when 'b' was written.
+      const saved = adapter.getSavedTasks() ?? [];
+      expect(saved).toHaveLength(2);
+      expect(saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'a', archived: true }),
+          expect.objectContaining({ id: 'b', archived: true }),
+        ]),
+      );
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2);
+        expect(result.current.tasks.every((t) => t.archived)).toBe(true);
+      });
     });
   });
 });
