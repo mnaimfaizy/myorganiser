@@ -348,6 +348,17 @@ test('parseGateTriggers rejects a suite with no ciStep', () => {
   );
 });
 
+test('parseGateTriggers rejects a suite with a blank job', () => {
+  assert.throws(
+    () =>
+      parseGateTriggers({
+        ...validRaw(),
+        suites: [suite('alpha:test', { job: '' })],
+      }),
+    /alpha:test: job, when given, is a non-empty string/,
+  );
+});
+
 test('parseGateTriggers rejects a suite with no why', () => {
   assert.throws(
     () =>

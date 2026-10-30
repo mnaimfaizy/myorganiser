@@ -82,6 +82,7 @@
     "mobile:release:publish": "node tools/scripts/publish-mobile-release.ts",
     "signing-material:check": "node tools/scripts/check-signing-material.ts",
     "prisma:migrations:check": "node tools/scripts/check-prisma-migrations.ts",
+    "prisma:migration:drift": "cd apps/backend/src && npx prisma migrate deploy --schema prisma/schema && npx prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code",
     "qa:accounts": "node tools/scripts/qa-accounts.ts print",
     "qa:accounts:seed": "node tools/scripts/qa-accounts.ts seed",
     "gates:run": "node tools/scripts/run-assertion-gates.ts",

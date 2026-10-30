@@ -101,8 +101,8 @@ Two of the six were not clean, and both are recorded rather than smoothed over.
 `apps/backend/src/prisma/migrations/**`. `prisma:migrations:check` covers the migration _history_;
 per [ADR 0094](0094-a-prisma-migration-is-gated-on-the-tree-and-against-a-database.md) the
 schema-versus-database question is a different artifact answered by `prisma migrate deploy` and
-`prisma migrate diff --exit-code` in the `Test` job — which is a job step, not a `*:check` script,
-and so is not nameable here. Rather than let one trigger point at a gate covering half of it, the
+`prisma migrate diff --exit-code` in the `Prisma Migration Gate` job — which is a job step, not a
+`*:check` script, and so is not nameable here. Rather than let one trigger point at a gate covering half of it, the
 trigger was narrowed to the half the named gate actually covers. A bare `schema/` edit no longer
 fires this obligation; it is gated by ADR 0094 tier 2, which is where that question was already
 decided to live.

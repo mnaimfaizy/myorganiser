@@ -236,6 +236,9 @@ test('the test job depends on setup, so the gate outputs it reads exist', () => 
 });
 
 for (const suite of config.suites) {
+  // A suite that carries its own job is gated at the job, not the step: its
+  // shape is asserted by prisma-migration-gate-workflow.test.ts instead.
+  if (suite.job) continue;
   test(`${suite.id} runs under the run-all fallback or its own flag via "${suite.ciStep}"`, () => {
     const step = stepNamed(TEST, suite.ciStep);
 

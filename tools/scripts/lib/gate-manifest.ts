@@ -238,8 +238,8 @@ export const GATE_MANIFEST: GateManifestEntry[] = [
   // The file-reading half of the Prisma migration gate (ADR 0094). Whether
   // the history applies and reproduces the schema needs a database, so that
   // half is the `Apply Prisma migrations and check schema drift` step of the
-  // `Test` job in .github/workflows/ci.yml, and is
-  // deliberately not here — this aggregate is cheap, file-reading checkers.
+  // path-gated `Prisma Migration Gate` job in .github/workflows/ci.yml, and
+  // is deliberately not here — this aggregate is cheap, file-reading checkers.
   {
     id: 'prisma:migrations:check',
     npmScript: 'prisma:migrations:check',

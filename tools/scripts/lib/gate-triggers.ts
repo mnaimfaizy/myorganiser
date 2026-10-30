@@ -52,8 +52,17 @@ export interface GateTriggerSuite {
    * matches on this.
    */
   id: string;
-  /** The `Test` job step this suite is, asserted by the workflow-shape suite. */
+  /** The step this suite is, asserted by the workflow-shape suite. */
   ciStep: string;
+  /**
+   * The job `ciStep` lives in, when it is not `test`. Most heavy suites are
+   * a step inside the `Test` job, so this is omitted there; a suite with a
+   * cost worth skipping the job for entirely — the Postgres service the
+   * Prisma migration drift check needs — carries its own job instead (ADR
+   * 0140, issue #1394), and this is how the workflow-shape suite knows where
+   * to look for `ciStep`.
+   */
+  job?: string;
   /** Why these globs, in the config rather than in a code comment. */
   why: string;
   triggers: string[];
@@ -123,6 +132,13 @@ export function parseGateTriggers(raw: unknown): GateTriggerConfig {
       throw new Error(`${where}: id is the gate name a coveringGate spells`);
     if (typeof suite.ciStep !== 'string' || !suite.ciStep.trim())
       throw new Error(`${where}: ${suite.id}: ciStep names the Test job step`);
+    if (
+      suite.job !== undefined &&
+      (typeof suite.job !== 'string' || !suite.job.trim())
+    )
+      throw new Error(
+        `${where}: ${suite.id}: job, when given, is a non-empty string`,
+      );
     if (typeof suite.why !== 'string' || !suite.why.trim())
       throw new Error(
         `${where}: ${suite.id}: why records the reason for these globs`,
@@ -143,6 +159,7 @@ export function parseGateTriggers(raw: unknown): GateTriggerConfig {
     return {
       id: suite.id,
       ciStep: suite.ciStep,
+      ...(suite.job !== undefined ? { job: suite.job } : {}),
       why: suite.why,
       triggers: requireGlobList(
         suite.triggers,

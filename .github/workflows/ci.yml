@@ -489,6 +489,7 @@ jobs:
       gate_tools_test: ${{ steps.gate-triggers.outputs.run_tools_test }}
       gate_upstream_briefs_test: ${{ steps.gate-triggers.outputs.run_upstream_briefs_test }}
       gate_openapi_check: ${{ steps.gate-triggers.outputs.run_openapi_check }}
+      gate_prisma_migration_drift: ${{ steps.gate-triggers.outputs.run_prisma_migration_drift }}
 
     steps:
       - name: Checkout repository
@@ -677,28 +678,13 @@ jobs:
     timeout-minutes: 30
     needs: setup
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          # Throwaway runner service. Trust avoids storing a credential in the
-          # workflow; this database is never reachable off the job.
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: myorganiser
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
-      # Prisma generate reads this without connecting; migrate deploy and
-      # migrate diff use the service above so a migration that fails to apply,
-      # or a schema that has drifted from the migrations, fails before merge.
-      DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. Nothing else in this job touches a database: the
+      # drift check that needs a live Postgres is its own path-gated
+      # `Prisma Migration Gate` job below, so this job carries no service
+      # container (ADR 0094, ADR 0140, issue #1394).
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
 
     steps:
       - name: Checkout repository
@@ -832,12 +818,6 @@ jobs:
       - name: Generate Prisma client
         run: corepack yarn nx run backend:generate-types
 
-      - name: Apply Prisma migrations and check schema drift
-        working-directory: apps/backend/src
-        run: |
-          npx prisma migrate deploy --schema prisma/schema
-          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code
-
       # Compiles each project's production and spec programs. Nothing ran
       # TypeScript in CI before this, so two type errors had reached main.
       # The graph was built above; this step needs the generated Prisma client,
@@ -908,6 +888,95 @@ jobs:
       - name: Test every project
         if: github.event_name != 'pull_request'
         run: corepack yarn nx run-many -t test
+
+  # Tier 2 of the Prisma migration gate (ADR 0094): applies the migration
+  # history to an ephemeral Postgres and asserts applying it reproduces the
+  # schema. Split out of `Test` into its own job so a pull request that
+  # cannot have touched a migration never pays for the ~23s Postgres
+  # container start (ADR 0140, issue #1394) — the condition below is what
+  # keeps the service from even starting on a run that skips it. `main`
+  # always runs it, through the same `gate_run_all` fallback every other
+  # heavy suite in tools/config/gate-triggers.json uses.
+  prisma-migration-gate:
+    name: Prisma Migration Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_prisma_migration_drift == 'true' }}
+    needs: setup
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          # Throwaway runner service. Trust avoids storing a credential in the
+          # workflow; this database is never reachable off the job.
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: myorganiser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # migrate deploy and migrate diff use the service above, so a migration
+      # that fails to apply, or a schema that has drifted from the
+      # migrations, fails before merge.
+      DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      # This job has its own checkout, so it needs its own generated client —
+      # the same dependency the Test job's Typecheck step has, generated
+      # there for that job rather than shared across jobs.
+      - name: Generate Prisma client
+        run: corepack yarn nx run backend:generate-types
+
+      - name: Apply Prisma migrations and check schema drift
+        run: corepack yarn prisma:migration:drift
+
+      # The one backend *.int.test.ts that does not mock ../prisma: it replays
+      # a landed migration's real SQL inside a rolled-back transaction, so it
+      # needs the schema the deploy above just applied. `Test` carries no
+      # database (ADR 0094, ADR 0140, issue #1394), so this file is excluded
+      # from its jest run (apps/backend/jest.config.ts) and run here instead,
+      # with the config's own ignore list overridden back to its default so
+      # this one file is no longer skipped.
+      - name: Run Prisma migration backfill test
+        run: |
+          node node_modules/.bin/jest --config=apps/backend/jest.config.ts \
+            --testPathIgnorePatterns='/node_modules/' \
+            --testPathPatterns='backfillUserCreatedAt\.int\.test\.ts$' \
+            --no-coverage --forceExit
 
   e2e:
     name: E2E Chromium (shard ${{ matrix.shard }}/3)
