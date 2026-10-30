@@ -89,6 +89,18 @@ export function flagName(id: string): string {
 /** The output name the all-suites fallback sets. */
 export const RUN_ALL_FLAG = 'run_all';
 
+/**
+ * The `gate_*` output a step-output flag is exposed as on the `setup` job
+ * (`run_all` becomes `gate_run_all`, `run_tools_test` becomes `gate_tools_test`).
+ * One copy, so the workflow-shape suites that read a job's or a step's `if:`
+ * agree with each other on the mapping rather than each deriving it by hand.
+ */
+export function gateOutputOf(flag: string): string {
+  return flag === RUN_ALL_FLAG
+    ? 'gate_run_all'
+    : flag.replace(/^run_/, 'gate_');
+}
+
 const requireGlobList = (value: unknown, where: string): string[] => {
   if (!Array.isArray(value) || value.length === 0)
     throw new Error(`${where}: expected a non-empty array of globs`);

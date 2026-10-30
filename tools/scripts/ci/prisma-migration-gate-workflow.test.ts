@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import {
   RUN_ALL_FLAG,
   flagName,
+  gateOutputOf,
   readGateTriggers,
   type GateTriggerSuite,
 } from '../lib/gate-triggers.ts';
@@ -59,10 +60,6 @@ const orTerms = (condition: string | undefined): string[] => {
     .filter(Boolean)
     .sort();
 };
-
-/** The `gate_*` output a flag is exposed as; `run_all` is `gate_run_all`. */
-const gateOutputOf = (flag: string): string =>
-  flag === RUN_ALL_FLAG ? 'gate_run_all' : flag.replace(/^run_/, 'gate_');
 
 /** The job-level condition: the run-all fallback OR the suite's own flag. */
 const expectedTerms = (suite: GateTriggerSuite): string[] =>
