@@ -39,6 +39,7 @@ import {
   formatShare,
   isE2eLaneJob,
   isMeasurableRun,
+  isSkipped,
   isStaleBranchRun,
   lastFinisher,
   lastFinisherShares,
@@ -136,7 +137,7 @@ describe('durations and spans', () => {
     assert.equal(runSeconds(overlapping), 540);
   });
 
-  test('a job with no timestamps, a skipped job, is not in the span', () => {
+  test('a job with no timestamps is not in the span', () => {
     const withSkipped = prRun({
       jobs: [
         job('Lint', 0, 240),
@@ -383,6 +384,139 @@ describe('E2E lane and last finisher', () => {
       { name: 'Build Frontend', runs: 1, share: 0.25 },
       { name: 'Lint', runs: 1, share: 0.25 },
     ]);
+  });
+});
+
+// ------------------------------------------- skipped steps and jobs are not work
+
+describe('skipped steps and jobs', () => {
+  test('isSkipped is true only for the conclusion skipped; a job still running has no conclusion and is not skipped', () => {
+    assert.equal(isSkipped('skipped'), true);
+    for (const conclusion of [
+      'success',
+      'failure',
+      'cancelled',
+      null,
+      undefined,
+    ]) {
+      assert.equal(
+        isSkipped(conclusion),
+        false,
+        `${conclusion} is not skipped`,
+      );
+    }
+  });
+
+  test('a skipped cacheable step with equal timestamps is not a zero-second sample', () => {
+    const run = prRun({
+      jobs: [
+        job('Lint', 0, 120, [
+          step('Lint every project', 30, 30, 'skipped'),
+          step('Lint affected projects', 0, 30),
+        ]),
+      ],
+    });
+    assert.deepEqual(cacheableStepSeconds(run), [30]);
+  });
+
+  test('every step of a skipped job is out of the cacheable samples, even a step that reports success', () => {
+    const run = prRun({
+      jobs: [
+        job(
+          'Test',
+          0,
+          900,
+          [step('Test affected projects', 0, 900)],
+          'skipped',
+        ),
+        job('Lint', 0, 120, [step('Lint affected projects', 0, 30)]),
+      ],
+    });
+    assert.deepEqual(cacheableStepSeconds(run), [30]);
+  });
+
+  test('a run whose only long job was skipped has no duration from it, and a run of only skipped jobs has none at all', () => {
+    assert.equal(
+      runSeconds(
+        prRun({
+          jobs: [job('Test', 0, 1200, [], 'skipped'), job('Lint', 0, 120)],
+        }),
+      ),
+      120,
+    );
+    assert.equal(
+      runSeconds(prRun({ jobs: [job('Test', 0, 0, [], 'skipped')] })),
+      null,
+    );
+  });
+
+  test('a skipped job that completed after the real jobs does not stretch the span', () => {
+    const run = prRun({
+      jobs: [job('Lint', 0, 120), job('E2E Report', 60, 900, [], 'skipped')],
+    });
+    assert.equal(runSeconds(run), 120);
+  });
+
+  test('e2eLaneSeconds is null, not zero, for a run whose whole E2E lane was skipped', () => {
+    const run = prRun({
+      jobs: [
+        job('Lint', 0, 120),
+        job('E2E Report', 120, 120, [], 'skipped'),
+        job('E2E Chromium (shard 1/3)', 120, 120, [], 'skipped'),
+      ],
+    });
+    assert.equal(e2eLaneSeconds(run), null);
+  });
+
+  test('lastFinisher never names a skipped job, even one whose completion is the latest in the run', () => {
+    const run = prRun({
+      jobs: [job('Lint', 0, 120), job('E2E Report', 0, 900, [], 'skipped')],
+    });
+    assert.equal(lastFinisher(run), 'Lint');
+  });
+
+  test('ten Single-Library runs with two skipped cacheable steps each still trip cacheable-steps-p50 on their real 900s step', () => {
+    // Pooled, the two zero-length skipped steps would make 20 of 30 samples 0
+    // and drag the p50 to 0, under the 60s line; the real step is what the
+    // signal is about.
+    const skippedAlongside = () =>
+      prRun({
+        jobs: [
+          job('Lint', 0, 120, [step('Lint every project', 0, 0, 'skipped')]),
+          job('Test', 0, 1200, [
+            step('Test affected projects', 0, 900),
+            step('Test every project', 900, 900, 'skipped'),
+          ]),
+        ],
+      });
+    const summary = measure(repeat(MIN_SINGLE_LIBRARY_RUNS, skippedAlongside));
+    assert.equal(summary.cacheableSteps.count, MIN_SINGLE_LIBRARY_RUNS);
+    assert.equal(summary.cacheableSteps.p50, 900);
+    assert.ok(
+      summary.signals.some((signal) => signal.id === 'cacheable-steps-p50'),
+      'cacheable-steps-p50 must trip on the real 900s step',
+    );
+  });
+
+  test('e2e-lane-p50 is the median over the lanes that ran, not diluted by runs whose lane was skipped', () => {
+    // Pooled with ten zero-second lanes the p50 would be 300s, which does not
+    // exceed the 300s line; the ten real 600s lanes alone trip it.
+    const ranLane = () =>
+      prRun({ jobs: [job('Test', 0, 120), job('E2E Report', 0, 600)] });
+    const skippedLane = () =>
+      prRun({
+        jobs: [job('Test', 0, 120), job('E2E Report', 120, 120, [], 'skipped')],
+      });
+    const summary = measure([
+      ...repeat(MIN_SINGLE_LIBRARY_RUNS, ranLane),
+      ...repeat(MIN_SINGLE_LIBRARY_RUNS, skippedLane),
+    ]);
+    assert.equal(summary.e2eLane.count, MIN_SINGLE_LIBRARY_RUNS);
+    assert.equal(summary.e2eLane.p50, 600);
+    assert.ok(
+      summary.signals.some((signal) => signal.id === 'e2e-lane-p50'),
+      'e2e-lane-p50 must trip on the 600s lanes that ran',
+    );
   });
 });
 

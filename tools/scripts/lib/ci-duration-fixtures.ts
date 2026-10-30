@@ -50,15 +50,21 @@ export const job = (
   steps,
 });
 
+/**
+ * One step. `conclusion` defaults to `success`; pass `'skipped'` to build a
+ * step that did not run, which the Actions API reports completed with equal
+ * timestamps when given a zero-length window.
+ */
 export const step = (
   name: string,
   start: number,
   end: number,
+  conclusion: string | null = 'success',
 ): GatheredStep => ({
   name,
   startedAt: at(start),
   completedAt: at(end),
-  conclusion: 'success',
+  conclusion,
 });
 
 /**

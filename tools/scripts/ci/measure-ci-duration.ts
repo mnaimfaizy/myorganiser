@@ -86,11 +86,28 @@ export const COMMIT_PAGE_SIZE = 100;
  */
 export const MAX_COMMIT_PAGES = 30;
 
-/** Directories a project-root walk never descends into. */
+/**
+ * The files whose presence makes a directory an Nx project root.
+ *
+ * Both, not just `project.json`: Nx infers a project from a `package.json`
+ * too, and this repository has one such project — `scripts`, rooted at
+ * `tools/scripts`, which carries a `package.json` and no `project.json`.
+ * Reading only `project.json` left that root out, and because `tools` *is* a
+ * `project.json` project, every `tools/scripts/**` file fell to the enclosing
+ * `tools` root: a pull request touching `tools/scripts` and `tools/config`
+ * read as one project when `nx affected` selects two.
+ */
+const PROJECT_ROOT_FILES = ['project.json', 'package.json'] as const;
+
+/**
+ * Directories a project-root walk never descends into.
+ *
+ * Hidden directories are skipped by the walk itself rather than listed here,
+ * because Nx does not infer a project inside one: `.agents` holds a fixture
+ * tree with its own `package.json`, and the project graph has no node for it.
+ */
 const SKIPPED_DIRECTORIES = new Set([
   'node_modules',
-  '.git',
-  '.nx',
   'dist',
   'coverage',
   'tmp',
@@ -126,12 +143,17 @@ interface MainCommit {
  * Every Nx project root, repo-relative with forward slashes.
  *
  * Read off disk rather than from the Nx project graph on purpose: the graph
- * costs a full Nx boot, and the fact this measurement needs — where each
- * project's root is — is exactly the set of directories holding a
- * `project.json`. A root is read at the head of `main` the measurement runs
- * from, not at each run's own commit, so a project added mid-window
- * classifies every run in the window; that is the reading that keeps a
- * freshly split library from making its own pull requests unclassified.
+ * costs a full Nx boot, and the watch workflow runs this script with no
+ * `yarn install` at all, so there is no Nx there to boot. What the walk
+ * reads instead is the rule Nx itself applies — a directory holding one of
+ * `PROJECT_ROOT_FILES`, outside a hidden directory — and the Contract Suite
+ * asserts the two agree over this repository, in both directions, so the
+ * rule cannot drift from the graph unnoticed.
+ *
+ * A root is read at the head of `main` the measurement runs from, not at each
+ * run's own commit, so a project added mid-window classifies every run in the
+ * window; that is the reading that keeps a freshly split library from making
+ * its own pull requests unclassified.
  */
 export function projectRootsUnder(root: string): string[] {
   const roots: string[] = [];
@@ -143,13 +165,21 @@ export function projectRootsUnder(root: string): string[] {
       return;
     }
     if (
-      entries.some((entry) => entry.isFile() && entry.name === 'project.json')
+      entries.some(
+        (entry) =>
+          entry.isFile() &&
+          (PROJECT_ROOT_FILES as readonly string[]).includes(entry.name),
+      )
     ) {
+      // The workspace root holds a `package.json` and is not a project. It
+      // would otherwise claim every file and make every pull request
+      // Single-Library, which `projectOfFile` also refuses on its own.
       const relativeRoot = relative(root, directory).split(sep).join('/');
       if (relativeRoot) roots.push(relativeRoot);
     }
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.')) continue;
       if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
       walk(join(directory, entry.name));
     }
@@ -442,7 +472,13 @@ export function gather({
         : withoutJobs === 0
           ? `read for all ${runs.length} run(s)`
           : `unreadable for ${withoutJobs} of ${runs.length} run(s), which are out of every duration figure`,
-    'branch compare (Actions API)':
+    // Named for the API each key actually reads: the compare and the commit
+    // listing are Repos endpoints (`repos/<slug>/compare`,
+    // `repos/<slug>/commits`), and only the job and step timestamps above
+    // come from the Actions API (`repos/<slug>/actions/...`). A reader of
+    // this block is being told where a figure came from, so the wrong name
+    // is the one thing it must not say.
+    'branch compare (Repos API)':
       runs.length === 0
         ? 'no runs to read them for'
         : withoutCompare === 0 && withoutMainTip === 0
@@ -450,15 +486,16 @@ export function gather({
           : `unreadable for ${withoutCompare + withoutMainTip} of ${runs.length} run(s)` +
             ` (${withoutMainTip} with no \`main\` tip at run start), which stay unclassified` +
             ' and out of the stale-branch denominator',
-    '`main` commits (Actions API)':
-      !useGithub || !slug
-        ? 'not read — no `gh`'
+    '`main` commits (Repos API)': !useGithub
+      ? 'not read — no `gh`'
+      : !slug
+        ? 'not read — the repository could not be resolved'
         : `${mainCommits.length} read over the window and its lead-in` +
           (read.incomplete === null
             ? ''
             : ` — ${read.incomplete}, so a run older than the oldest commit read` +
               ' resolves no tip and stays unclassified'),
-    'Nx project roots': `${projectRoots.length} read from \`project.json\` files at this checkout`,
+    'Nx project roots': `${projectRoots.length} read from ${PROJECT_ROOT_FILES.map((file) => `\`${file}\``).join(' and ')} files at this checkout`,
   };
   if (withTruncatedJobs > 0) {
     evidence['job listing'] =

@@ -17,7 +17,8 @@
  * when that marker says the last thing reported was a breach.
  *
  * What recovery *does* with the issue is not restated here either: it is
- * `recoveryAction` from the nightly module. No triage state label and the
+ * `recoveryAction` from `automation-issue.ts`, the rule every fixed-title
+ * automation issue shares. No triage state label and the
  * issue is the automation talking to itself, so recovery closes it; any one
  * of them — including the `needs-triage` a newly created watch issue wears —
  * and it stays open for whoever owns the work.
@@ -45,12 +46,13 @@ import {
   type ReportedStateInput,
 } from './issue-state-marker.ts';
 import {
-  findOpenRotIssue,
+  AUTOMATION_ISSUE_CREATE_LABELS,
+  findOpenAutomationIssue,
   recoveryAction,
   recoveryOutcomeSentence,
+  type AutomationIssueCandidate,
   type RecoveryAction,
-  type RotIssueCandidate,
-} from './nightly-e2e-rot-issue.ts';
+} from './automation-issue.ts';
 
 export { recoveryAction };
 
@@ -61,7 +63,7 @@ export const WATCH_ISSUE_TITLE =
  * Applied only when the watch creates the issue. `needs-triage` is also a
  * state label, so a recovery comments instead of closing it.
  */
-export const WATCH_ISSUE_CREATE_LABELS = ['needs-triage', 'github-actions'];
+export const WATCH_ISSUE_CREATE_LABELS = AUTOMATION_ISSUE_CREATE_LABELS;
 
 /** Which of the two states a report on the issue recorded. */
 export type ReportedState = 'breached' | 'recovered';
@@ -77,10 +79,10 @@ const state = issueStateMarker<ReportedState>({
 const marker = state.marker;
 
 /** The open issue this automation owns. */
-export function findOpenWatchIssue<T extends RotIssueCandidate>(
+export function findOpenWatchIssue<T extends AutomationIssueCandidate>(
   issues: readonly T[],
 ): T | undefined {
-  return findOpenRotIssue(issues, WATCH_ISSUE_TITLE);
+  return findOpenAutomationIssue(issues, WATCH_ISSUE_TITLE);
 }
 
 /** What one weekly run does about the issue. */

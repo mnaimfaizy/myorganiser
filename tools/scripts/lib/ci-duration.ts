@@ -336,9 +336,32 @@ export function durationSeconds(
 }
 
 /**
+ * Whether a job or step did not run, by its own `conclusion`.
+ *
+ * Read rather than inferred from the timestamps, because the Actions API
+ * does not promise a skipped job or step has none: it reports it `completed`
+ * with conclusion `skipped`, and a start equal to its completion is a
+ * duration of zero rather than an absent read. Zero is the wrong answer in
+ * both places it would land — a skipped step would enter the cacheable-step
+ * sample as a cache hit that took no time, and a skipped lane would enter
+ * the E2E-lane sample as a lane nobody waited for, each pulling its p50
+ * toward zero and keeping its signal from tripping. `ci.yml` makes both
+ * routine on the runs this measurement reads: `Lint every project` and
+ * `Test every project` are skipped on every pull request, and the whole E2E
+ * lane is skipped on a pull request that does not affect `web-e2e`.
+ *
+ * A job or step that never reached a conclusion at all is not skipped — it
+ * is still running, which the timestamp read already reports as unmeasurable.
+ */
+export function isSkipped(conclusion?: string | null): boolean {
+  return conclusion === 'skipped';
+}
+
+/**
  * Wall-clock seconds a set of jobs occupied: earliest start to latest
  * completion. This, not the sum of the jobs, is what the author waited —
- * the jobs run in parallel.
+ * the jobs run in parallel. A skipped job is not in the span, because it
+ * cost nobody anything.
  */
 export function spanSeconds(
   jobs: readonly GatheredJob[] | null | undefined,
@@ -346,6 +369,7 @@ export function spanSeconds(
   const starts: number[] = [];
   const ends: number[] = [];
   for (const job of jobs ?? []) {
+    if (isSkipped(job.conclusion)) continue;
     const start = job.startedAt ? Date.parse(job.startedAt) : Number.NaN;
     const end = job.completedAt ? Date.parse(job.completedAt) : Number.NaN;
     if (Number.isFinite(start)) starts.push(start);
@@ -463,13 +487,18 @@ export function isStaleBranchRun(run: GatheredRun): boolean | null {
   return behind > 0;
 }
 
-/** Durations of the cacheable Nx steps of one run, in seconds. */
+/**
+ * Durations of the cacheable Nx steps of one run, in seconds. A step the run
+ * skipped is not one of them, and neither is any step of a skipped job.
+ */
 export function cacheableStepSeconds(run: GatheredRun): number[] {
   const cacheable = new Set<string>(CACHEABLE_NX_STEPS);
   const seconds: number[] = [];
   for (const job of run.jobs ?? []) {
+    if (isSkipped(job.conclusion)) continue;
     for (const step of job.steps ?? []) {
       if (!cacheable.has(step.name)) continue;
+      if (isSkipped(step.conclusion)) continue;
       const duration = durationSeconds(step.startedAt, step.completedAt);
       if (duration !== null) seconds.push(duration);
     }
@@ -481,11 +510,17 @@ export function cacheableStepSeconds(run: GatheredRun): number[] {
  * The job that finished last in one run, or `null` when no job of it has a
  * completion time. A tie is broken by name so the answer is stable rather
  * than dependent on the order the API listed the jobs.
+ *
+ * A skipped job cannot be the last finisher: it is reported `completed` with
+ * a timestamp like any other, so without this it could be named the job every
+ * other check waited for while having run nothing — and the share of runs one
+ * job finishes last is what the `test-last-finisher` signal reads.
  */
 export function lastFinisher(run: GatheredRun): string | null {
   let bestName: string | null = null;
   let bestEnd = Number.NEGATIVE_INFINITY;
   for (const job of run.jobs ?? []) {
+    if (isSkipped(job.conclusion)) continue;
     const end = job.completedAt ? Date.parse(job.completedAt) : Number.NaN;
     if (!Number.isFinite(end)) continue;
     if (

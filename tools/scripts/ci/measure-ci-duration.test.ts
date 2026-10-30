@@ -25,10 +25,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   COMMIT_PAGE_SIZE,
   MAX_COMMIT_PAGES,
+  REPO_ROOT,
+  gather as gatherWindow,
   mainTipAt,
   projectRootsUnder,
 } from './measure-ci-duration.ts';
 import { gather, job, prRun, repeat } from '../lib/ci-duration-fixtures.ts';
+import { loadProjectGraph } from '../lib/nx-graph.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'measure-ci-duration.ts');
@@ -94,24 +97,73 @@ const writeJson = (name: string, value: unknown): string => {
 
 // --------------------------------------------------------- the root walk
 
-test('project roots are every nested project.json, repo-relative, skipping vendored and build trees', () => {
+test('project roots are every directory holding a project.json or a package.json, repo-relative, skipping hidden, vendored and build trees', () => {
   const tree = join(scratch, 'roots');
   for (const file of [
     'apps/a/project.json',
     'libs/x/project.json',
     'libs/x/y/project.json',
+    // Nx infers `scripts` from a package.json with no project.json.
+    'tools/scripts/package.json',
+    // Both files in one directory make one root, not two.
+    'libs/both/project.json',
+    'libs/both/package.json',
+    // The workspace root holds a package.json and is not a project.
+    'package.json',
+    // Nx infers no project inside a hidden directory.
+    '.agents/fixtures/pkg/package.json',
     'node_modules/pkg/project.json',
     'dist/d/project.json',
+    'coverage/c/package.json',
+    'tmp/t/package.json',
   ]) {
     mkdirSync(join(tree, dirname(file)), { recursive: true });
     writeFileSync(join(tree, file), '{}');
   }
-  assert.deepEqual(projectRootsUnder(tree), ['apps/a', 'libs/x', 'libs/x/y']);
+  assert.deepEqual(projectRootsUnder(tree), [
+    'apps/a',
+    'libs/both',
+    'libs/x',
+    'libs/x/y',
+    'tools/scripts',
+  ]);
 });
 
 test('a project root walk over a missing directory is empty rather than a throw', () => {
   assert.deepEqual(projectRootsUnder(join(scratch, 'missing')), []);
 });
+
+// The Nx project graph is the authority the walk must match. `NX_GRAPH_FILE`
+// is honoured when a graph has already been built: a local run, or a future
+// caller that sets it. CI does not set it for this test today. The
+// `corepack yarn tools:test` step runs before the step that builds the graph
+// and writes NX_GRAPH_FILE into GITHUB_ENV (ci.yml), and a GITHUB_ENV value only
+// reaches later steps, so this test pays its own Nx boot (about 12s). That cost
+// is the price of asserting the walk against the graph rather than against
+// itself. A graph that cannot be produced throws out of loadProjectGraph and
+// fails this test: it is deliberately not a skip.
+test(
+  'the walk finds exactly the project roots Nx finds in this repository, in both directions',
+  { timeout: 300_000 },
+  () => {
+    const graph = loadProjectGraph(process.env.NX_GRAPH_FILE || undefined);
+    const nxRoots = [
+      ...new Set(Object.values(graph.nodes).map((node) => node.data.root)),
+    ].sort();
+    const walked = projectRootsUnder(REPO_ROOT);
+    assert.ok(nxRoots.length > 0, 'the Nx graph names no project roots');
+    assert.deepEqual(
+      nxRoots.filter((root) => !walked.includes(root)),
+      [],
+      'Nx has project roots the walk does not find',
+    );
+    assert.deepEqual(
+      walked.filter((root) => !nxRoots.includes(root)),
+      [],
+      'the walk finds project roots Nx does not have',
+    );
+  },
+);
 
 // ------------------------------------------------------- the main tip
 
@@ -394,7 +446,7 @@ test('an endless commits server is walked to MAX_COMMIT_PAGES pages and no furth
   );
   const evidence = JSON.parse(readFileSync(out, 'utf8')).evidence;
   assert.match(
-    evidence['`main` commits (Actions API)'],
+    evidence['`main` commits (Repos API)'],
     new RegExp(`the paging loop hit its ${MAX_COMMIT_PAGES}-page bound`),
   );
 });
@@ -411,7 +463,7 @@ test('a short page ends the commits walk: a 40-item page 2 stops the walk at pag
   assert.deepEqual(pagesRequested(log), ['1', '2']);
   const evidence = JSON.parse(readFileSync(out, 'utf8')).evidence;
   assert.doesNotMatch(
-    evidence['`main` commits (Actions API)'],
+    evidence['`main` commits (Repos API)'],
     /could not be read|bound/,
   );
 });
@@ -428,7 +480,7 @@ test('an unreadable page 2 stops the walk and the saved gather names it, so an u
   assert.deepEqual(pagesRequested(log), ['1', '2']);
   const evidence = JSON.parse(readFileSync(out, 'utf8')).evidence;
   assert.match(
-    evidence['`main` commits (Actions API)'],
+    evidence['`main` commits (Repos API)'],
     /page 2 could not be read/,
   );
 });
@@ -454,4 +506,90 @@ test('--repository is passed to gh run list as --repo followed by the repository
   const at = runList.indexOf('--repo');
   assert.notEqual(at, -1, 'gh run list was not given --repo');
   assert.equal(runList[at + 1], 'owner/repo');
+});
+
+// ------------------------------------------------- the evidence key names
+
+const WINDOW_OPTIONS = {
+  workflow: 'ci.yml',
+  since: '2026-10-12',
+  until: '2026-10-26',
+  limit: 300,
+  repository: null,
+} as const;
+
+test('the evidence keys that name an API name the one that answers them: the job and step timestamps are Actions API, the compare and the commits are Repos API', () => {
+  const { evidence } = gatherWindow({
+    ...WINDOW_OPTIONS,
+    useGithub: false,
+    projectRoots: [],
+  });
+  assert.deepEqual(
+    Object.keys(evidence)
+      .filter((key) => key.includes('API'))
+      .sort(),
+    [
+      '`main` commits (Repos API)',
+      'branch compare (Repos API)',
+      'job and step timestamps (Actions API)',
+    ],
+  );
+});
+
+test('the `main` commits key is read from the Repos commits endpoint, the one API that lists them', () => {
+  const { env, log } = answeringEnvironment('short-second');
+  const out = join(scratch, 'repos-api-gather.json');
+  const result = runCli(
+    ['--repository', 'owner/repo', ...WINDOW, '--save-gather', out],
+    env,
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const commitCalls = callsLogged(log)
+    .filter((args) => args[0] === 'api' && args[1].includes('/commits?'))
+    .map((args) => args[1]);
+  assert.ok(commitCalls.length > 0, 'no commits request was made');
+  for (const endpoint of commitCalls) {
+    assert.ok(
+      endpoint.startsWith('repos/owner/repo/commits?'),
+      `the commits request must address the Repos endpoint, got ${endpoint}`,
+    );
+  }
+  const evidence = JSON.parse(readFileSync(out, 'utf8')).evidence;
+  assert.match(evidence['`main` commits (Repos API)'], /read over the window/);
+});
+
+test('the main commits key says no gh when gh is absent, and says the repository is unresolved when only the slug is missing', () => {
+  const noGh = gatherWindow({
+    ...WINDOW_OPTIONS,
+    useGithub: false,
+    projectRoots: [],
+  }).evidence;
+  assert.equal(noGh['`main` commits (Repos API)'], 'not read — no `gh`');
+
+  // `gh` answers auth but cannot name the repository, so the slug is null.
+  const { env } = answeringEnvironment('endless');
+  const out = join(scratch, 'unresolved-gather.json');
+  const result = runCli(
+    ['--since', '2026-10-12', '--until', '2026-10-26', '--save-gather', out],
+    env,
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const unresolved = JSON.parse(readFileSync(out, 'utf8')).evidence;
+  assert.equal(
+    unresolved['`main` commits (Repos API)'],
+    'not read — the repository could not be resolved',
+  );
+});
+
+test('the Nx project roots evidence names both root files it was read from', () => {
+  const { evidence } = gatherWindow({
+    ...WINDOW_OPTIONS,
+    useGithub: false,
+    projectRoots: ['apps/a'],
+  });
+  assert.equal(
+    evidence['Nx project roots'],
+    '1 read from `project.json` and `package.json` files at this checkout',
+  );
 });

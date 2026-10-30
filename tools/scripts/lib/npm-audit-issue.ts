@@ -9,8 +9,9 @@
  * Report Audit Success is the other half: the first green push records the
  * recovery on that same issue.
  *
- * What recovery does with the issue is the nightly E2E rot issue's rule,
- * imported rather than restated: no triage state label and the issue is the
+ * What recovery does with the issue is `automation-issue.ts`'s rule, the one
+ * every fixed-title automation issue shares, imported rather than restated:
+ * no triage state label and the issue is the
  * automation talking to itself, so recovery closes it; any one of them —
  * including `needs-triage`, which a newly created audit issue wears — and it
  * stays open for whoever owns it.
@@ -31,12 +32,13 @@ import {
   type ReportedStateInput,
 } from './issue-state-marker.ts';
 import {
-  findOpenRotIssue,
+  AUTOMATION_ISSUE_CREATE_LABELS,
+  findOpenAutomationIssue,
   recoveryAction,
   recoveryOutcomeSentence,
+  type AutomationIssueCandidate,
   type RecoveryAction,
-  type RotIssueCandidate,
-} from './nightly-e2e-rot-issue.ts';
+} from './automation-issue.ts';
 
 export { recoveryAction };
 
@@ -46,7 +48,7 @@ export const AUDIT_ISSUE_TITLE = '[automation] npm audit is failing on main';
  * Applied only when Report Audit Failure creates the issue. `needs-triage`
  * is also a state label, so a green push comments instead of closing it.
  */
-export const AUDIT_ISSUE_CREATE_LABELS = ['needs-triage', 'github-actions'];
+export const AUDIT_ISSUE_CREATE_LABELS = AUTOMATION_ISSUE_CREATE_LABELS;
 
 /** Rows the failure report prints before it counts the rest. */
 export const AUDIT_ADVISORY_LIMIT = 50;
@@ -67,10 +69,10 @@ const marker = state.marker;
 /**
  * The open issue this automation owns.
  */
-export function findOpenAuditIssue<T extends RotIssueCandidate>(
+export function findOpenAuditIssue<T extends AutomationIssueCandidate>(
   issues: readonly T[],
 ): T | undefined {
-  return findOpenRotIssue(issues, AUDIT_ISSUE_TITLE);
+  return findOpenAutomationIssue(issues, AUDIT_ISSUE_TITLE);
 }
 
 /** One advisory `yarn npm audit --json` reported against the tree. */
