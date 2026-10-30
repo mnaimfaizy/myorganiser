@@ -311,6 +311,132 @@ describe('TasksBoard', () => {
       ).toBeInTheDocument();
     });
 
+    it.each([
+      { chip: 'In progress · 0', label: 'in progress' },
+      { chip: 'Blocked · 0', label: 'blocked' },
+      { chip: 'Done', label: 'done' },
+      { chip: 'Archived', label: 'archived' },
+    ])(
+      'shows the filtered-empty state when the $label chip matches no tasks',
+      ({ chip }) => {
+        const planTrip = makeTask({
+          id: 'p',
+          title: 'Plan trip',
+          dueDate: '2026-10-30',
+          context: 'personal',
+        });
+        render(
+          <TasksBoard
+            page={makeTasksPageController([planTrip])}
+            variant="desktop"
+          />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: chip }));
+
+        expect(
+          screen.getByText('No tasks match these filters.'),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'Clear filters' }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('heading', { name: 'All clear' }),
+        ).not.toBeInTheDocument();
+        expect(headingTexts(2)).toEqual([]);
+      },
+    );
+
+    it('shows the filtered-empty state, not all-clear, when the context hides every open task', () => {
+      const shipDraft = makeTask({
+        id: 'w',
+        title: 'Ship draft',
+        dueDate: '2026-10-22',
+        context: 'work',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([shipDraft])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Ship draft' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open · 0' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('keeps the all-clear state under a narrowed context when no task is open anywhere', () => {
+      render(
+        <TasksBoard
+          page={makeTasksPageController([writeNotes])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByRole('heading', { name: 'All clear' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('No tasks match these filters.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('Clear filters resets the context to All and the status to Open, and re-shows the hidden task', () => {
+      const shipDraft = makeTask({
+        id: 'w',
+        title: 'Ship draft',
+        dueDate: '2026-10-22',
+        context: 'work',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([shipDraft])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+      expect(
+        screen.queryByText('No tasks match these filters.'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Personal' })).not.toBeChecked();
+      expect(screen.getByRole('button', { name: 'Open · 1' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(
+        screen.getByRole('button', { name: 'Ship draft' }),
+      ).toBeInTheDocument();
+    });
+
     it('renders neither sections nor the all-clear state while loading', () => {
       render(
         <TasksBoard
