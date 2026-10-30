@@ -14,3 +14,13 @@ export function isSafeLink(value: string): boolean {
     return false;
   }
 }
+
+/**
+ * A stored link, trimmed, only when it is safe to open — `null` otherwise,
+ * including a missing or empty value.
+ */
+export function openableLink(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return isSafeLink(trimmed) ? trimmed : null;
+}

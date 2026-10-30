@@ -1,4 +1,4 @@
-import { isSafeLink } from './safeLink';
+import { isSafeLink, openableLink } from './safeLink';
 
 describe('isSafeLink', () => {
   it('accepts an http link', () => {
@@ -47,5 +47,27 @@ describe('isSafeLink', () => {
 
   it('rejects an empty string', () => {
     expect(isSafeLink('')).toBe(false);
+  });
+});
+
+describe('openableLink', () => {
+  it('returns the trimmed link when it is safe', () => {
+    expect(openableLink('  https://example.com  ')).toBe('https://example.com');
+  });
+
+  it('returns null for an unsafe scheme', () => {
+    expect(openableLink('javascript:alert(1)')).toBeNull();
+  });
+
+  it('returns null for an empty string', () => {
+    expect(openableLink('')).toBeNull();
+  });
+
+  it('returns null for undefined', () => {
+    expect(openableLink(undefined)).toBeNull();
+  });
+
+  it('returns null for null', () => {
+    expect(openableLink(null)).toBeNull();
   });
 });

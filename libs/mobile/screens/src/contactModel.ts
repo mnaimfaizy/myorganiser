@@ -1,7 +1,7 @@
 import { formatDayMonth, toCalendarDate } from './calendarDate';
 import {
   compareUsageLocationsByPriority,
-  isSafeLink,
+  openableLink,
   type AddressRecord,
   type AddressStatus,
   type MobileNumberRecord,
@@ -134,8 +134,7 @@ export function isNotified(location: DecryptedUsageLocation): boolean {
 export function openableUsageLocationLink(
   location: DecryptedUsageLocation,
 ): string | null {
-  const link = location.link?.trim();
-  return link != null && link.length > 0 && isSafeLink(link) ? link : null;
+  return openableLink(location.link);
 }
 
 /** How many of `locations` still need notifying. */

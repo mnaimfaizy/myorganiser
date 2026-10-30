@@ -1,6 +1,6 @@
 import {
-  isSafeLink,
   monthlyEquivalentAmount,
+  openableLink,
   type CurrencyCode,
   type SubscriptionBillingCycle,
   type SubscriptionPaymentMethod,
@@ -102,8 +102,7 @@ export function findVisibleSubscription(
 export function openableSubscriptionLink(
   subscription: DecryptedSubscription,
 ): string | null {
-  const link = subscription.link?.trim();
-  return link != null && link.length > 0 && isSafeLink(link) ? link : null;
+  return openableLink(subscription.link);
 }
 
 /** A Subscription's status, defaulting to `active` when the payload carries
