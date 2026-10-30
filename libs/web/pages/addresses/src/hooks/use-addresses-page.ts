@@ -98,10 +98,12 @@ export function useAddressesPage(handle: VaultHandle): AddressesPageController {
       })
       .then(async (raw) => {
         const normalized = normalizeAddresses(raw);
-        // A superseded read neither reaches the screen nor goes back to the
-        // Vault. Normalization repairs what *this* read saw, so saving it
-        // after a newer read has landed writes the stale records over the
-        // newer ones, silently (#1280).
+        // A read a newer one has superseded stops here, reaching neither the
+        // screen nor the Vault. Normalization repairs what *this* read saw, so
+        // saving it after a newer read has landed writes the stale records
+        // over the newer ones, silently (#1280). What this decides is whether
+        // the save starts: a save already in flight fixes its records half
+        // when it is entered, and nothing here aborts it.
         if (!isActive) return;
         setItems(normalized.value);
         setLoading(false);
