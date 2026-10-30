@@ -43,7 +43,8 @@ The repository is public, so Actions minutes are free. Wall-clock is the only bu
   `needs-triage` and `github-actions`. A **scheduled** success acts on that same open issue: close it,
   with a comment linking the run, when it carries none of the triage state labels (`needs-triage`,
   `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`); otherwise comment that the suite
-  recovered and leave it open. `workflow_dispatch` does neither.
+  recovered and leave it open. `workflow_dispatch` does neither. That issue is an **Automation
+  Issue** (`CONTEXT.md`); the rule is shared through `tools/scripts/lib/automation-issue.ts`.
 
 **The app is served from a production build.** `webServer.command` becomes
 `nx run web:serve:production`, **including locally**, with `E2E_DEV_SERVER=1` as a documented

@@ -1,5 +1,6 @@
 /**
- * What every automation that reports on its own fixed-title issue shares.
+ * What every Automation Issue shares (`CONTEXT.md`): the rules common to each
+ * automation that reports on its own fixed-title issue.
  *
  * Three of them do: the nightly E2E rot issue (ADR 0050), the npm audit
  * issue (ADR 0124), and the PR CI duration watch (PRD #1387). Each opens one
