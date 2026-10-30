@@ -39,8 +39,9 @@
 // Not a gate. It reports percentiles over weeks of other branches' runs, has
 // no fact to fail on for the commit in front of it, and reaches the network;
 // it carries a written opt-out in tools/config/gate-coverage-optout.json.
-import { readdirSync, type Dirent } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -146,9 +147,16 @@ interface MainCommit {
  * costs a full Nx boot, and the watch workflow runs this script with no
  * `yarn install` at all, so there is no Nx there to boot. What the walk
  * reads instead is the rule Nx itself applies — a directory holding one of
- * `PROJECT_ROOT_FILES`, outside a hidden directory — and the Contract Suite
- * asserts the two agree over this repository, in both directions, so the
- * rule cannot drift from the graph unnoticed.
+ * `PROJECT_ROOT_FILES`, outside a hidden directory, and not ignored by git —
+ * and the Contract Suite asserts the two agree over this repository, in both
+ * directions, so the rule cannot drift from the graph unnoticed.
+ *
+ * The candidate files come from git (tracked, plus untracked files git does
+ * not ignore), not from a directory walk. Nx honours `.gitignore`, so a walk
+ * found roots Nx never does: a local `storybook-static` build output carries
+ * its own `project.json`. A git that cannot list the tree throws rather than
+ * falling back to a walk, because a measurement over the wrong roots still
+ * prints a number. A root directory that does not exist has no roots.
  *
  * A root is read at the head of `main` the measurement runs from, not at each
  * run's own commit, so a project added mid-window classifies every run in the
@@ -156,36 +164,36 @@ interface MainCommit {
  * its own pull requests unclassified.
  */
 export function projectRootsUnder(root: string): string[] {
-  const roots: string[] = [];
-  const walk = (directory: string) => {
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    if (
-      entries.some(
-        (entry) =>
-          entry.isFile() &&
-          (PROJECT_ROOT_FILES as readonly string[]).includes(entry.name),
-      )
-    ) {
-      // The workspace root holds a `package.json` and is not a project. It
-      // would otherwise claim every file and make every pull request
-      // Single-Library, which `projectOfFile` also refuses on its own.
-      const relativeRoot = relative(root, directory).split(sep).join('/');
-      if (relativeRoot) roots.push(relativeRoot);
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith('.')) continue;
-      if (SKIPPED_DIRECTORIES.has(entry.name)) continue;
-      walk(join(directory, entry.name));
-    }
-  };
-  walk(root);
-  return roots.sort();
+  if (!existsSync(root)) return [];
+  const listed = spawnSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  if (listed.error || listed.status !== 0) {
+    throw new Error(
+      `cannot list project roots: git ls-files failed in ${root}: ${
+        listed.error?.message ?? listed.stderr.trim()
+      }`,
+    );
+  }
+  const roots = new Set<string>();
+  for (const file of listed.stdout.split('\0')) {
+    const name = file.slice(file.lastIndexOf('/') + 1);
+    if (!(PROJECT_ROOT_FILES as readonly string[]).includes(name)) continue;
+    // A tracked file deleted from the working tree is not a project Nx sees.
+    if (!existsSync(join(root, file))) continue;
+    const directory = dirname(file);
+    // The workspace root holds a `package.json` and is not a project. It
+    // would otherwise claim every file and make every pull request
+    // Single-Library, which `projectOfFile` also refuses on its own.
+    if (directory === '.') continue;
+    const segments = directory.split('/');
+    if (segments.some((segment) => segment.startsWith('.'))) continue;
+    if (segments.some((segment) => SKIPPED_DIRECTORIES.has(segment))) continue;
+    roots.add(directory);
+  }
+  return [...roots].sort();
 }
 
 /** The repository `gh` is pointed at, or null when it cannot be read. */

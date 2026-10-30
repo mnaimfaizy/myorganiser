@@ -32,9 +32,14 @@ import {
 } from './measure-ci-duration.ts';
 import { gather, job, prRun, repeat } from '../lib/ci-duration-fixtures.ts';
 import { loadProjectGraph } from '../lib/nx-graph.ts';
+import { isolateGitEnvironment } from '../lib/git-environment.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'measure-ci-duration.ts');
+
+// The fixture tests `git init` temp trees; a hook-exported GIT_DIR must not
+// reach them (see git-environment.ts).
+isolateGitEnvironment();
 
 const scratch = mkdtempSync(join(tmpdir(), 'ci-duration-cli-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -71,6 +76,22 @@ const runCli = (
   }
 };
 
+/**
+ * Puts the real `git` into a bin dir that a child's PATH is replaced with. The
+ * script's project-root walk runs `git ls-files`, so a PATH holding only a fake
+ * `gh` would fail with ENOENT. It is a wrapper that execs the absolute path,
+ * not a symlink, and only the `git` binary is added: a system directory such as
+ * `/usr/bin` would also bring in a real `gh` and defeat the offline design.
+ */
+const addGitTo = (bin: string): void => {
+  const realGit = execFileSync('/bin/sh', ['-c', 'command -v git'], {
+    encoding: 'utf8',
+  }).trim();
+  const git = join(bin, 'git');
+  writeFileSync(git, `#!/bin/sh\nexec '${realGit}' "$@"\n`);
+  chmodSync(git, 0o755);
+};
+
 /** A PATH whose only `gh` records that it was called, and fails. */
 const offlineEnvironment = (): { env: NodeJS.ProcessEnv; marker: string } => {
   const bin = join(scratch, `bin-${Math.random().toString(36).slice(2)}`);
@@ -79,6 +100,7 @@ const offlineEnvironment = (): { env: NodeJS.ProcessEnv; marker: string } => {
   const gh = join(bin, 'gh');
   writeFileSync(gh, `#!/bin/sh\necho called >> '${marker}'\nexit 1\n`);
   chmodSync(gh, 0o755);
+  addGitTo(bin);
   return { env: { ...process.env, PATH: bin }, marker };
 };
 
@@ -97,9 +119,22 @@ const writeJson = (name: string, value: unknown): string => {
 
 // --------------------------------------------------------- the root walk
 
+/** Makes `dir` a git repository, quietly: the root walk lists its files via git. */
+const gitInit = (dir: string): void => {
+  execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'ignore' });
+};
+
+/** Writes each repo-relative file under `tree` as an empty JSON document. */
+const writeTree = (tree: string, files: readonly string[]): void => {
+  for (const file of files) {
+    mkdirSync(join(tree, dirname(file)), { recursive: true });
+    writeFileSync(join(tree, file), '{}');
+  }
+};
+
 test('project roots are every directory holding a project.json or a package.json, repo-relative, skipping hidden, vendored and build trees', () => {
   const tree = join(scratch, 'roots');
-  for (const file of [
+  writeTree(tree, [
     'apps/a/project.json',
     'libs/x/project.json',
     'libs/x/y/project.json',
@@ -116,10 +151,8 @@ test('project roots are every directory holding a project.json or a package.json
     'dist/d/project.json',
     'coverage/c/package.json',
     'tmp/t/package.json',
-  ]) {
-    mkdirSync(join(tree, dirname(file)), { recursive: true });
-    writeFileSync(join(tree, file), '{}');
-  }
+  ]);
+  gitInit(tree);
   assert.deepEqual(projectRootsUnder(tree), [
     'apps/a',
     'libs/both',
@@ -131,6 +164,58 @@ test('project roots are every directory holding a project.json or a package.json
 
 test('a project root walk over a missing directory is empty rather than a throw', () => {
   assert.deepEqual(projectRootsUnder(join(scratch, 'missing')), []);
+});
+
+test('a gitignored project.json does not make a project root', () => {
+  const tree = join(scratch, 'ignored-root');
+  writeTree(tree, [
+    'libs/web/ui/project.json',
+    // A local build output with its own project.json, which git ignores.
+    'libs/web/ui/storybook-static/project.json',
+  ]);
+  writeFileSync(join(tree, '.gitignore'), 'storybook-static\n');
+  gitInit(tree);
+  assert.deepEqual(projectRootsUnder(tree), ['libs/web/ui']);
+});
+
+test('a tracked project.json deleted from the working tree is not a project root', () => {
+  const tree = join(scratch, 'deleted-root');
+  writeTree(tree, ['libs/kept/project.json', 'libs/gone/project.json']);
+  gitInit(tree);
+  execFileSync(
+    'git',
+    ['add', 'libs/kept/project.json', 'libs/gone/project.json'],
+    { cwd: tree, stdio: 'ignore' },
+  );
+  // Still in the index, gone from disk.
+  rmSync(join(tree, 'libs/gone/project.json'));
+  assert.deepEqual(projectRootsUnder(tree), ['libs/kept']);
+});
+
+test('a project root walk over a directory git cannot list throws rather than falling back to a walk', () => {
+  // A fresh directory under the scratch tmpdir, which is not inside a repository.
+  const notARepo = join(scratch, 'not-a-repo');
+  writeTree(notARepo, ['libs/x/project.json']);
+  assert.throws(() => projectRootsUnder(notARepo), /git ls-files failed/);
+});
+
+test('a project root walk with no git on PATH throws rather than falling back to a walk', () => {
+  const tree = join(scratch, 'no-git-on-path');
+  writeTree(tree, ['libs/x/project.json']);
+  gitInit(tree);
+  // An empty bin dir holds no `git`, so the spawn itself fails (listed.error).
+  const emptyBin = join(
+    scratch,
+    `empty-bin-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(emptyBin, { recursive: true });
+  const originalPath = process.env.PATH;
+  process.env.PATH = emptyBin;
+  try {
+    assert.throws(() => projectRootsUnder(tree), /git ls-files failed/);
+  } finally {
+    process.env.PATH = originalPath;
+  }
 });
 
 // The Nx project graph is the authority the walk must match. `NX_GRAPH_FILE`
@@ -401,6 +486,7 @@ const answeringEnvironment = (
   // PATH is replaced, so the shebang must name node by its absolute path.
   writeFileSync(gh, `#!${process.execPath}\n${FAKE_GH_BODY}`);
   chmodSync(gh, 0o755);
+  addGitTo(bin);
   return {
     env: {
       ...process.env,
