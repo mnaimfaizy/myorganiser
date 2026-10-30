@@ -1,6 +1,6 @@
 /**
  * The decision behind path-gated heavy suites (ADR 0140): which of CI's
- * expensive `Test` steps a pull request's changed paths actually select.
+ * expensive steps and jobs a pull request's changed paths actually select.
  *
  * A single-library pull request used to pay for every heavy suite in the
  * `Test` job — `tools:test` at about 34s, the Upstream Brief and checker

@@ -98,10 +98,13 @@ the grep says the gate is there.
 
 ## Consequences
 
-- Java 21 is set up in `Test` exactly when `openapi:check` runs, rather than on every run.
+- Java 21 is set up in `Tool Suites` exactly when `openapi:check` runs, rather than on every run.
 - On a pull request touching one web library, every heavy suite is skipped: `tools:test`,
-  `upstream:briefs:test`, and `openapi:check`.
-- The heavy suites gated here are the ones that are their own `Test` step. The staging deploy
+  `upstream:briefs:test` and `openapi:check` (so the whole `Tool Suites` job),
+  `typecheck:tools-scripts` (a step of `Typecheck`), and `prisma:migration:drift` (the
+  `Prisma Migration Gate` job).
+- The heavy suites gated here are the ones that are their own CI step or job, named by `ciStep`
+  and `job` in `tools/config/gate-triggers.json`. The staging deploy
   contracts are Contract Suites under `tools/scripts`, so `tools:test`'s glob is what runs them
   and `docs/deployment/**` is one of its triggers; they are not a separately gated step.
 - Prisma migration drift is path-gated in its own job by
@@ -109,8 +112,8 @@ the grep says the gate is there.
   one `yarn gates:run` step by
   [#1389](https://github.com/mnaimfaizy/myorganiser/issues/1389). Both read the same config and the
   same resolver; neither changes the rules above.
-- A new heavy suite costs one config entry, one `Test` step whose `if:` names its flag, and one
-  `setup` job output. `tools/scripts/ci/gate-trigger-workflow.test.ts` drives itself from the
+- A new heavy suite costs one config entry, one step (in the job its `job` field
+  names, `test` by default) whose `if:` names its flag, and one `setup` job output. `tools/scripts/ci/gate-trigger-workflow.test.ts` drives itself from the
   config, so an entry added without that wiring fails.
 - `yarn covering-gates:check` asserts only what it can: a suite in the config that no obligation
   names is not a defect, whether a gate is invoked at all stays with `gates:coverage:check`, and
