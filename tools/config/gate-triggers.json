@@ -13,6 +13,7 @@
     {
       "id": "tools:test",
       "ciStep": "Run tools/scripts contract suites",
+      "job": "tool-suites",
       "why": "Every Contract Suite under tools/scripts in one `node --test` run (ADR 0135) — the checker contracts, the review pipeline, the release and staging deploy contracts, and the sandcastle decisions. The triggers are every tree those suites compile or read from the real repository, not just tools/ itself: the Husky hooks and workflow files whose wiring several suites assert, the composite action tools/scripts/lib/review-tier-workflow.test.ts and tools/scripts/review/run-facts-wiring.test.ts read, the skills and agent bodies they import, the sandcastle inputs tools/scripts/lib/sandcastle-cli-version.test.ts reads, the deployment pages tools/scripts/check-deploy-pipeline.test.ts copies, and the brand sources tools/scripts/generate-brand-logos.test.ts, check-web-app-icons.test.ts and check-mobile-app-icon.test.ts read — the brand-logo suite is the only thing in the tree that asserts those token names, since its generator is reached by no gate. A suite proves its checker works, and the checker itself still runs over the whole tree on every pull request through `yarn gates:run`; what this list must not omit is a tree a suite reads with no checker standing behind it.",
       "triggers": [
         "tools/**",
@@ -29,6 +30,7 @@
     {
       "id": "upstream:briefs:test",
       "ciStep": "Upstream Brief report contract and checker contracts",
+      "job": "tool-suites",
       "why": "The report contract, renderer, CLIs, and ledger suites that ship beside the upstream-brief Skill rather than under tools/scripts, so `tools:test`'s glob does not reach them (ADR 0084). Triggered by the Skill directory they live in and the adapter config they read.",
       "triggers": [
         ".agents/skills/upstream-brief/**",
@@ -38,6 +40,7 @@
     {
       "id": "openapi:check",
       "ciStep": "Check OpenAPI spec and generated client are in sync",
+      "job": "tool-suites",
       "why": "Regenerates the TSOA spec and the generated client, then asserts a clean tree — the Covering Gate for the generated API surface (ADR 0074's worked example, issue #408). The triggers are every input of the chain `api-specs:sync` runs: `apps/backend/**` rather than `apps/backend/src/**`, because `apps/backend/tsoa.json` is the generator config itself and holds the servers, securityDefinitions, specVersion and controller globs the spec is built from; then the sync script that rewrites the spec into libs/api-specs, the spec project, the generated client, and the generator config. `package.json` is a shared input, which is how a release version bump — the change that originally left the client stale — still runs it.",
       "triggers": [
         "apps/backend/**",
@@ -50,6 +53,7 @@
     {
       "id": "typecheck:tools-scripts",
       "ciStep": "Typecheck tools/scripts",
+      "job": "typecheck",
       "why": "The one TypeScript program no Nx project owns. ADR 0141 moves typecheck onto a per-project Inferred Target, so `nx affected -t typecheck` selects the projects a pull request can reach and the Nx computation cache covers the rest — but `tools/scripts` has no `project.json` on purpose (ADR 0135), and the plugin keys inference on `project.json`, so the `scripts` node Nx infers there from its `package.json` carries no `typecheck` target and `run-many` cannot reach its config. It stays the fixed job `check-typecheck.ts` runs, and this is what bounds it: the triggers are the tree that program compiles, which is not only tools/scripts. `include: [\"**/*.ts\"]` is rooted there, and `allowJs` pulls in the `.mjs` files beside it — `.agents/skills/upstream-brief/*.mjs`, which type the imports in `check-upstream-briefs.ts` and `copilot-hooks/upstream-brief-suggestion.ts` (ADR 0135 leaves those files out of the migration). Neither `tools:test` nor `upstream:briefs:test` type-checks anything, since `node --test` strips types, so dropping an export from one of them would otherwise reach `main` unchecked. The program does not extend `tsconfig.base.json`, so nothing outside those two trees changes its meaning except the TypeScript version, which `yarn.lock` and `package.json` already carry as shared inputs.",
       "triggers": ["tools/scripts/**", ".agents/skills/upstream-brief/**"]
     },

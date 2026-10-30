@@ -194,8 +194,8 @@ test('ci.yml test job runs affected projects on a pull request and the whole tre
 // affected step is the only one that may run on a pull request, and it must
 // diff the same range the Jest step diffs: a wrong --base or --head selects the
 // wrong projects and passes silently.
-test('ci.yml test job typechecks affected projects on a pull request and the whole tree otherwise', () => {
-  const job = jobBlock(CI, 'test');
+test('ci.yml typecheck job typechecks affected projects on a pull request and the whole tree otherwise', () => {
+  const job = jobBlock(CI, 'typecheck');
   const affected = stepNamed(job, 'Typecheck affected projects');
   assert.equal(ifOf(affected), "github.event_name == 'pull_request'");
   assert.match(runOf(affected), /nx affected -t typecheck/);
@@ -216,35 +216,69 @@ test('ci.yml test job typechecks affected projects on a pull request and the who
   assert.doesNotMatch(runOf(every), /affected|--base/);
 });
 
-// The defect worth catching: `typecheck` is cacheable per project (ADR 0141),
-// so a restore placed after it leaves a cacheable task with nothing to restore
-// from. Positions come from the exact `- name:` lines, so a renamed step reads
-// as missing and a reordered one moves its index past the restore.
+// The position of a step inside its job's text, from the exact `- name:` line.
+// Positions come from the exact `- name:` lines, so a renamed step reads as
+// missing and a reordered one moves its index past the restore.
+function stepIndex(job: string, jobId: string, name: string): number {
+  const line = `      - name: ${name}\n`;
+  const index = job.indexOf(line);
+  assert.notEqual(
+    index,
+    -1,
+    `the ${jobId} job has no step named exactly "${name}"`,
+  );
+  assert.equal(
+    job.indexOf(line, index + 1),
+    -1,
+    `the ${jobId} job has two steps named "${name}"`,
+  );
+  return index;
+}
+
+// The defect worth catching: `test`'s Nx tasks are cacheable per project, so a
+// restore placed after the generated Prisma client or the Jest steps leaves
+// those tasks with nothing to restore from.
 test("ci.yml restores the Nx computation cache before the test job's first cacheable task", () => {
   const job = jobBlock(CI, 'test');
-  const indexOfStep = (name: string): number => {
-    const line = `      - name: ${name}\n`;
-    const index = job.indexOf(line);
-    assert.notEqual(
-      index,
-      -1,
-      `the test job has no step named exactly "${name}"`,
+  const restore = stepIndex(job, 'test', 'Restore Nx computation cache');
+  for (const name of [
+    'Generate Prisma client',
+    'Test affected projects',
+    'Test every project',
+  ]) {
+    assert.ok(
+      restore < stepIndex(job, 'test', name),
+      `"${name}" runs before the Nx computation cache is restored, so a cacheable task has nothing to restore from`,
     );
-    assert.equal(
-      job.indexOf(line, index + 1),
-      -1,
-      `the test job has two steps named "${name}"`,
-    );
-    return index;
-  };
-  const restore = indexOfStep('Restore Nx computation cache');
+  }
+});
+
+// The defect worth catching: `typecheck` is cacheable per project (ADR 0141),
+// so a restore placed after it leaves a cacheable task with nothing to restore
+// from. The primary key and the first restore-key are the typecheck family. The
+// shared `-nx-22-` fallback that follows can still restore another target's
+// entry; that is harmless, because Nx entries are keyed by task hash.
+test('the typecheck job primary Nx cache key is the typecheck family, restored before its first cacheable step', () => {
+  const job = jobBlock(CI, 'typecheck');
+  const restoreStep = stepNamed(job, 'Restore Nx computation cache');
+  assert.match(
+    restoreStep,
+    /^ {10}key: \$\{\{ runner\.os \}\}-nx-22-typecheck-\$\{\{ github\.sha \}\}$/m,
+    'the typecheck job must use the typecheck key family as its primary key',
+  );
+  assert.match(
+    restoreStep,
+    /^ {10}restore-keys: \|\n {12}\$\{\{ runner\.os \}\}-nx-22-typecheck-\n/m,
+    'the first restore-key must be the typecheck family',
+  );
+  const restore = stepIndex(job, 'typecheck', 'Restore Nx computation cache');
   for (const name of [
     'Typecheck affected projects',
     'Typecheck every project',
     'Typecheck tools/scripts',
   ]) {
     assert.ok(
-      restore < indexOfStep(name),
+      restore < stepIndex(job, 'typecheck', name),
       `"${name}" runs before the Nx computation cache is restored, so a cacheable typecheck has nothing to restore from`,
     );
   }
@@ -256,26 +290,36 @@ test("ci.yml restores the Nx computation cache before the test job's first cache
 // job, so it must never run in CI on a pull request. The tools/scripts step
 // carries the one flag that narrows it to its own half.
 test('ci.yml does not typecheck the whole tree on a pull request', () => {
-  const job = uncommented(jobBlock(CI, 'test'));
-  for (const step of job.split(/^(?= {6}- name: )/m)) {
-    if (!/nx run-many -t typecheck\b/.test(step)) continue;
-    const name = /^ {6}- name: (.+)$/m.exec(step)?.[1]?.trim() ?? '(unnamed)';
-    assert.match(
-      ifOf(step) ?? '',
-      /github\.event_name != 'pull_request'/,
-      `"${name}" runs nx run-many -t typecheck without an if: that excludes pull_request, so every pull request compiles every project`,
+  // Every job, not only `typecheck`: a whole-tree step re-added to any other
+  // job must still exclude pull requests.
+  let wholeTreeSteps = 0;
+  for (const jobId of CI_JOB_IDS) {
+    const scanned = uncommented(jobBlock(CI, jobId));
+    assert.doesNotMatch(
+      scanned,
+      /typecheck:check/,
+      `${jobId} runs typecheck:check, which compiles the whole tree and the fixed tools/scripts job on a pull request; the whole-tree step must be nx run-many -t typecheck and the fixed job must be typecheck:tools-scripts`,
     );
+    for (const step of scanned.split(/^(?= {6}- name: )/m)) {
+      if (!/nx run-many -t typecheck\b/.test(step)) continue;
+      wholeTreeSteps += 1;
+      const name = /^ {6}- name: (.+)$/m.exec(step)?.[1]?.trim() ?? '(unnamed)';
+      assert.match(
+        ifOf(step) ?? '',
+        /github\.event_name != 'pull_request'/,
+        `${jobId}: "${name}" runs nx run-many -t typecheck without an if: that excludes pull_request, so every pull request compiles every project`,
+      );
+    }
   }
+  assert.ok(
+    wholeTreeSteps > 0,
+    'the scan found no nx run-many -t typecheck step; the whole-tree check is vacuous',
+  );
 
   assert.equal(
-    runOf(stepNamed(jobBlock(CI, 'test'), 'Typecheck tools/scripts')),
+    runOf(stepNamed(jobBlock(CI, 'typecheck'), 'Typecheck tools/scripts')),
     'corepack yarn typecheck:tools-scripts',
     'the Typecheck tools/scripts step must run the typecheck:tools-scripts script, the only way the fixed job is reached in CI',
-  );
-  assert.doesNotMatch(
-    job,
-    /typecheck:check/,
-    'a step in the test job runs typecheck:check, which compiles the whole tree and the fixed tools/scripts job on a pull request; the whole-tree step must be nx run-many -t typecheck and the fixed job must be typecheck:tools-scripts',
   );
 });
 
@@ -285,7 +329,7 @@ test('ci.yml does not typecheck the whole tree on a pull request', () => {
 // one the trigger describes.
 test('the tools/scripts typecheck step runs a package.json script, named by its gate id, that runs check-typecheck with --tools-scripts-only', () => {
   const invoked = /^corepack yarn (\S+)$/.exec(
-    runOf(stepNamed(jobBlock(CI, 'test'), 'Typecheck tools/scripts')),
+    runOf(stepNamed(jobBlock(CI, 'typecheck'), 'Typecheck tools/scripts')),
   )?.[1];
   assert.ok(
     invoked,

@@ -1192,19 +1192,22 @@
         </dd>
         <dt>checks</dt>
         <dd id="note-checks">
-          The five contexts the main-branch <b>ruleset</b> already requires
+          The eight contexts the main-branch <b>ruleset</b> already requires
           &mdash; not classic branch protection: <code>GET
           /branches/main/protection</code> returns 404, and the rules live in
           ruleset <code>*main*</code>, id 22235792, read via the GitHub API.
           <code>Authoritative Lockfile Policy</code>, <code>Secure Install
           Review</code>, <code>Setup Affected Context</code>,
-          <code>Lint</code>,
-          <code>Test</code> (<code>ci.yml:41, :160, :438, :586, :649</code>). The
+          <code>Lint</code>, <code>Test</code>, <code>Typecheck</code>,
+          <code>Tool Suites</code>, <code>E2E Report</code>
+          (<code>ci.yml:41, :160, :438, :586, :649, :825, :906, :1163</code>).
+          <code>Tool Suites</code> is skipped when none of its suites is
+          selected, and a skipped job reads as passing. The
           <code>Test</code> job sets a dummy <code>DATABASE_URL</code> for
           Prisma config loading only (<code>ci.yml:660</code>); the
           path-gated <code>Prisma Migration Gate</code> job starts a
           throwaway Postgres service and runs migrate deploy/diff separately
-          (<code>ci.yml:935</code>). Affected Jest runs against mocks without
+          (<code>ci.yml:1026</code>). Affected Jest runs against mocks without
           needing either service &mdash; which is why the Reviewer's
           <code>executed</code> evidence is feasible in CI, in the same
           environment.
@@ -1766,7 +1769,10 @@
       "Secure Install Review",
       "Setup Affected Context",
       "Lint",
-      "Test"
+      "Test",
+      "Typecheck",
+      "Tool Suites",
+      "E2E Report"
     ],
     "gateTierLabels": ["gate:mechanical", "gate:standard", "gate:full"],
     "agentVerdictCheck": "Agent Verdict",
@@ -1776,7 +1782,7 @@
 
 <script type="application/json" id="citation-anchors">
   {
-    "note": "Expected-content anchors for finding-lifecycle.html, verified against source on 2026-10-08",
+    "note": "Expected-content anchors for finding-lifecycle.html, verified against source on 2026-10-30",
     "anchors": {
       "SKILL.md:14-15": {
         "file": ".agents/skills/code-review/SKILL.md",
@@ -1840,7 +1846,19 @@
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://localhost:5432/myorganiser"
       },
-      "ci.yml:935": {
+      "ci.yml:825": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: Typecheck"
+      },
+      "ci.yml:906": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: Tool Suites"
+      },
+      "ci.yml:1163": {
+        "file": ".github/workflows/ci.yml",
+        "start": "name: E2E Report"
+      },
+      "ci.yml:1026": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser"
       },

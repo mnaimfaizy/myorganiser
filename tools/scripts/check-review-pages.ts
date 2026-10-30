@@ -64,6 +64,13 @@ export const AGENT_REVIEW_RAN_CHECK = 'Agent Review Ran';
  * this list changing first (ADR 0073 item 4: the ruleset and this statement
  * of it change together, and this file's own sanity check is what forces
  * this list to move first).
+ *
+ * `E2E Report` joined when #1397 made ADR 0050's blocking lane required.
+ * `Typecheck` and `Tool Suites` joined when they were split out of `Test` to
+ * run beside it: each held checks `Test` used to block on, so leaving them
+ * unrequired would let a type error or a failing contract suite merge. A
+ * `Tool Suites` run that its triggers skip reports as skipped, which the
+ * ruleset reads as passing.
  */
 export const REQUIRED_CHECK_CONTEXTS = [
   'Authoritative Lockfile Policy',
@@ -71,6 +78,9 @@ export const REQUIRED_CHECK_CONTEXTS = [
   'Setup Affected Context',
   'Lint',
   'Test',
+  'Typecheck',
+  'Tool Suites',
+  'E2E Report',
 ];
 
 const fail: (msg: string) => never = (msg) => {

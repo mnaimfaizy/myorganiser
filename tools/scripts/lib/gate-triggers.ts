@@ -55,12 +55,11 @@ export interface GateTriggerSuite {
   /** The step this suite is, asserted by the workflow-shape suite. */
   ciStep: string;
   /**
-   * The job `ciStep` lives in, when it is not `test`. Most heavy suites are
-   * a step inside the `Test` job, so this is omitted there; a suite with a
-   * cost worth skipping the job for entirely — the Postgres service the
-   * Prisma migration drift check needs — carries its own job instead (ADR
-   * 0140, issue #1394), and this is how the workflow-shape suite knows where
-   * to look for `ciStep`.
+   * The job `ciStep` lives in, when it is not `test`. The heavy suites run
+   * beside `Test` rather than inside it — `Tool Suites`, `Typecheck`, and the
+   * `Prisma Migration Gate`, whose Postgres service is a cost worth skipping
+   * a whole job for (ADR 0140, issue #1394) — and this is how the
+   * workflow-shape suite knows where to look for `ciStep`.
    */
   job?: string;
   /** Why these globs, in the config rather than in a code comment. */

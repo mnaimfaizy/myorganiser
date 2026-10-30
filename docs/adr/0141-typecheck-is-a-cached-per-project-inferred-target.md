@@ -114,8 +114,10 @@ carry a `typecheck` target that owns `tools/scripts/tsconfig.json`.
    nothing and `tsc` reports TS18003 ("no inputs were found"); that is a vacuous pass rather than a
    type error, so it is normalised to a pass — but only when it is the sole diagnostic.
 
-7. **A pull request typechecks what it can break; `main` typechecks everything.** The `Test` job
-   runs `nx affected -t typecheck` on `pull_request` and `nx run-many -t typecheck` otherwise, the
+7. **A pull request typechecks what it can break; `main` typechecks everything.** The `Typecheck`
+   job, which runs beside `Test` rather than inside it so a whole-tree run does not compile and
+   then test in series, runs `nx affected -t typecheck` on `pull_request` and
+   `nx run-many -t typecheck` otherwise, the
    same split Lint and the Jest step already use. The `tools/scripts` step is path-gated on the
    `typecheck:tools-scripts` triggers in `tools/config/gate-triggers.json`
    ([ADR 0140](0140-a-heavy-assertion-gate-is-path-gated-and-a-covering-gate-is-a-trigger-superset.md)),
@@ -134,8 +136,9 @@ carry a `typecheck` target that owns `tools/scripts/tsconfig.json`.
 - A pull request that changes one library typechecks that library and its dependents. On the
   baseline `libs/web/pages/legal` diff that is `web-pages-legal`, `web` and `web-e2e`; the other
   34 projects are not compiled at all, rather than compiled and cached.
-- The `Test` job's Nx computation cache is restored before the typecheck steps rather than before
-  the Jest step, or a cacheable typecheck would have nothing to restore from.
+- The `Typecheck` job restores its own Nx computation cache family
+  (`<os>-nx-22-typecheck-<commit>`) before its first step, or a cacheable typecheck would have
+  nothing to restore from. `main`'s `run-many` saves the whole-tree baseline for it.
 - `yarn typecheck:check` no longer takes an Nx graph file. CI builds one graph for the two
   checkers in the `Test` job that still read it (`lint:coverage:check`, `docs:nx-targets:check`).
 - `check-typecheck.ts` shrinks to the two halves of item 6 and asserts one direction: a config

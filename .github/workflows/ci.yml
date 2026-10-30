@@ -670,18 +670,6 @@ jobs:
         with:
           node-version: '22.18'
 
-      - name: Setup Java 21
-        # openapi:check regenerates the client via openapi-generator-cli, which is
-        # a Java tool. Pinned explicitly rather than relying on the runner image's
-        # preinstalled JDK, which is not part of the runner's stability contract.
-        # Nothing else in this job needs a JDK, so it is set up exactly when
-        # openapi:check runs (ADR 0140).
-        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -698,33 +686,6 @@ jobs:
       - name: Verify frozen lockfile
         if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: git diff --exit-code -- yarn.lock
-
-      # One glob target for every Contract Suite under tools/scripts (ADR
-      # 0135), in place of the per-suite steps this job used to carry one at
-      # a time — the Sandcastle decision contracts included, which are
-      # tools/scripts/lib/sandcastle-*.test.ts like any other suite here.
-      # This glob is the only thing that wires a suite (the gate-coverage
-      # meta-gate below); run one in isolation with `node --test <file>`.
-      # upstream:briefs:test still runs on its own further
-      # down: it also runs suites under .agents/skills/upstream-brief, which
-      # this glob does not reach.
-      #
-      # Path-gated on a pull request (ADR 0140): a suite proves its checker
-      # works, and the checkers themselves still run over the whole tree
-      # through the steps below. `tools:test` stays spelled exactly here, so
-      # the Meta-Gate still reads this job as the glob runner's wiring.
-      - name: Run tools/scripts contract suites
-        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true'
-        run: corepack yarn tools:test
-
-      - name: Check OpenAPI spec and generated client are in sync
-        # Regenerates the spec and client, then asserts a clean tree. Runs before
-        # the hygiene steps so an unrelated step cannot dirty the tree first.
-        # The Covering Gate for the generated API surface, so its triggers are
-        # asserted against the review-obligation catalogue by
-        # `yarn covering-gates:check` (ADR 0074, ADR 0140).
-        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
-        run: corepack yarn openapi:check
 
       - name: Check design token outputs are in sync
         # Same shape as openapi:check and for the same reason: src/generated is
@@ -787,12 +748,9 @@ jobs:
       - name: Check lint gate coverage
         run: corepack yarn lint:coverage:check "$NX_GRAPH_FILE"
 
-      # Restored before the first Nx task this job runs, not before the Jest
-      # step: `typecheck` below is cacheable per project (ADR 0141), so a
-      # pull request whose diff cannot reach a project restores that
-      # project's result instead of compiling it. Restoring after the
-      # typecheck steps would leave the whole point of caching them on the
-      # table.
+      # Restored before the first Nx task this job runs, so the generated
+      # Prisma client and every `test` result a pull request's diff cannot
+      # reach come out of the cache. `Typecheck` restores its own family.
       - name: Restore Nx computation cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -804,42 +762,12 @@ jobs:
 
       # apps/backend/src/prisma is generated and gitignored, so a fresh runner
       # has no @prisma/client to compile against. backend:test declares this
-      # same dependency; typechecking needs it just as much, and runs first.
-      # The inferred `typecheck` target declares it too (ADR 0141), so
-      # `run-many` would generate it anyway — this step keeps it out of the
-      # affected graph, where a pull request that does not reach the backend
-      # should not pay for it either way.
+      # same dependency, so Nx would run it before `backend:test` anyway; this
+      # step runs it up front so the backend suites start without it in the
+      # affected graph. The `Typecheck` job gets it the same way, through the
+      # inferred `typecheck` target's own dependency (ADR 0141).
       - name: Generate Prisma client
         run: corepack yarn nx run backend:generate-types
-
-      # Each project's production and spec programs, as one cacheable Nx task
-      # per project (ADR 0141). Affected on a pull request, whole tree on a
-      # push — the same split as Lint and the Jest step below, and for the same
-      # two reasons: `main`'s guarantee, and a full Nx cache baseline for pull
-      # requests to restore from. Compiling all 73 configs in one workspace
-      # script cost 200s on every pull request however small the diff; a
-      # single-library change now compiles that library and its dependents.
-      - name: Typecheck affected projects
-        if: github.event_name == 'pull_request'
-        run: corepack yarn nx affected -t typecheck --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
-
-      - name: Typecheck every project
-        if: github.event_name != 'pull_request'
-        run: corepack yarn nx run-many -t typecheck
-
-      # tools/scripts has no project.json on purpose (ADR 0135), and the
-      # plugin keys inference on project.json, so the `scripts` node Nx infers
-      # there from its package.json carries no typecheck target and neither
-      # `affected` nor `run-many` above reaches its config. It is a fixed job,
-      # path-gated like every other heavy suite (ADR 0140): `run_all` is set
-      # on every push and on any resolver failure, so `main` still pays for
-      # it. The command is the gate id's own script, which is what
-      # tools/config/gate-triggers.json requires of a suite. `typecheck:check`
-      # with no flag runs this half and `run-many` together, and is the
-      # whole-tree command to run locally.
-      - name: Typecheck tools/scripts
-        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_typecheck_tools_scripts == 'true'
-        run: corepack yarn typecheck:tools-scripts
 
       - name: Check libs markdown allowlist
         run: corepack yarn libs:markdown:check
@@ -868,13 +796,6 @@ jobs:
       - name: Check documented Nx targets resolve
         run: corepack yarn docs:nx-targets:check "$NX_GRAPH_FILE"
 
-      # These suites ship beside the upstream-brief Skill rather than under
-      # tools/scripts, so `tools:test`'s glob does not reach them — which is
-      # also why they are their own path-gated suite (ADR 0140).
-      - name: Upstream Brief report contract and checker contracts
-        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
-        run: corepack yarn upstream:briefs:test
-
       # ADR 0064: the Escape Copy must be openable by a tool that needs nothing
       # of ours, and a gate must assert the tool still opens a freshly produced
       # envelope. This builds the reader and runs it against an envelope the
@@ -895,6 +816,176 @@ jobs:
       - name: Test every project
         if: github.event_name != 'pull_request'
         run: corepack yarn nx run-many -t test
+
+  # Split out of `Test` so it runs beside it rather than before it: on a
+  # whole-tree run (every push to `main`, and every pull request that touches
+  # a shared input) typecheck and Jest each take minutes, and one job ran
+  # them back to back.
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: setup
+
+    env:
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. No step here touches a database.
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Restore Nx computation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-22-typecheck-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-22-typecheck-
+            ${{ runner.os }}-nx-22-
+
+      # Each project's production and spec programs, as one cacheable Nx task
+      # per project (ADR 0141). Affected on a pull request, whole tree on a
+      # push — the same split as Lint and the Jest step in `Test`, and for the same
+      # two reasons: `main`'s guarantee, and a full Nx cache baseline for pull
+      # requests to restore from. Compiling all 73 configs in one workspace
+      # script cost 200s on every pull request however small the diff; a
+      # single-library change now compiles that library and its dependents.
+      - name: Typecheck affected projects
+        if: github.event_name == 'pull_request'
+        run: corepack yarn nx affected -t typecheck --base=${{ needs.setup.outputs.nx_base }} --head=${{ needs.setup.outputs.nx_head }}
+
+      - name: Typecheck every project
+        if: github.event_name != 'pull_request'
+        run: corepack yarn nx run-many -t typecheck
+
+      # tools/scripts has no project.json on purpose (ADR 0135), and the
+      # plugin keys inference on project.json, so the `scripts` node Nx infers
+      # there from its package.json carries no typecheck target and neither
+      # `affected` nor `run-many` above reaches its config. It is a fixed job,
+      # path-gated like every other heavy suite (ADR 0140): `run_all` is set
+      # on every push and on any resolver failure, so `main` still pays for
+      # it. The command is the gate id's own script, which is what
+      # tools/config/gate-triggers.json requires of a suite. `typecheck:check`
+      # with no flag runs this half and `run-many` together, and is the
+      # whole-tree command to run locally.
+      - name: Typecheck tools/scripts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_typecheck_tools_scripts == 'true'
+        run: corepack yarn typecheck:tools-scripts
+
+  # The path-gated heavy suites that prove tooling rather than the app
+  # (ADR 0140), split out of `Test` so they run beside it. The job is skipped
+  # when none of them is selected, and a skipped job reads as passing to the
+  # ruleset, so a pull request that cannot reach them never waits on a runner.
+  tool-suites:
+    name: Tool Suites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: setup
+    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' }}
+
+    env:
+      # Prisma generate reads this without connecting, to satisfy Prisma v7
+      # config loading. No step here touches a database.
+      DATABASE_URL: postgresql://localhost:5432/myorganiser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Setup Java 21
+        # openapi:check regenerates the client via openapi-generator-cli, which is
+        # a Java tool. Pinned explicitly rather than relying on the runner image's
+        # preinstalled JDK, which is not part of the runner's stability contract.
+        # Nothing else in this job needs a JDK, so it is set up exactly when
+        # openapi:check runs (ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      # One glob target for every Contract Suite under tools/scripts (ADR
+      # 0135), in place of the per-suite steps this job used to carry one at
+      # a time — the Sandcastle decision contracts included, which are
+      # tools/scripts/lib/sandcastle-*.test.ts like any other suite here.
+      # This glob is the only thing that wires a suite (the gate-coverage
+      # meta-gate below); run one in isolation with `node --test <file>`.
+      # upstream:briefs:test still runs on its own below: it also runs suites under .agents/skills/upstream-brief, which
+      # this glob does not reach.
+      #
+      # Path-gated on a pull request (ADR 0140): a suite proves its checker
+      # works, and the checkers themselves still run over the whole tree
+      # through the `Test` job. `tools:test` stays spelled exactly here, so
+      # the Meta-Gate still reads this job as the glob runner's wiring.
+      - name: Run tools/scripts contract suites
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true'
+        run: corepack yarn tools:test
+
+      - name: Check OpenAPI spec and generated client are in sync
+        # Regenerates the spec and client, then asserts a clean tree. It shares
+        # this job only with suites that write nothing to the tree.
+        # The Covering Gate for the generated API surface, so its triggers are
+        # asserted against the review-obligation catalogue by
+        # `yarn covering-gates:check` (ADR 0074, ADR 0140).
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_openapi_check == 'true'
+        run: corepack yarn openapi:check
+
+      # These suites ship beside the upstream-brief Skill rather than under
+      # tools/scripts, so `tools:test`'s glob does not reach them — which is
+      # also why they are their own path-gated suite (ADR 0140).
+      - name: Upstream Brief report contract and checker contracts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
+        run: corepack yarn upstream:briefs:test
 
   # Tier 2 of the Prisma migration gate (ADR 0094): applies the migration
   # history to an ephemeral Postgres and asserts applying it reproduces the
@@ -1175,6 +1266,7 @@ jobs:
       - setup
       - lint
       - test
+      - typecheck
 
     steps:
       - name: Checkout repository
@@ -1308,6 +1400,7 @@ jobs:
       - setup
       - lint
       - test
+      - typecheck
 
     steps:
       - name: Checkout repository

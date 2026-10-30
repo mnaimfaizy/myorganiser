@@ -31,6 +31,7 @@ const E2E_LIVE_LOGOUT = jobBlock(CI, 'e2e-live-logout');
 const BUILD_BACKEND = jobBlock(CI, 'build-backend');
 const BUILD_FRONTEND = jobBlock(CI, 'build-frontend');
 const BUILD_STORYBOOK = jobBlock(CI, 'build-storybook');
+const BUILD_MOBILE = jobBlock(CI, 'build-mobile');
 
 /**
  * The job ids a job's `needs:` names, sorted. Reads both the scalar form
@@ -145,8 +146,22 @@ test('build-frontend skips pull_request runs, ANDed with its web affected-projec
   );
 });
 
-test('build-frontend keeps its lint and test wait list unchanged', () => {
-  assert.deepEqual(needsOf(BUILD_FRONTEND), ['lint', 'setup', 'test']);
+test('build-frontend waits on Typecheck as well as Lint, Setup and Test', () => {
+  assert.deepEqual(needsOf(BUILD_FRONTEND), [
+    'lint',
+    'setup',
+    'test',
+    'typecheck',
+  ]);
+});
+
+test('build-mobile waits on Lint, Setup, Test and Typecheck', () => {
+  assert.deepEqual(needsOf(BUILD_MOBILE), [
+    'lint',
+    'setup',
+    'test',
+    'typecheck',
+  ]);
 });
 
 test('build-storybook needs setup instead of the removed prepare-dependencies job', () => {

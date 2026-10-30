@@ -46,8 +46,13 @@ const config = readGateTriggers({ cwd: REPO_ROOT });
 const ifOf = (step: string): string | undefined =>
   step.match(/^ {8}if: (.+)$/m)?.[1];
 
+/** A job's own `if:`, unwrapped. A job's `if:` sits at four spaces. */
+const jobIf = (job: string): string | undefined =>
+  job.match(/^ {4}if: (.+)$/m)?.[1]?.trim();
+
 const SETUP = jobBlock(CI, 'setup');
 const TEST = jobBlock(CI, 'test');
+const TOOL_SUITES = jobBlock(CI, 'tool-suites');
 
 /**
  * The `run:` script of a step, dedented. A block scalar runs until the first
@@ -213,11 +218,11 @@ test('the test job depends on setup, so the gate outputs it reads exist', () => 
 });
 
 for (const suite of config.suites) {
-  // A suite that carries its own job is gated at the job, not the step: its
-  // shape is asserted by prisma-migration-gate-workflow.test.ts instead.
-  if (suite.job) continue;
+  // The Prisma Migration Gate job is gated at the job, and its drift step has
+  // no step-level `if:`; prisma-migration-gate-workflow.test.ts asserts it.
+  if (suite.job === 'prisma-migration-gate') continue;
   test(`${suite.id} runs under the run-all fallback or its own flag via "${suite.ciStep}"`, () => {
-    const step = stepNamed(TEST, suite.ciStep);
+    const step = stepNamed(jobBlock(CI, suite.job ?? 'test'), suite.ciStep);
 
     assert.deepEqual(
       orTerms(ifOf(step)),
@@ -227,11 +232,29 @@ for (const suite of config.suites) {
   });
 }
 
+test('the tool-suites job is gated on the OR of every suite it holds, so none can be skipped by the job-level if', () => {
+  const held = config.suites.filter((suite) => suite.job === 'tool-suites');
+  assert.notEqual(
+    held.length,
+    0,
+    'the config must name at least one suite that runs in tool-suites',
+  );
+  const expected = [
+    ...new Set(held.flatMap((suite) => expectedGateIfTerms(suite))),
+  ].sort();
+
+  assert.deepEqual(
+    orTerms(jobIf(TOOL_SUITES)),
+    expected,
+    "the tool-suites job-level if must be the OR of each held suite's run-all and own gate output",
+  );
+});
+
 test('Setup Java 21 is gated on the openapi:check suite and no other', () => {
   const openapi = config.suites.find((suite) => suite.id === 'openapi:check');
   assert.ok(openapi, 'openapi:check must be a path-gated suite in the config');
 
-  const java = stepNamed(TEST, 'Setup Java 21');
+  const java = stepNamed(TOOL_SUITES, 'Setup Java 21');
 
   assert.deepEqual(
     orTerms(ifOf(java)),
@@ -246,6 +269,6 @@ test('Setup Java 21 is gated on the openapi:check suite and no other', () => {
   );
 });
 
-test('tools:test is still spelled verbatim in the test job for the Meta-Gate', () => {
-  assert.match(TEST, /^ {8}run: corepack yarn tools:test$/m);
+test('tools:test is still spelled verbatim in the tool-suites job for the Meta-Gate', () => {
+  assert.match(TOOL_SUITES, /^ {8}run: corepack yarn tools:test$/m);
 });
