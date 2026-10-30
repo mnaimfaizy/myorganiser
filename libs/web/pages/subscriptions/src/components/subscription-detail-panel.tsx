@@ -2,6 +2,7 @@
 
 import { formatMoney } from '@myorganiser/core';
 import {
+  isSafeLink,
   SubscriptionStatusEnum,
   type SubscriptionRecord,
 } from '@myorganiser/vault-core';
@@ -123,7 +124,7 @@ export function SubscriptionDetailPanel({
           </>
         ) : null}
 
-        {subscription.link ? (
+        {subscription.link && isSafeLink(subscription.link) ? (
           <>
             <dt className="text-muted-foreground">Website</dt>
             <dd className="min-w-0">

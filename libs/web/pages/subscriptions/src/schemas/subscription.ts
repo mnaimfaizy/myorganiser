@@ -1,4 +1,5 @@
 import {
+  isSafeLink,
   SubscriptionBillingCycleEnum,
   SubscriptionPaymentMethodEnum,
   SubscriptionRenewalTypeEnum,
@@ -56,7 +57,9 @@ export const subscriptionFormSchema = z.object({
   link: z
     .string()
     .trim()
-    .url({ error: 'Enter a full web address, starting with https://' })
+    .refine((value) => !value || isSafeLink(value), {
+      message: 'Enter a full web address, starting with https://',
+    })
     .optional()
     .or(z.literal('')),
 });

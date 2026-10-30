@@ -1,6 +1,6 @@
 'use client';
 
-import type { UsageLocationRecord } from '@myorganiser/vault-core';
+import { isSafeLink, type UsageLocationRecord } from '@myorganiser/vault-core';
 import {
   Button,
   Checkbox,
@@ -70,7 +70,7 @@ export function PlaceRow({
         </span>
       </div>
       <StatusPill tone={pillSpec.tone}>{pillSpec.label}</StatusPill>
-      {location.link && !location.changed ? (
+      {location.link && !location.changed && isSafeLink(location.link) ? (
         <Button asChild variant="outline" size="sm">
           <a href={location.link} target="_blank" rel="noreferrer">
             Update online <span aria-hidden="true">↗</span>

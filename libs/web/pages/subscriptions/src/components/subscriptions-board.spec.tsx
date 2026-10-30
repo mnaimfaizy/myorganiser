@@ -327,6 +327,49 @@ describe('SubscriptionsBoard', () => {
       ).not.toBeInTheDocument();
     });
 
+    it('shows a Manage plan link in the detail panel for an https link', () => {
+      render(
+        <SubscriptionsBoard
+          page={makeSubscriptionsPageController([
+            { ...spotify, link: 'https://example.com' },
+          ])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /^Spotify/ }));
+
+      const panel = screen.getByRole('complementary', {
+        name: 'Subscription detail',
+      });
+      expect(
+        within(panel).getByRole('link', { name: /Manage plan/ }),
+      ).toHaveAttribute('href', 'https://example.com');
+    });
+
+    it('omits the Website row and any link in the detail panel for a javascript: link', () => {
+      render(
+        <SubscriptionsBoard
+          page={makeSubscriptionsPageController([
+            // eslint-disable-next-line no-script-url -- deliberate unsafe-scheme fixture for issue #1281
+            { ...spotify, link: 'javascript:alert(1)' },
+          ])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /^Spotify/ }));
+
+      const panel = screen.getByRole('complementary', {
+        name: 'Subscription detail',
+      });
+      expect(within(panel).queryByText('Website')).not.toBeInTheDocument();
+      expect(
+        within(panel).queryByRole('link', { name: /Manage plan/ }),
+      ).not.toBeInTheDocument();
+      expect(panel.querySelector('a[href^="javascript:"]')).toBeNull();
+    });
+
     it('Edit opens the edit form with the record values and submits through updateSubscription', async () => {
       const page = makeSubscriptionsPageController(FIXTURE);
       render(<SubscriptionsBoard page={page} variant="desktop" />);

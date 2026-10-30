@@ -7,6 +7,7 @@ import {
   splitAddressesByStatus,
   readUsageLocations,
   isNotified,
+  openableUsageLocationLink,
   countUnnotified,
   describeToNotify,
   notifiedProgress,
@@ -351,6 +352,44 @@ describe('contactModel', () => {
     it('returns false when changed is null', () => {
       const location = { id: 'ul1', changed: null } as any;
       expect(isNotified(location)).toBe(false);
+    });
+  });
+
+  describe('openableUsageLocationLink', () => {
+    it('returns an https link', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'https://example.com',
+      };
+      expect(openableUsageLocationLink(location)).toBe('https://example.com');
+    });
+
+    it('returns the link trimmed of surrounding whitespace', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: '  https://example.com  ',
+      };
+      expect(openableUsageLocationLink(location)).toBe('https://example.com');
+    });
+
+    it('returns null for a javascript: link', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'javascript:alert(1)',
+      };
+      expect(openableUsageLocationLink(location)).toBeNull();
+    });
+
+    it('returns null when link is missing', () => {
+      const location: DecryptedUsageLocation = { id: 'ul1' };
+      expect(openableUsageLocationLink(location)).toBeNull();
+    });
+
+    it('returns null for an empty or whitespace-only link', () => {
+      const empty: DecryptedUsageLocation = { id: 'ul1', link: '' };
+      const blank: DecryptedUsageLocation = { id: 'ul1', link: '   ' };
+      expect(openableUsageLocationLink(empty)).toBeNull();
+      expect(openableUsageLocationLink(blank)).toBeNull();
     });
   });
 

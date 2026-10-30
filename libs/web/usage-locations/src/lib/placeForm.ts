@@ -1,19 +1,11 @@
 import {
+  isSafeLink,
   OrganisationTypeEnum,
   PriorityEnum,
   UpdateMethodEnum,
   type UsageLocationRecord,
 } from '@myorganiser/vault-core';
 import { z } from 'zod';
-
-const isHttpUrl = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-};
 
 export const placeFormSchema = z.object({
   orgName: z.string().trim().min(1, 'Organisation name is required'),
@@ -23,7 +15,7 @@ export const placeFormSchema = z.object({
   link: z
     .string()
     .trim()
-    .refine((value) => !value || isHttpUrl(value), {
+    .refine((value) => !value || isSafeLink(value), {
       message: 'Enter a valid URL, including http:// or https://',
     })
     .optional(),

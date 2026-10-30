@@ -7,6 +7,7 @@ import {
   formatStoredDate,
   hasVisibleSubscriptions,
   monthlyEquivalentExamples,
+  openableSubscriptionLink,
   parseAmountDraft,
   selectSubscriptionListView,
   toPickerDate,
@@ -641,6 +642,38 @@ describe('subscriptionModel', () => {
       const result = selectSubscriptionListView(records, 'cancelled', now);
 
       expect(result.items.map((s) => s.id)).toEqual(['aug', 'jun', 'none']);
+    });
+  });
+
+  describe('openableSubscriptionLink', () => {
+    it('returns an https link', () => {
+      expect(
+        openableSubscriptionLink({ id: 'sub1', link: 'https://example.com' }),
+      ).toBe('https://example.com');
+    });
+
+    it('returns the link trimmed of surrounding whitespace', () => {
+      expect(
+        openableSubscriptionLink({
+          id: 'sub1',
+          link: '  https://example.com  ',
+        }),
+      ).toBe('https://example.com');
+    });
+
+    it('returns null for a javascript: link', () => {
+      expect(
+        openableSubscriptionLink({ id: 'sub1', link: 'javascript:alert(1)' }),
+      ).toBeNull();
+    });
+
+    it('returns null when link is missing', () => {
+      expect(openableSubscriptionLink({ id: 'sub1' })).toBeNull();
+    });
+
+    it('returns null for an empty or whitespace-only link', () => {
+      expect(openableSubscriptionLink({ id: 'sub1', link: '' })).toBeNull();
+      expect(openableSubscriptionLink({ id: 'sub1', link: '   ' })).toBeNull();
     });
   });
 

@@ -2,6 +2,7 @@
 
 import { formatMoney } from '@myorganiser/core';
 import {
+  isSafeLink,
   SubscriptionStatusEnum,
   type SubscriptionRecord,
 } from '@myorganiser/vault-core';
@@ -133,7 +134,7 @@ export function SubscriptionDetailScreen({
             </div>
           ))}
         </dl>
-        {subscription.link ? (
+        {subscription.link && isSafeLink(subscription.link) ? (
           <ListGroupRow
             asChild
             interactive

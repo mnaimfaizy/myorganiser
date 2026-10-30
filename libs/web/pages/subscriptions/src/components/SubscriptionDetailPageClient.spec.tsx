@@ -132,6 +132,42 @@ describe('SubscriptionDetailPageClient', () => {
       });
     });
 
+    it('shows a Manage plan on the website link for an https link', () => {
+      setController(
+        makeSubscriptionsPageController([
+          makeSubscriptionRecord({ ...netflix, link: 'https://example.com' }),
+        ]),
+      );
+
+      render(<SubscriptionDetailPageClient subscriptionId="sub-netflix" />);
+
+      expect(
+        screen.getByRole('link', { name: /Manage plan on the website/ }),
+      ).toHaveAttribute('href', 'https://example.com');
+    });
+
+    it('does not render the Manage plan on the website row for a javascript: link', () => {
+      setController(
+        makeSubscriptionsPageController([
+          makeSubscriptionRecord({
+            ...netflix,
+            // eslint-disable-next-line no-script-url -- deliberate unsafe-scheme fixture for issue #1281
+            link: 'javascript:alert(1)',
+          }),
+        ]),
+      );
+
+      render(<SubscriptionDetailPageClient subscriptionId="sub-netflix" />);
+
+      expect(
+        screen.queryByText(/Manage plan on the website/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: /Manage plan on the website/ }),
+      ).not.toBeInTheDocument();
+      expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
+    });
+
     it('redirects to the list when the subscription is not found after loading', () => {
       setController(makeSubscriptionsPageController([]));
 
