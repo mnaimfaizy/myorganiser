@@ -27,6 +27,7 @@ import { TaskQuickAdd } from './task-quick-add';
 import { TasksAllClear } from './tasks-all-clear';
 import { TasksBoardList } from './tasks-board-list';
 import type { TaskBoardSection } from './tasks-board-list';
+import { TasksFilteredEmpty } from './tasks-filtered-empty';
 import { TasksHeader } from './tasks-header';
 
 export interface TasksBoardProps {
@@ -207,6 +208,11 @@ export function TasksBoard({
     setDeletingTask(selectedTask ?? null);
   }, [selectedTask]);
 
+  const handleClearFilters = useCallback(() => {
+    setStatusFilter('open');
+    setContextFilter('all');
+  }, []);
+
   const handleDeleteOpenChange = useCallback((open: boolean) => {
     if (!open) setDeletingTask(null);
   }, []);
@@ -223,17 +229,28 @@ export function TasksBoard({
     setDeletingTask(null);
   }, [deleteTask, deletingTask]);
 
+  // "All clear" means no open Task in any context, so both its open check and
+  // its done-this-week figure read every live Task, not the context-scoped
+  // view.counts.
+  const globalCounts = countTasks(
+    tasks.filter((t) => !t.archived),
+    now,
+  );
   const showAllClear =
-    !loading && statusFilter === 'open' && view.counts.open === 0;
+    !loading && statusFilter === 'open' && globalCounts.open === 0;
+  const showFilteredEmpty =
+    !loading && !showAllClear && view.sections.length === 0;
   const summary = loading ? '' : formatTaskSummary(view.counts, variant);
 
   const list = loading ? null : showAllClear ? (
     <TasksAllClear
-      doneThisWeek={view.counts.doneThisWeek}
+      doneThisWeek={globalCounts.doneThisWeek}
       onShowDone={handleShowDone}
       onAddTask={isPhone ? undefined : handleAddRequest}
       variant={variant}
     />
+  ) : showFilteredEmpty ? (
+    <TasksFilteredEmpty onClearFilters={handleClearFilters} variant={variant} />
   ) : (
     <TasksBoardList
       sections={view.sections}

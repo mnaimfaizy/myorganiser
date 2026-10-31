@@ -311,6 +311,196 @@ describe('TasksBoard', () => {
       ).toBeInTheDocument();
     });
 
+    it.each([
+      { chip: 'In progress · 0', label: 'in progress' },
+      { chip: 'Blocked · 0', label: 'blocked' },
+      { chip: 'Done', label: 'done' },
+      { chip: 'Archived', label: 'archived' },
+    ])(
+      'shows the filtered-empty state when the $label chip matches no tasks',
+      ({ chip }) => {
+        const planTrip = makeTask({
+          id: 'p',
+          title: 'Plan trip',
+          dueDate: '2026-10-30',
+          context: 'personal',
+        });
+        render(
+          <TasksBoard
+            page={makeTasksPageController([planTrip])}
+            variant="desktop"
+          />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: chip }));
+
+        expect(
+          screen.getByText('No tasks match these filters.'),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'Clear filters' }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('heading', { name: 'All clear' }),
+        ).not.toBeInTheDocument();
+        expect(headingTexts(2)).toEqual([]);
+      },
+    );
+
+    it('shows the filtered-empty state, not all-clear, when the context hides every open task', () => {
+      const shipDraft = makeTask({
+        id: 'w',
+        title: 'Ship draft',
+        dueDate: '2026-10-22',
+        context: 'work',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([shipDraft])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Ship draft' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open · 0' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('shows the filtered-empty state when the Blocked chip matches no task in the Work context', () => {
+      const workTask = makeTask({
+        id: 'x1',
+        title: 'Draft memo',
+        dueDate: '2026-10-25',
+        context: 'work',
+      });
+      const personalBlocked = makeTask({
+        id: 'x2',
+        title: 'Call plumber',
+        dueDate: '2026-10-22',
+        context: 'personal',
+        status: 'blocked',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([workTask, personalBlocked])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Work' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Blocked · 0' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Clear filters' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(headingTexts(2)).toEqual([]);
+      expect(
+        screen.getByRole('button', { name: 'Blocked · 0' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('keeps the all-clear state under a narrowed context when no task is open anywhere', () => {
+      render(
+        <TasksBoard
+          page={makeTasksPageController([writeNotes])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByRole('heading', { name: 'All clear' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('No tasks match these filters.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('counts done-this-week across every context on the all-clear state under a narrowed context', () => {
+      const workDone = makeTask({
+        id: 'y1',
+        title: 'File expenses',
+        context: 'work',
+        status: 'done',
+        closedAt: DONE_THIS_WEEK,
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([workDone, writeNotes])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByRole('heading', { name: 'All clear' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Nothing open. 2 tasks done this week.'),
+      ).toBeInTheDocument();
+    });
+
+    it('Clear filters resets the context to All and the status to Open, and re-shows the hidden task', () => {
+      const shipDraft = makeTask({
+        id: 'w',
+        title: 'Ship draft',
+        dueDate: '2026-10-22',
+        context: 'work',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([shipDraft])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+      expect(
+        screen.queryByText('No tasks match these filters.'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Personal' })).not.toBeChecked();
+      expect(screen.getByRole('button', { name: 'Open · 1' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(
+        screen.getByRole('button', { name: 'Ship draft' }),
+      ).toBeInTheDocument();
+    });
+
     it('renders neither sections nor the all-clear state while loading', () => {
       render(
         <TasksBoard
@@ -565,6 +755,93 @@ describe('TasksBoard', () => {
 
       expect(
         screen.getByRole('textbox', { name: 'New task' }),
+      ).toBeInTheDocument();
+    });
+
+    it('shows the filtered-empty state when the Blocked chip matches no task in the Work context, and Clear filters restores Open and All', () => {
+      const workTask = makeTask({
+        id: 'x1',
+        title: 'Draft memo',
+        dueDate: '2026-10-25',
+        context: 'work',
+      });
+      const personalBlocked = makeTask({
+        id: 'x2',
+        title: 'Call plumber',
+        dueDate: '2026-10-22',
+        context: 'personal',
+        status: 'blocked',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([workTask, personalBlocked])}
+          variant="phone"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Work' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Blocked · 0' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Blocked · 0' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+      expect(
+        screen.queryByText('No tasks match these filters.'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Open · 2' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('link', { name: /Draft memo/ })).toHaveAttribute(
+        'href',
+        '/dashboard/tasks/x1',
+      );
+    });
+
+    it('shows the phone all-clear state with the done count and no add action, and Show done opens the Done view', () => {
+      render(
+        <TasksBoard
+          page={makeTasksPageController([writeNotes])}
+          variant="phone"
+        />,
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'All clear' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Nothing open. 1 task done this week.'),
+      ).toBeInTheDocument();
+
+      const allClear = screen.getByRole('heading', { name: 'All clear' })
+        .parentElement as HTMLElement;
+      expect(
+        within(allClear).queryByRole('button', { name: 'Add task' }),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(
+        within(allClear).getByRole('button', { name: 'Show done' }),
+      );
+
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(
+        screen.getByRole('link', { name: /Write notes/ }),
       ).toBeInTheDocument();
     });
   });
