@@ -71,15 +71,15 @@ function patchRecord(
   );
 }
 
-/**
- * Reads, writes and converts the Subscriptions blob for the page. Every write
- * saves the whole list, as before the redesign; the toasts are today's.
- */
 interface ConversionRunOptions {
   /** Leave the figure on screen until the new one lands, rather than `loading`. */
   keepFigure: boolean;
 }
 
+/**
+ * Reads, writes and converts the Subscriptions blob for the page. Every write
+ * saves the whole list, as before the redesign; the toasts are today's.
+ */
 export function useSubscriptionsPage(
   handle: VaultHandle,
 ): SubscriptionsPageController {
