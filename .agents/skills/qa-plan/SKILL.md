@@ -326,7 +326,10 @@ Do not require that taxonomy on ordinary UI copy or judgement-only scenarios.
 
 ## Evidence
 
-Point at the walkthrough-artifacts skill; do not fork a second evidence system.
+A QA Artifact is captured only where a written result would not be enough, and stays in
+`tmp/qa/<subject>/` unless the person it was captured for chooses to publish it. To upload one, see
+[Uploading QA Artifacts](../finish-standalone-runs/SKILL.md#uploading-qa-artifacts) and
+[ADR 0142](../../../docs/adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md).
 
 QA-specific lines:
 

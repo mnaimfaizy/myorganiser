@@ -43,7 +43,7 @@ Humans (or CI) may still run `yarn ai:create-pr` with no `--title` / `--body-fil
 
 ## Workflow
 
-1. Confirm the current branch is not the base branch (`main` / default). If it is, stop.
+1. Confirm the current branch is not the base branch (`main` / default). If it is, stop. On a PRD's feature branch, apply [the Outcome Check](../../../docs/agents/outcome-check.md) to its slices first.
 2. Call the `PrAuthor` sub-agent to draft the title, Surface Labels, merge base, and body from `merge-base..HEAD` plus linked issues (`#N` in commits and `issue/N-…` / `feat/N-…` branch names).
 3. If `PrAuthor` returns `ON_BASE_BRANCH:` or `NO_BRANCH_COMMITS:`, stop and report that line. Do not run `ai:create-pr`.
 4. Parse the draft: the first line is `TITLE: <text>`; an optional `LABELS: <a,b>` line follows; then `MERGE-BASE: <sha>`; the body starts at the first `##` heading. Write the body to a temporary file — the header lines stay out of it.

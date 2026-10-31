@@ -620,8 +620,16 @@ _Avoid_: Failed slice, crashed slice, partial slice
 The commit capturing an Interrupted Slice's uncommitted work on its slice branch. Unreviewed and ungated — a resuming agent audits it before building on it, and never treats it as finished work.
 _Avoid_: WIP commit (as the general name), draft commit, savepoint
 
+**Standalone Run**:
+A `dispatch-agents` run for an issue outside any PRD Issue, whose own branch is the deliverable and reaches `main` through its own Pull Request.
+_Avoid_: Solo run, single dispatch, non-PRD run
+
+**Run Outcome**:
+What a finished agent run reports about itself: whether it ended clean, and each item it left outstanding. It is the run's own claim, so whoever reviews the branch checks it rather than trusting it.
+_Avoid_: Run result, slice outcome, agent report
+
 **QA Plan**:
-The manual verification a human performs for completed work before its Pull Request merges, carrying only what the automated suites do not already prove. Every claim it makes about existing coverage is marked as observed or reconstructed, because a reader trusts it to say what may be skipped. It is composed as an uncommitted working file in `tmp/`, whatever becomes of it afterwards.
+The manual verification a person or an agent performs for completed work before its Pull Request merges, carrying only what the automated suites do not already prove. Every claim it makes about existing coverage is marked as observed or reconstructed, because a reader trusts it to say what may be skipped. It is composed as an uncommitted working file in `tmp/`, whatever becomes of it afterwards.
 _Avoid_: Test plan, test matrix, QA cycle, verification checklist, regression plan
 
 **QA Account**:
@@ -631,6 +639,14 @@ _Avoid_: Test account, throwaway account, test user, fixture user
 **QA Plan Issue**:
 A QA Plan for a PRD Issue, published as a GitHub issue labelled `qa`. Scenarios are checkboxes, closing it is the sign-off, and defects it finds become their own linked issues. A QA Plan for a single issue is not one of these — it stays the uncommitted working file it was composed as.
 _Avoid_: QA ticket, test ticket, validation issue
+
+**QA Artifact**:
+A screenshot or video captured while running a QA Plan, only where it shows something the written result cannot. It stays private to the person it was captured for unless they choose to publish it.
+_Avoid_: Evidence (a Finding's term), QA proof, attachment
+
+**QA Report**:
+The Pull Request comment recording which QA Plan scenarios were run, against which commit, and with what result. A later commit makes it stale.
+_Avoid_: QA sign-off, QA comment, QA results
 
 **Issue Orchestration Label**:
 A GitHub label in the `orchestration` set of `tools/config/github-labels.json` that coordinates planning tools and dispatch-agents. Applies to Issues only — never to Pull Requests. Includes the ADR 0002 machine contract plus the document-type markers `prd`, `qa`, and `grilling`.

@@ -4,6 +4,8 @@
 
 accepted
 
+Amended by [ADR 0142](0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md): a person or the `finish-standalone-runs` Skill opens the PR. The labels are unchanged.
+
 ## Context
 
 A standalone run (`yarn dispatch-agents --issue <n>` or `--all-standalone`) leaves its work on one
