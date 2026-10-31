@@ -6,7 +6,8 @@
     from Catalog, edit amount), and the List summary aside.
   - Error paths: five rejected writes (Uncheck All, Remove Checked, remove line,
     add Catalog chip, delete from Catalog) each raise the Error toast. A rejected
-    line-amount save is not covered here: see the open concern in the report.
+    line-amount save raises one Error toast and keeps its dialog open with the
+    typed amount.
   - Renders the real page hook, view, dialogs, and web-ui (Radix menus and dialogs).
   - Mocks: useGroceriesVault (controllable vault fake), next/navigation
     useRouter, useIsMobileState (forced to desktop), and useToast (a spy, because
@@ -285,6 +286,40 @@ describe('GroceryListView (desktop body)', () => {
           id: 'line-milk',
           amount: '3',
         }),
+      );
+    });
+
+    it('keeps the line dialog open with the typed amount when updateListLine rejects, and toasts once', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const vault = makeVault({
+        lists: [makeList([makeLine('line-milk', 'cat-milk', { amount: '2' })])],
+        updateListLine: jest.fn().mockRejectedValue(new Error('write failed')),
+      });
+      mockUseGroceriesVault.mockReturnValue(vault);
+      renderDetail();
+
+      await press(screen.getByRole('button', { name: 'Edit amount for Milk' }));
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Edit List Line',
+      });
+      fireEvent.change(within(dialog).getByLabelText('Quantity / Amount'), {
+        target: { value: '3' },
+      });
+      await press(
+        within(dialog).getByRole('button', { name: 'Save List Line' }),
+      );
+
+      await waitFor(() => expect(mockToast).toHaveBeenCalledWith(ERROR_TOAST));
+      expect(mockToast).toHaveBeenCalledTimes(1);
+      expect(vault.updateListLine).toHaveBeenCalledWith(LIST_ID, {
+        id: 'line-milk',
+        amount: '3',
+      });
+      expect(
+        screen.getByRole('dialog', { name: 'Edit List Line' }),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByLabelText('Quantity / Amount')).toHaveValue(
+        '3',
       );
     });
 
