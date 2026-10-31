@@ -23,6 +23,7 @@ import {
   groupUsageLocations,
   isNotified,
   openableUsageLocationLink,
+  openUsageLocationLink,
   PRIORITY_LABEL,
   UPDATE_METHOD_LABEL,
   USAGE_LOCATIONS_COPY,
@@ -124,8 +125,7 @@ export function UsageLocationRow({
 }: UsageLocationRowProps): React.JSX.Element {
   const notified = isNotified(location);
   const name = location.organisationName?.trim() || 'Organisation';
-  const link = openableUsageLocationLink(location);
-  const hasLink = link != null;
+  const hasLink = openableUsageLocationLink(location) != null;
   const state = edits.rowState(location.id);
   // A tick in flight keeps the line it had, so the row still says how the
   // organisation is reached while "Saving…" shows (Det-UL-Unconfirmed).
@@ -133,9 +133,8 @@ export function UsageLocationRow({
   const metaText = showsNotifiedOn
     ? describeNotifiedOn(location, now)
     : describeUsageLocationMeta(location);
-  const openLink = (): void => {
-    if (hasLink) void Linking.openURL(link);
-  };
+  const openLink = (): void =>
+    openUsageLocationLink(location, (url) => Linking.openURL(url));
   const toggle = (): void => edits.toggle(location);
 
   return (

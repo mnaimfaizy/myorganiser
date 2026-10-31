@@ -60,6 +60,7 @@ import {
   formatStoredDate,
   formatSubscriptionAmount,
   openableSubscriptionLink,
+  openSubscriptionLink,
   PAYMENT_METHOD_LABELS,
   RENEWAL_TYPE_LABELS,
   subscriptionStatus,
@@ -288,9 +289,9 @@ export function SubscriptionDetailScreen(): React.JSX.Element {
   const cancelEdit = useCallback((): void => setEditVisible(false), []);
 
   const openLink = useCallback((): void => {
-    const link =
-      subscription != null ? openableSubscriptionLink(subscription) : null;
-    if (link != null) void Linking.openURL(link);
+    if (subscription != null) {
+      openSubscriptionLink(subscription, (url) => Linking.openURL(url));
+    }
   }, [subscription]);
 
   const notice = writeError == null ? null : VAULT_WRITE_ERROR_COPY[writeError];

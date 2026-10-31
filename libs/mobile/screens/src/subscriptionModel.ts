@@ -105,6 +105,16 @@ export function openableSubscriptionLink(
   return openableLink(subscription.link);
 }
 
+/** Hands a Subscription's link to `open` only when it is safe to open, so the
+ * screen's tap and its test share one guard (issue #1281). */
+export function openSubscriptionLink(
+  subscription: DecryptedSubscription,
+  open: (url: string) => unknown,
+): void {
+  const link = openableSubscriptionLink(subscription);
+  if (link != null) void open(link);
+}
+
 /** A Subscription's status, defaulting to `active` when the payload carries
  * none — the same "oldest data has no opinion" default `taskModel.ts` gives
  * a missing status. */

@@ -137,6 +137,16 @@ export function openableUsageLocationLink(
   return openableLink(location.link);
 }
 
+/** Hands a Usage Location's link to `open` only when it is safe to open, so
+ * the row's tap and its test share one guard (issue #1281). */
+export function openUsageLocationLink(
+  location: DecryptedUsageLocation,
+  open: (url: string) => unknown,
+): void {
+  const link = openableUsageLocationLink(location);
+  if (link != null) void open(link);
+}
+
 /** How many of `locations` still need notifying. */
 export function countUnnotified(
   locations: readonly DecryptedUsageLocation[],
