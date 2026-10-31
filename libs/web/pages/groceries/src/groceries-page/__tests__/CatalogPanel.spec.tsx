@@ -483,7 +483,6 @@ describe('CatalogPanel', () => {
     );
   });
 
-  // The edit-save rejection path is untested: CatalogItemEditDialog does not catch onSave rejections (pre-existing; tracked as a follow-up).
   it('opens Edit Catalog Item prefilled and saves the changed name through updateCatalogItem', async () => {
     const vault = renderPage({ lists: [weeklyShop, party] });
     openCatalogTab();
@@ -523,6 +522,58 @@ describe('CatalogPanel', () => {
         screen.queryByRole('dialog', { name: 'Edit Catalog Item' }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it('keeps Edit Catalog Item open with the typed name when updateCatalogItem rejects, and toasts once', async () => {
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    consoleSpies.push(consoleError);
+    const vault = renderPage({ lists: [weeklyShop, party] });
+    vault.updateCatalogItem.mockRejectedValue(new Error('write failed'));
+    openCatalogTab();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Milk' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Edit Catalog Item',
+    });
+    fireEvent.change(
+      within(dialog).getByRole('textbox', { name: 'Catalog Item Name' }),
+      { target: { value: 'Whole milk' } },
+    );
+
+    const save = within(dialog).getByRole('button', {
+      name: 'Save Catalog Item',
+    });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    });
+    await act(async () => {
+      fireEvent.click(save);
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Failed to save your changes. Please try again.',
+        variant: 'destructive',
+      });
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(vault.updateCatalogItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'cat-milk',
+        name: 'Whole milk',
+        category: 'dairy',
+        price: 2.5,
+      }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Edit Catalog Item' }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('textbox', { name: 'Catalog Item Name' }),
+    ).toHaveValue('Whole milk');
   });
 
   it('deletes from Catalog only after the exact name is typed, then toasts the deletion', async () => {

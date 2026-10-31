@@ -54,7 +54,13 @@ export function ListLineEditDialog({
 
   const handleSubmit = form.handleSubmit(async (values) => {
     if (!line) return;
-    await onSave({ id: line.id, amount: values.amount || undefined });
+    try {
+      await onSave({ id: line.id, amount: values.amount || undefined });
+    } catch {
+      // The caller has already reported the failure. Keep the dialog open
+      // with the current values so the user can retry.
+      return;
+    }
     onClose();
   });
 

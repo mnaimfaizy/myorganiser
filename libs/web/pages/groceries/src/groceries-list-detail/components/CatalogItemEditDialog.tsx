@@ -88,15 +88,21 @@ export function CatalogItemEditDialog({
 
   const handleSubmit = form.handleSubmit(async (values) => {
     if (!item) return;
-    await onSave({
-      id: item.id,
-      name: values.name,
-      category: values.category,
-      price: values.price === '' ? undefined : Number(values.price),
-      notes: values.notes || undefined,
-      imageUrl: values.imageUrl || undefined,
-      links: values.links.length ? values.links : undefined,
-    });
+    try {
+      await onSave({
+        id: item.id,
+        name: values.name,
+        category: values.category,
+        price: values.price === '' ? undefined : Number(values.price),
+        notes: values.notes || undefined,
+        imageUrl: values.imageUrl || undefined,
+        links: values.links.length ? values.links : undefined,
+      });
+    } catch {
+      // The caller already reports the failure. Keep the dialog open with the
+      // current values so the user can retry.
+      return;
+    }
     onClose();
   });
 
