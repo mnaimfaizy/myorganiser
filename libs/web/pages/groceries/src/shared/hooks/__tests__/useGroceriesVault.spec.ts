@@ -321,6 +321,122 @@ describe('useGroceriesVault', () => {
         groceriesEncryptedSave(repaired),
       );
     });
+
+    /**
+     * Holds every load the effect makes, and answers the read that
+     * saveGroceriesPayload makes before its save (the second load) straight
+     * away. holdFirstTwoReads cannot serve here: it would hold that save read
+     * too, so the save would never start.
+     */
+    function holdEffectReads() {
+      const effectReads: Array<(value: unknown) => void> = [];
+      mockLoadDecryptedData.mockImplementation(() => {
+        if (mockLoadDecryptedData.mock.calls.length === 2) {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve) => {
+          effectReads.push(resolve);
+        });
+      });
+      return effectReads;
+    }
+
+    /** Holds the next Vault save open; the returned function releases it. */
+    function holdSave() {
+      let releaseSave: () => void = () => undefined;
+      mockSaveEncryptedData.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseSave = () => resolve();
+          }),
+      );
+      return () => releaseSave();
+    }
+
+    it('keeps loading true while a current read is still writing its normalized payload back', async () => {
+      const repairedList = makeList({ id: 'listA', name: 'A' });
+      const repaired: GroceriesVaultPayload = {
+        catalog: [],
+        lists: [repairedList],
+      };
+      const effectReads = holdEffectReads();
+      const releaseSave = holdSave();
+      mockNormalizeGroceries.mockImplementation(() => ({
+        value: repaired,
+        changed: true,
+      }));
+
+      const { result } = renderHook(() => useGroceriesVault({ handle }));
+      await waitFor(() => expect(effectReads).toHaveLength(1));
+
+      await act(async () => {
+        effectReads[0]({ stored: 'needs repair' });
+      });
+      await waitFor(() =>
+        expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        groceriesEncryptedSave(repaired),
+      );
+
+      expect(result.current.lists).toEqual([repairedList]);
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        releaseSave();
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+    });
+
+    it('leaves loading to the newer read when a superseded save finishes after that read starts', async () => {
+      const staleRaw = { stale: true };
+      const staleList = makeList({ id: 'stale', name: 'Stale' });
+      const newerList = makeList({ id: 'newer', name: 'Newer' });
+      const newerRaw = { catalog: [], lists: [newerList] };
+      const effectReads = holdEffectReads();
+      const releaseSave = holdSave();
+      mockNormalizeGroceries.mockImplementation((raw: unknown) =>
+        raw === staleRaw
+          ? { value: { catalog: [], lists: [staleList] }, changed: true }
+          : { value: raw as GroceriesVaultPayload, changed: false },
+      );
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(effectReads).toHaveLength(1));
+
+      await act(async () => {
+        effectReads[0](staleRaw);
+      });
+      await waitFor(() =>
+        expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        groceriesEncryptedSave({ catalog: [], lists: [staleList] }),
+      );
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(effectReads).toHaveLength(2));
+
+      await act(async () => {
+        releaseSave();
+        await new Promise((settle) => setTimeout(settle, 0));
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        effectReads[1](newerRaw);
+      });
+      await waitFor(() => {
+        expect(result.current.lists).toEqual([newerList]);
+        expect(result.current.loading).toBe(false);
+      });
+      expect(result.current.error).toBeNull();
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('addItemToLists', () => {

@@ -168,6 +168,8 @@ export function useGroceriesVault({
     // Cancellation matters because this effect re-fires on every convergence:
     // without it, an earlier read resolving late can put stale lists back on
     // screen and save them over the ones a later read just applied (#1280).
+    // What this decides is whether the save starts: a save already in flight
+    // fixes its payload when it is entered, and nothing here aborts it.
     let isActive = true;
 
     setError(null);
@@ -195,7 +197,8 @@ export function useGroceriesVault({
         if (normalized.changed) {
           await saveGroceriesPayload(handle, normalized.value);
         }
-        setLoading(false);
+        // A read superseded during that save leaves loading to the newer one.
+        if (isActive) setLoading(false);
       })
       .catch((err) => {
         if (!isActive) return;
