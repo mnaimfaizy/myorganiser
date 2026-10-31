@@ -1,5 +1,6 @@
 import {
   monthlyEquivalentAmount,
+  openableLink,
   type CurrencyCode,
   type SubscriptionBillingCycle,
   type SubscriptionPaymentMethod,
@@ -94,6 +95,24 @@ export function findVisibleSubscription(
   id: string,
 ): DecryptedSubscription | null {
   return readVisibleSubscriptions(records).find((sub) => sub.id === id) ?? null;
+}
+
+/** A Subscription's link, only when it is safe to open — `null` otherwise,
+ * including a stored value with an unsafe scheme (issue #1281). */
+export function openableSubscriptionLink(
+  subscription: DecryptedSubscription,
+): string | null {
+  return openableLink(subscription.link);
+}
+
+/** Hands a Subscription's link to `open` only when it is safe to open, so the
+ * screen's tap and its test share one guard (issue #1281). */
+export function openSubscriptionLink(
+  subscription: DecryptedSubscription,
+  open: (url: string) => unknown,
+): void {
+  const link = openableSubscriptionLink(subscription);
+  if (link != null) void open(link);
 }
 
 /** A Subscription's status, defaulting to `active` when the payload carries

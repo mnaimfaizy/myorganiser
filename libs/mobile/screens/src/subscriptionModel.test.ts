@@ -7,6 +7,8 @@ import {
   formatStoredDate,
   hasVisibleSubscriptions,
   monthlyEquivalentExamples,
+  openableSubscriptionLink,
+  openSubscriptionLink,
   parseAmountDraft,
   selectSubscriptionListView,
   toPickerDate,
@@ -641,6 +643,73 @@ describe('subscriptionModel', () => {
       const result = selectSubscriptionListView(records, 'cancelled', now);
 
       expect(result.items.map((s) => s.id)).toEqual(['aug', 'jun', 'none']);
+    });
+  });
+
+  describe('openableSubscriptionLink', () => {
+    it('returns an https link', () => {
+      expect(
+        openableSubscriptionLink({ id: 'sub1', link: 'https://example.com' }),
+      ).toBe('https://example.com');
+    });
+
+    it('returns the link trimmed of surrounding whitespace', () => {
+      expect(
+        openableSubscriptionLink({
+          id: 'sub1',
+          link: '  https://example.com  ',
+        }),
+      ).toBe('https://example.com');
+    });
+
+    it('returns null for a javascript: link', () => {
+      expect(
+        openableSubscriptionLink({ id: 'sub1', link: 'javascript:alert(1)' }),
+      ).toBeNull();
+    });
+
+    it('returns null when link is missing', () => {
+      expect(openableSubscriptionLink({ id: 'sub1' })).toBeNull();
+    });
+
+    it('returns null for an empty or whitespace-only link', () => {
+      expect(openableSubscriptionLink({ id: 'sub1', link: '' })).toBeNull();
+      expect(openableSubscriptionLink({ id: 'sub1', link: '   ' })).toBeNull();
+    });
+  });
+
+  describe('openSubscriptionLink', () => {
+    it('hands the trimmed https link to the opener once', () => {
+      const open = jest.fn();
+      openSubscriptionLink(
+        { id: 'sub1', link: '  https://example.com  ' },
+        open,
+      );
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenCalledWith('https://example.com');
+    });
+
+    it('never calls the opener for a stored javascript: link', () => {
+      const open = jest.fn();
+      openSubscriptionLink({ id: 'sub1', link: 'javascript:alert(1)' }, open);
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('never calls the opener for a stored data: link', () => {
+      const open = jest.fn();
+      openSubscriptionLink(
+        { id: 'sub1', link: 'data:text/html,<script>alert(1)</script>' },
+        open,
+      );
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('never calls the opener when link is missing, empty or blank', () => {
+      const open = jest.fn();
+      openSubscriptionLink({ id: 'sub1' }, open);
+      openSubscriptionLink({ id: 'sub1', link: '' }, open);
+      openSubscriptionLink({ id: 'sub1', link: '   ' }, open);
+      expect(open).not.toHaveBeenCalled();
     });
   });
 

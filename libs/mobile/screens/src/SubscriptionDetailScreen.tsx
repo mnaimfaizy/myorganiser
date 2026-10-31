@@ -59,6 +59,8 @@ import {
   findVisibleSubscription,
   formatStoredDate,
   formatSubscriptionAmount,
+  openableSubscriptionLink,
+  openSubscriptionLink,
   PAYMENT_METHOD_LABELS,
   RENEWAL_TYPE_LABELS,
   subscriptionStatus,
@@ -287,8 +289,10 @@ export function SubscriptionDetailScreen(): React.JSX.Element {
   const cancelEdit = useCallback((): void => setEditVisible(false), []);
 
   const openLink = useCallback((): void => {
-    if (subscription?.link != null) void Linking.openURL(subscription.link);
-  }, [subscription?.link]);
+    if (subscription != null) {
+      openSubscriptionLink(subscription, (url) => Linking.openURL(url));
+    }
+  }, [subscription]);
 
   const notice = writeError == null ? null : VAULT_WRITE_ERROR_COPY[writeError];
   const saving = subscription !== null && pendingId === subscription.id;
@@ -482,10 +486,7 @@ function SubscriptionFields({
   const theme = useTheme();
   const status = subscriptionStatus(subscription);
   const monthlyEquivalent = describeMonthlyEquivalent(subscription);
-  const link =
-    subscription.link != null && subscription.link.length > 0
-      ? subscription.link
-      : null;
+  const link = openableSubscriptionLink(subscription);
 
   return (
     // The sheet leaves 12 between groups: `md`, a tie rounded up.

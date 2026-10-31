@@ -1,6 +1,9 @@
 'use client';
 
-import type { UsageLocationRecord } from '@myorganiser/vault-core';
+import {
+  openableLink,
+  type UsageLocationRecord,
+} from '@myorganiser/vault-core';
 import {
   Button,
   Checkbox,
@@ -42,6 +45,7 @@ export function PlaceRow({
   const pillSpec = location.changed
     ? PLACE_UPDATED_PILL
     : PLACE_PRIORITY_PILL[location.priority];
+  const link = openableLink(location.link);
 
   return (
     <li
@@ -70,9 +74,9 @@ export function PlaceRow({
         </span>
       </div>
       <StatusPill tone={pillSpec.tone}>{pillSpec.label}</StatusPill>
-      {location.link && !location.changed ? (
+      {link && !location.changed ? (
         <Button asChild variant="outline" size="sm">
-          <a href={location.link} target="_blank" rel="noreferrer">
+          <a href={link} target="_blank" rel="noreferrer">
             Update online <span aria-hidden="true">↗</span>
             <span className="sr-only"> (opens in a new tab)</span>
           </a>

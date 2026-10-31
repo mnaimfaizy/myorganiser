@@ -2,6 +2,7 @@
 
 import { formatMoney } from '@myorganiser/core';
 import {
+  openableLink,
   SubscriptionStatusEnum,
   type SubscriptionRecord,
 } from '@myorganiser/vault-core';
@@ -55,6 +56,7 @@ export function SubscriptionDetailPanel({
     today,
   );
   const ends = formatLongDate(subscription.endDate);
+  const link = openableLink(subscription.link);
 
   return (
     <aside
@@ -123,14 +125,11 @@ export function SubscriptionDetailPanel({
           </>
         ) : null}
 
-        {subscription.link ? (
+        {link ? (
           <>
             <dt className="text-muted-foreground">Website</dt>
             <dd className="min-w-0">
-              <NewTabLink
-                href={subscription.link}
-                className="font-semibold text-brand-text"
-              >
+              <NewTabLink href={link} className="font-semibold text-brand-text">
                 Manage plan
               </NewTabLink>
             </dd>

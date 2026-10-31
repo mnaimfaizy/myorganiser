@@ -1,6 +1,7 @@
 import { formatDayMonth, toCalendarDate } from './calendarDate';
 import {
   compareUsageLocationsByPriority,
+  openableLink,
   type AddressRecord,
   type AddressStatus,
   type MobileNumberRecord,
@@ -126,6 +127,24 @@ export function readUsageLocations(contact: {
  * record written before this field existed still needs telling. */
 export function isNotified(location: DecryptedUsageLocation): boolean {
   return location.changed === true;
+}
+
+/** A Usage Location's link, only when it is safe to open — `null` otherwise,
+ * including a stored value with an unsafe scheme (issue #1281). */
+export function openableUsageLocationLink(
+  location: DecryptedUsageLocation,
+): string | null {
+  return openableLink(location.link);
+}
+
+/** Hands a Usage Location's link to `open` only when it is safe to open, so
+ * the row's tap and its test share one guard (issue #1281). */
+export function openUsageLocationLink(
+  location: DecryptedUsageLocation,
+  open: (url: string) => unknown,
+): void {
+  const link = openableUsageLocationLink(location);
+  if (link != null) void open(link);
 }
 
 /** How many of `locations` still need notifying. */

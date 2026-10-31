@@ -115,6 +115,31 @@ describe('place meta lines', () => {
       }),
       'Online · link saved',
     ],
+    [
+      'a padded safe link',
+      makeLocation({
+        updateMethod: UpdateMethodEnum.Online,
+        link: '  https://example.com/account  ',
+      }),
+      'Online · link saved',
+    ],
+    [
+      'a javascript: link',
+      makeLocation({
+        updateMethod: UpdateMethodEnum.Online,
+        // eslint-disable-next-line no-script-url -- deliberate unsafe-scheme fixture for issue #1281
+        link: 'javascript:alert(1)',
+      }),
+      'Online',
+    ],
+    [
+      'an https link missing its slashes',
+      makeLocation({
+        updateMethod: UpdateMethodEnum.Online,
+        link: 'https:example.com',
+      }),
+      'Online',
+    ],
   ])('formats the phone meta for %s', (_label, location, expected) => {
     expect(formatPlacePhoneMeta(location)).toBe(expected);
   });

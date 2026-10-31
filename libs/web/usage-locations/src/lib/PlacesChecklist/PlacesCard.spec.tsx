@@ -20,6 +20,7 @@ function place(
   id: string,
   organisationName: string,
   changed: boolean,
+  link?: string,
 ): UsageLocationRecord {
   return {
     id,
@@ -29,6 +30,7 @@ function place(
     changed,
     priority: PriorityEnum.Normal,
     createdAt: '2026-01-15T09:00:00.000Z',
+    ...(link ? { link } : {}),
   };
 }
 
@@ -124,6 +126,59 @@ describe('PlacesCard', () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('checkbox', { name: 'Updated at Electoral roll' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Update online for a place still to update that has an https link', () => {
+    renderCard({
+      locations: [
+        place('loc-medicare', 'Medicare', false, 'https://example.com'),
+      ],
+    });
+
+    expect(screen.getByRole('link', { name: /Update online/ })).toHaveAttribute(
+      'href',
+      'https://example.com',
+    );
+  });
+
+  it('uses the trimmed stored link as the Update online href', () => {
+    renderCard({
+      locations: [
+        place('loc-medicare', 'Medicare', false, '  https://example.com  '),
+      ],
+    });
+
+    expect(screen.getByRole('link', { name: /Update online/ })).toHaveAttribute(
+      'href',
+      'https://example.com',
+    );
+  });
+
+  it('does not offer Update online for a javascript: link', () => {
+    renderCard({
+      locations: [
+        // eslint-disable-next-line no-script-url -- deliberate unsafe-scheme fixture for issue #1281
+        place('loc-medicare', 'Medicare', false, 'javascript:alert(1)'),
+      ],
+    });
+
+    expect(
+      screen.queryByRole('link', { name: /Update online/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Update online/)).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
+  });
+
+  it('does not offer Update online for a place already ticked as updated', () => {
+    renderCard({
+      locations: [
+        place('loc-medicare', 'Medicare', true, 'https://example.com'),
+      ],
+    });
+
+    expect(
+      screen.queryByRole('link', { name: /Update online/ }),
     ).not.toBeInTheDocument();
   });
 

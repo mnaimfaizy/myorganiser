@@ -2,6 +2,7 @@ import {
   PriorityEnum,
   type Priority,
   type UsageLocationRecord,
+  openableLink,
 } from '@myorganiser/vault-core';
 import type { StatusPillTone } from '@myorganiser/web-ui';
 import { format, isSameYear, isValid, parseISO } from 'date-fns';
@@ -89,7 +90,7 @@ export function formatPlaceMeta(
 /** The phone place row's second line, e.g. "Online · link saved". */
 export function formatPlacePhoneMeta(location: UsageLocationRecord): string {
   const method = UPDATE_METHOD_LABELS[location.updateMethod];
-  return location.link ? `${method} · link saved` : method;
+  return openableLink(location.link) ? `${method} · link saved` : method;
 }
 
 /** Highest first, so the most urgent place to update sits at the top. */

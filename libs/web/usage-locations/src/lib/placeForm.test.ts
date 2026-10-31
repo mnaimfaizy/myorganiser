@@ -89,6 +89,26 @@ describe('placeFormSchema', () => {
     ]);
   });
 
+  it.each([
+    // eslint-disable-next-line no-script-url -- deliberate unsafe-scheme fixture for issue #1281
+    ['a javascript: link', 'javascript:alert(1)'],
+    ['a data: link', 'data:text/html,x'],
+    ['a vbscript: link', 'vbscript:msgbox(1)'],
+    ['an intent: link', 'intent:#Intent;scheme=https;end'],
+    ['a tel: link', 'tel:+1234567890'],
+    ['an https link missing its slashes', 'https:example.com'],
+  ])('rejects %s with the valid URL message', (_label, link) => {
+    const result = placeFormSchema.safeParse({ ...VALID_FORM, link });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['link'],
+        message: 'Enter a valid URL, including http:// or https://',
+      }),
+    ]);
+  });
+
   it('accepts an empty link and an https link', () => {
     expect(placeFormSchema.safeParse({ ...VALID_FORM, link: '' }).success).toBe(
       true,

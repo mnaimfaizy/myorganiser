@@ -7,6 +7,8 @@ import {
   splitAddressesByStatus,
   readUsageLocations,
   isNotified,
+  openableUsageLocationLink,
+  openUsageLocationLink,
   countUnnotified,
   describeToNotify,
   notifiedProgress,
@@ -351,6 +353,85 @@ describe('contactModel', () => {
     it('returns false when changed is null', () => {
       const location = { id: 'ul1', changed: null } as any;
       expect(isNotified(location)).toBe(false);
+    });
+  });
+
+  describe('openableUsageLocationLink', () => {
+    it('returns an https link', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'https://example.com',
+      };
+      expect(openableUsageLocationLink(location)).toBe('https://example.com');
+    });
+
+    it('returns the link trimmed of surrounding whitespace', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: '  https://example.com  ',
+      };
+      expect(openableUsageLocationLink(location)).toBe('https://example.com');
+    });
+
+    it('returns null for a javascript: link', () => {
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'javascript:alert(1)',
+      };
+      expect(openableUsageLocationLink(location)).toBeNull();
+    });
+
+    it('returns null when link is missing', () => {
+      const location: DecryptedUsageLocation = { id: 'ul1' };
+      expect(openableUsageLocationLink(location)).toBeNull();
+    });
+
+    it('returns null for an empty or whitespace-only link', () => {
+      const empty: DecryptedUsageLocation = { id: 'ul1', link: '' };
+      const blank: DecryptedUsageLocation = { id: 'ul1', link: '   ' };
+      expect(openableUsageLocationLink(empty)).toBeNull();
+      expect(openableUsageLocationLink(blank)).toBeNull();
+    });
+  });
+
+  describe('openUsageLocationLink', () => {
+    it('hands the trimmed https link to the opener once', () => {
+      const open = jest.fn();
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: '  https://example.com  ',
+      };
+      openUsageLocationLink(location, open);
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenCalledWith('https://example.com');
+    });
+
+    it('never calls the opener for a stored javascript: link', () => {
+      const open = jest.fn();
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'javascript:alert(1)',
+      };
+      openUsageLocationLink(location, open);
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('never calls the opener for a stored data: link', () => {
+      const open = jest.fn();
+      const location: DecryptedUsageLocation = {
+        id: 'ul1',
+        link: 'data:text/html,<script>alert(1)</script>',
+      };
+      openUsageLocationLink(location, open);
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('never calls the opener when link is missing, empty or blank', () => {
+      const open = jest.fn();
+      openUsageLocationLink({ id: 'ul1' }, open);
+      openUsageLocationLink({ id: 'ul1', link: '' }, open);
+      openUsageLocationLink({ id: 'ul1', link: '   ' }, open);
+      expect(open).not.toHaveBeenCalled();
     });
   });
 

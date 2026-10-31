@@ -2,6 +2,7 @@
 
 import { formatMoney } from '@myorganiser/core';
 import {
+  openableLink,
   SubscriptionStatusEnum,
   type SubscriptionRecord,
 } from '@myorganiser/vault-core';
@@ -53,6 +54,7 @@ export function SubscriptionDetailScreen({
   const isCancelled = subscription.status === SubscriptionStatusEnum.Cancelled;
   const renewal = formatRenewal(subscription.nextBillingDate, today);
   const renewsOn = formatWeekdayDate(subscription.nextBillingDate);
+  const link = openableLink(subscription.link);
 
   const rows = [
     {
@@ -133,14 +135,14 @@ export function SubscriptionDetailScreen({
             </div>
           ))}
         </dl>
-        {subscription.link ? (
+        {link ? (
           <ListGroupRow
             asChild
             interactive
             size="value"
             className="text-brand-text"
           >
-            <a href={subscription.link} target="_blank" rel="noreferrer">
+            <a href={link} target="_blank" rel="noreferrer">
               <ListGroupRowTitle className="min-w-0 flex-1 text-body-sm font-semibold">
                 Manage plan on the website
                 <span className="sr-only"> (opens in a new tab)</span>
