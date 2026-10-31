@@ -27,6 +27,10 @@ jest.mock('@myorganiser/core', () => {
   };
 });
 
+jest.mock('@myorganiser/web-vault-ui', () => ({
+  useLocalVaultRevision: jest.fn(),
+}));
+
 import type {
   CatalogItem,
   GroceriesVaultPayload,
@@ -35,6 +39,7 @@ import type {
 } from '@myorganiser/vault-core';
 import { randomId } from '@myorganiser/core';
 import { normalizeGroceries, type VaultHandle } from '@myorganiser/web-vault';
+import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useGroceriesVault } from '../useGroceriesVault';
 
@@ -113,6 +118,7 @@ describe('useGroceriesVault', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(useLocalVaultRevision).mockReturnValue(0);
   });
 
   it('reports a load failure and stops loading without claiming success', async () => {
@@ -161,6 +167,275 @@ describe('useGroceriesVault', () => {
     await waitFor(() => {
       expect(result.current.catalog).toEqual(initialPayload.catalog);
       expect(result.current.lists).toEqual(initialPayload.lists);
+    });
+  });
+
+  describe('convergence reloads', () => {
+    /**
+     * Holds the first two loads open so the test controls their order. Any later
+     * load (e.g. the read saveGroceriesPayload makes before writing) resolves
+     * straight away with `newerRaw`, so a stale write-back can reach the Vault.
+     */
+    function holdFirstTwoReads(newerRaw: unknown) {
+      const reads: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }> = [];
+      mockLoadDecryptedData.mockImplementation(() => {
+        if (reads.length >= 2) return Promise.resolve(newerRaw);
+        return new Promise((resolve, reject) => {
+          reads.push({ resolve, reject });
+        });
+      });
+      return reads;
+    }
+
+    it('reloads when the Local Vault revision moves and shows the newer lists', async () => {
+      const listA = makeList({ id: 'listA', name: 'A' });
+      const listB = makeList({ id: 'listB', name: 'B' });
+      const storedPayloads = [
+        { catalog: [], lists: [listA] },
+        { catalog: [], lists: [listB] },
+      ];
+      mockLoadDecryptedData.mockImplementation(async () => {
+        const next =
+          storedPayloads[mockLoadDecryptedData.mock.calls.length - 1];
+        return next;
+      });
+      mockNormalizeGroceries.mockImplementation((raw: unknown) => ({
+        value: raw as GroceriesVaultPayload,
+        changed: false,
+      }));
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(result.current.lists).toEqual([listA]));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+
+      await waitFor(() => expect(result.current.lists).toEqual([listB]));
+      expect(mockLoadDecryptedData).toHaveBeenCalledTimes(2);
+      expect(mockSaveEncryptedData).not.toHaveBeenCalled();
+    });
+
+    it('ignores a read that resolves after a newer revision has applied, on screen and in the Vault', async () => {
+      const staleItem = makeCatalogItem({ id: 'cat-old', name: 'Milk' });
+      const staleList = makeList({ id: 'stale', name: 'Stale' });
+      const newerItem = makeCatalogItem({ id: 'cat-new', name: 'Eggs' });
+      const newerList = makeList({ id: 'newer', name: 'Newer' });
+      const staleRaw = { catalog: [staleItem], lists: [staleList] };
+      const newerRaw = { catalog: [newerItem], lists: [newerList] };
+      const reads = holdFirstTwoReads(newerRaw);
+      mockNormalizeGroceries.mockImplementation((raw: unknown) =>
+        raw === staleRaw
+          ? {
+              value: { catalog: [staleItem], lists: [staleList] },
+              changed: true,
+            }
+          : { value: raw as GroceriesVaultPayload, changed: false },
+      );
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(reads).toHaveLength(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+
+      await act(async () => {
+        reads[1].resolve(newerRaw);
+      });
+      await waitFor(() => expect(result.current.lists).toEqual([newerList]));
+
+      await act(async () => {
+        reads[0].resolve(staleRaw);
+        await new Promise((settle) => setTimeout(settle, 0));
+      });
+
+      // Vault half first: a stale write-back is the harm this guards against.
+      expect(mockSaveEncryptedData).not.toHaveBeenCalled();
+      expect(mockLoadDecryptedData).toHaveBeenCalledTimes(2);
+      expect(result.current.lists).toEqual([newerList]);
+      expect(result.current.catalog).toEqual([newerItem]);
+      expect(result.current.selectedListId).toBe('newer');
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('stays quiet when an older read rejects after a newer read has applied', async () => {
+      const newerList = makeList({ id: 'newer', name: 'Newer' });
+      const newerRaw = { catalog: [], lists: [newerList] };
+      const reads = holdFirstTwoReads(newerRaw);
+      mockNormalizeGroceries.mockImplementation((raw: unknown) => ({
+        value: raw as GroceriesVaultPayload,
+        changed: false,
+      }));
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(reads).toHaveLength(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+
+      await act(async () => {
+        reads[1].resolve(newerRaw);
+      });
+      await waitFor(() => expect(result.current.lists).toEqual([newerList]));
+
+      await act(async () => {
+        reads[0].reject(new Error('bad key'));
+        await new Promise((settle) => setTimeout(settle, 0));
+      });
+
+      expect(result.current.lists).toEqual([newerList]);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('writes a normalized payload back to the Vault exactly once', async () => {
+      const repairedList = makeList({ id: 'listA', name: 'A' });
+      const repaired: GroceriesVaultPayload = {
+        catalog: [],
+        lists: [repairedList],
+      };
+      mockLoadDecryptedData.mockResolvedValue(null);
+      mockNormalizeGroceries.mockImplementation(() => ({
+        value: repaired,
+        changed: true,
+      }));
+      mockSaveEncryptedData.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useGroceriesVault({ handle }));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.lists).toEqual([repairedList]);
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1);
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        groceriesEncryptedSave(repaired),
+      );
+    });
+
+    /**
+     * Holds every load the effect makes, and answers the read that
+     * saveGroceriesPayload makes before its save (the second load) straight
+     * away. holdFirstTwoReads cannot serve here: it would hold that save read
+     * too, so the save would never start.
+     */
+    function holdEffectReads() {
+      const effectReads: Array<(value: unknown) => void> = [];
+      mockLoadDecryptedData.mockImplementation(() => {
+        if (mockLoadDecryptedData.mock.calls.length === 2) {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve) => {
+          effectReads.push(resolve);
+        });
+      });
+      return effectReads;
+    }
+
+    /** Holds the next Vault save open; the returned function releases it. */
+    function holdSave() {
+      let releaseSave: () => void = () => undefined;
+      mockSaveEncryptedData.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseSave = () => resolve();
+          }),
+      );
+      return () => releaseSave();
+    }
+
+    it('keeps loading true while a current read is still writing its normalized payload back', async () => {
+      const repairedList = makeList({ id: 'listA', name: 'A' });
+      const repaired: GroceriesVaultPayload = {
+        catalog: [],
+        lists: [repairedList],
+      };
+      const effectReads = holdEffectReads();
+      const releaseSave = holdSave();
+      mockNormalizeGroceries.mockImplementation(() => ({
+        value: repaired,
+        changed: true,
+      }));
+
+      const { result } = renderHook(() => useGroceriesVault({ handle }));
+      await waitFor(() => expect(effectReads).toHaveLength(1));
+
+      await act(async () => {
+        effectReads[0]({ stored: 'needs repair' });
+      });
+      await waitFor(() =>
+        expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        groceriesEncryptedSave(repaired),
+      );
+
+      expect(result.current.lists).toEqual([repairedList]);
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        releaseSave();
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+    });
+
+    it('leaves loading to the newer read when a superseded save finishes after that read starts', async () => {
+      const staleRaw = { stale: true };
+      const staleList = makeList({ id: 'stale', name: 'Stale' });
+      const newerList = makeList({ id: 'newer', name: 'Newer' });
+      const newerRaw = { catalog: [], lists: [newerList] };
+      const effectReads = holdEffectReads();
+      const releaseSave = holdSave();
+      mockNormalizeGroceries.mockImplementation((raw: unknown) =>
+        raw === staleRaw
+          ? { value: { catalog: [], lists: [staleList] }, changed: true }
+          : { value: raw as GroceriesVaultPayload, changed: false },
+      );
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(effectReads).toHaveLength(1));
+
+      await act(async () => {
+        effectReads[0](staleRaw);
+      });
+      await waitFor(() =>
+        expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        groceriesEncryptedSave({ catalog: [], lists: [staleList] }),
+      );
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(effectReads).toHaveLength(2));
+
+      await act(async () => {
+        releaseSave();
+        await new Promise((settle) => setTimeout(settle, 0));
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        effectReads[1](newerRaw);
+      });
+      await waitFor(() => {
+        expect(result.current.lists).toEqual([newerList]);
+        expect(result.current.loading).toBe(false);
+      });
+      expect(result.current.error).toBeNull();
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -229,6 +229,7 @@ describe('useAddressesPage', () => {
           normalized,
         );
       });
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
     });
 
     it('reports a decrypt failure with the destructive toast and stops loading', async () => {
@@ -333,6 +334,47 @@ describe('useAddressesPage', () => {
         expect.objectContaining({ title: 'Failed to load addresses' }),
       );
       expect(result.current.loading).toBe(false);
+      expect(result.current.items).toEqual([OTHER]);
+    });
+
+    it('does not write the records of a superseded read back over the newer ones', async () => {
+      const reads: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }> = [];
+      loadDecryptedData.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            reads.push({ resolve, reject });
+          }),
+      );
+      // Only the older read's raw records need repair, so the two reads get different verdicts.
+      const staleRaw = [{ legacy: true }];
+      jest
+        .mocked(normalizeAddresses)
+        .mockImplementation((raw) =>
+          raw === staleRaw
+            ? { value: [HOME], changed: true }
+            : { value: raw as AddressRecord[], changed: false },
+        );
+
+      const { result, rerender } = renderHook(() => useAddressesPage(handle));
+      await waitFor(() => expect(reads).toHaveLength(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+
+      await act(async () => {
+        reads[1].resolve([OTHER]);
+      });
+      await waitFor(() => expect(result.current.items).toEqual([OTHER]));
+
+      await act(async () => {
+        reads[0].resolve(staleRaw);
+      });
+
+      expect(saveVaultRecords).not.toHaveBeenCalled();
       expect(result.current.items).toEqual([OTHER]);
     });
   });

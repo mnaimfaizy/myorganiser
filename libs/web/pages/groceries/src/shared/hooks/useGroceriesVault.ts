@@ -165,6 +165,13 @@ export function useGroceriesVault({
 
   // Load payload from vault on mount, and again whenever it is replaced
   useEffect(() => {
+    // Cancellation matters because this effect re-fires on every convergence:
+    // without it, an earlier read resolving late can put stale lists back on
+    // screen and save them over the ones a later read just applied (#1280).
+    // What this decides is whether the save starts: a save already in flight
+    // fixes its payload when it is entered, and nothing here aborts it.
+    let isActive = true;
+
     setError(null);
     handle
       .loadDecryptedData<unknown>({
@@ -173,6 +180,7 @@ export function useGroceriesVault({
       })
       .then(async (raw) => {
         const normalized = normalizeGroceries(raw);
+        if (!isActive) return;
         setPayload(normalized.value);
         // Only ever moves the selection onto a list that exists. A reload
         // triggered by convergence must not pull the User off the list they
@@ -189,13 +197,19 @@ export function useGroceriesVault({
         if (normalized.changed) {
           await saveGroceriesPayload(handle, normalized.value);
         }
-        setLoading(false);
+        // A read superseded during that save leaves loading to the newer one.
+        if (isActive) setLoading(false);
       })
       .catch((err) => {
+        if (!isActive) return;
         console.error('Failed to load grocery lists from vault:', err);
         setError('Failed to load your grocery lists. Please try again.');
         setLoading(false);
       });
+
+    return () => {
+      isActive = false;
+    };
   }, [handle, revision]);
 
   // Persist full payload to vault
