@@ -75,6 +75,11 @@ function patchRecord(
  * Reads, writes and converts the Subscriptions blob for the page. Every write
  * saves the whole list, as before the redesign; the toasts are today's.
  */
+interface ConversionRunOptions {
+  /** Leave the figure on screen until the new one lands, rather than `loading`. */
+  keepFigure: boolean;
+}
+
 export function useSubscriptionsPage(
   handle: VaultHandle,
 ): SubscriptionsPageController {
@@ -247,10 +252,14 @@ export function useSubscriptionsPage(
     [items, persist, toast],
   );
 
-  // Whether the converted view is the one on screen, so a later items change
-  // knows to recompute. A ref, not state: flipping it never needs a render of
-  // its own, only the recompute it triggers below.
-  const isShowingConvertedRef = useRef(false);
+  // Whether the User has the converted view on, so a later items change knows
+  // to recompute. A ref, not state: flipping it never needs a render of its
+  // own, only the recompute it triggers below.
+  const isConvertedViewOnRef = useRef(false);
+
+  // The currency of the figure on screen. A recompute keeps that figure until
+  // its replacement lands, which is only honest while the label still fits it.
+  const convertedCurrencyRef = useRef<CurrencyCode | null>(null);
 
   // Recomputing on every items change means two conversions can be in flight
   // at once (an edit landing while the previous one is still awaiting rates).
@@ -258,67 +267,85 @@ export function useSubscriptionsPage(
   // latest, so a slower, superseded run can never overwrite a fresher one.
   const conversionRequestIdRef = useRef(0);
 
-  const runConversion = useCallback(async () => {
-    const requestId = ++conversionRequestIdRef.current;
-    setConversion({ status: 'loading' });
-    try {
-      const active = items.filter(isActiveSubscription);
-      const fromCurrencies = Array.from(new Set(active.map((s) => s.currency)));
-      const ratesByFrom = new Map<
-        CurrencyCode,
-        Awaited<ReturnType<typeof getFxRates>>
-      >();
+  const runConversion = useCallback(
+    async ({ keepFigure }: ConversionRunOptions) => {
+      const requestId = ++conversionRequestIdRef.current;
+      if (!keepFigure) setConversion({ status: 'loading' });
+      try {
+        const active = items.filter(isActiveSubscription);
+        const fromCurrencies = Array.from(
+          new Set(active.map((s) => s.currency)),
+        );
+        const ratesByFrom = new Map<
+          CurrencyCode,
+          Awaited<ReturnType<typeof getFxRates>>
+        >();
 
-      await Promise.all(
-        fromCurrencies.map(async (from) => {
-          if (from === preferredCurrency) return;
-          const rates = await getFxRates({ base: from });
-          ratesByFrom.set(from, rates);
-        }),
-      );
+        await Promise.all(
+          fromCurrencies.map(async (from) => {
+            if (from === preferredCurrency) return;
+            const rates = await getFxRates({ base: from });
+            ratesByFrom.set(from, rates);
+          }),
+        );
 
-      const monthly = activeMonthlyEquivalentIn(items, (amount, from) => {
-        if (from === preferredCurrency) return amount;
-        const rates = ratesByFrom.get(from);
-        if (!rates) {
-          throw new Error(`Missing FX rates for ${from}`);
-        }
-        return convertAmount({ amount, from, to: preferredCurrency, rates });
-      });
+        const monthly = activeMonthlyEquivalentIn(items, (amount, from) => {
+          if (from === preferredCurrency) return amount;
+          const rates = ratesByFrom.get(from);
+          if (!rates) {
+            throw new Error(`Missing FX rates for ${from}`);
+          }
+          return convertAmount({ amount, from, to: preferredCurrency, rates });
+        });
 
-      if (conversionRequestIdRef.current !== requestId) return;
-      setConversion({ status: 'ready', monthly });
-    } catch (e: unknown) {
-      if (conversionRequestIdRef.current !== requestId) return;
-      const message = e instanceof Error ? e.message : String(e);
-      setConversion({ status: 'error', message });
-      toast({
-        title: 'Conversion failed',
-        description: message,
-        variant: 'destructive',
-      });
-    }
-  }, [items, preferredCurrency, toast]);
+        if (conversionRequestIdRef.current !== requestId) return;
+        convertedCurrencyRef.current = preferredCurrency;
+        setConversion({ status: 'ready', monthly });
+      } catch (e: unknown) {
+        if (conversionRequestIdRef.current !== requestId) return;
+        // The error state shows the original figure and the "Show all" link,
+        // so the view is off and that link is the retry. Left on, every later
+        // change would fetch and toast again with no converted figure showing.
+        isConvertedViewOnRef.current = false;
+        const message = e instanceof Error ? e.message : String(e);
+        setConversion({ status: 'error', message });
+        toast({
+          title: 'Conversion failed',
+          description: message,
+          variant: 'destructive',
+        });
+      }
+    },
+    [items, preferredCurrency, toast],
+  );
 
-  // Recomputes whenever the converted view is showing and the records it was
-  // computed from move — add, edit, cancel, or a convergence pull. Skipped
-  // while the view is off, so toggling it on is still the only thing that
-  // ever fetches rates (#1282).
+  // Recomputes while the converted view is on and what it was computed from
+  // moves: add, edit, cancel, a convergence pull, or the preferred currency.
+  // Nothing fetches while the view is off (#1282).
   useEffect(() => {
-    if (!isShowingConvertedRef.current) return;
-    // runConversion sets `loading` synchronously so the button disables at
-    // once; the ready/error state only lands after the awaited FX fetch.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void runConversion();
-  }, [runConversion]);
+    if (!isConvertedViewOnRef.current) return;
+    // A currency change goes through `loading`, so the old figure never sits
+    // beside the new label.
+    void runConversion({
+      keepFigure: convertedCurrencyRef.current === preferredCurrency,
+    });
+  }, [preferredCurrency, runConversion]);
+
+  // A run still in flight when the page goes away must not toast over the next.
+  useEffect(
+    () => () => {
+      conversionRequestIdRef.current += 1;
+    },
+    [],
+  );
 
   const convertToPreferred = useCallback(async () => {
-    isShowingConvertedRef.current = true;
-    await runConversion();
+    isConvertedViewOnRef.current = true;
+    await runConversion({ keepFigure: false });
   }, [runConversion]);
 
   const showOriginal = useCallback(() => {
-    isShowingConvertedRef.current = false;
+    isConvertedViewOnRef.current = false;
     // Invalidates any in-flight run so its late result can't land over 'off'.
     conversionRequestIdRef.current += 1;
     setConversion({ status: 'off' });
