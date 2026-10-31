@@ -1,12 +1,14 @@
 /**
- * Whether a stored link is safe to follow: scheme `http` or `https`,
- * case-insensitive, after trimming. Anything else — `javascript:`, `data:`,
- * `vbscript:`, `intent:`, `tel:`, or a scheme-less value — is not, and
- * neither is an empty value.
+ * Whether a stored link is safe to follow: after trimming, it literally starts
+ * `http://` or `https://`, case-insensitive, and parses. Anything else —
+ * `javascript:`, `data:`, `vbscript:`, `intent:`, `tel:`, a scheme-less value,
+ * or an empty one — is not. The text itself has to say so, not only what
+ * `URL` makes of it: the parser strips tabs and newlines and accepts
+ * `https:example.com`, and what gets opened is the text.
  */
 export function isSafeLink(value: string): boolean {
   const trimmed = value.trim();
-  if (trimmed.length === 0) return false;
+  if (!/^https?:\/\//i.test(trimmed) || /[\t\r\n]/.test(trimmed)) return false;
   try {
     const protocol = new URL(trimmed).protocol;
     return protocol === 'http:' || protocol === 'https:';

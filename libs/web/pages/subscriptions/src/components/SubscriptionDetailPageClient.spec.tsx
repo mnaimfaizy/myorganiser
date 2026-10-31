@@ -146,6 +146,20 @@ describe('SubscriptionDetailPageClient', () => {
       ).toHaveAttribute('href', 'https://example.com');
     });
 
+    it('uses the trimmed stored link as the Manage plan on the website href', () => {
+      setController(
+        makeSubscriptionsPageController([
+          makeSubscriptionRecord({ ...netflix, link: ' https://example.com ' }),
+        ]),
+      );
+
+      render(<SubscriptionDetailPageClient subscriptionId="sub-netflix" />);
+
+      expect(
+        screen.getByRole('link', { name: /Manage plan on the website/ }),
+      ).toHaveAttribute('href', 'https://example.com');
+    });
+
     it('does not render the Manage plan on the website row for a javascript: link', () => {
       setController(
         makeSubscriptionsPageController([

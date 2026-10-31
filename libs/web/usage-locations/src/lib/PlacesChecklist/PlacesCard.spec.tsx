@@ -142,6 +142,19 @@ describe('PlacesCard', () => {
     );
   });
 
+  it('uses the trimmed stored link as the Update online href', () => {
+    renderCard({
+      locations: [
+        place('loc-medicare', 'Medicare', false, '  https://example.com  '),
+      ],
+    });
+
+    expect(screen.getByRole('link', { name: /Update online/ })).toHaveAttribute(
+      'href',
+      'https://example.com',
+    );
+  });
+
   it('does not offer Update online for a javascript: link', () => {
     renderCard({
       locations: [

@@ -68,4 +68,24 @@ describe('subscriptionFormSchema link', () => {
       }),
     ]);
   });
+
+  it.each([
+    ['a vbscript: link', 'vbscript:msgbox(1)'],
+    ['an intent: link', 'intent:#Intent;scheme=https;end'],
+    ['a tel: link', 'tel:+1234567890'],
+    ['an https link missing its slashes', 'https:example.com'],
+  ])('rejects %s with the full web address message', (_label, link) => {
+    const result = subscriptionFormSchema.safeParse({
+      ...VALID_FORM,
+      link,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['link'],
+        message: 'Enter a full web address, starting with https://',
+      }),
+    ]);
+  });
 });
