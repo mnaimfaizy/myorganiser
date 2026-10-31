@@ -13,7 +13,7 @@ GitHub holds the state, so a new session can run this Skill at any point. There 
 
 ## The worktree
 
-Fixes and QA run in one reusable worktree, one branch at a time, because the app needs fixed ports and a local database.
+Fixes and QA run in one reusable worktree, one branch at a time, because the app needs ports and a local database. It is the first QA stack; see [Scheduling QA sessions](#scheduling-qa-sessions) for when a second is worth having.
 
 ```sh
 git worktree add --detach tmp/qa/worktree origin/main   # first use only
@@ -37,7 +37,7 @@ The worktree has no env file, and none is created. Never read the Maintainer's e
 
 ### Cleaning up
 
-When Pass 2 ends, stop only the processes recorded or shown to run from the worktree, by PID, and remove the container. Leave `tmp/qa/pr-<n>/` in place, since the Maintainer reads the QA Artifacts there.
+When Pass 2 ends, stop only the processes recorded or shown to run from the worktree, by PID, shut down any simulator or emulator a QA session booted, remove the container and any extra stack's worktree, and offer to archive the finished QA sessions. Leave `tmp/qa/pr-<n>/` in place, since the Maintainer reads the QA Artifacts there.
 
 ## Choose the pass
 
@@ -60,19 +60,45 @@ Report a blocked or crashed run and leave it alone. Sending it back to an agent 
 1. Run the `address-pr-review` Skill on the Pull Requests.
 2. A Pull Request is ready for QA when CI has passed, its code review covers the latest commit, and no finding is waiting on a decision. Skip it if its QA Report already names that commit.
 3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, report "no manual QA needed" and skip the run.
-4. Delegate the plan to one QA sub-agent. Brief it to:
-   - stop and report if `:3000` or `:4200` is in use, and never kill what is using them
-   - run `yarn qa:accounts:seed` and sign in only as a QA Account
-   - drive the app with a throwaway Playwright script in `tmp/qa/pr-<n>/`, never committed, or with the built-in browser when Playwright's browsers are not installed
-   - capture a QA Artifact only where a written result would not be enough, such as a visual change or a multi-step flow, and none for a backend or logic-only fix
-   - report each scenario as PASS or FAIL, or as left for a person when an agent cannot verify it, such as a real device or design fidelity
-   - fix nothing
-
-   If the permission check refuses the sub-agent, run the plan in the main session under the same brief and say so in the results.
-
-5. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code. QA Artifacts from a failed run stay local.
+4. Schedule the plans as in [Scheduling QA sessions](#scheduling-qa-sessions), and give each one to its own QA session.
+5. Check each report against its plan before relying on it. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code. QA Artifacts from a failed run stay local.
 6. Show the results and list each QA Artifact with its path and what it shows. Ask which to upload; the default is none.
 7. Upload what was chosen, then post the QA Report.
+
+## Scheduling QA sessions
+
+A QA session is a separate agent session that runs one Pull Request's plan and reports back to this one. It is not a sub-agent, because a sub-agent cannot use the built-in browser, a simulator or an emulator. This session stays the orchestrator: it holds the schedule, the decisions and the QA Report.
+
+Before starting any, sort the plans by what each one needs:
+
+| Plan needs      | Holds                                                                       |
+| --------------- | --------------------------------------------------------------------------- |
+| Web app         | A stack: a worktree, ports, a database                                      |
+| Mobile app      | A stack, the Metro port, and a simulator or emulator for each platform used |
+| Nothing by hand | Nothing; no session is started                                              |
+
+Then schedule by these rules:
+
+1. **Pilot first.** Start the smallest plan alone. It proves the stack and the brief before any other session spends time on them. Fix what it exposes before starting the next.
+2. **One holder per resource.** A worktree, a port, a database and a device each have one QA session at a time. Sessions sharing a database also share the QA Accounts' vaults, so a session starts with `yarn qa:accounts:seed --restore`.
+3. **One at a time by default.** Start the next session when the last has reported and released its stack.
+4. **Overlap only when it saves real time.** Plans that need different branches need separate stacks, each with its own installed worktree, ports and database. The web port is pinned in `apps/web/project.json` and the API address comes from env, so confirm a second stack starts before giving it a session. Run at most two stacks, and keep to one when disk or memory is short.
+5. **Same feature, one after another.** When two plans cover the same screens or data, run them in turn, even with a spare stack, so a failure has one cause.
+6. **Say the schedule first.** State the order and the reason in one line, then start. Revise it as reports come in.
+
+Start each session in the stack's existing worktree, without a new worktree of its own. Brief it with the plan's path, the branch and commit, the stack it holds, and these rules:
+
+- check that the commit is what the stack serves, and report instead of testing anything else
+- stop and report if a port it needs is in use, and never kill what it did not start
+- sign in only as a QA Account
+- use the app as a person would, through its real screens, in the built-in browser or on a simulator or emulator, and look at the result as well as checking the code's output
+- for a mobile plan, follow `apps/mobile/AGENTS.md` and cover each platform the change affects, in light and dark where the plan asks
+- capture a QA Artifact only where a written result would not be enough, such as a visual change or a multi-step flow, and none for a backend or logic-only fix, saved in `tmp/qa/pr-<n>/`
+- write each scenario as PASS or FAIL, or as left for a person when a session cannot verify it, such as a real device, a screen reader or design fidelity, to `tmp/qa/pr-<n>/report.md`
+- fix nothing, and post, upload or merge nothing
+- stop the processes it started, release the stack, and end with the report's path and the overall result
+
+A session's closing message may be cut short, so read the report file instead. If the harness has no separate sessions, or a session is refused, run the plan in this session under the same brief, one at a time, and say so in the results.
 
 ## Uploading QA Artifacts
 

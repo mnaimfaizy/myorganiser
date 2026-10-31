@@ -729,19 +729,19 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
       "file": ".agents/skills/upstream-brief/SKILL.md",
       "start": "Launch one **research worker per Ecosystem** — not per package. These are Independent Hops and may run in parallel. If the host has a Research specialist, use it as the worker. Otherwise the same agent fetches the pages. A failed hop is recorded; the run continues."
     },
-    "finish-standalone-runs/SKILL.md:33": {
+    "finish-standalone-runs/SKILL.md:49": {
       "file": ".agents/skills/finish-standalone-runs/SKILL.md",
       "start": "Report a blocked or crashed run and leave it alone. Sending it back to an agent is a `my-triage` decision."
     },
-    "finish-standalone-runs/SKILL.md:38": {
+    "finish-standalone-runs/SKILL.md:54": {
       "file": ".agents/skills/finish-standalone-runs/SKILL.md",
       "start": "2. Open a Pull Request for each branch with nothing to resolve, through the `create-pull-request-workflow` Skill."
     },
-    "finish-standalone-runs/SKILL.md:44": {
+    "finish-standalone-runs/SKILL.md:60": {
       "file": ".agents/skills/finish-standalone-runs/SKILL.md",
       "start": "1. Run the `address-pr-review` Skill on the Pull Requests."
     },
-    "finish-standalone-runs/SKILL.md:46": {
+    "finish-standalone-runs/SKILL.md:62": {
       "file": ".agents/skills/finish-standalone-runs/SKILL.md",
       "start": "3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, report \"no manual QA needed\" and skip the run."
     },
@@ -758,7 +758,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
       "file": ".agents/skills/address-pr-review/SKILL.md",
       "start": "2. Use one commit per round of fixes, unless gate tiers need separate ones. Commit through `corepack yarn ai:commit`."
     },
-    "finish-standalone-runs/SKILL.md:79": {
+    "finish-standalone-runs/SKILL.md:124": {
       "file": ".agents/skills/finish-standalone-runs/SKILL.md",
       "start": "Commit: `<sha>`. Run by an agent. Result: QA passed | Failures listed below"
     }
@@ -820,9 +820,9 @@ const SS = [
   ["grill-with-docs","to-prd","B","grill-with-docs/SKILL.md:14"],
   ["unit-test-delegation-workflow","code-review","B","unit-test-delegation-workflow/SKILL.md:117 \u2014 /code-review runs once per Slice after checks are green, NOT after every hop."],
   ["unit-test-delegation-workflow","playwright-e2e-workflow","B","unit-test-delegation-workflow/SKILL.md:17"],
-  ["finish-standalone-runs","create-pull-request-workflow","B","finish-standalone-runs/SKILL.md:38 \u2014 pass 1 opens each clean branch's Pull Request through that skill."],
-  ["finish-standalone-runs","address-pr-review","B","finish-standalone-runs/SKILL.md:44 \u2014 pass 2 starts by running it on the Pull Requests."],
-  ["finish-standalone-runs","qa-plan","B","finish-standalone-runs/SKILL.md:46 \u2014 composes each plan with qa-plan Issue mode."],
+  ["finish-standalone-runs","create-pull-request-workflow","B","finish-standalone-runs/SKILL.md:54 \u2014 pass 1 opens each clean branch's Pull Request through that skill."],
+  ["finish-standalone-runs","address-pr-review","B","finish-standalone-runs/SKILL.md:60 \u2014 pass 2 starts by running it on the Pull Requests."],
+  ["finish-standalone-runs","qa-plan","B","finish-standalone-runs/SKILL.md:62 \u2014 composes each plan with qa-plan Issue mode."],
 
   /* C \u2014 warns-off (5) */
   ["backend-api-contract-change","auth-session-workflow","C","backend-api-contract-change/SKILL.md:18 \u2014 \u201cDo not use this skill as the writer for cookie/refresh/session behavior.\u201d"],
@@ -853,7 +853,7 @@ const SS = [
   ["my-triage","domain-modeling","A","my-triage/SKILL.md"],
   ["my-triage","grill-with-docs","A","my-triage/SKILL.md"],
   ["implement","to-issues","A","implement/SKILL.md \u2014 back-reference to the slice that spawned it"],
-  ["finish-standalone-runs","my-triage","A","finish-standalone-runs/SKILL.md:33 \u2014 sending a blocked or crashed run back to an agent is a my-triage decision."],
+  ["finish-standalone-runs","my-triage","A","finish-standalone-runs/SKILL.md:49 \u2014 sending a blocked or crashed run back to an agent is a my-triage decision."],
   ["qa-plan","finish-standalone-runs","A","qa-plan/SKILL.md:330-331 \u2014 uploading a QA Artifact is that skill's procedure; qa-plan points to it."],
   ["qa-plan","playwright-e2e-workflow","A","qa-plan/SKILL.md:25-28 \u2014 planning Playwright specs is a different task owned elsewhere; qa-plan sends it away."],
   ["qa-plan","unit-test-delegation-workflow","A","qa-plan/SKILL.md:25-28 \u2014 a Jest behavior matrix is that skill's job."],
@@ -910,7 +910,7 @@ const AGENTS = {
   "VersionBump": ["release-and-deploy-workflow"]
 };
 const AGENT_NOTE = {
-  "Commit": "Two of the three parents match by wording, not delegation: address-pr-review/SKILL.md:49 says \u201cCommit through `corepack yarn ai:commit`\u201d (the verb) and finish-standalone-runs/SKILL.md:79 has a \u201cCommit:\u201d report label. Only commit-change-workflow drafts through the sub-agent. check-skill-map.ts counts them because its AGENT_FALSE_POSITIVES has no entry for either.",
+  "Commit": "Two of the three parents match by wording, not delegation: address-pr-review/SKILL.md:49 says \u201cCommit through `corepack yarn ai:commit`\u201d (the verb) and finish-standalone-runs/SKILL.md:124 has a \u201cCommit:\u201d report label. Only commit-change-workflow drafts through the sub-agent. check-skill-map.ts counts them because its AGENT_FALSE_POSITIVES has no entry for either.",
   "Research": "Conditional \u2014 upstream-brief/SKILL.md:67: \u201cIf the host has a Research specialist, use it as the worker. Otherwise the same agent fetches the pages.\u201d",
   "Audit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names Audit as the owner a human routes an Incidental Observation to (INCIDENTAL_OWNERS, upstream-brief/report.mjs). Nothing invokes this agent automatically.",
   "DepAudit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names DepAudit as the owner a human routes an Incidental Observation to (INCIDENTAL_OWNERS, upstream-brief/report.mjs). Nothing invokes this agent automatically.",
