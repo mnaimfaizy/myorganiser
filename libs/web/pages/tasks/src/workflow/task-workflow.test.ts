@@ -14,6 +14,7 @@ import {
   archiveTaskInWorkflow,
   deleteTaskFromWorkflow,
   loadTasksFromVault,
+  type TasksLoadOutcome,
   unarchiveTaskInWorkflow,
   updateTaskInWorkflow,
 } from './task-workflow';
@@ -31,6 +32,15 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createdAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
   };
+}
+
+function appliedOutcome(
+  outcome: TasksLoadOutcome,
+): Extract<TasksLoadOutcome, { superseded: false }> {
+  if (outcome.superseded) {
+    throw new Error('expected an applied load outcome, got superseded');
+  }
+  return outcome;
 }
 
 class ThrowOnLoadVaultAdapter extends InMemoryTasksVaultAdapter {
@@ -52,6 +62,19 @@ class ThrowOnDeleteVaultAdapter extends InMemoryTasksVaultAdapter {
     _deletedAt: string,
   ): Promise<Task[]> {
     throw new Error('disk full');
+  }
+}
+class SupersedeDuringLoadVaultAdapter extends InMemoryTasksVaultAdapter {
+  private readonly onLoad: () => void;
+
+  constructor(onLoad: () => void, initial: { tasks: Task[] }) {
+    super(initial);
+    this.onLoad = onLoad;
+  }
+
+  async loadTasks(): Promise<Task[] | null> {
+    this.onLoad();
+    return super.loadTasks();
   }
 }
 
@@ -77,7 +100,11 @@ describe('task-workflow', () => {
 
       const result = await loadTasksFromVault(adapter);
 
-      expect(result).toEqual({ tasks: [], loadError: null });
+      expect(result).toEqual({
+        tasks: [],
+        loadError: null,
+        superseded: false,
+      });
       expect(adapter.getSavedTasks()).toBeNull();
     });
 
@@ -96,7 +123,7 @@ describe('task-workflow', () => {
       ];
       const adapter = new InMemoryTasksVaultAdapter({ tasks: unsorted });
 
-      const result = await loadTasksFromVault(adapter);
+      const result = appliedOutcome(await loadTasksFromVault(adapter));
 
       expect(result.loadError).toBeNull();
       expect(result.tasks.map((t) => t.id)).toEqual(['high', 'low']);
@@ -107,7 +134,11 @@ describe('task-workflow', () => {
 
       const result = await loadTasksFromVault(adapter);
 
-      expect(result).toEqual({ tasks: [], loadError: null });
+      expect(result).toEqual({
+        tasks: [],
+        loadError: null,
+        superseded: false,
+      });
       expect(adapter.getSavedTasks()).toBeNull();
     });
 
@@ -125,7 +156,7 @@ describe('task-workflow', () => {
         ],
       });
 
-      const result = await loadTasksFromVault(adapter);
+      const result = appliedOutcome(await loadTasksFromVault(adapter));
 
       expect(result.loadError).toBeNull();
       expect(result.tasks).toHaveLength(1);
@@ -144,7 +175,112 @@ describe('task-workflow', () => {
           code: 'load_failed',
           message: 'Could not decrypt saved data.',
         },
+        superseded: false,
       });
+    });
+
+    it('returns superseded with no tasks and does not write back when isCurrent turns false during the read', async () => {
+      let current = true;
+      const adapter = new SupersedeDuringLoadVaultAdapter(
+        () => {
+          current = false;
+        },
+        {
+          tasks: [
+            makeTask({ id: 'urgent', priority: 'urgent' as TaskPriority }),
+          ],
+        },
+      );
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const isCurrent = jest.fn(() => current);
+
+      const result = await loadTasksFromVault(adapter, { isCurrent });
+
+      expect(isCurrent).toHaveBeenCalledTimes(1);
+      expect(result).toStrictEqual({ superseded: true });
+      expect(saveSpy).not.toHaveBeenCalled();
+      expect(adapter.getSavedTasks()?.[0].priority).toBe('urgent');
+    });
+
+    it('returns superseded with no tasks and does not save when isCurrent is false and stored tasks are valid', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: [makeTask()] });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const result = await loadTasksFromVault(adapter, {
+        isCurrent: () => false,
+      });
+
+      expect(result).toStrictEqual({ superseded: true });
+      expect(saveSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns superseded with no tasks and does not save when isCurrent is false and stored tasks are null', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: null });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const result = await loadTasksFromVault(adapter, {
+        isCurrent: () => false,
+      });
+
+      expect(result).toStrictEqual({ superseded: true });
+      expect(saveSpy).not.toHaveBeenCalled();
+      expect(adapter.getSavedTasks()).toBeNull();
+    });
+
+    it('returns superseded with no loadError when the read rejects after isCurrent turned false', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: [makeTask()] });
+      let current = true;
+      jest.spyOn(adapter, 'loadTasks').mockImplementation(async () => {
+        current = false;
+        throw new Error('decrypt failed');
+      });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const result = await loadTasksFromVault(adapter, {
+        isCurrent: () => current,
+      });
+
+      expect(result).toStrictEqual({ superseded: true });
+      expect(saveSpy).not.toHaveBeenCalled();
+    });
+
+    it('normalises and writes back the stored tasks when isCurrent is true', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({
+        tasks: [makeTask({ id: 'urgent', priority: 'urgent' as TaskPriority })],
+      });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const isCurrent = jest.fn(() => true);
+
+      const result = appliedOutcome(
+        await loadTasksFromVault(adapter, { isCurrent }),
+      );
+
+      expect(isCurrent).toHaveBeenCalledTimes(1);
+      expect(result.superseded).toBe(false);
+      expect(result.loadError).toBeNull();
+      expect(result.tasks.map((t) => [t.id, t.priority])).toEqual([
+        ['urgent', 'medium'],
+      ]);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(adapter.getSavedTasks()?.[0].priority).toBe('medium');
+    });
+
+    it('returns current tasks without saving when isCurrent is true and stored tasks are valid', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: [makeTask()] });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const result = await loadTasksFromVault(adapter, {
+        isCurrent: () => true,
+      });
+
+      expect(result).toEqual({
+        tasks: [makeTask()],
+        loadError: null,
+        superseded: false,
+      });
+      expect(saveSpy).not.toHaveBeenCalled();
     });
 
     it('sorts by priority, due date, then createdAt', async () => {
@@ -175,7 +311,7 @@ describe('task-workflow', () => {
       ];
       const adapter = new InMemoryTasksVaultAdapter({ tasks });
 
-      const result = await loadTasksFromVault(adapter);
+      const result = appliedOutcome(await loadTasksFromVault(adapter));
 
       expect(result.tasks.map((t) => t.id)).toEqual([
         'high-early',

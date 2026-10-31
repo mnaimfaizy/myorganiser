@@ -23,23 +23,66 @@ function loadFailedError(): TaskWorkflowError {
   };
 }
 
+export interface LoadTasksOptions {
+  /**
+   * Answers whether this load is still the one its caller wants. It is asked
+   * once the read has resolved, because a load superseded by then must not
+   * write its normalisation back over whatever replaced it (#1277).
+   */
+  isCurrent?: () => boolean;
+}
+
+/**
+ * What one load produced. The superseded variant carries no tasks at all, so
+ * a caller cannot read an empty list off a load it was supposed to discard
+ * and save that list back over a populated Vault (#1277).
+ */
+export type TasksLoadOutcome =
+  /** `isCurrent` turned false while the read was in flight: nothing was written back. */
+  { superseded: true } | AppliedTasksLoad;
+
+/** A load that finished as the one its caller wants. */
+export interface AppliedTasksLoad {
+  superseded: false;
+  tasks: Task[];
+  loadError: TaskWorkflowError | null;
+}
+
+/** With no `isCurrent` there is nothing to supersede the load. */
+export function loadTasksFromVault(
+  adapter: TasksVaultAdapter,
+): Promise<AppliedTasksLoad>;
+export function loadTasksFromVault(
+  adapter: TasksVaultAdapter,
+  options: LoadTasksOptions,
+): Promise<TasksLoadOutcome>;
 export async function loadTasksFromVault(
   adapter: TasksVaultAdapter,
-): Promise<{ tasks: Task[]; loadError: TaskWorkflowError | null }> {
+  { isCurrent = () => true }: LoadTasksOptions = {},
+): Promise<TasksLoadOutcome> {
   try {
     const raw = await adapter.loadTasks();
 
+    if (!isCurrent()) {
+      return { superseded: true };
+    }
+
     if (raw === null) {
-      return { tasks: [], loadError: null };
+      return { superseded: false, tasks: [], loadError: null };
     }
 
     const normalized = normalizeTasks(raw);
     if (normalized.changed) {
       await adapter.saveTasks(normalized.value);
     }
-    return { tasks: sortTasks(normalized.value), loadError: null };
+    return {
+      superseded: false,
+      tasks: sortTasks(normalized.value),
+      loadError: null,
+    };
   } catch {
-    return { tasks: [], loadError: loadFailedError() };
+    if (!isCurrent()) return { superseded: true };
+    return { superseded: false, tasks: [], loadError: loadFailedError() };
   }
 }
 
