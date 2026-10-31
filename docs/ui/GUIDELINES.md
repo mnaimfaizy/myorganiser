@@ -82,7 +82,7 @@ libs/web/pages/<route>/src/
 ├── page.tsx                ← thin Next.js route wrapper only (no logic)
 ├── components/
 │   ├── <Route>PageClient.tsx   ← top-level client compositor; stays thin
-│   ├── <SectionName>Card.tsx   ← extracted section (e.g. SubscriptionsTotalsCard)
+│   ├── <SectionName>Card.tsx   ← extracted section (e.g. DueTodayCard)
 │   ├── <Action>Dialog.tsx      ← extracted dialog (e.g. CreateListDialog)
 │   └── <Item>Item.tsx          ← extracted list item (e.g. TodoItem)
 ├── hooks/
@@ -109,9 +109,9 @@ A re-export barrel is not a Feature Component and this rule does not reach it: `
 - A section has its own form, its own loading state, or its own error boundary
 - The section could stand alone in a Storybook story
 
-**Reference: `SubscriptionsPageClient.tsx` (796 lines) is the counter-example.** It contains three hidden sections — a totals card, an add-form card, and a subscriptions table — that should each be their own file.
+**Counter-example:** a page client that accretes several hidden sections inline — say, a totals card, an add-form card, and a data table all living in one file — instead of extracting each once it is independently describable.
 
-**Reference: `DashboardHomeClient.tsx` (36 lines) is the target pattern** — a thin compositor that imports and arranges isolated widget files.
+**Reference: `DashboardHomeClient.tsx` is the target pattern** — a thin compositor that picks `HomeDesktop.tsx` or `HomePhone.tsx`, which in turn import and arrange isolated widget files (`DueTodayCard`, `RenewingSoonCard`, `SpaceCard`, and others).
 
 ---
 
@@ -394,23 +394,23 @@ Before finishing a component, grep the file for every prop passed to a child (`<
 
 ### Files and folders
 
-| Context             | Pattern                                         | Example                                               |
-| ------------------- | ----------------------------------------------- | ----------------------------------------------------- |
-| UI Primitive folder | `PascalCase/`                                   | `Card/`, `DropdownMenu/`                              |
-| UI Primitive file   | `<Name>.tsx` (matches folder)                   | `Card.tsx`, `DropdownMenu.tsx`                        |
-| Vault UI Component  | `<Name>.tsx` under `libs/web/vault-ui/src/lib/` | `CloudBackupCard.tsx`, `LastBackupCard.tsx`           |
-| Feature component   | `<Purpose><Type>.tsx`                           | `CreateListDialog.tsx`, `SubscriptionsTotalsCard.tsx` |
-| Feature page client | `<Route>PageClient.tsx`                         | `SubscriptionsPageClient.tsx`                         |
-| Feature hook        | `use-<feature>.ts`                              | `use-grocery-lists.ts`                                |
-| Zod schema file     | `<feature>.ts`                                  | `subscription.ts`                                     |
+| Context             | Pattern                                         | Example                                     |
+| ------------------- | ----------------------------------------------- | ------------------------------------------- |
+| UI Primitive folder | `PascalCase/`                                   | `Card/`, `DropdownMenu/`                    |
+| UI Primitive file   | `<Name>.tsx` (matches folder)                   | `Card.tsx`, `DropdownMenu.tsx`              |
+| Vault UI Component  | `<Name>.tsx` under `libs/web/vault-ui/src/lib/` | `CloudBackupCard.tsx`, `LastBackupCard.tsx` |
+| Feature component   | `<Purpose><Type>.tsx`                           | `CreateListDialog.tsx`, `DueTodayCard.tsx`  |
+| Feature page client | `<Route>PageClient.tsx`                         | `SubscriptionsPageClient.tsx`               |
+| Feature hook        | `use-<feature>.ts`                              | `use-groceries-page.ts`                     |
+| Zod schema file     | `<feature>.ts`                                  | `subscription.ts`                           |
 
 ### Components and sub-components
 
-| Rule                                                    | Good                                             | Avoid                                      |
-| ------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| Compound sub-components use the parent name as a prefix | `CardHeader`, `CardContent`, `CardFooter`        | `Header`, `Content`, `Footer`              |
-| Feature components describe the action or section       | `SubscriptionsTotalsCard`, `AddSubscriptionForm` | `Section`, `Panel`, `Container`, `Wrapper` |
-| No abbreviations in component names                     | `SubscriptionsOverviewCard`                      | `SubsOvCard`                               |
+| Rule                                                    | Good                                      | Avoid                                      |
+| ------------------------------------------------------- | ----------------------------------------- | ------------------------------------------ |
+| Compound sub-components use the parent name as a prefix | `CardHeader`, `CardContent`, `CardFooter` | `Header`, `Content`, `Footer`              |
+| Feature components describe the action or section       | `DueTodayCard`, `CreateListDialog`        | `Section`, `Panel`, `Container`, `Wrapper` |
+| No abbreviations in component names                     | `RenewingSoonCard`                        | `RenSoonCard`                              |
 
 ### Exports
 
