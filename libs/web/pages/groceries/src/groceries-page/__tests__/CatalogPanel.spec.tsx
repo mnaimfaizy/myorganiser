@@ -172,28 +172,7 @@ function catalogPanel() {
   return screen.getByRole('tabpanel', { name: /^Catalog ·/ });
 }
 
-/**
- * AddExistingItemDialog renders its title and description as plain text, so
- * Radix logs two accessibility warnings each time it opens. That is a gap in
- * the production dialog, not the behaviour under test. Only those two messages
- * are silenced; every other console call still reaches the real console.
- */
-const RADIX_DIALOG_GAP = /DialogTitle|Missing `Description`/;
 const consoleSpies: jest.SpyInstance[] = [];
-
-function silenceAddExistingDialogA11yWarnings() {
-  for (const method of ['error', 'warn'] as const) {
-    const original = console[method].bind(console);
-    consoleSpies.push(
-      jest.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        if (typeof args[0] === 'string' && RADIX_DIALOG_GAP.test(args[0])) {
-          return;
-        }
-        original(...args);
-      }),
-    );
-  }
-}
 
 /** Radix opens a dropdown on Enter keydown on its trigger. */
 function openRowMenu(name: string) {
@@ -366,7 +345,6 @@ describe('CatalogPanel', () => {
   });
 
   it('opens Add From Catalog preselected for the item and adds it to the chosen list with its amount', async () => {
-    silenceAddExistingDialogA11yWarnings();
     const vault = renderPage({ lists: [weeklyShop, party] });
     vault.addExistingCatalogItemToLists.mockResolvedValue(['list-party']);
     openCatalogTab();
@@ -374,7 +352,9 @@ describe('CatalogPanel', () => {
     fireEvent.click(
       within(rowFor('Eggs')).getByRole('button', { name: 'Add to lists' }),
     );
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Add From Catalog',
+    });
     expect(
       within(dialog).getByRole('heading', { name: 'Add From Catalog' }),
     ).toBeInTheDocument();
@@ -414,7 +394,6 @@ describe('CatalogPanel', () => {
   });
 
   it('toasts the partial count when only some selected lists took the item', async () => {
-    silenceAddExistingDialogA11yWarnings();
     const vault = renderPage({ lists: [weeklyShop, party] });
     vault.addExistingCatalogItemToLists.mockResolvedValue(['list-party']);
     openCatalogTab();
@@ -451,7 +430,6 @@ describe('CatalogPanel', () => {
   });
 
   it('toasts that nothing was added when every selected list already has the item', async () => {
-    silenceAddExistingDialogA11yWarnings();
     const vault = renderPage({ lists: [weeklyShop, party] });
     vault.addExistingCatalogItemToLists.mockResolvedValue([]);
     openCatalogTab();
@@ -483,7 +461,6 @@ describe('CatalogPanel', () => {
     );
   });
 
-  // The edit-save rejection path is untested: CatalogItemEditDialog does not catch onSave rejections (pre-existing; tracked as a follow-up).
   it('opens Edit Catalog Item prefilled and saves the changed name through updateCatalogItem', async () => {
     const vault = renderPage({ lists: [weeklyShop, party] });
     openCatalogTab();
@@ -523,6 +500,58 @@ describe('CatalogPanel', () => {
         screen.queryByRole('dialog', { name: 'Edit Catalog Item' }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it('keeps Edit Catalog Item open with the typed name when updateCatalogItem rejects, and toasts once', async () => {
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    consoleSpies.push(consoleError);
+    const vault = renderPage({ lists: [weeklyShop, party] });
+    vault.updateCatalogItem.mockRejectedValue(new Error('write failed'));
+    openCatalogTab();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Milk' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Edit Catalog Item',
+    });
+    fireEvent.change(
+      within(dialog).getByRole('textbox', { name: 'Catalog Item Name' }),
+      { target: { value: 'Whole milk' } },
+    );
+
+    const save = within(dialog).getByRole('button', {
+      name: 'Save Catalog Item',
+    });
+    await waitFor(() => {
+      expect(save).toBeEnabled();
+    });
+    await act(async () => {
+      fireEvent.click(save);
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Failed to save your changes. Please try again.',
+        variant: 'destructive',
+      });
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(vault.updateCatalogItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'cat-milk',
+        name: 'Whole milk',
+        category: 'dairy',
+        price: 2.5,
+      }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Edit Catalog Item' }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('textbox', { name: 'Catalog Item Name' }),
+    ).toHaveValue('Whole milk');
   });
 
   it('deletes from Catalog only after the exact name is typed, then toasts the deletion', async () => {
@@ -633,9 +662,10 @@ describe('CatalogPanel', () => {
   });
 
   it('toasts the Error copy and logs when adding to lists rejects, and keeps the dialog open', async () => {
-    silenceAddExistingDialogA11yWarnings();
-    // Returns the narrow Radix-silence spy, so only the two Radix messages stay filtered.
-    const consoleError = jest.spyOn(console, 'error');
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    consoleSpies.push(consoleError);
     const vault = renderPage({ lists: [weeklyShop, party] });
     const failure = new Error('vault write failed');
     vault.addExistingCatalogItemToLists.mockRejectedValue(failure);

@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DatePicker } from './DatePicker';
@@ -36,5 +37,26 @@ describe('DatePicker', () => {
       />,
     );
     expect(screen.getByRole('button').textContent).toContain('Pick a due date');
+  });
+
+  it('forwards aria-invalid and aria-describedby to the trigger button', () => {
+    render(
+      <DatePicker
+        value=""
+        onChange={() => undefined}
+        aria-invalid={true}
+        aria-describedby="err-1"
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger).toHaveAttribute('aria-describedby', 'err-1');
+  });
+
+  it('renders no aria-invalid or aria-describedby when neither prop is passed', () => {
+    render(<DatePicker value="" onChange={() => undefined} />);
+    const trigger = screen.getByRole('button');
+    expect(trigger).not.toHaveAttribute('aria-invalid');
+    expect(trigger).not.toHaveAttribute('aria-describedby');
   });
 });

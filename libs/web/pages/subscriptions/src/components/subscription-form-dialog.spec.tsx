@@ -243,4 +243,21 @@ describe('SubscriptionFormDialog', () => {
 
     expect(screen.getByLabelText('Name')).toHaveValue('Spotify');
   });
+
+  it('links the Started date error to its trigger and does not submit', async () => {
+    const { props } = renderDialog({
+      initialValues: { ...emptySubscriptionFormValues('AUD'), startDate: '' },
+    });
+
+    typeInto('Name', 'Gym');
+    fireEvent.click(screen.getByRole('button', { name: 'Add subscription' }));
+
+    const message = await screen.findByText('Start date is required');
+    const trigger = screen.getByLabelText(/^Started/);
+    expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger.getAttribute('aria-describedby')?.split(' ')).toContain(
+      message.id,
+    );
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
 });

@@ -27,6 +27,10 @@ jest.mock('@myorganiser/web-ui', () => {
     <div className={className}>{children}</div>
   );
 
+  const DialogTitle = ({ children }: any) => <h2>{children}</h2>;
+
+  const DialogDescription = ({ children }: any) => <p>{children}</p>;
+
   function Button({ children, onClick, disabled, type, variant }: any) {
     return (
       <button
@@ -68,6 +72,8 @@ jest.mock('@myorganiser/web-ui', () => {
   return {
     Dialog,
     DialogContent,
+    DialogTitle,
+    DialogDescription,
     Button,
     Input,
     Label,
