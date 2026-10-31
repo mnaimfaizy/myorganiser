@@ -67,6 +67,7 @@ export async function loadTasksFromVault(
       loadError: null,
     };
   } catch {
+    if (!isCurrent()) return { superseded: true };
     return { superseded: false, tasks: [], loadError: loadFailedError() };
   }
 }

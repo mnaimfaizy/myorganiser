@@ -67,6 +67,12 @@ export function useTasksWorkflow({
   // array and the second would drop the first one's change (#1277).
   const latestTasksRef = useRef<Task[]>([]);
 
+  // Whether `latestTasksRef` is known to match the Vault. It is not before a
+  // current load has applied, after a load fails, or once the revision moves.
+  // Saving the whole array from one of those would overwrite a populated Vault
+  // with whatever the array happens to hold, so the mutation re-reads first.
+  const latestTasksMatchVaultRef = useRef(false);
+
   const applyTasks = useCallback((next: Task[]) => {
     latestTasksRef.current = next;
     setTasks(next);
@@ -74,7 +80,8 @@ export function useTasksWorkflow({
 
   // One chain for every Vault write this hook makes — the five mutations and
   // the load's normalisation write-back alike. Nothing here overlaps, so each
-  // write starts from what the write before it saved.
+  // write starts from the latest array, which includes a change whose own save
+  // failed: that change stays on screen and the next write carries it.
   const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve());
 
   const enqueue = useCallback(<T>(run: () => Promise<T>): Promise<T> => {
@@ -92,11 +99,21 @@ export function useTasksWorkflow({
   const runMutation = useCallback(
     (mutate: TasksMutation): Promise<TaskWorkflowMutationResult> =>
       enqueue(async () => {
+        if (!latestTasksMatchVaultRef.current) {
+          const reread = await loadTasksFromVault(vaultAdapter);
+          if (reread.superseded) {
+            throw new Error('A re-read with no isCurrent cannot be superseded');
+          }
+          if (reread.loadError) return { ok: false, error: reread.loadError };
+          applyTasks(reread.tasks);
+          setLoadError(null);
+          latestTasksMatchVaultRef.current = true;
+        }
         const { tasks: next, result } = await mutate(latestTasksRef.current);
         applyTasks(next);
         return result;
       }),
-    [applyTasks, enqueue],
+    [applyTasks, enqueue, vaultAdapter],
   );
 
   // Convergence replaces the Local Vault without passing through this hook, so
@@ -112,6 +129,7 @@ export function useTasksWorkflow({
     // `current` a mutation is handed below, which is a `Task[]`, not a flag.
     let thisLoadIsCurrent = true;
     const isCurrent = () => thisLoadIsCurrent;
+    latestTasksMatchVaultRef.current = false;
 
     // The load joins the write queue because its normalisation write-back is
     // a whole-array save like any other. A load the revision has superseded
@@ -124,6 +142,7 @@ export function useTasksWorkflow({
       if (!isCurrent()) return;
 
       applyTasks(loaded.tasks);
+      latestTasksMatchVaultRef.current = loaded.loadError === null;
       setLoadError(loaded.loadError);
       setLoading(false);
     });

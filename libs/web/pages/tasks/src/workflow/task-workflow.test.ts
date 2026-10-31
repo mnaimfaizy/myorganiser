@@ -228,6 +228,23 @@ describe('task-workflow', () => {
       expect(adapter.getSavedTasks()).toBeNull();
     });
 
+    it('returns superseded with no loadError when the read rejects after isCurrent turned false', async () => {
+      const adapter = new InMemoryTasksVaultAdapter({ tasks: [makeTask()] });
+      let current = true;
+      jest.spyOn(adapter, 'loadTasks').mockImplementation(async () => {
+        current = false;
+        throw new Error('decrypt failed');
+      });
+      const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+      const result = await loadTasksFromVault(adapter, {
+        isCurrent: () => current,
+      });
+
+      expect(result).toStrictEqual({ superseded: true });
+      expect(saveSpy).not.toHaveBeenCalled();
+    });
+
     it('normalises and writes back the stored tasks when isCurrent is true', async () => {
       const adapter = new InMemoryTasksVaultAdapter({
         tasks: [makeTask({ id: 'urgent', priority: 'urgent' as TaskPriority })],

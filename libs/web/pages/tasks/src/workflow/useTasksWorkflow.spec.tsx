@@ -341,14 +341,15 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
     async function mountWithLoadedTasks(tasks: Task[]): Promise<{
       adapter: HeldTasksVaultAdapter;
       result: { current: UseTasksWorkflowResult };
+      rerender: () => void;
     }> {
       const adapter = new HeldTasksVaultAdapter();
-      const { result } = renderHook(() =>
+      const { result, rerender } = renderHook(() =>
         useTasksWorkflow({ handle: null as any, adapter }),
       );
       await settleLoad(adapter, tasks);
       await waitFor(() => expect(result.current.loading).toBe(false));
-      return { adapter, result };
+      return { adapter, result, rerender };
     }
 
     /** Releases the next `count` queued Vault writes, one at a time, in queue order. */
@@ -509,6 +510,41 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       expect(adapter.getSavedTasks()).toEqual([newerTask]);
     });
 
+    it('a load write-back that finishes after a newer revision does not apply its stale copy', async () => {
+      const newerTask = makeTask({ id: 'task-2', title: 'Current copy' });
+      const adapter = new HeldTasksVaultAdapter();
+
+      (useLocalVaultRevision as jest.Mock).mockReturnValue(0);
+      const { result, rerender } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+
+      // The stored copy needs normalising, so the first load writes it back.
+      await settleLoad(adapter, [
+        makeTask({
+          id: 'task-1',
+          title: 'Stale copy',
+          priority: 'urgent' as Task['priority'],
+        }),
+      ]);
+      await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+
+      // The revision moves on while that write-back is still held.
+      (useLocalVaultRevision as jest.Mock).mockReturnValue(1);
+      rerender();
+
+      // Releasing the write lets the stale load finish. It must not apply.
+      await releaseWrite(adapter);
+      await waitFor(() => expect(adapter.pendingLoadCount()).toBe(1));
+      expect(result.current.tasks).toEqual([]);
+      expect(result.current.loading).toBe(true);
+
+      // The newer load settles with its own copy, and that is what is shown.
+      await settleLoad(adapter, [newerTask]);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.tasks).toEqual([newerTask]);
+    });
+
     it('a load write-back still pending holds a mutation behind it', async () => {
       const adapter = new HeldTasksVaultAdapter();
       const { result } = renderHook(() =>
@@ -614,6 +650,303 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       await waitFor(() => {
         expect(result.current.tasks).toHaveLength(2);
         expect(result.current.tasks.every((t) => t.archived)).toBe(true);
+      });
+    });
+
+    describe('a write re-reads the Vault when the array is not known to match it', () => {
+      /** Makes the first `count` Vault reads throw, then reads normally. */
+      function failFirstLoads(
+        adapter: InMemoryTasksVaultAdapter,
+        count: number,
+      ): void {
+        const read = adapter.loadTasks.bind(adapter);
+        let failures = count;
+        jest.spyOn(adapter, 'loadTasks').mockImplementation(async () => {
+          if (failures > 0) {
+            failures -= 1;
+            throw new Error('decrypt failed');
+          }
+          return read();
+        });
+      }
+
+      it('an add queued behind a superseded load re-reads the Vault and keeps the existing tasks', async () => {
+        const existing = makeTask({ id: 'task-1', title: 'Existing' });
+        const adapter = new HeldTasksVaultAdapter();
+        const { result, rerender } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        // The first load is still in flight when the add is queued and the revision moves on.
+        await waitFor(() => expect(adapter.pendingLoadCount()).toBe(1));
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        (useLocalVaultRevision as jest.Mock).mockReturnValue(1);
+        rerender();
+
+        // The superseded load resolves empty, and that must not be applied.
+        await settleLoad(adapter, null);
+        // The add reads the Vault itself before it saves.
+        await settleLoad(adapter, [existing]);
+        await drainQueuedWrites(adapter, 1);
+        await expect(added).resolves.toEqual({ ok: true, kind: 'created' });
+
+        const saved = adapter.getSavedTasks() ?? [];
+        expect(saved).toHaveLength(2);
+        expect(saved).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: 'task-1', title: 'Existing' }),
+            expect.objectContaining({ title: 'New task' }),
+          ]),
+        );
+
+        // The revision's own load runs last and applies what is now stored.
+        await settleLoad(adapter, saved);
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.tasks).toHaveLength(2);
+      });
+
+      it('a mutation queued before a revision bump re-reads and saves over the converged tasks', async () => {
+        const first = makeTask({ id: 'task-1', title: 'First' });
+        const converged = makeTask({ id: 'task-2', title: 'From server' });
+        const { adapter, result, rerender } = await mountWithLoadedTasks([
+          first,
+        ]);
+
+        const archived = result.current.archiveTask('task-1');
+        await waitFor(() => expect(adapter.pendingWriteCount()).toBe(1));
+        // Queued while the archive is still saving, so it runs after it.
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        (useLocalVaultRevision as jest.Mock).mockReturnValue(1);
+        rerender();
+
+        await releaseWrite(adapter);
+        await expect(archived).resolves.toEqual({
+          ok: true,
+          kind: 'archived',
+        });
+        // Convergence has added a task to the Vault since the page last read it.
+        await settleLoad(adapter, [
+          ...(adapter.getSavedTasks() ?? []),
+          converged,
+        ]);
+        await drainQueuedWrites(adapter, 1);
+        await expect(added).resolves.toEqual({ ok: true, kind: 'created' });
+
+        const saved = adapter.getSavedTasks() ?? [];
+        expect(saved).toHaveLength(3);
+        expect(saved).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: 'task-1', archived: true }),
+            expect.objectContaining({ id: 'task-2', title: 'From server' }),
+            expect.objectContaining({ title: 'New task' }),
+          ]),
+        );
+
+        await settleLoad(adapter, saved);
+        await waitFor(() => expect(result.current.tasks).toHaveLength(3));
+      });
+
+      it('an add after a failed load re-reads and saves the existing tasks with the new one', async () => {
+        const existing = makeTask({ id: 'task-1', title: 'Existing' });
+        const adapter = new InMemoryTasksVaultAdapter({ tasks: [existing] });
+        failFirstLoads(adapter, 1);
+
+        const { result } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.loadError).toEqual({
+          code: 'load_failed',
+          message: 'Could not decrypt saved data.',
+        });
+        expect(result.current.tasks).toEqual([]);
+
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        await act(async () => {
+          await added;
+        });
+        await expect(added).resolves.toEqual({ ok: true, kind: 'created' });
+        expect(result.current.loadError).toBeNull();
+
+        const saved = adapter.getSavedTasks() ?? [];
+        expect(saved).toHaveLength(2);
+        expect(saved).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: 'task-1', title: 'Existing' }),
+            expect.objectContaining({ title: 'New task' }),
+          ]),
+        );
+      });
+
+      it('an add whose re-read write-back also fails resolves load_failed, saves no new task, and leaves the stored copy unchanged', async () => {
+        const stored = makeTask({
+          id: 'task-1',
+          title: 'Stored copy',
+          priority: 'urgent' as Task['priority'],
+        });
+        const adapter = new InMemoryTasksVaultAdapter({ tasks: [stored] });
+        // Every write-back fails: the mount's normalisation and the add's re-read alike.
+        const saveSpy = jest
+          .spyOn(adapter, 'saveTasks')
+          .mockRejectedValue(new Error('disk full'));
+
+        const { result } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        await act(async () => {
+          await added;
+        });
+        await expect(added).resolves.toEqual({
+          ok: false,
+          error: {
+            code: 'load_failed',
+            message: 'Could not decrypt saved data.',
+          },
+        });
+
+        const savedTitles = saveSpy.mock.calls.flatMap(([tasks]) =>
+          tasks.map((t) => t.title),
+        );
+        expect(savedTitles).not.toContain('New task');
+        expect(adapter.getSavedTasks()).toEqual([stored]);
+      });
+
+      it('a mutation whose re-read also fails resolves load_failed without saving, and a later mutation still runs', async () => {
+        const existing = makeTask({ id: 'task-1', title: 'Existing' });
+        const adapter = new InMemoryTasksVaultAdapter({ tasks: [existing] });
+        // Fails the mount's load and the add's re-read; the Vault reads again after that.
+        failFirstLoads(adapter, 2);
+        const saveSpy = jest.spyOn(adapter, 'saveTasks');
+
+        const { result } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        await act(async () => {
+          await added;
+        });
+        await expect(added).resolves.toEqual({
+          ok: false,
+          error: {
+            code: 'load_failed',
+            message: 'Could not decrypt saved data.',
+          },
+        });
+        expect(saveSpy).not.toHaveBeenCalled();
+
+        const archived = result.current.archiveTask('task-1');
+        await act(async () => {
+          await archived;
+        });
+        await expect(archived).resolves.toEqual({
+          ok: true,
+          kind: 'archived',
+        });
+        expect(saveSpy).toHaveBeenCalledTimes(1);
+        expect(adapter.getSavedTasks()).toEqual([
+          expect.objectContaining({ id: 'task-1', archived: true }),
+        ]);
+      });
+
+      it('mutations after a successful load do not read the Vault again', async () => {
+        const adapter = new InMemoryTasksVaultAdapter({
+          tasks: [makeTask({ id: 'task-1' })],
+        });
+        const loadSpy = jest.spyOn(adapter, 'loadTasks');
+
+        const { result } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(loadSpy).toHaveBeenCalledTimes(1);
+
+        const archived = result.current.archiveTask('task-1');
+        await act(async () => {
+          await archived;
+        });
+        const added = result.current.addTask({
+          title: 'New task',
+          priority: 'low',
+          status: 'pending',
+        });
+        await act(async () => {
+          await added;
+        });
+
+        expect(loadSpy).toHaveBeenCalledTimes(1);
+        expect(adapter.getSavedTasks()).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: 'task-1', archived: true }),
+            expect.objectContaining({ title: 'New task' }),
+          ]),
+        );
+      });
+
+      it('a save that fails keeps the change on screen, and the next write saves it too', async () => {
+        const adapter = new InMemoryTasksVaultAdapter({
+          tasks: [makeTask({ id: 'a' }), makeTask({ id: 'b' })],
+        });
+        jest.spyOn(adapter, 'saveTasks').mockImplementationOnce(async () => {
+          throw new Error('disk full');
+        });
+
+        const { result } = renderHook(() =>
+          useTasksWorkflow({ handle: null as any, adapter }),
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const failed = result.current.archiveTask('a');
+        await act(async () => {
+          await failed;
+        });
+        await expect(failed).resolves.toEqual({
+          ok: false,
+          error: { code: 'save_failed', message: 'disk full' },
+        });
+        // Optimistic: the change is still shown, though the Vault never took it.
+        expect(result.current.tasks.find((t) => t.id === 'a')?.archived).toBe(
+          true,
+        );
+        expect(
+          adapter.getSavedTasks()?.find((t) => t.id === 'a')?.archived,
+        ).toBe(false);
+
+        const next = result.current.archiveTask('b');
+        await act(async () => {
+          await next;
+        });
+        await expect(next).resolves.toEqual({ ok: true, kind: 'archived' });
+
+        expect(adapter.getSavedTasks()).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: 'a', archived: true }),
+            expect.objectContaining({ id: 'b', archived: true }),
+          ]),
+        );
       });
     });
   });
