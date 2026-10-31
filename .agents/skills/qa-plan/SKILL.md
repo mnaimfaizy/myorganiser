@@ -391,8 +391,8 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - `docs/adr/0041-internal-notes-have-homes.md` — why the working copy is an uncommitted file in
   `tmp/`.
 - `docs/adr/0043-gates-assert-facts.md` — the gate shape this repo does not build.
-- Walkthrough evidence: the `walkthrough-artifacts` skill (Cloud Agent), plus the three QA lines
-  under Evidence above.
+- QA Artifacts: Evidence above, [Uploading QA Artifacts](../finish-standalone-runs/SKILL.md#uploading-qa-artifacts),
+  and [ADR 0142](../../../docs/adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md).
 - Issue #827 — grill decisions that added Compose/Execute, hazards, failure classes, and Execution
   record (skill-only; no new ADR).
 
@@ -418,5 +418,5 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - Vault/crypto hazards were obeyed when applicable.
 - Every scenario has an Execution record row with PASS/FAIL and evidence.
 - Defects and automatable-residue follow-ups were filed as issues (follow-ups do not block sign-off).
-- Evidence follows the walkthrough-artifacts pointer and the three QA lines.
+- QA Artifacts follow the Evidence section and its three QA lines.
 - Sign-off checklist is ticked at the correct destination (QA Plan Issue vs `tmp/`).

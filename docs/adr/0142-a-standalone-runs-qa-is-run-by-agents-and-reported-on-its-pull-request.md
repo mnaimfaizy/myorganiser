@@ -14,7 +14,7 @@ A finished Standalone Run waits as `ready-for-human`, and the Maintainer was ask
 
 The `finish-standalone-runs` Skill runs QA with one sub-agent per Pull Request, without asking for approval of the plan.
 
-1. **QA follows the Pull Request.** It runs once CI and code review have settled, so it tests the code that will merge. `docs/sandcastle/RUNBOOK.md`'s "QA the local branch, then push" remains the PRD order.
+1. **QA follows the Pull Request.** It runs once CI and code review have settled, so it tests the code that will merge. `docs/sandcastle/RUNBOOK.md`'s "QA the integrated branch locally", before the push, remains the PRD order.
 2. **The result is a QA Report.** One text comment names the commit, the scenarios and the result, and a later commit makes it stale. The Maintainer sees the results before it is posted. Nothing enforces it, as ADR 0048 decided for QA Plans.
 3. **A QA Artifact is private by default.** It stays in `tmp/qa/pr-<n>/`. Most exist so the Maintainer can check a fix while working on something else, so each upload is their choice, and the default is none. A failed run's QA Artifact stays local.
 4. **An uploaded QA Artifact goes on the `qa-evidence` prerelease.** Upload is public at once, so only QA Accounts may appear.
