@@ -84,7 +84,7 @@ libs/web/pages/<route>/src/
 │   ├── <Route>PageClient.tsx   ← top-level client compositor; stays thin
 │   ├── <SectionName>Card.tsx   ← extracted section (e.g. DueTodayCard)
 │   ├── <Action>Dialog.tsx      ← extracted dialog (e.g. CreateListDialog)
-│   └── <Item>Item.tsx          ← extracted list item (e.g. TodoItem)
+│   └── <Item>Item.tsx          ← extracted list item (e.g. QueueRailItem)
 ├── hooks/
 │   └── use-<feature>.ts    ← custom hooks private to this route
 └── schemas/
