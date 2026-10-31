@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, userEvent, waitFor, within } from '@storybook/test';
+import { CircleAlert } from 'lucide-react';
 import { useState } from 'react';
 
+import { Label } from '../Label/Label';
 import { DatePicker } from './DatePicker';
 
 /** Pinned yyyy-MM-dd string — never use live dates in stories. */
@@ -42,6 +44,51 @@ export const Disabled: Story = {
   render: function Render() {
     const [value, setValue] = useState(PINNED_DATE);
     return <DatePicker value={value} onChange={setValue} disabled />;
+  },
+};
+
+/**
+ * Required field left empty. The error is derived from the value, so picking a
+ * date clears both `aria-invalid` and the `aria-describedby` link, as a real
+ * form would. The error copy is sample text for the story only.
+ */
+export const Invalid: Story = {
+  render: function Render() {
+    const [value, setValue] = useState('');
+    const error = value ? undefined : 'Start date is required.';
+    return (
+      <div className="grid w-full max-w-md items-center gap-1.5">
+        <Label htmlFor="start-date">Start date</Label>
+        <DatePicker
+          id="start-date"
+          value={value}
+          onChange={setValue}
+          placeholder="Pick a start date"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'start-date-error' : undefined}
+        />
+        {error ? (
+          <p
+            id="start-date-error"
+            className="inline-flex items-start gap-1.5 text-caption text-destructive-text"
+          >
+            <CircleAlert
+              aria-hidden="true"
+              className="mt-px h-4 w-4 shrink-0"
+            />
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole('button');
+    await expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    await expect(trigger).toHaveAccessibleDescription(
+      /Start date is required\./,
+    );
   },
 };
 

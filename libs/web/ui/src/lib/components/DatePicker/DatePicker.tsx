@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 
@@ -14,6 +15,8 @@ export type DatePickerProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  'aria-invalid'?: React.AriaAttributes['aria-invalid'];
+  'aria-describedby'?: string;
 };
 
 function parseDateInput(value?: string) {
@@ -29,6 +32,8 @@ export function DatePicker({
   onChange,
   placeholder = 'Pick a date',
   disabled,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
 }: DatePickerProps) {
   const selected = parseDateInput(value);
 
@@ -43,6 +48,8 @@ export function DatePicker({
             !selected && 'text-muted-foreground',
           )}
           disabled={disabled}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
           type="button"
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
