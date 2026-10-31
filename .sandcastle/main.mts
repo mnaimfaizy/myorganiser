@@ -119,7 +119,7 @@ const sandcastleModels = agentModelPolicy.orchestrators.sandcastle;
 //     its sandbox; the host fast-forwards the local feature branch onto the slice.
 //   • No per-slice push, no per-slice PR, no `gh pr merge`.
 //
-// After the run you QA the local feature branch, then push it and open ONE PR to
+// After a prd run you QA the local feature branch, then push it and open ONE PR to
 // `main` yourself — CI runs there. See docs/adr/0010 and docs/sandcastle/RUNBOOK.md.
 //
 // TWO MODES (see the run plan below):
@@ -127,7 +127,7 @@ const sandcastleModels = agentModelPolicy.orchestrators.sandcastle;
 //   • issue — `--issue <n>` with NO `--prd`. One ad-hoc issue, cut from origin/main
 //     (or `--base`). There is no integration branch, so the work branch IS the
 //     deliverable: gate green ends the run, the issue is left OPEN, and nothing is
-//     fast-forwarded. Same sandbox, same in-container install, same gate.
+//     fast-forwarded. Same sandbox, same gate. Then finish-standalone-runs (ADR 0142).
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

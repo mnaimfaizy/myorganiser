@@ -306,7 +306,7 @@ Standalone runs follow the same rule with the last step removed: agent → commi
 There is no integration branch to fast-forward into, so the work branch is the deliverable and the
 issue is left open.
 
-When the run finishes, **you** finish the loop by hand:
+When a PRD run finishes, **you** finish the loop by hand:
 
 ```bash
 git switch feat/<slug>                 # QA the integrated branch locally
@@ -317,7 +317,7 @@ corepack yarn ai:create-pr             # push it and open ONE PR; CI runs here; 
 keyboard. An agent opening the PR goes through the create-pull-request-workflow Skill instead, so
 `PrAuthor` drafts the title, body, Surface Labels, and merge base.
 
-For a standalone run, substitute the `<type>/<n>-<slug>` branch the summary printed.
+A standalone run goes through the `finish-standalone-runs` Skill instead. It opens the Pull Request first and runs QA afterwards, on the code that will merge ([ADR 0142](../adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md)).
 
 ### Tunables
 
