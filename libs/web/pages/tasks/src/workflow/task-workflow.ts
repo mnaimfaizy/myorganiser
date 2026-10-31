@@ -39,9 +39,23 @@ export interface LoadTasksOptions {
  */
 export type TasksLoadOutcome =
   /** `isCurrent` turned false while the read was in flight: nothing was written back. */
-  | { superseded: true }
-  | { superseded: false; tasks: Task[]; loadError: TaskWorkflowError | null };
+  { superseded: true } | AppliedTasksLoad;
 
+/** A load that finished as the one its caller wants. */
+export interface AppliedTasksLoad {
+  superseded: false;
+  tasks: Task[];
+  loadError: TaskWorkflowError | null;
+}
+
+/** With no `isCurrent` there is nothing to supersede the load. */
+export function loadTasksFromVault(
+  adapter: TasksVaultAdapter,
+): Promise<AppliedTasksLoad>;
+export function loadTasksFromVault(
+  adapter: TasksVaultAdapter,
+  options: LoadTasksOptions,
+): Promise<TasksLoadOutcome>;
 export async function loadTasksFromVault(
   adapter: TasksVaultAdapter,
   { isCurrent = () => true }: LoadTasksOptions = {},

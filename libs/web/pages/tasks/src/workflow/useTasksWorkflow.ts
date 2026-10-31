@@ -101,9 +101,6 @@ export function useTasksWorkflow({
       enqueue(async () => {
         if (!latestTasksMatchVaultRef.current) {
           const reread = await loadTasksFromVault(vaultAdapter);
-          if (reread.superseded) {
-            throw new Error('A re-read with no isCurrent cannot be superseded');
-          }
           if (reread.loadError) return { ok: false, error: reread.loadError };
           applyTasks(reread.tasks);
           setLoadError(null);
