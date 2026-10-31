@@ -5,6 +5,8 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
   Input,
   Label,
 } from '@myorganiser/web-ui';
@@ -117,17 +119,17 @@ export function AddExistingItemDialog({
       <DialogContent className="w-[calc(100%-2rem)] max-w-xl p-0 gap-0 overflow-hidden">
         <div className="px-6 py-5 border-b border-border">
           <div className="flex items-start gap-3 mb-1">
-            <h2 className="text-xl font-semibold text-primary">
+            <DialogTitle className="text-xl font-semibold text-primary">
               Add From Catalog
-            </h2>
+            </DialogTitle>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan/10 text-foreground rounded-full border border-cyan/30 text-[10px] font-bold tracking-wider uppercase shrink-0 mt-0.5">
               <Lock className="w-3 h-3" />
               Encrypted Data
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription className="text-sm text-muted-foreground">
             Attach an existing Catalog Item to one or more Grocery Lists.
-          </p>
+          </DialogDescription>
         </div>
 
         <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
