@@ -229,21 +229,22 @@ export function TasksBoard({
     setDeletingTask(null);
   }, [deleteTask, deletingTask]);
 
-  // "All clear" means no open Task in any context, so it reads every live Task
-  // rather than the context-scoped view.counts.
-  const globalOpenCount = countTasks(
+  // "All clear" means no open Task in any context, so both its open check and
+  // its done-this-week figure read every live Task, not the context-scoped
+  // view.counts.
+  const globalCounts = countTasks(
     tasks.filter((t) => !t.archived),
     now,
-  ).open;
+  );
   const showAllClear =
-    !loading && statusFilter === 'open' && globalOpenCount === 0;
+    !loading && statusFilter === 'open' && globalCounts.open === 0;
   const showFilteredEmpty =
     !loading && !showAllClear && view.sections.length === 0;
   const summary = loading ? '' : formatTaskSummary(view.counts, variant);
 
   const list = loading ? null : showAllClear ? (
     <TasksAllClear
-      doneThisWeek={view.counts.doneThisWeek}
+      doneThisWeek={globalCounts.doneThisWeek}
       onShowDone={handleShowDone}
       onAddTask={isPhone ? undefined : handleAddRequest}
       variant={variant}

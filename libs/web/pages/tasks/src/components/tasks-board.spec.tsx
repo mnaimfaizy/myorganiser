@@ -378,6 +378,45 @@ describe('TasksBoard', () => {
       );
     });
 
+    it('shows the filtered-empty state when the Blocked chip matches no task in the Work context', () => {
+      const workTask = makeTask({
+        id: 'x1',
+        title: 'Draft memo',
+        dueDate: '2026-10-25',
+        context: 'work',
+      });
+      const personalBlocked = makeTask({
+        id: 'x2',
+        title: 'Call plumber',
+        dueDate: '2026-10-22',
+        context: 'personal',
+        status: 'blocked',
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([workTask, personalBlocked])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Work' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Blocked · 0' }));
+
+      expect(
+        screen.getByText('No tasks match these filters.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Clear filters' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'All clear' }),
+      ).not.toBeInTheDocument();
+      expect(headingTexts(2)).toEqual([]);
+      expect(
+        screen.getByRole('button', { name: 'Blocked · 0' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+
     it('keeps the all-clear state under a narrowed context when no task is open anywhere', () => {
       render(
         <TasksBoard
@@ -394,6 +433,31 @@ describe('TasksBoard', () => {
       expect(
         screen.queryByText('No tasks match these filters.'),
       ).not.toBeInTheDocument();
+    });
+
+    it('counts done-this-week across every context on the all-clear state under a narrowed context', () => {
+      const workDone = makeTask({
+        id: 'y1',
+        title: 'File expenses',
+        context: 'work',
+        status: 'done',
+        closedAt: DONE_THIS_WEEK,
+      });
+      render(
+        <TasksBoard
+          page={makeTasksPageController([workDone, writeNotes])}
+          variant="desktop"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+
+      expect(
+        screen.getByRole('heading', { name: 'All clear' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Nothing open. 2 tasks done this week.'),
+      ).toBeInTheDocument();
     });
 
     it('Clear filters resets the context to All and the status to Open, and re-shows the hidden task', () => {
