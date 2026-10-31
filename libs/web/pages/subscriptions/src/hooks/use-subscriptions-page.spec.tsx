@@ -107,6 +107,11 @@ async function renderLoaded(records: unknown[] = [NETFLIX]) {
   return hook;
 }
 
+/** An FX lookup result, where only the base and rates matter to a test. */
+function fxEntry(base: FxEntry['base'], rates: FxEntry['rates']): FxEntry {
+  return { base, fetchedAt: 0, ttlMs: 0, rates };
+}
+
 describe('useSubscriptionsPage', () => {
   beforeEach(() => {
     // Pin only the clock so the stamped updatedAt is deterministic.
@@ -564,12 +569,7 @@ describe('useSubscriptionsPage', () => {
       expect(result.current.conversion).toEqual({ status: 'loading' });
 
       await act(async () => {
-        resolveRates({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        resolveRates(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
 
@@ -718,12 +718,9 @@ describe('useSubscriptionsPage', () => {
     });
 
     it('shows the error state instead of the stale total when a recompute fails', async () => {
-      jest.mocked(getFxRates).mockResolvedValueOnce({
-        base: 'USD',
-        fetchedAt: 0,
-        ttlMs: 0,
-        rates: { AUD: 1.5 },
-      });
+      jest
+        .mocked(getFxRates)
+        .mockResolvedValueOnce(fxEntry('USD', { AUD: 1.5 }));
 
       const { result } = await renderLoaded([NETFLIX]);
 
@@ -805,12 +802,7 @@ describe('useSubscriptionsPage', () => {
 
       // Let the superseded run's FX fetch resolve and its continuation finish.
       await act(async () => {
-        resolveRates({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        resolveRates(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
 
@@ -875,12 +867,9 @@ describe('useSubscriptionsPage', () => {
     it('makes no lookup and no further conversion toast for a change after a failed recompute', async () => {
       const { result } = await renderLoaded([NETFLIX]);
 
-      jest.mocked(getFxRates).mockResolvedValueOnce({
-        base: 'USD',
-        fetchedAt: 0,
-        ttlMs: 0,
-        rates: { AUD: 1.5 },
-      });
+      jest
+        .mocked(getFxRates)
+        .mockResolvedValueOnce(fxEntry('USD', { AUD: 1.5 }));
       await act(async () => {
         await result.current.convertToPreferred();
       });
@@ -950,12 +939,7 @@ describe('useSubscriptionsPage', () => {
       expect(result.current.conversion).toEqual({ status: 'loading' });
 
       await act(async () => {
-        lookups[0].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[0].resolve(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
       expect(result.current.conversion).toEqual({
@@ -974,12 +958,7 @@ describe('useSubscriptionsPage', () => {
       expect(lookups).toHaveLength(2);
 
       await act(async () => {
-        lookups[1].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[1].resolve(fxEntry('USD', { AUD: 1.5 }));
       });
       await waitFor(() =>
         expect(result.current.conversion).toEqual({
@@ -998,12 +977,7 @@ describe('useSubscriptionsPage', () => {
         pending = result.current.convertToPreferred();
       });
       await act(async () => {
-        lookups[0].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[0].resolve(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
       expect(result.current.conversion).toEqual({
@@ -1027,12 +1001,7 @@ describe('useSubscriptionsPage', () => {
       });
 
       await act(async () => {
-        lookups[1].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[1].resolve(fxEntry('USD', { AUD: 1.5 }));
       });
       await waitFor(() =>
         expect(result.current.conversion).toEqual({
@@ -1062,12 +1031,7 @@ describe('useSubscriptionsPage', () => {
       });
       await act(async () => {
         // Only the USD record needs a lookup while AUD is preferred.
-        lookups[0].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[0].resolve(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
       expect(result.current.conversion).toEqual({
@@ -1089,12 +1053,7 @@ describe('useSubscriptionsPage', () => {
       expect(getFxRates).toHaveBeenLastCalledWith({ base: 'AUD' });
 
       await act(async () => {
-        lookups[1].resolve({
-          base: 'AUD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { USD: 0.5 },
-        });
+        lookups[1].resolve(fxEntry('AUD', { USD: 0.5 }));
       });
       // Gym 50 AUD * 0.5 = 25; Netflix is already USD, so 15 stays 15.
       await waitFor(() =>
@@ -1146,12 +1105,7 @@ describe('useSubscriptionsPage', () => {
         pending = result.current.convertToPreferred();
       });
       await act(async () => {
-        lookups[0].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[0].resolve(fxEntry('USD', { AUD: 1.5 }));
         await pending;
       });
       expect(result.current.conversion).toEqual({
@@ -1179,12 +1133,7 @@ describe('useSubscriptionsPage', () => {
 
       // The newer recompute (Netflix 20 + Spotify 10 = 30 USD at 1.5) settles first.
       await act(async () => {
-        lookups[2].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 1.5 },
-        });
+        lookups[2].resolve(fxEntry('USD', { AUD: 1.5 }));
       });
       await waitFor(() =>
         expect(result.current.conversion).toEqual({
@@ -1195,12 +1144,7 @@ describe('useSubscriptionsPage', () => {
 
       // The older recompute (15 + 10 = 25 USD at 2) settles last and must not land.
       await act(async () => {
-        lookups[1].resolve({
-          base: 'USD',
-          fetchedAt: 0,
-          ttlMs: 0,
-          rates: { AUD: 2 },
-        });
+        lookups[1].resolve(fxEntry('USD', { AUD: 2 }));
       });
       expect(result.current.conversion).toEqual({
         status: 'ready',
