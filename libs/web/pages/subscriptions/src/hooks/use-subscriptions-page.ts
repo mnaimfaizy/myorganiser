@@ -19,7 +19,7 @@ import {
   type VaultHandle,
 } from '@myorganiser/web-vault';
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SubscriptionFormValues } from '../schemas/subscription';
 import { formValuesToFields } from '../utils/subscription-form-values';
@@ -247,7 +247,19 @@ export function useSubscriptionsPage(
     [items, persist, toast],
   );
 
-  const convertToPreferred = useCallback(async () => {
+  // Whether the converted view is the one on screen, so a later items change
+  // knows to recompute. A ref, not state: flipping it never needs a render of
+  // its own, only the recompute it triggers below.
+  const isShowingConvertedRef = useRef(false);
+
+  // Recomputing on every items change means two conversions can be in flight
+  // at once (an edit landing while the previous one is still awaiting rates).
+  // Each run claims the next id and only writes its result while still the
+  // latest, so a slower, superseded run can never overwrite a fresher one.
+  const conversionRequestIdRef = useRef(0);
+
+  const runConversion = useCallback(async () => {
+    const requestId = ++conversionRequestIdRef.current;
     setConversion({ status: 'loading' });
     try {
       const active = items.filter(isActiveSubscription);
@@ -274,8 +286,10 @@ export function useSubscriptionsPage(
         return convertAmount({ amount, from, to: preferredCurrency, rates });
       });
 
+      if (conversionRequestIdRef.current !== requestId) return;
       setConversion({ status: 'ready', monthly });
     } catch (e: unknown) {
+      if (conversionRequestIdRef.current !== requestId) return;
       const message = e instanceof Error ? e.message : String(e);
       setConversion({ status: 'error', message });
       toast({
@@ -286,7 +300,27 @@ export function useSubscriptionsPage(
     }
   }, [items, preferredCurrency, toast]);
 
+  // Recomputes whenever the converted view is showing and the records it was
+  // computed from move — add, edit, cancel, or a convergence pull. Skipped
+  // while the view is off, so toggling it on is still the only thing that
+  // ever fetches rates (#1282).
+  useEffect(() => {
+    if (!isShowingConvertedRef.current) return;
+    // runConversion sets `loading` synchronously so the button disables at
+    // once; the ready/error state only lands after the awaited FX fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void runConversion();
+  }, [runConversion]);
+
+  const convertToPreferred = useCallback(async () => {
+    isShowingConvertedRef.current = true;
+    await runConversion();
+  }, [runConversion]);
+
   const showOriginal = useCallback(() => {
+    isShowingConvertedRef.current = false;
+    // Invalidates any in-flight run so its late result can't land over 'off'.
+    conversionRequestIdRef.current += 1;
     setConversion({ status: 'off' });
   }, []);
 

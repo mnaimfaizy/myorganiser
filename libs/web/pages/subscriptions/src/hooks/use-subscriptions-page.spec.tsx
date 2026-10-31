@@ -611,5 +611,231 @@ describe('useSubscriptionsPage', () => {
         variant: 'destructive',
       });
     });
+
+    it('recomputes the shown total when a subscription is added', async () => {
+      const { result } = await renderLoaded([GYM]);
+
+      await act(async () => {
+        await result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({
+        status: 'ready',
+        monthly: 50,
+      });
+
+      await act(async () => {
+        await result.current.addSubscription({
+          ...emptySubscriptionFormValues('AUD'),
+          name: 'Spotify',
+          amount: 10,
+          startDate: '2026-10-01',
+        });
+      });
+
+      await waitFor(() =>
+        expect(result.current.conversion).toEqual({
+          status: 'ready',
+          monthly: 60,
+        }),
+      );
+      // Everything is already in the preferred currency, so no FX lookup runs.
+      expect(getFxRates).not.toHaveBeenCalled();
+    });
+
+    it('recomputes the shown total when a subscription is edited', async () => {
+      const { result } = await renderLoaded([GYM]);
+
+      await act(async () => {
+        await result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({
+        status: 'ready',
+        monthly: 50,
+      });
+
+      await act(async () => {
+        await result.current.updateSubscription('sub-gym', {
+          ...emptySubscriptionFormValues('AUD'),
+          name: 'Gym',
+          amount: 80,
+          startDate: '2026-03-01',
+        });
+      });
+
+      await waitFor(() =>
+        expect(result.current.conversion).toEqual({
+          status: 'ready',
+          monthly: 80,
+        }),
+      );
+    });
+
+    it('recomputes the shown total when a subscription is cancelled', async () => {
+      const pool: SubscriptionRecord = {
+        ...GYM,
+        id: 'sub-pool',
+        name: 'Pool',
+        amount: 30,
+      };
+      const { result } = await renderLoaded([GYM, pool]);
+
+      await act(async () => {
+        await result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({
+        status: 'ready',
+        monthly: 80,
+      });
+
+      await act(async () => {
+        await result.current.markCancelled('sub-gym');
+      });
+
+      // Only the remaining active Pool record is left in the total.
+      await waitFor(() =>
+        expect(result.current.conversion).toEqual({
+          status: 'ready',
+          monthly: 30,
+        }),
+      );
+    });
+
+    it('does not fetch rates for a change while the converted view is off', async () => {
+      const { result } = await renderLoaded([NETFLIX]);
+
+      await act(async () => {
+        await result.current.addSubscription({
+          ...emptySubscriptionFormValues('AUD'),
+          name: 'Spotify',
+          amount: 10,
+          startDate: '2026-10-01',
+        });
+      });
+
+      expect(result.current.items).toHaveLength(2);
+      expect(getFxRates).not.toHaveBeenCalled();
+      expect(result.current.conversion).toEqual({ status: 'off' });
+    });
+
+    it('shows the error state instead of the stale total when a recompute fails', async () => {
+      jest.mocked(getFxRates).mockResolvedValueOnce({
+        base: 'USD',
+        fetchedAt: 0,
+        ttlMs: 0,
+        rates: { AUD: 1.5 },
+      });
+
+      const { result } = await renderLoaded([NETFLIX]);
+
+      await act(async () => {
+        await result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({
+        status: 'ready',
+        monthly: 22.5,
+      });
+
+      jest
+        .mocked(getFxRates)
+        .mockRejectedValue(new Error('FX service unavailable'));
+
+      // A second USD record forces a fresh USD lookup on recompute.
+      await act(async () => {
+        await result.current.addSubscription({
+          ...emptySubscriptionFormValues('USD'),
+          name: 'Spotify',
+          amount: 10,
+          startDate: '2026-10-01',
+        });
+      });
+
+      await waitFor(() =>
+        expect(result.current.conversion).toEqual({
+          status: 'error',
+          message: 'FX service unavailable',
+        }),
+      );
+      expect(result.current.conversion).not.toEqual({
+        status: 'ready',
+        monthly: 22.5,
+      });
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Conversion failed',
+        description: 'FX service unavailable',
+        variant: 'destructive',
+      });
+    });
+
+    it('ignores a conversion that resolves after showOriginal already turned the view off', async () => {
+      const { result } = await renderLoaded([NETFLIX]);
+
+      let resolveRates: (entry: FxEntry) => void = () => undefined;
+      jest.mocked(getFxRates).mockImplementation(
+        () =>
+          new Promise<FxEntry>((resolve) => {
+            resolveRates = resolve;
+          }),
+      );
+
+      let pending: Promise<void> = Promise.resolve();
+      await act(async () => {
+        pending = result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({ status: 'loading' });
+
+      act(() => {
+        result.current.showOriginal();
+      });
+      expect(result.current.conversion).toEqual({ status: 'off' });
+
+      // Let the superseded run's FX fetch resolve and its continuation finish.
+      await act(async () => {
+        resolveRates({
+          base: 'USD',
+          fetchedAt: 0,
+          ttlMs: 0,
+          rates: { AUD: 1.5 },
+        });
+        await pending;
+      });
+
+      expect(getFxRates).toHaveBeenCalledTimes(1);
+      expect(result.current.conversion).toEqual({ status: 'off' });
+    });
+
+    it('ignores a conversion that rejects after showOriginal already turned the view off', async () => {
+      const { result } = await renderLoaded([NETFLIX]);
+
+      let rejectRates: (reason: Error) => void = () => undefined;
+      jest.mocked(getFxRates).mockImplementation(
+        () =>
+          new Promise<FxEntry>((_resolve, reject) => {
+            rejectRates = reject;
+          }),
+      );
+
+      let pending: Promise<void> = Promise.resolve();
+      await act(async () => {
+        pending = result.current.convertToPreferred();
+      });
+      expect(result.current.conversion).toEqual({ status: 'loading' });
+
+      act(() => {
+        result.current.showOriginal();
+      });
+      expect(result.current.conversion).toEqual({ status: 'off' });
+
+      // Let the superseded run's FX fetch reject and its catch branch finish.
+      await act(async () => {
+        rejectRates(new Error('FX service unavailable'));
+        await pending;
+      });
+
+      expect(getFxRates).toHaveBeenCalledTimes(1);
+      expect(result.current.conversion).toEqual({ status: 'off' });
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Conversion failed' }),
+      );
+    });
   });
 });
