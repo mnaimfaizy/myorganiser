@@ -311,7 +311,7 @@ component's form configuration before writing assertions.
 ### MyOrganiser form defaults
 
 ```typescript
-// EditItemDialog pattern
+// Item-edit dialog pattern
 const form = useForm<ItemData>({
   mode: 'onChange', // ← real-time validation; REQUIRED for save-button UX
   resolver: zodResolver(itemSchema),
@@ -319,7 +319,7 @@ const form = useForm<ItemData>({
 });
 
 // Parent ensures form state resets per item
-<EditItemDialog
+<ItemEditDialog
   key={editingItemId ?? 'none'} // ← forces remount per item; REQUIRED
   item={editingItem || null}
 />;
