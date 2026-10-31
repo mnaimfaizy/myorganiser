@@ -8,8 +8,9 @@ A Run Outcome is the run's own claim, so check it instead of repeating it.
 
 1. **Outstanding items.** Read each `OUTSTANDING` item from the issue's latest handoff comment. On a PRD, include every slice held open as `ready-for-human` ([ADR 0111](../adr/0111-a-prd-slice-closes-only-on-a-clean-outcome.md)).
 2. **Flagged decisions.** Note anything the commits, the comment or the run log say the agent chose on the Maintainer's behalf. Logs are in `.sandcastle/logs/` and may be gone in a later session.
-3. **Local tests.** Run the affected Jest projects at the branch tip. A run's own gate result does not cover a later merge from `main`.
-4. **Merge conflicts.** For a batch, run `git merge-tree --write-tree --quiet` on each branch pair, and against `origin/main`.
+3. **Named paths.** Confirm that each file or test the Run Outcome or the commits name exists at the branch tip, including a bare file name given without its directory.
+4. **Local tests.** Run the affected Jest projects at the branch tip. A run's own gate result does not cover a later merge from `main`.
+5. **Merge conflicts.** For a batch, run `git merge-tree --write-tree --quiet` on each branch pair, and against `origin/main`.
 
 ## Resolve
 
