@@ -119,7 +119,7 @@ const sandcastleModels = agentModelPolicy.orchestrators.sandcastle;
 //     its sandbox; the host fast-forwards the local feature branch onto the slice.
 //   • No per-slice push, no per-slice PR, no `gh pr merge`.
 //
-// After the run you QA the local feature branch, then push it and open ONE PR to
+// After a prd run you QA the local feature branch, then push it and open ONE PR to
 // `main` yourself — CI runs there. See docs/adr/0010 and docs/sandcastle/RUNBOOK.md.
 //
 // TWO MODES (see the run plan below):
@@ -127,7 +127,7 @@ const sandcastleModels = agentModelPolicy.orchestrators.sandcastle;
 //   • issue — `--issue <n>` with NO `--prd`. One ad-hoc issue, cut from origin/main
 //     (or `--base`). There is no integration branch, so the work branch IS the
 //     deliverable: gate green ends the run, the issue is left OPEN, and nothing is
-//     fast-forwarded. Same sandbox, same in-container install, same gate.
+//     fast-forwarded. Same sandbox, same gate. Then finish-standalone-runs (ADR 0142).
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -3643,21 +3643,26 @@ if (integrationBranch !== null && merged.length > 0 && !deferGate) {
 
 if (merged.length > 0) {
   const deliverable = integrationBranch ?? merged[0].sliceBranch;
-  console.log(`\nNext step: QA the local \`${deliverable}\` branch`);
-  console.log(
-    integrationBranch === null
-      ? `  git switch ${deliverable}   # the agent's work for this issue`
-      : `  git switch ${deliverable}   # it now contains the merged slices`,
-  );
-  // Agents read this line as an instruction, so it names the repository's only
-  // PR entry point: `ai:create-pr` pushes, checks the merge base, and applies
-  // Surface Labels. A bare `git push && gh pr create` skips all three (AGENTS.md).
-  console.log(
-    `Then open ONE PR to \`main\` so CI runs, through the create-pull-request-workflow Skill:`,
-  );
-  console.log(
-    `  PrAuthor drafts it; \`corepack yarn ai:create-pr --title <t> --body-file <f> --merge-base <sha>\` pushes and opens it.`,
-  );
+  if (integrationBranch === null) {
+    // ADR 0142: the Skill checks each branch, opens its PR, and runs its QA.
+    console.log(
+      `\nNext step: run the finish-standalone-runs Skill on this batch's issues.`,
+    );
+  } else {
+    console.log(`\nNext step: QA the local \`${deliverable}\` branch`);
+    console.log(
+      `  git switch ${deliverable}   # it now contains the merged slices`,
+    );
+    // Agents read this line as an instruction, so it names the repository's only
+    // PR entry point: `ai:create-pr` pushes, checks the merge base, and applies
+    // Surface Labels. A bare `git push && gh pr create` skips all three (AGENTS.md).
+    console.log(
+      `Then open ONE PR to \`main\` so CI runs, through the create-pull-request-workflow Skill:`,
+    );
+    console.log(
+      `  PrAuthor drafts it; \`corepack yarn ai:create-pr --title <t> --body-file <f> --merge-base <sha>\` pushes and opens it.`,
+    );
+  }
 }
 
 // ─── Desktop notification (best-effort; Windows / WSL2 only) ───────────────────
