@@ -1,5 +1,6 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem } from '@myorganiser/vault-core';
 import {
   FormControl,
@@ -14,7 +15,6 @@ import { useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { Control } from 'react-hook-form';
 import { getCategoryLabel } from '../../shared/constants/categories';
-import { formatMoney } from '../../shared/utils';
 import type { AddItemFormValues } from '../schemas';
 import { CategoryPicker } from './CategoryPicker';
 
@@ -152,7 +152,7 @@ export function AddItemMetadataFields({
                       </span>
                       {typeof item.price === 'number' ? (
                         <span className="shrink-0 text-body-sm text-foreground-secondary tabular-nums">
-                          {formatMoney(item.price)}
+                          {formatUsd(item.price)}
                         </span>
                       ) : null}
                     </button>

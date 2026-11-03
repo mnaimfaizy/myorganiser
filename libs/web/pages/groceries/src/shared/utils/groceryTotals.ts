@@ -59,8 +59,3 @@ export function summarizeListSpend(
 
   return { known, unpricedCount, pricedCount, checkedKnown };
 }
-
-/** Formats a number as USD-style currency for display, e.g. `$12.50`. */
-export function formatMoney(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}

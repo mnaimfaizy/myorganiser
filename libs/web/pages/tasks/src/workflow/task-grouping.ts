@@ -1,3 +1,4 @@
+import { localDateKey } from '@myorganiser/core';
 import type { Task, TaskContext } from '@myorganiser/vault-core';
 import { isClosedTaskStatus } from '@myorganiser/vault-core';
 
@@ -49,13 +50,6 @@ export interface TaskCounts {
   blocked: number;
   /** Tasks marked done since the start of this week (Monday, local time). */
   doneThisWeek: number;
-}
-
-/** A local calendar date as `YYYY-MM-DD`, the shape a Task's `dueDate` takes. */
-export function localDateKey(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /** True while a Task is neither done nor cancelled. */

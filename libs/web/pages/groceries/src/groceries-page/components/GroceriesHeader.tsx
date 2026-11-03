@@ -1,9 +1,10 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import { Button, Illustration } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
 import type { GroceriesLayout } from '../../shared/utils';
-import { formatMoney, pluralize } from '../../shared/utils';
+import { pluralize } from '../../shared/utils';
 import type { GroceriesTab } from './GroceriesTabs';
 
 const CATALOG_SUMMARY =
@@ -27,7 +28,7 @@ function listsSummary(
   knownSpend: number,
   unpricedCount: number,
 ): string {
-  const head = `${pluralize(listCount, 'list')} · ${formatMoney(knownSpend)} known`;
+  const head = `${pluralize(listCount, 'list')} · ${formatUsd(knownSpend)} known`;
   if (variant === 'phone') return head;
   const spend = `${head} spend`;
   return unpricedCount > 0

@@ -1,8 +1,8 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import { Button } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
-import { formatMoney } from '../../shared/utils';
 
 interface PhoneSpendBarProps {
   knownSpend: number;
@@ -24,7 +24,7 @@ export function PhoneSpendBar({
         </span>
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-display text-title tabular-nums text-foreground">
-            {formatMoney(knownSpend)}
+            {formatUsd(knownSpend)}
           </span>
           {unpricedCount > 0 ? (
             <span className="text-caption text-warning-text">

@@ -1,9 +1,9 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import { Button, cn } from '@myorganiser/web-ui';
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { formatMoney } from '../../shared/utils';
 import type { ResolvedLine } from '../../shared/utils';
 import type { GroceryListLineActions } from '../hooks/use-grocery-list-page';
 import { ListLineRow } from './ListLineRow';
@@ -48,7 +48,7 @@ export function CheckedSection({
     />
   );
   const countLabel = `Checked · ${lines.length}`;
-  const spendLabel = formatMoney(checkedKnown);
+  const spendLabel = formatUsd(checkedKnown);
 
   if (variant === 'phone') {
     return (

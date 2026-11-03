@@ -4,6 +4,7 @@ jest.mock('@myorganiser/web-vault-ui', () => ({
 }));
 
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { localDateKey } from '@myorganiser/core';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 import * as homeSummary from '../home-summary';
@@ -37,7 +38,7 @@ function openTask(id: string, title: string) {
     priority: 'medium',
     archived: false,
     createdAt: '2026-01-01T00:00:00.000Z',
-    dueDate: homeSummary.localDateKey(new Date()),
+    dueDate: localDateKey(new Date()),
   };
 }
 

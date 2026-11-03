@@ -1,16 +1,13 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem, GroceryList } from '@myorganiser/vault-core';
 import { Progress } from '@myorganiser/web-ui';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import type { ListProgress, ListSpendSummary } from '../../shared/utils';
-import {
-  formatMoney,
-  summarizeListProgress,
-  summarizeListSpend,
-} from '../../shared/utils';
+import { summarizeListProgress, summarizeListSpend } from '../../shared/utils';
 
 export interface GroceryListPhoneCardProps {
   list: GroceryList;
@@ -54,7 +51,7 @@ export function GroceryListPhoneCard({
           </span>
         </span>
         <span className="font-semibold tabular-nums">
-          {formatMoney(spend.known)}
+          {formatUsd(spend.known)}
         </span>
         <ChevronRight
           aria-hidden="true"
