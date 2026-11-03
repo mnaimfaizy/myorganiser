@@ -126,4 +126,12 @@ describe('BottomSheet', () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it('marks the open dialog data-bottom-sheet so the shared toast can clear it', () => {
+    renderSheet(null);
+
+    const sheet = openSheet();
+
+    expect(sheet).toHaveAttribute('data-bottom-sheet');
+  });
 });

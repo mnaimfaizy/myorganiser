@@ -165,6 +165,17 @@ const FormItem = React.forwardRef<...>(({ className, ...props }, ref) => {
 })
 ```
 
+### Cross-tree layout reservation (obstruction offsets)
+
+Two unrelated components sometimes need to coordinate layout without either knowing about the other — a page's floating action button or an open modal must not be covered by the shared toast viewport, for example. React Context and props cannot cross a Radix `Portal` boundary (a `BottomSheetContent` mounts under `document.body`, not under the app's own tree), so the established convention is:
+
+- The obstruction announces its own presence with a static `data-*` attribute on its root DOM node (e.g. `data-phone-fab`, `data-phone-tab-bar`, `data-bottom-sheet`) — present only while it is actually mounted.
+- The nearest shared DOM ancestor of both the obstruction and the component that must avoid it (not necessarily a React ancestor) sets a CSS custom property from a Tailwind `has-[]` arbitrary variant keyed on that attribute, e.g. `has-[[data-phone-fab]]:[--toast-fab-reserve:calc(...)]`.
+- The component being kept clear reads the variable with `var(--name,<fallback>)`.
+- When more than one obstruction can be active at once, give each its own variable name and combine them with CSS `max()` at the point of use, rather than letting multiple `has-[]` rules fight over one shared variable name — cascade order between separate rules on different elements is not guaranteed.
+
+See `Toast.tsx`, `BottomSheet.tsx`, and `IconButton.tsx` in `libs/web/ui` for a worked example (`--toast-offset`, `--toast-fab-reserve`, `--toast-sheet-reserve`).
+
 ---
 
 ## 4. UI Primitive Implementation Rules

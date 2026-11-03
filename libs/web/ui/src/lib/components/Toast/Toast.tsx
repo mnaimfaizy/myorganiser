@@ -12,12 +12,26 @@ const ToastProvider = ToastPrimitives.Provider;
  * Viewport position. Desktop (md and up): bottom-right. Phone: bottom-centred,
  * full width, with the 16px gutter from p-4.
  *
- * The phone bottom inset is `--toast-offset`, a CSS length the phone shell sets
- * on an ancestor (the tab bar height, plus any safe-area inset) so toasts clear
- * the bottom tab bar. It defaults to 0. A CSS variable rather than a prop on
- * ToastViewport or Toaster, because the shell owns the tab bar height and sets
- * it once for the whole subtree without threading it through the toast
- * provider. md:bottom-0 ignores the offset on desktop, which has no tab bar.
+ * The phone bottom inset is the largest of three independently-set CSS
+ * lengths, each owned by whatever is obstructing the bottom of the screen:
+ *   --toast-offset        the phone shell sets this to the tab bar's height
+ *                          plus any safe-area inset (apps/web/.../layout.tsx).
+ *   --toast-fab-reserve    a page's floating action button sets this while
+ *                          mounted (IconButton's `size="fab"` variant), big
+ *                          enough to also clear the tab bar beneath it.
+ *   --toast-sheet-reserve  an open BottomSheet sets this (BottomSheet.tsx),
+ *                          tall enough to clear any sheet this app renders.
+ * Each defaults to 0 so a page with none of these mounted keeps the toast at
+ * the screen edge. Each reserve is set to its obstruction's own top edge; the
+ * p-4 padding below supplies the final rem of clearance. They are three
+ * separate custom properties rather than one reassigned value, so max() picks
+ * whichever obstruction is tallest regardless of which order Tailwind emits
+ * their has-[] rules in.
+ *
+ * A CSS variable rather than a prop on ToastViewport or Toaster, because each
+ * owner sets it once for the whole subtree without threading it through the
+ * toast provider. md:bottom-0 ignores all three on desktop, which has no tab
+ * bar, FAB, or bottom sheet.
  */
 const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Viewport>,
@@ -26,7 +40,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      'pointer-events-none fixed inset-x-0 bottom-[var(--toast-offset,0)] z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 md:bottom-0 md:left-auto md:right-0 md:w-105 md:flex-col',
+      'pointer-events-none fixed inset-x-0 bottom-[max(var(--toast-offset,0px),var(--toast-fab-reserve,0px),var(--toast-sheet-reserve,0px))] z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 md:bottom-0 md:left-auto md:right-0 md:w-105 md:flex-col',
       className,
     )}
     {...props}

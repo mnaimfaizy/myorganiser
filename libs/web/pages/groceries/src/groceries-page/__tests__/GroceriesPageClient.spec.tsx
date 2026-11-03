@@ -624,15 +624,17 @@ describe('GroceriesPageClient', () => {
       renderPage({ lists: [] });
 
       expect(screen.getByText('No grocery lists yet')).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'New list' }),
-      ).toBeInTheDocument();
+      const newListFab = screen.getByRole('button', { name: 'New list' });
+      expect(newListFab).toBeInTheDocument();
+      expect(newListFab).toHaveAttribute('data-phone-fab');
 
       fireEvent.click(screen.getByRole('tab', { name: 'Catalog · 6' }));
 
-      expect(
-        screen.getByRole('button', { name: 'New Catalog Item' }),
-      ).toBeInTheDocument();
+      const newCatalogItemFab = screen.getByRole('button', {
+        name: 'New Catalog Item',
+      });
+      expect(newCatalogItemFab).toBeInTheDocument();
+      expect(newCatalogItemFab).toHaveAttribute('data-phone-fab');
       expect(
         screen.queryByRole('button', { name: 'New list' }),
       ).not.toBeInTheDocument();

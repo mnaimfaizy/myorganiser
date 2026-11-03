@@ -47,12 +47,19 @@ export default function DashboardLayout({
   return (
     <DashboardGuard>
       {/*
-       * On a phone the tab bar sits above the toasts: the Toast viewport reads
-       * --toast-offset from this ancestor, set only while the tab bar is mounted.
+       * On a phone the tab bar and a page's floating action button both sit
+       * above the toasts: the Toast viewport reads --toast-offset and
+       * --toast-fab-reserve from this ancestor, each set only while its own
+       * obstruction is mounted. The FAB clause builds on --toast-offset, so
+       * toasts clear both the tab bar and the FAB at once; see Toast.tsx. It
+       * matches the FAB's own top edge exactly (--toast-offset plus the FAB's
+       * 1rem gap above the tab bar, plus its 56px height, IconButton's
+       * size="fab"). The toast viewport's own p-4 padding supplies the 1rem of
+       * clearance above that on its own.
        */}
       <SidebarProvider
         style={SIDEBAR_STYLE}
-        className="has-[[data-phone-tab-bar]]:[--toast-offset:calc(88px_+_env(safe-area-inset-bottom))]"
+        className="has-[[data-phone-tab-bar]]:[--toast-offset:calc(88px_+_env(safe-area-inset-bottom))] has-[[data-phone-fab]]:[--toast-fab-reserve:calc(var(--toast-offset,0px)_+_1rem_+_56px)]"
       >
         <VaultSessionProvider>
           {/*
