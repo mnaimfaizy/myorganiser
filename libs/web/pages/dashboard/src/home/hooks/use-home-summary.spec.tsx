@@ -232,4 +232,154 @@ describe('useHomeSummary', () => {
     });
     expect(handle.loadDecryptedData).toHaveBeenCalledTimes(10);
   });
+
+  describe('across local midnight', () => {
+    const MS_PER_HOUR = 60 * 60 * 1000;
+
+    function setVisibility(state: 'visible' | 'hidden') {
+      Object.defineProperty(document, 'visibilityState', {
+        value: state,
+        configurable: true,
+      });
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // Noon, so the next local midnight is twelve hours away and the
+      // scheduled timeout is the only thing that can roll the day over.
+      jest.setSystemTime(new Date(2026, 10, 3, 12, 0, 0));
+      // Reset after setSystemTime so openTask's dueDate is computed under the
+      // fake clock, not the real one.
+      tasks = [openTask('t1', 'Pay rent')];
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(document, 'visibilityState');
+      jest.useRealTimers();
+    });
+
+    it('rolls now and the summary over at each midnight, re-arming the timer', async () => {
+      // An active subscription billing today: in Renewing soon at mount
+      // (0 days away), and gone once midnight makes it -1 days away.
+      const billingToday = {
+        id: 's1',
+        name: 'Streaming',
+        status: 'active',
+        nextBillingDate: homeSummary.localDateKey(new Date()),
+      };
+      const handle = makeHandle((type) =>
+        type === 'subscriptions' ? [billingToday] : blobsFor(type),
+      );
+      const { result } = renderHook(() => useHomeSummary(asHandle(handle)));
+
+      await waitFor(() => {
+        expect(result.current.summary).not.toBeNull();
+      });
+      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-03');
+      expect(result.current.summary?.tasks.dueOpen[0]).toMatchObject({
+        dueDate: '2026-11-03',
+        overdue: false,
+      });
+      expect(
+        result.current.summary?.subscriptions.renewingSoon.map((r) => r.id),
+      ).toEqual(['s1']);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(12 * MS_PER_HOUR + 1000);
+      });
+
+      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-04');
+      // The mount-day task is now before today: it is overdue, and it still
+      // counts toward today's total because overdue tasks do.
+      await waitFor(() => {
+        expect(result.current.summary?.tasks.dueOpen[0]).toMatchObject({
+          dueDate: '2026-11-03',
+          overdue: true,
+        });
+      });
+      expect(result.current.summary?.tasks.todayTotal).toBe(1);
+      // Yesterday's billing day is -1 days away, so it leaves Renewing soon.
+      expect(result.current.summary?.subscriptions.renewingSoon).toEqual([]);
+
+      // The first fire re-schedules for the following midnight. A second
+      // day rollover proves the timer re-armed rather than firing once.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(24 * MS_PER_HOUR + 1000);
+      });
+      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-05');
+    });
+
+    it('catches up at once when the tab is visible again on a later day', async () => {
+      const handle = makeHandle(blobsFor);
+      const { result } = renderHook(() => useHomeSummary(asHandle(handle)));
+
+      await waitFor(() => {
+        expect(result.current.summary).not.toBeNull();
+      });
+
+      // The tab is hidden while the clock crosses midnight. The timer is never
+      // advanced, so only the visibility listener can move `now`.
+      setVisibility('hidden');
+      jest.setSystemTime(new Date(2026, 10, 4, 9, 0, 0));
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-03');
+
+      setVisibility('visible');
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-04');
+      await waitFor(() => {
+        expect(handle.loadDecryptedData).toHaveBeenCalledTimes(10);
+      });
+    });
+
+    it('leaves now and the vault reads unchanged when visible again on the same day', async () => {
+      const handle = makeHandle(blobsFor);
+      const { result } = renderHook(() => useHomeSummary(asHandle(handle)));
+
+      await waitFor(() => {
+        expect(result.current.summary).not.toBeNull();
+      });
+      const before = result.current.now;
+      const readsBefore = handle.loadDecryptedData.mock.calls.length;
+
+      // Later the same day: the time differs, the local date does not.
+      jest.setSystemTime(new Date(2026, 10, 3, 15, 30, 0));
+      setVisibility('visible');
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(result.current.now).toBe(before);
+      expect(handle.loadDecryptedData).toHaveBeenCalledTimes(readsBefore);
+    });
+
+    it('clears the midnight timer and the visibility listener on unmount', async () => {
+      const addSpy = jest.spyOn(document, 'addEventListener');
+      const removeSpy = jest.spyOn(document, 'removeEventListener');
+      const handle = makeHandle(blobsFor);
+      const { result, unmount } = renderHook(() =>
+        useHomeSummary(asHandle(handle)),
+      );
+
+      await waitFor(() => {
+        expect(result.current.summary).not.toBeNull();
+      });
+      expect(jest.getTimerCount()).toBeGreaterThan(0);
+
+      const added = addSpy.mock.calls.find(
+        ([type]) => type === 'visibilitychange',
+      )?.[1];
+      expect(added).toEqual(expect.any(Function));
+
+      unmount();
+
+      // The exact handler that was added must be the one removed.
+      expect(removeSpy).toHaveBeenCalledWith('visibilitychange', added);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+  });
 });
