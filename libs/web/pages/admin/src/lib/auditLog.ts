@@ -2,6 +2,7 @@ import type {
   AdminAuditAction,
   AdminAuditLogEntry,
 } from '@myorganiser/app-api-client';
+import { localDateKey } from '@myorganiser/core';
 
 import { AUDIT_ACTION_LABELS, formatAuditAction } from './formatAuditLog';
 import { formatDayMonth, formatShowingRange } from './userDirectory';
@@ -62,18 +63,13 @@ export function formatAuditTime(iso: string): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** The local calendar day as "YYYY-MM-DD". */
-function localDayKey(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 /** "Today" or "Yesterday" for a local day; `null` for any other day. */
 export function relativeDayLabel(
   date: Date,
   now: Date,
 ): 'Today' | 'Yesterday' | null {
-  const key = localDayKey(date);
-  if (key === localDayKey(now)) return 'Today';
+  const key = localDateKey(date);
+  if (key === localDateKey(now)) return 'Today';
 
   // Day 0 of the month is the last day of the previous month, so the day
   // arithmetic crosses month and year boundaries correctly.
@@ -82,7 +78,7 @@ export function relativeDayLabel(
     now.getMonth(),
     now.getDate() - 1,
   );
-  if (key === localDayKey(yesterday)) return 'Yesterday';
+  if (key === localDateKey(yesterday)) return 'Yesterday';
 
   return null;
 }
@@ -110,7 +106,7 @@ export function groupAuditEntriesByDay(
 
   for (const entry of entries) {
     const date = new Date(entry.createdAt);
-    const key = localDayKey(date);
+    const key = localDateKey(date);
     let group = byKey.get(key);
 
     if (!group) {
