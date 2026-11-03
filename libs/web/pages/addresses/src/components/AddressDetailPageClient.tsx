@@ -155,6 +155,8 @@ function AddressDetailInner({ handle, addressId }: AddressDetailInnerProps) {
       setPendingPlaceIds((prev) => new Set(prev).add(locationId));
       try {
         await setLocationChanged(addressId, locationId, changed);
+      } catch {
+        // The caller does not await this handler, so a rejection would be unhandled.
       } finally {
         setPendingPlaceIds((prev) => {
           const next = new Set(prev);
@@ -194,13 +196,19 @@ function AddressDetailInner({ handle, addressId }: AddressDetailInnerProps) {
 
   const handleConfirmDeleteAddress = useCallback(async () => {
     leavingRef.current = true;
-    const deleted = await deleteAddress(addressId);
+    let deleted = false;
+    try {
+      deleted = await deleteAddress(addressId);
+    } catch {
+      // Caught so `deleted` stays settled and the `finally` below can reset
+      // `leavingRef` deterministically instead of leaving it stuck true.
+    } finally {
+      // Stay on the detail with the dialog open, so the User can retry.
+      if (!deleted) leavingRef.current = false;
+    }
     if (deleted) {
       setDeletingAddress(false);
       router.push(ADDRESSES_HREF);
-    } else {
-      // Stay on the detail with the dialog open, so the User can retry.
-      leavingRef.current = false;
     }
   }, [addressId, deleteAddress, router]);
 
