@@ -1,11 +1,11 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem } from '@myorganiser/vault-core';
 import { Input, Label, cn } from '@myorganiser/web-ui';
 import { Search } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { getCategoryEmoji } from '../../shared/constants/categories';
-import { formatMoney } from '../../shared/utils';
 
 interface AddExistingItemCatalogSelectorProps {
   catalog: CatalogItem[];
@@ -93,7 +93,7 @@ export function AddExistingItemCatalogSelector({
                 </span>
                 {typeof item.price === 'number' && (
                   <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                    {formatMoney(item.price)}
+                    {formatUsd(item.price)}
                   </span>
                 )}
               </button>

@@ -1,10 +1,11 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem, ListLine } from '@myorganiser/vault-core';
 import { Checkbox, IconButton, cn } from '@myorganiser/web-ui';
 import { Pencil } from 'lucide-react';
 import { useCallback } from 'react';
-import { UNKNOWN_ITEM_NAME, formatMoney } from '../../shared/utils';
+import { UNKNOWN_ITEM_NAME } from '../../shared/utils';
 import type { GroceriesLayout } from '../../shared/utils';
 import type { GroceryListLineActions } from '../hooks/use-grocery-list-page';
 import { ListLineMenu } from './ListLineMenu';
@@ -35,7 +36,7 @@ export function ListLineRow({
 
   const metaParts: string[] = [];
   if (line.amount) metaParts.push(line.amount);
-  if (typeof price === 'number') metaParts.push(formatMoney(price));
+  if (typeof price === 'number') metaParts.push(formatUsd(price));
   if (item?.notes) metaParts.push(item.notes);
 
   const handleToggle = useCallback(() => {

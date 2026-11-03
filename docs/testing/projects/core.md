@@ -6,8 +6,16 @@ Jest unit · `ts-jest` or `babel-jest` · `yarn nx test core`
 
 Read `libs/core/jest.config.ts` for the active transformer. `libs/core` holds framework-free
 utilities (currency formatting, geo, time, account settings, ids), so tests are plain unit tests
-with no module mocking. It has no specs today — the Vault record shapes and merges it used to
-carry moved to `libs/vault-core` with their specs (#164), so the config sets `passWithNoTests`.
+with no module mocking. Most of it still has no specs — the Vault record shapes and merges it used
+to carry moved to `libs/vault-core` with their specs (#164) — but `formatUsd` (currency) and
+`localDateKey` (time) each have one, so the config keeps `passWithNoTests` rather than requiring
+every remaining helper to carry a test.
+
+`jest.config.ts` also points `globalSetup` at `jest.global-setup.js`, which pins the process
+timezone to a fixed, non-UTC zone before any worker touches a `Date`. `localDateKey`'s test needs a
+real local/UTC-day split to mean anything, and reassigning `process.env.TZ` from inside a test or
+`setupFiles` does not reliably affect a worker's already-initialized `Date` behavior — see that
+file's own comment for why `globalSetup` is the one hook that does.
 
 ## Patterns
 

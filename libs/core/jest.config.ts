@@ -7,7 +7,9 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/core',
-  // Every spec here covered Vault record code, which moved to vault-core
-  // with its specs (#164). Nothing left in core is tested yet.
+  // Pins a non-UTC timezone for every spec in this project before any Jest
+  // worker touches a `Date` — see jest.global-setup.js for why this has to
+  // run here rather than in a test file or `setupFiles`.
+  globalSetup: '<rootDir>/jest.global-setup.js',
   passWithNoTests: true,
 };

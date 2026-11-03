@@ -4,6 +4,7 @@ jest.mock('@myorganiser/web-vault-ui', () => ({
 }));
 
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { localDateKey } from '@myorganiser/core';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 import * as homeSummary from '../home-summary';
@@ -37,7 +38,7 @@ function openTask(id: string, title: string) {
     priority: 'medium',
     archived: false,
     createdAt: '2026-01-01T00:00:00.000Z',
-    dueDate: homeSummary.localDateKey(new Date()),
+    dueDate: localDateKey(new Date()),
   };
 }
 
@@ -265,7 +266,7 @@ describe('useHomeSummary', () => {
         id: 's1',
         name: 'Streaming',
         status: 'active',
-        nextBillingDate: homeSummary.localDateKey(new Date()),
+        nextBillingDate: localDateKey(new Date()),
       };
       const handle = makeHandle((type) =>
         type === 'subscriptions' ? [billingToday] : blobsFor(type),
@@ -275,7 +276,7 @@ describe('useHomeSummary', () => {
       await waitFor(() => {
         expect(result.current.summary).not.toBeNull();
       });
-      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-03');
+      expect(localDateKey(result.current.now)).toBe('2026-11-03');
       expect(result.current.summary?.tasks.dueOpen[0]).toMatchObject({
         dueDate: '2026-11-03',
         overdue: false,
@@ -288,7 +289,7 @@ describe('useHomeSummary', () => {
         await jest.advanceTimersByTimeAsync(12 * MS_PER_HOUR + 1000);
       });
 
-      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-04');
+      expect(localDateKey(result.current.now)).toBe('2026-11-04');
       // The mount-day task is now before today: it is overdue, and it still
       // counts toward today's total because overdue tasks do.
       await waitFor(() => {
@@ -306,7 +307,7 @@ describe('useHomeSummary', () => {
       await act(async () => {
         await jest.advanceTimersByTimeAsync(24 * MS_PER_HOUR + 1000);
       });
-      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-05');
+      expect(localDateKey(result.current.now)).toBe('2026-11-05');
     });
 
     it('catches up at once when the tab is visible again on a later day', async () => {
@@ -324,13 +325,13 @@ describe('useHomeSummary', () => {
       act(() => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-03');
+      expect(localDateKey(result.current.now)).toBe('2026-11-03');
 
       setVisibility('visible');
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      expect(homeSummary.localDateKey(result.current.now)).toBe('2026-11-04');
+      expect(localDateKey(result.current.now)).toBe('2026-11-04');
       await waitFor(() => {
         expect(handle.loadDecryptedData).toHaveBeenCalledTimes(10);
       });

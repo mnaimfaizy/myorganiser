@@ -1,5 +1,6 @@
 'use client';
 
+import { localDateKey } from '@myorganiser/core';
 import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
@@ -9,7 +10,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TaskDetailPatch } from '../hooks/use-task-detail-draft';
 import { useTasksPage } from '../hooks/use-tasks-page';
 import type { TasksPageController } from '../hooks/use-tasks-page';
-import { localDateKey } from '../workflow/task-grouping';
 import { TaskDetailScreen } from './task-detail-screen';
 import { TasksBoard } from './tasks-board';
 

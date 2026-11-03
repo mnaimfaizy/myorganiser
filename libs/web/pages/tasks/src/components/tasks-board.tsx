@@ -1,5 +1,6 @@
 'use client';
 
+import { localDateKey } from '@myorganiser/core';
 import type { Task } from '@myorganiser/vault-core';
 import { ConfirmDialog, IconButton } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
@@ -13,7 +14,6 @@ import {
   formatTaskSummary,
   groupOpenTasks,
   isOpenTask,
-  localDateKey,
   TASK_DUE_GROUPS,
 } from '../workflow/task-grouping';
 import type { TaskCounts } from '../workflow/task-grouping';

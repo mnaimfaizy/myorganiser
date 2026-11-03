@@ -1,12 +1,13 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem } from '@myorganiser/vault-core';
 import { cn } from '@myorganiser/web-ui';
 import { Search } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { GroceryCategoryIllustration } from '../../shared/components';
-import { formatMoney, searchCatalog } from '../../shared/utils';
+import { searchCatalog } from '../../shared/utils';
 
 const SUGGESTION_LIMIT = 12;
 
@@ -61,7 +62,7 @@ export function CatalogAddStrip({
         {suggestions.map((item) => {
           const onList = listCatalogIds.has(item.id);
           const priceText =
-            typeof item.price === 'number' ? formatMoney(item.price) : null;
+            typeof item.price === 'number' ? formatUsd(item.price) : null;
 
           return (
             <button

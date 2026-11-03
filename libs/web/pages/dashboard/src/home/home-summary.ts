@@ -1,4 +1,4 @@
-import { formatMoney } from '@myorganiser/core';
+import { formatMoney, localDateKey } from '@myorganiser/core';
 import {
   calculateMonthlyEquivalents,
   isClosedTaskStatus,
@@ -47,24 +47,12 @@ const PRIORITY_RANK = {
   low: 2,
 } as const satisfies Record<TaskPriority, number>;
 
-/** A local calendar date as `YYYY-MM-DD`, the shape a Task's `dueDate` takes. */
-export function localDateKey(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 /** Morning before 12, afternoon before 18, evening after. */
 export function getGreeting(now: Date): string {
   const hour = now.getHours();
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
-}
-
-/** `$12.50`, the Groceries page's own money format. */
-export function formatUsd(amount: number): string {
-  return `$${amount.toFixed(2)}`;
 }
 
 /** The singular for a count of one, otherwise the plural. */

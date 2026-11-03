@@ -9,7 +9,6 @@ import {
   formatTaskSummary,
   groupOpenTasks,
   isOpenTask,
-  localDateKey,
   parseEstimate,
   taskMetaLine,
   type TaskCounts,
@@ -43,16 +42,6 @@ function makeCounts(overrides: Partial<TaskCounts> = {}): TaskCounts {
 }
 
 describe('task-grouping', () => {
-  describe('localDateKey', () => {
-    it('zero-pads month and day', () => {
-      expect(localDateKey(new Date(2026, 0, 5))).toBe('2026-01-05');
-    });
-
-    it('uses the local calendar date, so a late-evening time stays on its day', () => {
-      expect(localDateKey(new Date(2026, 9, 22, 23, 30))).toBe('2026-10-22');
-    });
-  });
-
   describe('isOpenTask', () => {
     it.each(['pending', 'in_progress', 'blocked'] as const)(
       'treats a %s task as open',

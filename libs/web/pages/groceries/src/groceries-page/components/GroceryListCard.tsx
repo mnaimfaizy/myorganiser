@@ -1,5 +1,6 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem, GroceryList } from '@myorganiser/vault-core';
 import {
   Button,
@@ -17,7 +18,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { GroceryCategoryIllustration } from '../../shared/components';
 import {
   formatListActivity,
-  formatMoney,
   resolveCatalogItem,
   UNKNOWN_ITEM_NAME,
   summarizeListProgress,
@@ -114,7 +114,7 @@ export function GroceryListCard({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-display text-title-lg font-extrabold tabular-nums text-foreground">
-              {formatMoney(spend.known)}
+              {formatUsd(spend.known)}
             </span>
             <span
               className={cn(

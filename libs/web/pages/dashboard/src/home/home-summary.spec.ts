@@ -1,3 +1,4 @@
+import { localDateKey } from '@myorganiser/core';
 import type {
   CatalogItem,
   GroceryList,
@@ -7,9 +8,7 @@ import type {
 import {
   formatDateCaption,
   formatRenewalDay,
-  formatUsd,
   getGreeting,
-  localDateKey,
   pluralize,
   summarizeCountedRecords,
   summarizeGroceries,
@@ -83,19 +82,6 @@ function line(
 function list(id: string, lines: GroceryLine[]): GroceryList {
   return { id, name: id, lines, createdAt: STAMP, updatedAt: STAMP };
 }
-
-describe('localDateKey', () => {
-  it.each([
-    ['early January, late evening', new Date(2026, 0, 5, 23, 59), '2026-01-05'],
-    [
-      'end of November, just after midnight',
-      new Date(2026, 10, 30, 0, 1),
-      '2026-11-30',
-    ],
-  ])('pads month and day for %s', (_label, date, expected) => {
-    expect(localDateKey(date)).toBe(expected);
-  });
-});
 
 describe('getGreeting', () => {
   it.each([
@@ -453,14 +439,6 @@ describe('summarizeCountedRecords', () => {
 });
 
 describe('formatting helpers', () => {
-  it.each([
-    [0, '$0.00'],
-    [12.5, '$12.50'],
-    [3, '$3.00'],
-  ])('formatUsd(%s) is %s', (amount, expected) => {
-    expect(formatUsd(amount)).toBe(expected);
-  });
-
   it('pluralizes by count, formats the renewal day and the date caption', () => {
     expect(pluralize(1, 'item', 'items')).toBe('item');
     expect(pluralize(0, 'item', 'items')).toBe('items');

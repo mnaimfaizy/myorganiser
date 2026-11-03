@@ -1,5 +1,6 @@
 'use client';
 
+import { localDateKey } from '@myorganiser/core';
 import type { Task, TaskStatus } from '@myorganiser/vault-core';
 import { ToastAction, useToast } from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
@@ -7,7 +8,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useTasksWorkflow } from '../workflow';
 import type { TaskFormInput, TaskUpdateInput } from '../workflow';
-import { localDateKey } from '../workflow/task-grouping';
 import type { TaskDetailPatch } from './use-task-detail-draft';
 
 export interface TaskQuickAddValues {

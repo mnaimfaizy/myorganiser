@@ -17,6 +17,8 @@
  * key, so a Short metered in one tab is spent in all of them.
  */
 
+import { localDateKey } from '@myorganiser/core';
+
 /** Namespaced per the repo's localStorage convention; `v1` allows a reshape later. */
 export const SHORTS_BUDGET_STORAGE_KEY = 'myorganiser.youtube.shorts-budget.v1';
 
@@ -55,10 +57,7 @@ export interface ShortsBudgetLedger {
  * reset boundary off local midnight for anyone not on UTC.
  */
 export function localDayKey(now: Date = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return localDateKey(now);
 }
 
 function clampLimit(limitMs: number): number {

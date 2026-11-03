@@ -1,7 +1,8 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import { Progress } from '@myorganiser/web-ui';
-import { formatMoney, pluralize } from '../../shared/utils';
+import { pluralize } from '../../shared/utils';
 
 interface ListSummaryAsideProps {
   knownSpend: number;
@@ -23,7 +24,7 @@ export function ListSummaryAside({
     <section className="flex flex-col gap-3.5 rounded-panel bg-navy p-5 text-navy-foreground">
       <span className="text-label-caps text-navy-accent">KNOWN SPEND</span>
       <span className="font-display text-display tabular-nums">
-        {formatMoney(knownSpend)}
+        {formatUsd(knownSpend)}
       </span>
       <Progress
         tone="navy"
@@ -35,13 +36,13 @@ export function ListSummaryAside({
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-navy-muted-foreground">In the basket</dt>
           <dd className="font-semibold tabular-nums">
-            {formatMoney(checkedKnown)}
+            {formatUsd(checkedKnown)}
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-navy-muted-foreground">Still to buy</dt>
           <dd className="font-semibold tabular-nums">
-            {formatMoney(knownSpend - checkedKnown)}
+            {formatUsd(knownSpend - checkedKnown)}
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">

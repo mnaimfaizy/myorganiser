@@ -1,5 +1,6 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem } from '@myorganiser/vault-core';
 import {
   Button,
@@ -12,7 +13,7 @@ import {
 } from '@myorganiser/web-ui';
 import { MoreVertical, Pencil } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { formatMoney, pluralize } from '../../shared/utils';
+import { pluralize } from '../../shared/utils';
 
 export interface CatalogItemRowProps {
   item: CatalogItem;
@@ -43,7 +44,7 @@ export function CatalogItemRow({
 }: CatalogItemRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const priceLabel =
-    typeof item.price === 'number' ? formatMoney(item.price) : null;
+    typeof item.price === 'number' ? formatUsd(item.price) : null;
 
   const handleMenuOpenChange = useCallback((open: boolean) => {
     setMenuOpen(open);

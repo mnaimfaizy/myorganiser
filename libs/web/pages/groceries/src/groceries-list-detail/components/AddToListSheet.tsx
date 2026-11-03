@@ -1,5 +1,6 @@
 'use client';
 
+import { formatUsd } from '@myorganiser/core';
 import type { CatalogItem } from '@myorganiser/vault-core';
 import {
   BottomSheet,
@@ -14,7 +15,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { GroceryCategoryIllustration } from '../../shared/components';
 import { getCategoryLabel } from '../../shared/constants/categories';
-import { formatMoney, pluralize, searchCatalog } from '../../shared/utils';
+import { pluralize, searchCatalog } from '../../shared/utils';
 
 const RESULT_LIMIT = 12;
 const OFTEN_BOUGHT_LIMIT = 4;
@@ -140,7 +141,7 @@ export function AddToListSheet({
                   (listCounts.get(item.id) ?? 0) - (onList ? 1 : 0);
                 const priceText =
                   typeof item.price === 'number'
-                    ? formatMoney(item.price)
+                    ? formatUsd(item.price)
                     : 'No price';
                 return (
                   <div

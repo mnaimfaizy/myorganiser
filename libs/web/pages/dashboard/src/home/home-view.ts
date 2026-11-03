@@ -1,10 +1,9 @@
-import { formatMoney } from '@myorganiser/core';
+import { formatMoney, formatUsd } from '@myorganiser/core';
 import type { IllustrationKind } from '@myorganiser/web-ui';
 import { formatDistanceStrict, isValid } from 'date-fns';
 import {
   formatDateCaption,
   formatRenewalDay,
-  formatUsd,
   getGreeting,
   isParseableTimestamp,
   pluralize,

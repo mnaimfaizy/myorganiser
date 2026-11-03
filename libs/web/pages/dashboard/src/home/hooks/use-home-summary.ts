@@ -1,5 +1,6 @@
 'use client';
 
+import { localDateKey } from '@myorganiser/core';
 import {
   normalizeAddresses,
   normalizeGroceries,
@@ -11,7 +12,6 @@ import {
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 import { useEffect, useState } from 'react';
 import {
-  localDateKey,
   summarizeCountedRecords,
   summarizeGroceries,
   summarizeSubscriptions,

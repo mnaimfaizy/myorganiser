@@ -1,3 +1,5 @@
+import { localDateKey } from '@myorganiser/core';
+
 export function isoToDateInput(value: string | undefined): string {
   if (!value) return '';
   // Expect ISO or date-only, return YYYY-MM-DD (UTC date portion)
@@ -24,9 +26,5 @@ export function dateInputToIso(value: string | undefined): string | undefined {
  * the UTC date and may be off by one day for users in non-UTC timezones.
  */
 export function todayAsDateInput(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return localDateKey(new Date());
 }
