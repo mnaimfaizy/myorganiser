@@ -48,6 +48,8 @@ export interface UserDirectoryState {
   setSort: (next: AdminUserSort) => void;
   goToPage: (next: number) => void;
   loadMore: () => void;
+  /** Re-requests the page that just failed to append. No-op unless loadMoreError is set. */
+  retryLoadMore: () => void;
 }
 
 interface UserDirectoryPaging {
@@ -98,8 +100,18 @@ export function useUserDirectory({
   });
   const page = paging.mode === mode ? paging.page : 1;
   const append = paging.mode === mode && paging.append;
+  // Bumped only by retryLoadMore, so a retry re-requests the same page
+  // without page/query/filter/sort changing.
+  const [retryToken, setRetryToken] = useState(0);
 
-  const requestKey = JSON.stringify([query, status, role, sort, page]);
+  const requestKey = JSON.stringify([
+    query,
+    status,
+    role,
+    sort,
+    page,
+    retryToken,
+  ]);
 
   const [settled, setSettled] = useState<UserDirectorySettled>({
     key: null,
@@ -229,11 +241,17 @@ export function useUserDirectory({
   const hasMore = page * USER_DIRECTORY_PAGE_SIZE < total;
 
   // A failed append is not retried by a loop: loadMore holds until a filter,
-  // query, or sort change replaces the request.
+  // query, or sort change replaces the request, or retryLoadMore re-requests
+  // the same page explicitly.
   const loadMore = useCallback(() => {
     if (!hasMore || pending || loadMoreError) return;
     setPaging({ mode, page: page + 1, append: true });
   }, [hasMore, pending, loadMoreError, mode, page]);
+
+  const retryLoadMore = useCallback(() => {
+    if (!loadMoreError) return;
+    setRetryToken((token) => token + 1);
+  }, [loadMoreError]);
 
   return {
     users,
@@ -256,5 +274,6 @@ export function useUserDirectory({
     setSort,
     goToPage,
     loadMore,
+    retryLoadMore,
   };
 }

@@ -125,6 +125,14 @@ function listResponse(
   return { data: { users, total, page, pageSize: 25 } };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 function lastListParams(): Record<string, unknown> {
   const calls = mockListUsers.mock.calls;
   return calls[calls.length - 1][0] as Record<string, unknown>;
@@ -158,6 +166,24 @@ class FakeIntersectionObserver {
     this.callback = callback;
     createdObservers.push(this);
   }
+}
+
+/**
+ * While loadMoreError is set, no new observer is created, and firing the
+ * pre-existing one again does not fetch (its request key already matches
+ * the failed one).
+ */
+function expectSentinelStaysDisarmed(observerCountBeforeLoadMore: number) {
+  expect(createdObservers.length).toBe(observerCountBeforeLoadMore);
+  const callsBeforeStaleFire = mockListUsers.mock.calls.length;
+  const newestObserver = createdObservers[createdObservers.length - 1];
+  act(() => {
+    newestObserver.callback(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      newestObserver as unknown as IntersectionObserver,
+    );
+  });
+  expect(mockListUsers).toHaveBeenCalledTimes(callsBeforeStaleFire);
 }
 
 describe('UserDirectoryPageClient', () => {
@@ -482,6 +508,7 @@ describe('UserDirectoryPageClient', () => {
       renderDirectory();
       await screen.findByText('Scroll for more · 25 of 60');
 
+      const observerCountBeforeLoadMore = createdObservers.length;
       const observer = createdObservers[createdObservers.length - 1];
       act(() => {
         observer.callback(
@@ -492,6 +519,9 @@ describe('UserDirectoryPageClient', () => {
 
       await screen.findByText('Unable to load users. Please try again.');
       expect(
+        screen.getByRole('button', { name: 'Try again' }),
+      ).toBeInTheDocument();
+      expect(
         screen.queryByText('Scroll for more · 25 of 60'),
       ).not.toBeInTheDocument();
       const userLinks = screen
@@ -500,6 +530,114 @@ describe('UserDirectoryPageClient', () => {
           link.getAttribute('href')?.startsWith('/admin/users/'),
         );
       expect(userLinks).toHaveLength(25);
+
+      expectSentinelStaysDisarmed(observerCountBeforeLoadMore);
+    });
+
+    it('retrying after a failed load-more appends the next page and clears the error', async () => {
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+      const retriedPage = deferred<{ data: AdminUserListResponse }>();
+      mockListUsers.mockImplementation(({ page }: { page: number }) => {
+        if (page === 1) {
+          return Promise.resolve(listResponse(usersRange(1, 25), 30, 1));
+        }
+        const page2Attempts = mockListUsers.mock.calls.filter(
+          ([params]) => (params as { page: number }).page === 2,
+        ).length;
+        return page2Attempts === 1
+          ? Promise.reject(new Error('network down'))
+          : retriedPage.promise;
+      });
+
+      renderDirectory();
+      await screen.findByText('Scroll for more · 25 of 30');
+
+      const observer = createdObservers[createdObservers.length - 1];
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer as unknown as IntersectionObserver,
+        );
+      });
+
+      await screen.findByText('Unable to load users. Please try again.');
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Unable to load users. Please try again.'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(lastListParams()).toEqual(expect.objectContaining({ page: 2 }));
+
+      await act(async () => {
+        retriedPage.resolve(listResponse(usersRange(26, 5), 30, 2));
+      });
+
+      await screen.findByText('30 of 30');
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Unable to load users. Please try again.'),
+      ).not.toBeInTheDocument();
+      const userLinks = screen
+        .getAllByRole('link')
+        .filter((link) =>
+          link.getAttribute('href')?.startsWith('/admin/users/'),
+        );
+      expect(userLinks).toHaveLength(30);
+    });
+
+    it('retrying after a failed load-more shows the error and control again on a second failure', async () => {
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+      mockListUsers.mockImplementation(({ page }: { page: number }) =>
+        page === 1
+          ? Promise.resolve(listResponse(usersRange(1, 25), 60, 1))
+          : Promise.reject(new Error('network down')),
+      );
+
+      renderDirectory();
+      await screen.findByText('Scroll for more · 25 of 60');
+
+      const observerCountBeforeLoadMore = createdObservers.length;
+      const observer = createdObservers[createdObservers.length - 1];
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer as unknown as IntersectionObserver,
+        );
+      });
+
+      await screen.findByText('Unable to load users. Please try again.');
+      const callsBeforeRetry = mockListUsers.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(mockListUsers).toHaveBeenCalledTimes(callsBeforeRetry + 1);
+      expect(lastListParams()).toEqual(expect.objectContaining({ page: 2 }));
+
+      await screen.findByText('Unable to load users. Please try again.');
+      expect(
+        screen.getByRole('button', { name: 'Try again' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Scroll for more · 25 of 60'),
+      ).not.toBeInTheDocument();
+      const userLinks = screen
+        .getAllByRole('link')
+        .filter((link) =>
+          link.getAttribute('href')?.startsWith('/admin/users/'),
+        );
+      expect(userLinks).toHaveLength(25);
+
+      expectSentinelStaysDisarmed(observerCountBeforeLoadMore);
     });
   });
 });

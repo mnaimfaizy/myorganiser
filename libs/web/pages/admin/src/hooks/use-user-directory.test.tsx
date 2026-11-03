@@ -401,4 +401,78 @@ describe('useUserDirectory', () => {
     expect(result.current.total).toBe(3);
     expect(result.current.loading).toBe(false);
   });
+
+  it('retryLoadMore re-requests the same page and appends the rows on success', async () => {
+    const page1 = usersRange(1, 25);
+    const page2 = usersRange(26, 5);
+    mockListUsers.mockImplementation((params: { page: number }) => {
+      if (params.page !== 2) return Promise.resolve(listResponse(page1, 30));
+      const page2Attempts = mockListUsers.mock.calls.filter(
+        ([call]) => (call as { page: number }).page === 2,
+      ).length;
+      return page2Attempts === 1
+        ? Promise.reject(new Error('network down'))
+        : Promise.resolve(listResponse(page2, 30));
+    });
+
+    const { result } = renderHook(() => useUserDirectory({ mode: 'append' }));
+    await waitFor(() => expect(result.current.users).toEqual(page1));
+
+    act(() => {
+      result.current.retryLoadMore();
+    });
+    expect(mockListUsers).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(result.current.loadMoreError).toBe(true));
+    const callsBeforeRetry = mockListUsers.mock.calls.length;
+
+    act(() => {
+      result.current.retryLoadMore();
+    });
+    expect(result.current.loadMoreError).toBe(false);
+    expect(result.current.loadingMore).toBe(true);
+    expect(mockListUsers).toHaveBeenCalledTimes(callsBeforeRetry + 1);
+    expect(lastListParams()).toEqual(expect.objectContaining({ page: 2 }));
+
+    await waitFor(() => expect(result.current.loadingMore).toBe(false));
+    expect(result.current.users).toEqual([...page1, ...page2]);
+    expect(result.current.total).toBe(30);
+    expect(result.current.loadMoreError).toBe(false);
+    expect(result.current.error).toBe(false);
+  });
+
+  it('retryLoadMore shows the error again when the retried request also fails', async () => {
+    const page1 = usersRange(1, 25);
+    mockListUsers.mockImplementation((params: { page: number }) =>
+      params.page === 2
+        ? Promise.reject(new Error('network down'))
+        : Promise.resolve(listResponse(page1, 60)),
+    );
+
+    const { result } = renderHook(() => useUserDirectory({ mode: 'append' }));
+    await waitFor(() => expect(result.current.users).toEqual(page1));
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(result.current.loadMoreError).toBe(true));
+    const callsBeforeRetry = mockListUsers.mock.calls.length;
+
+    act(() => {
+      result.current.retryLoadMore();
+    });
+    expect(result.current.loadMoreError).toBe(false);
+    expect(result.current.loadingMore).toBe(true);
+    expect(mockListUsers).toHaveBeenCalledTimes(callsBeforeRetry + 1);
+    expect(lastListParams()).toEqual(expect.objectContaining({ page: 2 }));
+
+    await waitFor(() => expect(result.current.loadMoreError).toBe(true));
+    expect(result.current.loadingMore).toBe(false);
+    expect(result.current.users).toEqual(page1);
+    expect(result.current.total).toBe(60);
+    expect(result.current.error).toBe(false);
+  });
 });

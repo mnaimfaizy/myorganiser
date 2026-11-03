@@ -1,7 +1,7 @@
 'use client';
 
 import type { AdminUserIdentity } from '@myorganiser/app-api-client';
-import { StatusPill } from '@myorganiser/web-ui';
+import { Button, StatusPill } from '@myorganiser/web-ui';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
@@ -26,6 +26,8 @@ export interface UserDirectoryPhoneListProps {
   loadMoreError: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
+  /** Re-requests the page that failed to append. Call only while loadMoreError is true. */
+  onRetryLoadMore: () => void;
 }
 
 /**
@@ -41,6 +43,7 @@ export function UserDirectoryPhoneList({
   loadMoreError,
   hasMore,
   onLoadMore,
+  onRetryLoadMore,
 }: UserDirectoryPhoneListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -129,8 +132,17 @@ export function UserDirectoryPhoneList({
       </div>
       <div ref={sentinelRef} aria-hidden="true" className="h-px" />
       {loadMoreError ? (
-        <p className="text-center text-caption text-destructive">
-          {USER_DIRECTORY_MESSAGES.error}
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-center text-caption text-destructive">
+            {USER_DIRECTORY_MESSAGES.error}
+          </p>
+          <Button variant="outline" size="sm" onClick={onRetryLoadMore}>
+            Try again
+          </Button>
+        </div>
+      ) : loadingMore ? (
+        <p className="text-center text-caption text-muted-foreground">
+          {USER_DIRECTORY_MESSAGES.loading}
         </p>
       ) : countLabel !== null ? (
         <p className="text-center text-caption text-muted-foreground">
