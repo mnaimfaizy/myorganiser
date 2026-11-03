@@ -227,9 +227,9 @@
   "orchestrators": {
     "sandcastle": {
       "claudeByComplexity": {
-        "low": "claude-sonnet-5",
-        "medium": "claude-sonnet-5",
-        "high": "claude-opus-5"
+        "low": "claude-sonnet-5-5",
+        "medium": "claude-sonnet-5-5",
+        "high": "claude-opus-5-5"
       },
       "cursorDefault": "composer-2.5",
       "copilotDefault": "claude-sonnet-5"

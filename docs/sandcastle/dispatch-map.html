@@ -3424,7 +3424,7 @@
       <p class="small muted">
         Cost note for a subscription-auth sweep: subscription auth shares the
         same 5-hour window as interactive Claude Code, and
-        <code>complexity:high</code> routes to <code>claude-opus-5</code>. An
+        <code>complexity:high</code> routes to <code>claude-opus-5-5</code>. An
         overnight sweep can throttle your own keyboard.
       </p>
     </div>
@@ -3581,14 +3581,14 @@
           <dl class="kv" style="margin-top: 8px">
             <dt>low</dt>
             <dd>
-              <code>claude-sonnet-5</code> &mdash; the same as medium, and the
+              <code>claude-sonnet-5-5</code> &mdash; the same as medium, and the
               default when unlabelled. Complexity is size, not risk, so nothing
               implements on the smallest model (ADR&nbsp;0111)
             </dd>
             <dt>medium</dt>
-            <dd><code>claude-sonnet-5</code></dd>
+            <dd><code>claude-sonnet-5-5</code></dd>
             <dt>high</dt>
-            <dd><code>claude-opus-5</code></dd>
+            <dd><code>claude-opus-5-5</code></dd>
             <dt>cursor</dt>
             <dd><code>composer-2.5</code></dd>
             <dt>copilot</dt>
@@ -3762,9 +3762,9 @@
       "outcomeCompletionPromise": "<promise>COMPLETE</promise>",
       "outcomeOutstandingMarker": "OUTSTANDING:",
       "outcomeNeedsHumanLabel": "ready-for-human",
-      "policySandcastleClaudeModelLow": "claude-sonnet-5",
-      "policySandcastleClaudeModelMedium": "claude-sonnet-5",
-      "policySandcastleClaudeModelHigh": "claude-opus-5",
+      "policySandcastleClaudeModelLow": "claude-sonnet-5-5",
+      "policySandcastleClaudeModelMedium": "claude-sonnet-5-5",
+      "policySandcastleClaudeModelHigh": "claude-opus-5-5",
       "policySandcastleCursorDefault": "composer-2.5",
       "policySandcastleCopilotDefault": "claude-sonnet-5",
       "packageSandcastleVersion": "0.12.0"
