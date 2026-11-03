@@ -466,6 +466,37 @@ describe('AddressDetailPageClient', () => {
       expect(tick).not.toBeChecked();
     });
 
+    it('re-enables a place tick once its save rejects, without ticking it or surfacing the rejection', async () => {
+      const { page } = await renderDetail();
+      // The handler catches a rejected save, so nothing reaches the unawaited caller.
+      let fail: (error: Error) => void = () => undefined;
+      jest.mocked(page.setLocationChanged).mockImplementation(
+        () =>
+          new Promise<boolean>((_resolve, reject) => {
+            fail = reject;
+          }),
+      );
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('checkbox', { name: 'Updated at Bank' }),
+        );
+      });
+      expect(
+        screen.getByRole('checkbox', { name: 'Updated at Bank' }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        fail(new Error('Tick failed'));
+        // Jest fails the running test on an unhandled rejection; the macrotask
+        // flush makes Node report it while this test is still active.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      const tick = screen.getByRole('checkbox', { name: 'Updated at Bank' });
+      expect(tick).toBeEnabled();
+      expect(tick).not.toBeChecked();
+    });
+
     it('closes the place confirm without deleting when Cancel is chosen', async () => {
       const { page } = await renderDetail();
 
@@ -785,6 +816,39 @@ describe('AddressDetailPageClient', () => {
       expect(
         screen.getByRole('alertdialog', { name: 'Delete "Home"?' }),
       ).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('keeps the confirm open and stays on the detail when the delete rejects, and resets the leaving state', async () => {
+      const { page, rerender } = await renderDetail();
+      jest
+        .mocked(page.deleteAddress)
+        .mockRejectedValue(new Error('Delete failed'));
+
+      const danger = screen.getByRole('region', {
+        name: 'Delete this address',
+      });
+      fireEvent.click(within(danger).getByRole('button', { name: 'Delete…' }));
+      const dialog = await screen.findByRole('alertdialog', {
+        name: 'Delete "Home"?',
+      });
+
+      await act(async () => {
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Delete address' }),
+        );
+      });
+
+      expect(page.deleteAddress).toHaveBeenCalledWith('addr-home');
+      expect(
+        screen.getByRole('alertdialog', { name: 'Delete "Home"?' }),
+      ).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
+
+      // With leavingRef reset, removing the Address now shows the not-found state.
+      mockUseAddressesPage.mockReturnValue({ ...page, items: [parents] });
+      rerender(<AddressDetailPageClient params={{ id: 'addr-home' }} />);
+      expect(screen.getByText('Address not found.')).toBeInTheDocument();
       expect(mockPush).not.toHaveBeenCalled();
     });
   });
