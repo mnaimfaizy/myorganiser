@@ -1,5 +1,6 @@
 'use client';
 
+import { localDateKey } from '@myorganiser/core';
 import {
   normalizeAddresses,
   normalizeGroceries,
@@ -18,6 +19,20 @@ import {
   type HomeSummaryData,
 } from '../home-summary';
 
+/** Milliseconds from `from` to the next local midnight strictly after it. */
+function msUntilNextLocalMidnight(from: Date): number {
+  const nextMidnight = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate() + 1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return nextMidnight.getTime() - from.getTime();
+}
+
 /** What a vault with no records reads as: every count zero. */
 function emptySummary(now: Date): HomeSummaryData {
   return {
@@ -30,7 +45,11 @@ function emptySummary(now: Date): HomeSummaryData {
 }
 
 export interface UseHomeSummaryResult {
-  /** The clock this read was taken against, fixed for the life of the page. */
+  /**
+   * The clock the summary was derived against. Advances at least once per
+   * local day while the hook is mounted, so it never reads a day that has
+   * already ended.
+   */
   now: Date;
   /** Null until the five blobs have been read while unlocked. */
   summary: HomeSummaryData | null;
@@ -43,13 +62,46 @@ export interface UseHomeSummaryResult {
 export function useHomeSummary(
   handle: VaultHandle | null,
 ): UseHomeSummaryResult {
-  const [now] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date());
   const [summary, setSummary] = useState<HomeSummaryData | null>(null);
 
   // Read-only, so there is no overwrite to prevent here — but a dashboard
   // still showing the count from before convergence is the same staleness
   // wearing a quieter face (#587).
   const revision = useLocalVaultRevision();
+
+  // `now` goes stale across local midnight otherwise, so the greeting and
+  // both date-based sections keep reading yesterday until a reload (#1290).
+  // A sleeping or backgrounded tab misses the scheduled timeout, so the
+  // visibility listener catches up at once if the day has already turned
+  // over by the time the tab is looked at again.
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const scheduleNextRefresh = () => {
+      timeoutId = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextRefresh();
+      }, msUntilNextLocalMidnight(new Date()));
+    };
+    scheduleNextRefresh();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      setNow((previous) => {
+        const fresh = new Date();
+        return localDateKey(fresh) === localDateKey(previous)
+          ? previous
+          : fresh;
+      });
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const unlocked = handle?.isUnlocked === true;
 

@@ -74,6 +74,16 @@ export function isVaultBlobType(key: string): key is VaultBlobType {
 }
 `;
 
+/** A fan-out over every member, written by hand instead of through the pin. */
+const FAN_OUT_WITHOUT_PIN = `const blobs = {
+  [VaultBlobType.Addresses]: a,
+  [VaultBlobType.Groceries]: g,
+  [VaultBlobType.MobileNumbers]: m,
+  [VaultBlobType.Subscriptions]: s,
+  [VaultBlobType.Notes]: t,
+};
+`;
+
 /**
  * The declaration sites the checker asserts exist. They are exempt from the
  * rule and must be present, so every fixture carries them as empty modules.
@@ -114,14 +124,7 @@ for (const type of VAULT_BLOB_TYPES) upload(type);
 
 test('fails a hand-enumerated fan-out that never reaches the table', (t) => {
   const workspace = scaffold(t, {
-    'libs/web/vault/src/lib/vault/export.ts': `const blobs = {
-  [VaultBlobType.Addresses]: a,
-  [VaultBlobType.Groceries]: g,
-  [VaultBlobType.MobileNumbers]: m,
-  [VaultBlobType.Subscriptions]: s,
-  [VaultBlobType.Notes]: t,
-};
-`,
+    'libs/web/vault/src/lib/vault/export.ts': FAN_OUT_WITHOUT_PIN,
   });
   const result = run(workspace);
   assert.equal(result.status, 1);
@@ -359,6 +362,31 @@ test('cannot run when the guarded enum has moved out of its declared home', (t) 
   const result = run(workspace);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /no longer declared as a const object/);
+});
+
+test('skips a tracked source deleted on disk but not staged', (t) => {
+  const workspace = scaffold(t, {
+    'libs/web/vault/src/lib/vault/export.ts': FAN_OUT_WITHOUT_PIN,
+  });
+  rmSync(join(workspace, 'libs/web/vault/src/lib/vault/export.ts'));
+  const result = run(workspace);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('still fails when a declaration-site exemption names a file deleted but not staged', (t) => {
+  const workspace = createRepo(t);
+  write(workspace, 'libs/app-api-client/src/api.ts', ENUM_SOURCE);
+  write(
+    workspace,
+    'libs/web/vault/src/lib/vault/vaultBlobFields.ts',
+    PIN_SOURCE,
+  );
+  for (const path of DECLARATION_SITES) write(workspace, path, 'export {};\n');
+  commitAll(workspace);
+  rmSync(join(workspace, DECLARATION_SITES[0]));
+  const result = run(workspace);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /does not exist/);
 });
 
 test('--print reports the members and the pin it resolved', (t) => {
