@@ -5,7 +5,11 @@ import {
   type AddressStatus,
   type UsageLocationRecord,
 } from '@myorganiser/vault-core';
-import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
+import {
+  ConfirmDialog,
+  useDetailBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import {
   PlaceDialog,
   PlaceSheet,
@@ -81,6 +85,7 @@ function AddressDetailInner({ handle, addressId }: AddressDetailInnerProps) {
     deleteLocation,
   } = page;
   const address = items.find((x) => x.id === addressId);
+  useDetailBreadcrumbLabel(loading, address, (a) => a.label);
   const today = new Date();
 
   const [editing, setEditing] = useState(false);

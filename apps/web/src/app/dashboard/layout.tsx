@@ -1,6 +1,11 @@
 import type { Viewport } from 'next';
 
-import { SidebarInset, SidebarProvider, Toaster } from '@myorganiser/web-ui';
+import {
+  BreadcrumbLabelProvider,
+  SidebarInset,
+  SidebarProvider,
+  Toaster,
+} from '@myorganiser/web-ui';
 
 import {
   DashboardGuard,
@@ -79,16 +84,18 @@ export default function DashboardLayout({
             <PassphraseResetPrompt />
             <DashboardSidebar />
             <SidebarInset>
-              <DashboardHeader />
-              <PhoneAppBar />
-              {/*
-               * Explains why a save fails while the browser reports no
-               * connection. It changes no save path and queues nothing, and
-               * it is a browser signal, not a server reachability check.
-               */}
-              <OfflineNotice />
-              {children}
-              <PhoneTabBar />
+              <BreadcrumbLabelProvider>
+                <DashboardHeader />
+                <PhoneAppBar />
+                {/*
+                 * Explains why a save fails while the browser reports no
+                 * connection. It changes no save path and queues nothing, and
+                 * it is a browser signal, not a server reachability check.
+                 */}
+                <OfflineNotice />
+                {children}
+                <PhoneTabBar />
+              </BreadcrumbLabelProvider>
             </SidebarInset>
             {/* Feedback Dialog is mounted once here because both the sidebar
                 footer and the account menu in the header open it. */}

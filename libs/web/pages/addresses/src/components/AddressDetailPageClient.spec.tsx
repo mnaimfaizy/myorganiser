@@ -55,7 +55,11 @@ import {
   UpdateMethodEnum,
   type UsageLocationRecord,
 } from '@myorganiser/vault-core';
-import { useIsMobileState } from '@myorganiser/web-ui';
+import {
+  BreadcrumbLabelProvider,
+  useBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import '@testing-library/jest-dom';
 import { AddressDetailPageClient } from './AddressDetailPageClient';
 import {
@@ -165,6 +169,27 @@ async function renderDetail(
 
 function setPhone(isPhone: boolean) {
   jest.mocked(useIsMobileState).mockReturnValue(isPhone);
+}
+
+function BreadcrumbLabelProbe() {
+  const label = useBreadcrumbLabel();
+  return <div data-testid="breadcrumb-label-probe">{label ?? 'null'}</div>;
+}
+
+// The probe sits in a fixed slot, so toggling the page does not remount it.
+function Harness({
+  showPage,
+  id = 'addr-home',
+}: {
+  showPage: boolean;
+  id?: string;
+}) {
+  return (
+    <BreadcrumbLabelProvider>
+      {showPage && <AddressDetailPageClient params={{ id }} />}
+      <BreadcrumbLabelProbe />
+    </BreadcrumbLabelProvider>
+  );
 }
 
 /** Opens a place's row menu. jsdom has no PointerEvent, so Enter opens it. */
@@ -937,6 +962,59 @@ describe('AddressDetailPageClient', () => {
           name: 'Updated at Electoral roll',
         }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('shell breadcrumb label', () => {
+    function probeText() {
+      return screen.getByTestId('breadcrumb-label-probe').textContent;
+    }
+
+    // Flushed inside act, so the edit sheet's form state settles before the assertion.
+    async function renderHarness(props: { showPage: boolean; id?: string }) {
+      let view!: ReturnType<typeof render>;
+      await act(async () => {
+        view = render(<Harness {...props} />);
+      });
+      return view;
+    }
+
+    it('shows the address label once loaded', async () => {
+      mockUseAddressesPage.mockReturnValue(makeAddressesPageController([home]));
+
+      await renderHarness({ showPage: true });
+
+      expect(probeText()).toBe('Home');
+    });
+
+    it('shows Details while the addresses are loading', async () => {
+      mockUseAddressesPage.mockReturnValue(
+        makeAddressesPageController([home], { loading: true }),
+      );
+
+      await renderHarness({ showPage: true });
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('shows Details when the address is not found', async () => {
+      mockUseAddressesPage.mockReturnValue(makeAddressesPageController([]));
+
+      await renderHarness({ showPage: true, id: 'addr-missing' });
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('clears the label when the page unmounts', async () => {
+      mockUseAddressesPage.mockReturnValue(makeAddressesPageController([home]));
+      const { rerender } = await renderHarness({ showPage: true });
+      expect(probeText()).toBe('Home');
+
+      await act(async () => {
+        rerender(<Harness showPage={false} />);
+      });
+
+      expect(probeText()).toBe('null');
     });
   });
 });

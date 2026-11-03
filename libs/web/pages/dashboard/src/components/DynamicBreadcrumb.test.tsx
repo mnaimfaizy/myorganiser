@@ -3,6 +3,10 @@ jest.mock('next/navigation');
 
 import { render, screen } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
+import {
+  BreadcrumbLabelProvider,
+  useSetBreadcrumbLabel,
+} from '@myorganiser/web-ui';
 import { DynamicBreadcrumb, getBreadcrumbItems } from './DynamicBreadcrumb';
 
 describe('getBreadcrumbItems (pure resolver)', () => {
@@ -443,5 +447,54 @@ describe('DynamicBreadcrumb (component)', () => {
       const listElement = navElement.querySelector('ol');
       expect(listElement).toBeInTheDocument();
     });
+  });
+});
+
+describe('page-supplied label', () => {
+  function SetLabel({ label }: { label: string }) {
+    useSetBreadcrumbLabel(label);
+    return null;
+  }
+
+  // The setter sits in a fixed slot (`false` when hidden) so the breadcrumb
+  // keeps its position and stays mounted across the rerender.
+  function Harness({ withLabel }: { withLabel: boolean }) {
+    return (
+      <BreadcrumbLabelProvider>
+        {withLabel && <SetLabel label="Renew passport" />}
+        <DynamicBreadcrumb />
+      </BreadcrumbLabelProvider>
+    );
+  }
+
+  beforeEach(() => {
+    (usePathname as jest.Mock).mockReturnValue('/dashboard/tasks/task-1');
+  });
+
+  it('shows the page-supplied label as the current page and keeps the parent link path', () => {
+    render(<Harness withLabel />);
+
+    expect(
+      screen.getByRole('link', { name: 'Renew passport', current: 'page' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Details')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+      'href',
+      '/dashboard/tasks',
+    );
+  });
+
+  it('falls back to the path-based label when the page-supplied label unmounts', () => {
+    const { rerender } = render(<Harness withLabel />);
+    expect(
+      screen.getByRole('link', { name: 'Renew passport', current: 'page' }),
+    ).toBeInTheDocument();
+
+    rerender(<Harness withLabel={false} />);
+
+    expect(
+      screen.getByRole('link', { name: 'Details', current: 'page' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Renew passport')).not.toBeInTheDocument();
   });
 });

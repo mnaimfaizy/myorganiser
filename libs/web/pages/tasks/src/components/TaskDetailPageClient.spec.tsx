@@ -24,7 +24,11 @@ jest.mock('@myorganiser/web-ui', () => ({
 }));
 
 import type { Task } from '@myorganiser/vault-core';
-import { useIsMobileState } from '@myorganiser/web-ui';
+import {
+  BreadcrumbLabelProvider,
+  useBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import {
   act,
   fireEvent,
@@ -71,6 +75,27 @@ const mockRouter = { push: jest.fn(), replace: jest.fn() };
 function setController(controller: TasksPageController): TasksPageController {
   (useTasksPage as jest.Mock).mockReturnValue(controller);
   return controller;
+}
+
+function BreadcrumbLabelProbe() {
+  const label = useBreadcrumbLabel();
+  return <div data-testid="breadcrumb-label-probe">{label ?? 'null'}</div>;
+}
+
+// The probe sits in a fixed slot, so toggling the page does not remount it.
+function Harness({
+  showPage,
+  taskId = 'task-1',
+}: {
+  showPage: boolean;
+  taskId?: string;
+}) {
+  return (
+    <BreadcrumbLabelProvider>
+      {showPage && <TaskDetailPageClient taskId={taskId} />}
+      <BreadcrumbLabelProbe />
+    </BreadcrumbLabelProvider>
+  );
 }
 
 describe('TaskDetailPageClient', () => {
@@ -268,6 +293,46 @@ describe('TaskDetailPageClient', () => {
       expect(within(detail).getByRole('textbox', { name: 'Task' })).toHaveValue(
         'Renew passport',
       );
+    });
+  });
+
+  describe('shell breadcrumb label', () => {
+    function probeText() {
+      return screen.getByTestId('breadcrumb-label-probe').textContent;
+    }
+
+    it('shows the task title once loaded', () => {
+      setController(makeTasksPageController([renewPassport]));
+
+      render(<Harness showPage />);
+
+      expect(probeText()).toBe('Renew passport');
+    });
+
+    it('shows Details while the tasks are loading', () => {
+      setController(makeTasksPageController([renewPassport], true));
+
+      render(<Harness showPage />);
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('shows Details when the task is not found', () => {
+      setController(makeTasksPageController([]));
+
+      render(<Harness showPage taskId="missing-task" />);
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('clears the label when the page unmounts', () => {
+      setController(makeTasksPageController([renewPassport]));
+      const { rerender } = render(<Harness showPage />);
+      expect(probeText()).toBe('Renew passport');
+
+      rerender(<Harness showPage={false} />);
+
+      expect(probeText()).toBe('null');
     });
   });
 });

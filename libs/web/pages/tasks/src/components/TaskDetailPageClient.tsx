@@ -1,7 +1,11 @@
 'use client';
 
 import { localDateKey } from '@myorganiser/core';
-import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
+import {
+  ConfirmDialog,
+  useDetailBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
 import { useRouter } from 'next/navigation';
@@ -128,6 +132,8 @@ function TaskDetailPhone({ page, taskId }: TaskDetailPhoneProps) {
 
 function TaskDetailInner({ handle, taskId }: TaskDetailInnerProps) {
   const page = useTasksPage(handle);
+  const task = page.tasks.find((t) => t.id === taskId);
+  useDetailBreadcrumbLabel(page.loading, task, (t) => t.title);
   // Render nothing until the breakpoint is decided, so a phone never paints
   // the desktop board on the first frame.
   const isPhone = useIsMobileState();

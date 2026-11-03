@@ -1,13 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { expect, waitFor, within } from '@storybook/test';
 
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
   BreadcrumbItem,
+  BreadcrumbLabelProvider,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
+  useBreadcrumbLabel,
+  useSetBreadcrumbLabel,
 } from './Breadcrumb';
 
 function BreadcrumbExample() {
@@ -126,6 +130,54 @@ function BreadcrumbManyItemsExample() {
   );
 }
 
+/**
+ * The last segment reads the page-supplied label, and falls back to "Details"
+ * when none is set, as DynamicBreadcrumb does in the dashboard shell.
+ */
+function LabelledBreadcrumbExample() {
+  const label = useBreadcrumbLabel();
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbLink href="/dashboard/tasks">Tasks</BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage>{label ?? 'Details'}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
+
+/** Supplies the record name the way a detail page does, from inside the provider. */
+function SupplyRecordLabel() {
+  useSetBreadcrumbLabel('Renew passport');
+  return null;
+}
+
+function LabelOverrideExample() {
+  return (
+    <BreadcrumbLabelProvider>
+      <SupplyRecordLabel />
+      <LabelledBreadcrumbExample />
+    </BreadcrumbLabelProvider>
+  );
+}
+
+function LabelFallbackExample() {
+  return (
+    <BreadcrumbLabelProvider>
+      <LabelledBreadcrumbExample />
+    </BreadcrumbLabelProvider>
+  );
+}
+
 const meta: Meta<typeof BreadcrumbExample> = {
   component: BreadcrumbExample,
   title: 'Components/Breadcrumb',
@@ -152,5 +204,48 @@ export const LongContent: Story = {
 export const ManyItems: Story = {
   render: function Render() {
     return <BreadcrumbManyItemsExample />;
+  },
+};
+
+/**
+ * A component inside BreadcrumbLabelProvider sets the label on mount. The
+ * last segment shows it, not the static fallback.
+ */
+export const RecordLabelOverride: Story = {
+  render: function Render() {
+    return <LabelOverrideExample />;
+  },
+  play: async ({ canvasElement }) => {
+    const crumbs = within(canvasElement).getByRole('navigation', {
+      name: 'breadcrumb',
+    });
+    await waitFor(() => {
+      expect(within(crumbs).getByText('Renew passport')).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+    expect(within(crumbs).queryByText('Details')).toBeNull();
+  },
+};
+
+/**
+ * The provider is mounted and nothing sets a label, so the hook reads null and
+ * the last segment shows "Details".
+ */
+export const RecordLabelFallback: Story = {
+  render: function Render() {
+    return <LabelFallbackExample />;
+  },
+  play: async ({ canvasElement }) => {
+    const crumbs = within(canvasElement).getByRole('navigation', {
+      name: 'breadcrumb',
+    });
+    await waitFor(() => {
+      expect(within(crumbs).getByText('Details')).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
   },
 };

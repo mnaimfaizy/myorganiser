@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
@@ -103,6 +105,72 @@ const BreadcrumbEllipsis = ({
 );
 BreadcrumbEllipsis.displayName = 'BreadcrumbElipssis';
 
+interface BreadcrumbLabelContextValue {
+  label: string | null;
+  setLabel: (label: string | null) => void;
+}
+
+const BreadcrumbLabelContext =
+  React.createContext<BreadcrumbLabelContextValue | null>(null);
+
+/**
+ * Holds the label a page supplies for the breadcrumb's last segment. The
+ * shell (breadcrumb and header title) reads it; a detail page sets it through
+ * `useSetBreadcrumbLabel`.
+ */
+function BreadcrumbLabelProvider({ children }: { children: React.ReactNode }) {
+  const [label, setLabel] = React.useState<string | null>(null);
+
+  const contextValue = React.useMemo<BreadcrumbLabelContextValue>(
+    () => ({ label, setLabel }),
+    [label],
+  );
+
+  return (
+    <BreadcrumbLabelContext.Provider value={contextValue}>
+      {children}
+    </BreadcrumbLabelContext.Provider>
+  );
+}
+BreadcrumbLabelProvider.displayName = 'BreadcrumbLabelProvider';
+
+/**
+ * The page-supplied last-segment label, or null when none is set or no
+ * provider is mounted. Never throws, so the shell renders in isolation.
+ */
+function useBreadcrumbLabel(): string | null {
+  const context = React.useContext(BreadcrumbLabelContext);
+  return context?.label ?? null;
+}
+
+/**
+ * Sets the breadcrumb's last-segment label while the calling component is
+ * mounted, and clears it on unmount so the next route never shows a stale
+ * name. A no-op when no provider is mounted.
+ */
+function useSetBreadcrumbLabel(label: string | null): void {
+  const context = React.useContext(BreadcrumbLabelContext);
+  const setLabel = context?.setLabel;
+
+  React.useEffect(() => {
+    if (!setLabel) return;
+    setLabel(label);
+    return () => setLabel(null);
+  }, [label, setLabel]);
+}
+
+/**
+ * Sets the breadcrumb's last-segment label for a detail page: "Details" while
+ * the record is loading or missing, otherwise a field of the record.
+ */
+function useDetailBreadcrumbLabel<T>(
+  loading: boolean,
+  record: T | null | undefined,
+  label: (record: T) => string,
+): void {
+  useSetBreadcrumbLabel(loading || !record ? 'Details' : label(record));
+}
+
 export {
   Breadcrumb,
   BreadcrumbList,
@@ -111,4 +179,8 @@ export {
   BreadcrumbPage,
   BreadcrumbSeparator,
   BreadcrumbEllipsis,
+  BreadcrumbLabelProvider,
+  useBreadcrumbLabel,
+  useSetBreadcrumbLabel,
+  useDetailBreadcrumbLabel,
 };

@@ -59,7 +59,11 @@ function mockFormStub(props: unknown) {
   );
 }
 
-import { useIsMobileState } from '@myorganiser/web-ui';
+import {
+  BreadcrumbLabelProvider,
+  useBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import {
   fireEvent,
   render,
@@ -101,6 +105,29 @@ function setController(
 ): SubscriptionsPageController {
   (useSubscriptionsPage as jest.Mock).mockReturnValue(controller);
   return controller;
+}
+
+function BreadcrumbLabelProbe() {
+  const label = useBreadcrumbLabel();
+  return <div data-testid="breadcrumb-label-probe">{label ?? 'null'}</div>;
+}
+
+// The probe sits in a fixed slot, so toggling the page does not remount it.
+function Harness({
+  showPage,
+  subscriptionId = 'sub-netflix',
+}: {
+  showPage: boolean;
+  subscriptionId?: string;
+}) {
+  return (
+    <BreadcrumbLabelProvider>
+      {showPage && (
+        <SubscriptionDetailPageClient subscriptionId={subscriptionId} />
+      )}
+      <BreadcrumbLabelProbe />
+    </BreadcrumbLabelProvider>
+  );
 }
 
 describe('SubscriptionDetailPageClient', () => {
@@ -315,6 +342,48 @@ describe('SubscriptionDetailPageClient', () => {
       expect(
         within(panel).getByRole('heading', { level: 2, name: 'Netflix' }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('shell breadcrumb label', () => {
+    function probeText() {
+      return screen.getByTestId('breadcrumb-label-probe').textContent;
+    }
+
+    it('shows the subscription name once loaded', () => {
+      setController(makeSubscriptionsPageController([netflix]));
+
+      render(<Harness showPage />);
+
+      expect(probeText()).toBe('Netflix');
+    });
+
+    it('shows Details while the subscriptions are loading', () => {
+      setController(
+        makeSubscriptionsPageController([netflix], { loading: true }),
+      );
+
+      render(<Harness showPage />);
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('shows Details when the subscription is not found', () => {
+      setController(makeSubscriptionsPageController([]));
+
+      render(<Harness showPage subscriptionId="missing" />);
+
+      expect(probeText()).toBe('Details');
+    });
+
+    it('clears the label when the page unmounts', () => {
+      setController(makeSubscriptionsPageController([netflix]));
+      const { rerender } = render(<Harness showPage />);
+      expect(probeText()).toBe('Netflix');
+
+      rerender(<Harness showPage={false} />);
+
+      expect(probeText()).toBe('null');
     });
   });
 });

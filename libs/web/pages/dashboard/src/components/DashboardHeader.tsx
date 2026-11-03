@@ -9,6 +9,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  useBreadcrumbLabel,
   useSidebar,
 } from '@myorganiser/web-ui';
 import {
@@ -33,13 +34,15 @@ export function DashboardHeader() {
   const { state, isMobile, toggleSidebar } = useSidebar();
   const lockState = useVaultLockState();
   const { status } = useVaultSyncStatus();
+  const pageLabel = useBreadcrumbLabel();
 
   const crumbs = getBreadcrumbItems(pathname);
-  // The dashboard root is titled Home; every other path keeps its last crumb.
+  // The dashboard root is titled Home; every other path keeps its last crumb,
+  // unless the page supplied a label for it.
   const isRoot = isNavItemActive(pathname, '/dashboard');
   const title = isRoot
     ? 'Home'
-    : (crumbs[crumbs.length - 1]?.label ?? 'Dashboard');
+    : (pageLabel ?? crumbs[crumbs.length - 1]?.label ?? 'Dashboard');
 
   const toggleLabel = isMobile
     ? 'Open sidebar'
