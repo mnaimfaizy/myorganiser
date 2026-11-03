@@ -224,7 +224,7 @@ Two guard rails, because this is the only mode where no human named the work:
   non-interactive stdin the run fails rather than proceeding unattended.
 
 ⚠️ On `SANDCASTLE_CLAUDE_AUTH=subscription`, a sweep draws on the same 5-hour window as your
-interactive Claude Code sessions, and any `complexity:high` issue routes to `claude-opus-5`. Check
+interactive Claude Code sessions, and any `complexity:high` issue routes to `claude-opus-5-5`. Check
 the `--dry-run` output before committing to a large batch.
 
 Provider switching is optional: the default agent can live in `.sandcastle/.env` as
@@ -278,7 +278,7 @@ Resolution rules:
   image or any worktrees.
 
 **Quota warning.** Subscription auth shares the 5-hour window with your interactive Claude Code
-sessions, and `complexity:high` slices route to `claude-opus-5`
+sessions, and `complexity:high` slices route to `claude-opus-5-5`
 (`tools/config/agent-model-policy.json`). A long AFK batch can throttle you at the keyboard — send
 big batches to `SANDCASTLE_CLAUDE_AUTH=api` and keep the plan for short runs.
 
