@@ -1,28 +1,40 @@
-/* eslint-disable import/first */
+/* eslint-disable import/first -- jest.mock must precede application imports */
 jest.mock('../../hooks/useYouTubeNavVisible', () => ({
   useYouTubeNavVisible: jest.fn(),
 }));
 
-jest.mock('@myorganiser/auth', () => ({
-  getAccessToken: jest.fn(),
-}));
-
-jest.mock('@myorganiser/core', () => ({
-  getApiBaseUrl: jest.fn(),
+jest.mock('../../lib/apiClient', () => ({
+  createYouTubeApi: jest.fn(),
 }));
 
 import { renderHook, waitFor } from '@testing-library/react';
-import { getAccessToken } from '@myorganiser/auth';
-import { getApiBaseUrl } from '@myorganiser/core';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
+import { createYouTubeApi } from '../../lib/apiClient';
 import { useYouTubeHome } from './use-youtube-home';
 
-const VIDEOS_PATH = '/videos?sort=latest&limit=6';
-
 const videos = [
-  { videoId: 'v1', title: 'First upload' },
-  { videoId: 'v2', title: 'Second upload' },
+  {
+    videoId: 'v1',
+    title: 'First upload',
+    thumbnail: null,
+    publishedAt: '2026-11-01T00:00:00Z',
+  },
+  {
+    videoId: 'v2',
+    title: 'Second upload',
+    thumbnail: null,
+    publishedAt: '2026-10-30T00:00:00Z',
+  },
 ];
+
+const videosPage = {
+  videos,
+  total: 2,
+  page: 1,
+  limit: 6,
+  totalPages: 1,
+  message: '',
+};
 
 const subscriptionRows = [
   { enabled: true },
@@ -30,62 +42,59 @@ const subscriptionRows = [
   { enabled: true },
 ];
 
-/** Routes each YouTube API path to a JSON body, as the backend would. */
-function stubYouTubeApi(routes: Record<string, unknown>): jest.Mock {
-  return jest.fn(async (url: string) => {
-    const path = url.replace('https://api.test/youtube', '');
-    return { json: async () => routes[path] };
-  });
-}
+const mockGetConnectionStatus = jest.fn();
+const mockGetVideos = jest.fn();
+const mockGetSubscriptions = jest.fn();
 
 describe('useYouTubeHome', () => {
-  const originalFetch = global.fetch;
-  let fetchMock: jest.Mock;
-
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockGetConnectionStatus.mockReset();
+    mockGetVideos.mockReset();
+    mockGetSubscriptions.mockReset();
+    (createYouTubeApi as jest.Mock).mockReset();
+    (useYouTubeNavVisible as jest.Mock).mockReset();
+
     (useYouTubeNavVisible as jest.Mock).mockReturnValue(true);
-    (getApiBaseUrl as jest.Mock).mockReturnValue('https://api.test');
-    (getAccessToken as jest.Mock).mockReturnValue(null);
-    fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    (createYouTubeApi as jest.Mock).mockReturnValue({
+      getConnectionStatus: mockGetConnectionStatus,
+      getVideos: mockGetVideos,
+      getSubscriptions: mockGetSubscriptions,
+    });
+    mockGetConnectionStatus.mockResolvedValue({
+      data: { connected: true, status: 'ok', message: '' },
+    });
+    mockGetVideos.mockResolvedValue({ data: videosPage });
+    mockGetSubscriptions.mockResolvedValue({ data: subscriptionRows });
   });
 
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('reports not visible and sends no request when the nav gate is closed', () => {
+  it('reports not visible and calls no YouTube endpoint when the nav gate is closed', () => {
     (useYouTubeNavVisible as jest.Mock).mockReturnValue(false);
 
     const { result } = renderHook(() => useYouTubeHome());
 
     expect(result.current.visible).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createYouTubeApi).not.toHaveBeenCalled();
+    expect(mockGetConnectionStatus).not.toHaveBeenCalled();
+    expect(mockGetVideos).not.toHaveBeenCalled();
+    expect(mockGetSubscriptions).not.toHaveBeenCalled();
   });
 
-  it('reads as disconnected when the status says the account is not connected', async () => {
-    fetchMock.mockImplementation(
-      stubYouTubeApi({ '/status': { connected: false } }),
-    );
+  it('reads as disconnected and skips the videos and channel reads when the account is not connected', async () => {
+    mockGetConnectionStatus.mockResolvedValue({
+      data: { connected: false, status: 'none', message: '' },
+    });
 
     const { result } = renderHook(() => useYouTubeHome());
 
     await waitFor(() => {
       expect(result.current.state).toEqual({ status: 'disconnected' });
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.current.visible).toBe(true);
+    expect(mockGetVideos).not.toHaveBeenCalled();
+    expect(mockGetSubscriptions).not.toHaveBeenCalled();
   });
 
-  it('loads the latest videos and the enabled channel count when connected', async () => {
-    fetchMock.mockImplementation(
-      stubYouTubeApi({
-        '/status': { connected: true },
-        [VIDEOS_PATH]: { videos },
-        '/subscriptions': subscriptionRows,
-      }),
-    );
-
+  it('loads the latest six videos and counts only the enabled channels when connected', async () => {
     const { result } = renderHook(() => useYouTubeHome());
 
     await waitFor(() => {
@@ -95,82 +104,64 @@ describe('useYouTubeHome', () => {
         videos,
       });
     });
-    expect(result.current.visible).toBe(true);
+    expect(mockGetVideos).toHaveBeenCalledWith({ sort: 'latest', limit: 6 });
+    expect(mockGetSubscriptions).toHaveBeenCalledTimes(1);
   });
 
-  it.each<[string, () => Promise<unknown>]>([
-    ['rejects', () => Promise.reject(new TypeError('Failed to fetch'))],
-    [
-      'is not a list',
-      async () => ({ json: async () => ({ error: 'unexpected' }) }),
-    ],
-  ])(
-    'keeps the videos and reads the channel count as null when /subscriptions %s',
-    async (_label, subscriptionsResponse) => {
-      const apiRoutes = stubYouTubeApi({
-        '/status': { connected: true },
-        [VIDEOS_PATH]: { videos },
+  it('keeps the videos and reads the channel count as null when the subscriptions payload is not a list', async () => {
+    mockGetSubscriptions.mockResolvedValue({
+      data: { error: 'unexpected' },
+    });
+
+    const { result } = renderHook(() => useYouTubeHome());
+
+    await waitFor(() => {
+      expect(result.current.state).toEqual({
+        status: 'loaded',
+        channels: null,
+        videos,
       });
-      fetchMock.mockImplementation((url: string) =>
-        url.endsWith('/subscriptions')
-          ? subscriptionsResponse()
-          : apiRoutes(url),
-      );
+    });
+  });
 
-      const { result } = renderHook(() => useYouTubeHome());
+  it('keeps the videos and reads the channel count as null when the subscriptions read rejects', async () => {
+    mockGetSubscriptions.mockRejectedValue(new Error('boom'));
 
-      await waitFor(() => {
-        expect(result.current.state).toEqual({
-          status: 'loaded',
-          channels: null,
-          videos,
-        });
+    const { result } = renderHook(() => useYouTubeHome());
+
+    await waitFor(() => {
+      expect(result.current.state).toEqual({
+        status: 'loaded',
+        channels: null,
+        videos,
       });
-    },
-  );
+    });
+  });
 
-  it('reads as error when a request rejects', async () => {
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+  it('reads as error, not disconnected, when the status endpoint answers with an HTTP error body', async () => {
+    // Regression for the bug this spec guards: the old raw-fetch code parsed
+    // a non-2xx body as success data, so this error body read as
+    // `{ connected: false }` and rendered "Not connected". The generated
+    // client rejects on non-2xx, so the hook must land on the error state.
+    mockGetConnectionStatus.mockRejectedValue({
+      response: { status: 500, data: { connected: false, message: 'boom' } },
+    });
 
     const { result } = renderHook(() => useYouTubeHome());
 
     await waitFor(() => {
       expect(result.current.state).toEqual({ status: 'error' });
     });
+    expect(mockGetVideos).not.toHaveBeenCalled();
   });
 
-  it('calls the YouTube endpoints with the bearer token when one exists', async () => {
-    (getAccessToken as jest.Mock).mockReturnValue('token-abc');
-    fetchMock.mockImplementation(
-      stubYouTubeApi({
-        '/status': { connected: true },
-        [VIDEOS_PATH]: { videos },
-        '/subscriptions': subscriptionRows,
-      }),
-    );
+  it('reads as error when the request fails with no response (network error)', async () => {
+    mockGetConnectionStatus.mockRejectedValue(new Error('Network Error'));
 
     const { result } = renderHook(() => useYouTubeHome());
 
     await waitFor(() => {
-      expect(result.current.state.status).toBe('loaded');
+      expect(result.current.state).toEqual({ status: 'error' });
     });
-
-    const urls = fetchMock.mock.calls.map(([url]) => url);
-    expect(urls).toEqual(
-      expect.arrayContaining([
-        'https://api.test/youtube/status',
-        `https://api.test/youtube${VIDEOS_PATH}`,
-        'https://api.test/youtube/subscriptions',
-      ]),
-    );
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(init).toEqual(
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer token-abc',
-          }),
-        }),
-      );
-    }
   });
 });

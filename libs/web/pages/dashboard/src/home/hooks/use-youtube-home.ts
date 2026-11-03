@@ -1,14 +1,13 @@
 'use client';
 
-import { getAccessToken } from '@myorganiser/auth';
-import { getApiBaseUrl } from '@myorganiser/core';
+import {
+  GetVideosSortEnum,
+  type SubscriptionResponse,
+} from '@myorganiser/app-api-client';
 import { useEffect, useState } from 'react';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
-import type { YouTubeHome, YouTubeState, YouTubeVideo } from '../home-view';
-
-interface YouTubeSubscriptionRow {
-  enabled: boolean;
-}
+import { createYouTubeApi } from '../../lib/apiClient';
+import type { YouTubeHome, YouTubeState } from '../home-view';
 
 /**
  * YouTube status, recent uploads and channel count for Home. Gated by the
@@ -23,42 +22,36 @@ export function useYouTubeHome(): YouTubeHome {
     if (!visible) return;
 
     let isActive = true;
-
-    const base = `${getApiBaseUrl()}/youtube`;
-    const token = getAccessToken();
-    const init: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      credentials: 'include',
-    };
-    const getJson = <T>(path: string): Promise<T> =>
-      fetch(`${base}${path}`, init).then((r) => r.json() as Promise<T>);
+    const api = createYouTubeApi();
 
     // The channel count is a side read: if it fails or is not a list, it is
     // unknown (null) and the videos still load.
     const readChannelCount = async (): Promise<number | null> => {
       try {
-        const rows: unknown = await getJson<unknown>('/subscriptions');
+        const response = await api.getSubscriptions();
+        // The generated response type collapses the backend's
+        // `SubscriptionResponse[] | YouTubeErrorResponse` union to the error
+        // shape; the success body is really an array.
+        const rows = response.data as unknown as SubscriptionResponse[];
         if (!Array.isArray(rows)) return null;
-        return rows.filter((row: YouTubeSubscriptionRow) => row.enabled).length;
+        return rows.filter((row) => row.enabled).length;
       } catch {
         return null;
       }
     };
 
-    getJson<{ connected: boolean }>('/status')
+    api
+      .getConnectionStatus()
       .then(async (status): Promise<YouTubeState> => {
-        if (!status.connected) return { status: 'disconnected' };
+        if (!status.data.connected) return { status: 'disconnected' };
         const [videos, channels] = await Promise.all([
-          getJson<{ videos?: YouTubeVideo[] }>('/videos?sort=latest&limit=6'),
+          api.getVideos({ sort: GetVideosSortEnum.Latest, limit: 6 }),
           readChannelCount(),
         ]);
         return {
           status: 'loaded',
           channels,
-          videos: videos.videos ?? [],
+          videos: videos.data.videos,
         };
       })
       .then((next) => {
