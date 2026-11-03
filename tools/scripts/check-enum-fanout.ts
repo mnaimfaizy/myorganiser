@@ -26,6 +26,12 @@
 // No type-checker or program is built: this is a syntax-only parse, so it costs
 // a few milliseconds per file and needs no tsconfig resolution.
 //
+// `git ls-files` can list a path that is deleted on disk but whose deletion is
+// not yet staged. Such a source is skipped rather than read, because a file
+// that does not exist cannot contain a fan-out. A declaration-site exemption
+// naming a missing file is a different claim — that the exemption is still
+// needed — and keeps failing the run (#1253, #1250).
+//
 // Exit 0 = every fan-out is pinned. Exit 1 = an unpinned fan-out. Exit 2 = the
 // check could not run.
 import { execFileSync } from 'node:child_process';
@@ -379,6 +385,9 @@ for (const guard of GUARDED_ENUMS) {
   for (const path of sources) {
     if (path === guard.pin) continue;
     if (declared.has(path)) continue;
+    // Tracked but gone from disk (deleted, deletion not staged): nothing to
+    // read, and nothing to find a fan-out in.
+    if (!existsSync(join(cwd, path))) continue;
     const text = readFileSync(join(cwd, path), 'utf8');
     // Cheap pre-filter: a file mentioning neither the enum nor any member value
     // cannot contain a fan-out, and parsing every tracked file would dominate

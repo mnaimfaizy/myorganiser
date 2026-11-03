@@ -361,6 +361,38 @@ test('cannot run when the guarded enum has moved out of its declared home', (t) 
   assert.match(result.stderr, /no longer declared as a const object/);
 });
 
+test('skips a tracked source deleted on disk but not staged', (t) => {
+  const workspace = scaffold(t, {
+    'libs/web/vault/src/lib/vault/export.ts': `const blobs = {
+  [VaultBlobType.Addresses]: a,
+  [VaultBlobType.Groceries]: g,
+  [VaultBlobType.MobileNumbers]: m,
+  [VaultBlobType.Subscriptions]: s,
+  [VaultBlobType.Notes]: t,
+};
+`,
+  });
+  rmSync(join(workspace, 'libs/web/vault/src/lib/vault/export.ts'));
+  const result = run(workspace);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('still fails when a declaration-site exemption names a file deleted but not staged', (t) => {
+  const workspace = createRepo(t);
+  write(workspace, 'libs/app-api-client/src/api.ts', ENUM_SOURCE);
+  write(
+    workspace,
+    'libs/web/vault/src/lib/vault/vaultBlobFields.ts',
+    PIN_SOURCE,
+  );
+  for (const path of DECLARATION_SITES) write(workspace, path, 'export {};\n');
+  commitAll(workspace);
+  rmSync(join(workspace, DECLARATION_SITES[0]));
+  const result = run(workspace);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /does not exist/);
+});
+
 test('--print reports the members and the pin it resolved', (t) => {
   const workspace = scaffold(t);
   const result = run(workspace, '--print');
