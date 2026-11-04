@@ -81,6 +81,7 @@ export function Combobox(props: {
                 <CommandItem
                   key={option.value}
                   value={option.value}
+                  keywords={[option.label]}
                   onSelect={() => {
                     onValueChange(option.value);
                     setOpen(false);
