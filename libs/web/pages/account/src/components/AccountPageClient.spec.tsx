@@ -32,7 +32,7 @@ jest.mock('../lib/apiClient', () => ({
 
 import { getCurrentUser } from '@myorganiser/auth';
 import { useIsMobileState } from '@myorganiser/web-ui';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { useAccountPreferences } from '../hooks/use-account-preferences';
@@ -62,6 +62,8 @@ function digestSettings(connected: boolean) {
     saving: false,
     save: jest.fn(),
     timeZone: 'Australia/Sydney',
+    loadError: null,
+    retryLoad: jest.fn(),
   };
 }
 
@@ -133,6 +135,21 @@ describe('AccountPageClient', () => {
     expect(
       screen.queryByRole('heading', { name: 'Weekly YouTube digest' }),
     ).toBeNull();
+  });
+
+  it('shows a retryable error when the digest settings fail to load', () => {
+    const retryLoad = jest.fn();
+    (useYouTubeDigestSettings as jest.Mock).mockReturnValue({
+      ...digestSettings(false),
+      loadError: 'Boom',
+      retryLoad,
+    });
+    setBreakpoint(false);
+    render(<AccountPageClient />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Boom');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retryLoad).toHaveBeenCalledTimes(1);
   });
 
   it('shows the YouTube digest card when the YouTube account is connected', () => {
