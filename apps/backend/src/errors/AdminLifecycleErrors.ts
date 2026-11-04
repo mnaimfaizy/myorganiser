@@ -16,6 +16,15 @@ export class LastPlatformAdminError extends Error {
   }
 }
 
+export class SelfLifecycleActionError extends Error {
+  status = 409;
+
+  constructor(action: 'disable' | 'demote') {
+    super(`You can't ${action} your own account`);
+    this.name = 'SelfLifecycleActionError';
+  }
+}
+
 export class EmailAlreadyVerifiedError extends Error {
   status = 409;
 

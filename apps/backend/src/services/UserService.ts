@@ -10,6 +10,7 @@ import {
   VerificationCooldownError,
   VerificationSendFailedError,
   YouTubeAccessCeilingReachedError,
+  SelfLifecycleActionError,
 } from '../errors/AdminLifecycleErrors';
 import apiTokens from '../helpers/ApiTokens';
 import { logErrorWithStack } from '../helpers/describeError';
@@ -284,6 +285,9 @@ class UserService {
     actorUserId: string,
     targetUserId: string,
   ): Promise<AdminIdentityUser> {
+    if (actorUserId === targetUserId) {
+      throw new SelfLifecycleActionError('disable');
+    }
     await this.requireIdentityUser(targetUserId);
 
     return this.prisma.$transaction(async (tx) => {
@@ -375,12 +379,15 @@ class UserService {
 
   /**
    * Demote a Platform Admin to a normal User.
-   * Rejects when the target is the last Platform Admin.
+   * Rejects self-demotion and demotion of the last Platform Admin.
    */
   async demoteUser(
     actorUserId: string,
     targetUserId: string,
   ): Promise<AdminIdentityUser> {
+    if (actorUserId === targetUserId) {
+      throw new SelfLifecycleActionError('demote');
+    }
     const existing = await this.requireIdentityUser(targetUserId);
 
     if (existing.role !== 'platform_admin') {
