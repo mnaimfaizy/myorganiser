@@ -1,9 +1,14 @@
 'use client';
 
-import { clearAuthSession, getAccessToken, refresh } from '@myorganiser/auth';
-import { getApiBaseUrl } from '@myorganiser/core';
+import {
+  GetVideosKindEnum,
+  GetVideosSortEnum,
+  type YouTubeApi,
+} from '@myorganiser/app-api-client';
 import { requestYouTubeAvailabilityRecheck } from '@myorganiser/web-youtube';
+import { isAxiosError } from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createYouTubeApi } from '../lib/youtubeApi';
 import { didSyncRequestRun } from '../lib/syncProgress';
 import type {
   ChannelCarousel,
@@ -51,25 +56,6 @@ export {
   formatShortsDuration,
 } from '../lib/shortsBudget';
 
-function getYouTubeApiBase(): string {
-  return `${getApiBaseUrl()}/youtube`;
-}
-
-let refreshInFlight: Promise<unknown> | null = null;
-
-async function doFetch(path: string, options?: RequestInit): Promise<Response> {
-  const token = getAccessToken();
-  return fetch(`${getYouTubeApiBase()}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-    credentials: 'include',
-  });
-}
-
 export class YouTubeRequestError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -82,43 +68,39 @@ export class YouTubeRequestError extends Error {
   }
 }
 
-async function throwFromResponse(res: Response): Promise<never> {
-  const body = (await res.json().catch(() => ({}))) as {
-    message?: string;
-    code?: string;
-  };
-  throw new YouTubeRequestError(
-    body.message ?? `Request failed: ${res.status}`,
-    res.status,
+/**
+ * Turns whatever the generated client rejects with into a
+ * `YouTubeRequestError`. The auth axios instance has already refreshed the
+ * token and replayed a 401 once, so an error here is final.
+ */
+function toRequestError(err: unknown): unknown {
+  if (!isAxiosError(err) || !err.response) return err;
+  const { status, data } = err.response;
+  const body = (data ?? {}) as { message?: string; code?: string };
+  // A 404 may mean YouTube was taken away from this open page (ADR 0129);
+  // only the availability check can tell, so ask every page to make it.
+  if (status === 404) requestYouTubeAvailabilityRecheck();
+  return new YouTubeRequestError(
+    body.message ?? `Request failed: ${status}`,
+    status,
     body.code,
   );
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  let res = await doFetch(path, options);
-
-  if (res.status === 401) {
-    try {
-      if (!refreshInFlight) {
-        refreshInFlight = refresh();
-      }
-      await refreshInFlight;
-    } catch {
-      clearAuthSession();
-      await throwFromResponse(res);
-    } finally {
-      refreshInFlight = null;
-    }
-    res = await doFetch(path, options);
+/**
+ * Runs one call on the generated `YouTubeApi` and returns its body as `T`.
+ * The generated response types collapse the backend's success/error unions to
+ * the error shape, so the caller names the success body.
+ */
+async function callApi<T>(
+  call: (api: YouTubeApi) => Promise<{ data: unknown }>,
+): Promise<T> {
+  const api = createYouTubeApi();
+  try {
+    return (await call(api)).data as T;
+  } catch (err) {
+    throw toRequestError(err);
   }
-
-  if (!res.ok) {
-    // A 404 may mean YouTube was taken away from this open page (ADR 0129);
-    // only the availability check can tell, so ask every page to make it.
-    if (res.status === 404) requestYouTubeAvailabilityRecheck();
-    await throwFromResponse(res);
-  }
-  return res.json();
 }
 
 export function useYouTubeStatus() {
@@ -128,8 +110,8 @@ export function useYouTubeStatus() {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await apiFetch<{ connected: boolean; status: string }>(
-        '/status',
+      const data = await callApi<{ connected: boolean; status: string }>(
+        (api) => api.getConnectionStatus(),
       );
       setConnected(data.connected);
       setStatus(data.status);
@@ -141,7 +123,9 @@ export function useYouTubeStatus() {
   useEffect(() => {
     if (!didMount.current) {
       didMount.current = true;
-      apiFetch<{ connected: boolean; status: string }>('/status')
+      callApi<{ connected: boolean; status: string }>((api) =>
+        api.getConnectionStatus(),
+      )
         .then((data) => {
           setConnected(data.connected);
           setStatus(data.status);
@@ -160,7 +144,9 @@ export function useYouTubeSubscriptions() {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<YouTubeSubscription[]>('/subscriptions');
+      const data = await callApi<YouTubeSubscription[]>((api) =>
+        api.getSubscriptions(),
+      );
       setSubscriptions(data);
     } finally {
       setLoading(false);
@@ -169,10 +155,12 @@ export function useYouTubeSubscriptions() {
 
   const toggle = useCallback(
     async (id: string, enabled: boolean) => {
-      await apiFetch(`/subscriptions/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ enabled }),
-      });
+      await callApi((api) =>
+        api.toggleSubscription({
+          subscriptionId: id,
+          toggleSubscriptionRequest: { enabled },
+        }),
+      );
       await fetch_();
     },
     [fetch_],
@@ -197,21 +185,23 @@ export function useYouTubeVideos(channelId?: string) {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('sort', sort);
-      params.set('page', String(page));
-      params.set('limit', '24');
-      // Long-form surfaces exclude Shorts: short-form is isolated on its own
-      // budgeted page (PRD #264, user story 14), so it must not reappear in
-      // the channel grid or a channel's detail list.
-      params.set('kind', 'long');
-      if (search) params.set('search', search);
-      if (channelId) params.set('channelId', channelId);
-      const data = await apiFetch<{
+      const data = await callApi<{
         videos: YouTubeVideo[];
         total: number;
         totalPages: number;
-      }>(`/videos?${params.toString()}`);
+      }>((api) =>
+        api.getVideos({
+          sort: sort as GetVideosSortEnum,
+          page,
+          limit: 24,
+          // Long-form surfaces exclude Shorts: short-form is isolated on its
+          // own budgeted page (PRD #264, user story 14), so it must not
+          // reappear in the channel grid or a channel's detail list.
+          kind: GetVideosKindEnum.Long,
+          ...(search ? { search } : {}),
+          ...(channelId ? { channelId } : {}),
+        }),
+      );
       setVideos(data.videos);
       setTotal(data.total);
       setTotalPages(data.totalPages);
@@ -263,14 +253,13 @@ export function useYouTubeShorts() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        sort: 'latest',
-        page: '1',
-        limit: '50',
-        kind: 'short',
-      });
-      const data = await apiFetch<{ videos: YouTubeVideo[] }>(
-        `/videos?${params.toString()}`,
+      const data = await callApi<{ videos: YouTubeVideo[] }>((api) =>
+        api.getVideos({
+          sort: GetVideosSortEnum.Latest,
+          page: 1,
+          limit: 50,
+          kind: GetVideosKindEnum.Short,
+        }),
       );
       setShorts(data.videos);
     } catch (err: unknown) {
@@ -302,7 +291,9 @@ export function useYouTubeCarousel() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<ChannelCarousel[]>('/videos/carousel');
+      const data = await callApi<ChannelCarousel[]>((api) =>
+        api.getVideosCarousel(),
+      );
       setChannels(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -341,8 +332,8 @@ export function useYouTubeNotifications() {
 
   const fetch_ = useCallback(async () => {
     try {
-      const data = await apiFetch<NotificationSettings>(
-        '/notification-settings',
+      const data = await callApi<NotificationSettings>((api) =>
+        api.getNotificationSettings(),
       );
       setSettings(data);
     } catch {
@@ -353,12 +344,8 @@ export function useYouTubeNotifications() {
   const update = useCallback(async (data: Partial<NotificationSettings>) => {
     setLoading(true);
     try {
-      const result = await apiFetch<NotificationSettings>(
-        '/notification-settings',
-        {
-          method: 'PATCH',
-          body: JSON.stringify(data),
-        },
+      const result = await callApi<NotificationSettings>((api) =>
+        api.updateNotificationSettings({ notificationSettingsBody: data }),
       );
       setSettings(result);
     } finally {
@@ -382,14 +369,12 @@ export interface YouTubeDisconnectResponse {
 
 export function useYouTubeConnect() {
   const connect = useCallback(async () => {
-    const data = await apiFetch<{ url: string }>('/auth-url');
+    const data = await callApi<{ url: string }>((api) => api.getAuthUrl());
     window.location.href = data.url;
   }, []);
 
   const disconnect = useCallback(async () => {
-    return apiFetch<YouTubeDisconnectResponse>('/disconnect', {
-      method: 'DELETE',
-    });
+    return callApi<YouTubeDisconnectResponse>((api) => api.disconnect());
   }, []);
 
   return { connect, disconnect };
@@ -423,8 +408,8 @@ export function useYouTubeAcknowledgement(): YouTubeAcknowledgementState {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ acknowledgedAt: string | null }>(
-        '/acknowledgement',
+      const data = await callApi<{ acknowledgedAt: string | null }>((api) =>
+        api.getAcknowledgement(),
       );
       setAcknowledged(Boolean(data.acknowledgedAt));
     } catch (err: unknown) {
@@ -439,9 +424,9 @@ export function useYouTubeAcknowledgement(): YouTubeAcknowledgementState {
   }, [fetch_]);
 
   const accept = useCallback(async () => {
-    await apiFetch<{ acknowledgedAt: string }>('/acknowledgement', {
-      method: 'POST',
-    });
+    await callApi<{ acknowledgedAt: string }>((api) =>
+      api.acceptAcknowledgement(),
+    );
     setAcknowledged(true);
   }, []);
 
@@ -501,18 +486,16 @@ export function useChannelUploads(): ChannelUploadExpansion {
     setError(null);
     setLoadingChannelIds((prev) => new Set(prev).add(channelId));
 
-    const params = new URLSearchParams({
-      sort: 'latest',
-      page: '1',
-      limit: String(CHANNEL_UPLOAD_PAGE_SIZE),
-      // Shorts stay on their own budgeted page (PRD #264, user story 14) and
-      // must not leak back into a long-form channel list.
-      kind: 'long',
-      channelId,
-    });
-
-    void apiFetch<{ videos: YouTubeVideo[]; total: number }>(
-      `/videos?${params.toString()}`,
+    void callApi<{ videos: YouTubeVideo[]; total: number }>((api) =>
+      api.getVideos({
+        sort: GetVideosSortEnum.Latest,
+        page: 1,
+        limit: CHANNEL_UPLOAD_PAGE_SIZE,
+        // Shorts stay on their own budgeted page (PRD #264, user story 14)
+        // and must not leak back into a long-form channel list.
+        kind: GetVideosKindEnum.Long,
+        channelId,
+      }),
     )
       .then((data) => {
         setUploadsByChannel((prev) => ({ ...prev, [channelId]: data.videos }));
@@ -569,7 +552,7 @@ export function useChannelUploads(): ChannelUploadExpansion {
  * stamp `didSyncRequestRun` compares (#753).
  */
 interface SyncRequest<R> {
-  path: string;
+  send: (api: YouTubeApi) => Promise<{ data: unknown }>;
   disabledLabel: string;
   retryAt: (status: YouTubeSyncStatus) => string | null;
   attemptAtBefore: (status: YouTubeSyncStatus) => string | null;
@@ -577,7 +560,7 @@ interface SyncRequest<R> {
 }
 
 const UPLOAD_SYNC_REQUEST: SyncRequest<YouTubeSyncResult> = {
-  path: '/uploads/sync',
+  send: (api) => api.syncUploads(),
   disabledLabel: 'Sync disabled',
   retryAt: (status) => status.retryAt,
   attemptAtBefore: (status) => status.lastSyncAttemptAt,
@@ -585,7 +568,7 @@ const UPLOAD_SYNC_REQUEST: SyncRequest<YouTubeSyncResult> = {
 };
 
 const CHANNEL_SYNC_REQUEST: SyncRequest<YouTubeChannelSyncResult> = {
-  path: '/subscriptions/sync',
+  send: (api) => api.syncSubscriptions(),
   disabledLabel: 'Refresh channels disabled',
   retryAt: (status) => status.channelRetryAt,
   attemptAtBefore: (status) => status.channelLastAttemptAt,
@@ -602,8 +585,9 @@ export function useYouTubeSyncStatus() {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     try {
-      const data =
-        await apiFetch<import('../types').YouTubeSyncStatus>('/sync-status');
+      const data = await callApi<import('../types').YouTubeSyncStatus>((api) =>
+        api.getSyncStatus(),
+      );
       setStatus(data);
       return data;
     } finally {
@@ -624,7 +608,9 @@ export function useYouTubeSyncStatus() {
         // observation can overwrite a live status if another fetch happens to
         // resolve afterward, which would kill the poll loop. The component
         // will poll for the actual live status after the PUT is sent.
-        const latest = await apiFetch<YouTubeSyncStatus>('/sync-status');
+        const latest = await callApi<YouTubeSyncStatus>((api) =>
+          api.getSyncStatus(),
+        );
         const retryAt = request.retryAt(latest);
         if (isRetryCooldownActive(retryAt)) {
           throw new Error(
@@ -634,7 +620,7 @@ export function useYouTubeSyncStatus() {
 
         // The request resolves once the run has finished (ADR 0080), so its
         // result is the completion signal for a run the User started (#753).
-        const result = await apiFetch<R>(request.path, { method: 'PUT' });
+        const result = await callApi<R>(request.send);
 
         // A failed re-read must not hide a run that did work.
         await fetch_().catch(() => undefined);
@@ -687,11 +673,7 @@ export async function updateVideoWatched(
   videoId: string,
   watched: boolean,
 ): Promise<{ ok: boolean; watched: boolean }> {
-  return apiFetch<{ ok: boolean; watched: boolean }>(
-    `/videos/${encodeURIComponent(videoId)}/watched`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ watched }),
-    },
+  return callApi<{ ok: boolean; watched: boolean }>((api) =>
+    api.setVideoWatched({ videoId, watchedBody: { watched } }),
   );
 }

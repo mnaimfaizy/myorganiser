@@ -1,7 +1,8 @@
 'use client';
 
+import { isAxiosError } from 'axios';
+import { createYouTubeApi } from '../lib/youtubeApi';
 import { getAccessToken } from '@myorganiser/auth';
-import { getApiBaseUrl } from '@myorganiser/core';
 import { Button, Illustration } from '@myorganiser/web-ui';
 import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -42,27 +43,22 @@ export default function YouTubeCallbackClient() {
       }
 
       try {
-        // Raw fetch, not the generated client: the callback's contract is kept as it was.
-        const res = await fetch(`${getApiBaseUrl()}/youtube/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: 'include',
-          body: JSON.stringify({ code }),
+        const res = await createYouTubeApi().handleCallback({
+          handleCallbackRequest: { code },
         });
-
-        const data = await res.json();
-
-        if (!res.ok || !data.ok) {
-          setError(data.message ?? 'Failed to connect YouTube.');
+        if (!res.data.ok) {
+          setError(res.data.message ?? 'Failed to connect YouTube.');
           return;
         }
 
         router.replace('/dashboard/youtube');
-      } catch {
-        setError('Something went wrong while connecting YouTube.');
+      } catch (err) {
+        const body = isAxiosError(err)
+          ? (err.response?.data as { message?: string } | undefined)
+          : undefined;
+        setError(
+          body?.message ?? 'Something went wrong while connecting YouTube.',
+        );
       }
     })();
   }, [searchParams, router, isUnavailable]);
