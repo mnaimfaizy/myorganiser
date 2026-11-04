@@ -29,6 +29,8 @@ const buttonVariants = cva(
         // weight (400 for input and body-sm) would otherwise win.
         default:
           'h-12 md:h-11 px-control-x rounded-control text-field font-semibold md:text-body-sm md:font-semibold',
+        // 40px at every breakpoint; type step matches default.
+        md: 'h-10 px-control-x rounded-control text-field font-semibold md:text-body-sm md:font-semibold',
         lg: 'h-12 px-control-x rounded-control text-field font-semibold',
         // 36px visual height. after: extends the hit area to 44px without
         // changing the drawn size.

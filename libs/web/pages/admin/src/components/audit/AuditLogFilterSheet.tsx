@@ -51,11 +51,7 @@ export function AuditLogFilterSheet({
   return (
     <BottomSheet>
       <BottomSheetTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 md:h-10 shrink-0"
-        >
+        <Button size="md" type="button" variant="outline" className="shrink-0">
           {triggerLabel}
         </Button>
       </BottomSheetTrigger>
@@ -108,16 +104,17 @@ export function AuditLogFilterSheet({
 
         <div className="flex shrink-0 items-center gap-2">
           <Button
+            size="md"
             type="button"
             variant="ghost"
-            className="h-10 md:h-10 flex-1"
+            className="flex-1"
             disabled={activeCount === 0}
             onClick={onClear}
           >
             Clear filters
           </Button>
           <BottomSheetClose asChild>
-            <Button type="button" className="h-10 md:h-10 flex-1">
+            <Button type="button" size="md" className="flex-1">
               Done
             </Button>
           </BottomSheetClose>

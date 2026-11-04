@@ -26,9 +26,9 @@ const meta: Meta<typeof Button> = {
     },
     size: {
       control: 'select',
-      options: ['default', 'sm', 'lg', 'icon'],
+      options: ['default', 'sm', 'md', 'lg', 'icon'],
       description:
-        'Height and type step. `default` is 48px on a phone and 44px from md.',
+        'Height and type step. `default` is 48px on a phone and 44px from md; `md` is 40px at every width.',
     },
     loading: {
       control: 'boolean',
@@ -201,6 +201,10 @@ export const Destructive: Story = {
 
 export const Small: Story = { args: { size: 'sm', children: 'Small 36' } };
 
+export const Medium: Story = {
+  args: { size: 'md', children: 'Medium 40' },
+};
+
 export const Large: Story = {
   args: { size: 'lg', children: 'Phone full width 48' },
 };
@@ -232,6 +236,7 @@ export const Sizes: Story = {
     <div className="grid w-full max-w-xs gap-3">
       <div className="flex items-center gap-2.5">
         <Button size="sm">Small 36</Button>
+        <Button size="md">Medium 40</Button>
         <Button size="default">Default 44</Button>
       </div>
       <Button size="lg" className="w-full">

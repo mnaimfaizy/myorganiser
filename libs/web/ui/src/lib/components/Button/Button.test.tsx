@@ -130,6 +130,14 @@ describe('Button', () => {
   });
 
   describe('link variant merge', () => {
+    it('md size is h-10 at every breakpoint', () => {
+      render(<Button size="md">Filter</Button>);
+      const button = screen.getByRole('button', { name: 'Filter' });
+      expect(button).toHaveClass('h-10');
+      expect(button).not.toHaveClass('md:h-11');
+      expect(button).not.toHaveClass('h-12');
+    });
+
     it('link variant with default size resolves to h-8 and drops the size height', () => {
       render(
         <Button variant="link" size="default">
