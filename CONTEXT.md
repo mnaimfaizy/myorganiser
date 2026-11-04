@@ -16,6 +16,10 @@ _Avoid_: the local vault (as a device-wide singleton), browser vault, device vau
 The encrypted blob format produced by the Vault for all vault-backed data types.
 _Avoid_: Encrypted data, encrypted blob
 
+**Space**:
+The word a User reads for one area of their Vault — Tasks, Groceries, Subscriptions, and so on — as on the Home "Your spaces" grid. It names no stored object: a Space is a navigation and copy word, not a domain entity, and carries no plaintext or Ciphertext of its own.
+_Avoid_: Section, module, area (as the product name), category
+
 **Task**:
 A structured work item the user creates to track personal or professional goals. Can have a status, priority, context, due date, effort estimate, and can be archived.
 _Avoid_: Todo, to-do, item, reminder
@@ -89,8 +93,8 @@ A Grocery List’s reference to a Catalog Item for a trip, carrying trip-local s
 _Avoid_: Embedded item, list-owned item, row (as domain name)
 
 **Usage Location**:
-An organisation the User must notify when an Address or Mobile Number changes, together with whether it has been notified yet. It is not a place — it is one line on a change-of-address checklist, carrying the organisation, how it is reached, how urgent it is, and whether it has been notified.
-_Avoid_: Location, place, address usage, linked organisation, contact; updated or changed (for the notified state)
+An organisation the User must notify when an Address or Mobile Number changes, together with whether it has been notified yet. It is not a physical location — it is one line on a change-of-address checklist, carrying the organisation, how it is reached, how urgent it is, and whether it has been notified.
+_Avoid_: Location, place (outside copy and UI component names), address usage, linked organisation, contact; updated or changed (for the notified state)
 
 **Address**:
 A postal address the User keeps in their Vault, and the anchor for the Usage Locations that must be notified when it changes.
