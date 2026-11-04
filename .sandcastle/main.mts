@@ -2630,7 +2630,7 @@ function buildPrompt(
     ``,
     `Run synchronously — do not background the process or poll temp files.`,
     `Use a Bash timeout of at least 600 s; a full lib suite takes 5–8 min in Docker.`,
-    `To run a subset, append \`--testPathPattern='<dir or filename fragment>'\`.`,
+    `To run a subset, append \`--testPathPatterns='<dir or filename fragment>'\`.`,
   ].join('\n');
 }
 
