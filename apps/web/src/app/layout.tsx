@@ -131,16 +131,11 @@ export default function RootLayout({
         />
       </head>
       {/*
-       * A BottomSheet portals to this element (Radix's default Portal target),
-       * outside the dashboard/admin layouts' SidebarProvider subtree. This is
-       * the one DOM ancestor common to both, so this is where an open sheet's
-       * reach above the toast must be set. It matches the tallest sheet's own
-       * height, calc(100dvh_-_2.5rem), used by its near-full-height phone
-       * sheets, exactly. The toast viewport's own p-4 padding supplies the 1rem
-       * gap above that edge on its own, the same way it does for
-       * --toast-fab-reserve. See Toast.tsx and BottomSheet.tsx.
+       * No class on <body>: an open BottomSheet is detected by the toast
+       * viewport itself, which pins to the top of the screen while a
+       * [data-bottom-sheet] is in the document. See Toast.tsx and BottomSheet.tsx.
        */}
-      <body className="has-[[data-bottom-sheet]]:[--toast-sheet-reserve:calc(100dvh_-_2.5rem)]">
+      <body>
         {children}
         {/*
          * Registers the service worker in production builds only (ADR 0127).

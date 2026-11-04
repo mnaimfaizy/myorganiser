@@ -173,8 +173,9 @@ Two unrelated components sometimes need to coordinate layout without either know
 - The nearest shared DOM ancestor of both the obstruction and the component that must avoid it (not necessarily a React ancestor) sets a CSS custom property from a Tailwind `has-[]` arbitrary variant keyed on that attribute, e.g. `has-[[data-phone-fab]]:[--toast-fab-reserve:calc(...)]`.
 - The component being kept clear reads the variable with `var(--name,<fallback>)`.
 - When more than one obstruction can be active at once, give each its own variable name and combine them with CSS `max()` at the point of use, rather than letting multiple `has-[]` rules fight over one shared variable name — cascade order between separate rules on different elements is not guaranteed.
+- An obstruction whose height cannot be bounded (an open `BottomSheet` can be near full height) is not reserved with a variable. The component being kept clear reads the obstruction's attribute directly with an `in-[body:has([data-…])]:` variant and changes its own placement, as `ToastViewport` does: pinned to the top edge while a sheet is open on phone widths, scoped with `max-md:`.
 
-See `Toast.tsx`, `BottomSheet.tsx`, and `IconButton.tsx` in `libs/web/ui` for a worked example (`--toast-offset`, `--toast-fab-reserve`, `--toast-sheet-reserve`).
+See `Toast.tsx`, `BottomSheet.tsx`, and `IconButton.tsx` in `libs/web/ui` for a worked example (`--toast-offset`, `--toast-fab-reserve`, and the `data-bottom-sheet` top pin).
 
 ---
 

@@ -169,12 +169,14 @@ const meta: Meta<typeof ToastDefaultExample> = {
         component:
           'The default variant is the navy toast, and destructive is the white error toast with a red edge. ' +
           'The viewport sits bottom-right from md up, and bottom full-width on phone. ' +
-          'On phone its bottom inset is the largest of three CSS lengths, each set by whatever obstructs the bottom of the screen: ' +
-          '`--toast-offset` (the phone shell, sized to the bottom tab bar plus any safe-area inset), ' +
-          '`--toast-fab-reserve` (a floating action button on the page, sized to clear the tab bar beneath it), and ' +
-          '`--toast-sheet-reserve` (an open bottom sheet, sized to clear the tallest sheet the app renders). ' +
-          'The viewport takes `max()` of the three, so the order they are applied in does not matter. ' +
-          'Each defaults to 0, and these stories set none of them, so the toast sits at the screen edge.',
+          'On phone its bottom inset is the larger of two CSS lengths, each set by whatever obstructs the bottom of the screen: ' +
+          '`--toast-offset` (the phone shell, sized to the bottom tab bar plus any safe-area inset) and ' +
+          '`--toast-fab-reserve` (a floating action button on the page, sized to clear the tab bar beneath it). ' +
+          'The viewport takes `max()` of the two, so the order they are applied in does not matter. ' +
+          'Each defaults to 0, and these stories set neither, so the toast sits at the screen edge. ' +
+          'While any bottom sheet (`[data-bottom-sheet]`) is open, phone pins the viewport to the top instead: ' +
+          'the top edge sits at the safe-area inset and the newest toast is nearest the top. ' +
+          'A sheet can be near full height, so no bottom inset clears every sheet. Desktop is unchanged.',
       },
     },
   },

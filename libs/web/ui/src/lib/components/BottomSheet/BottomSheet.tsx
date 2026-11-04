@@ -19,12 +19,12 @@ import { cn } from '../../utils';
  * 0 on devices without a bottom inset, so the sheet is 26px there. The inset
  * only takes effect when the page sets `viewport-fit=cover`.
  *
- * `data-bottom-sheet` on the content lets apps/web/src/app/layout.tsx raise
- * the shared toast's bottom offset (via --toast-sheet-reserve) for as long as
- * this sheet is mounted — Radix only mounts it while open or still playing
- * its close animation, so the toast stays clear through the slide-out too.
- * A CSS variable rather than a prop, because a sheet's rendered height varies
- * and the toast must clear it regardless of which sheet is open.
+ * `data-bottom-sheet` on the content is how the shared toast knows a sheet is
+ * open. On phone widths, ToastViewport pins itself to the top of the screen
+ * while any [data-bottom-sheet] is in the document (see Toast.tsx). Radix only
+ * mounts the content while open or still playing its close animation, so the
+ * toast stays clear through the slide-out too. The top pin rather than a bottom
+ * offset, because a sheet's rendered height varies and can be near full height.
  */
 
 const BottomSheet = DialogPrimitive.Root;
