@@ -42,6 +42,7 @@ export function UserDirectoryPageClient() {
     setSort,
     goToPage,
     loadMore,
+    retryLoadMore,
   } = useUserDirectory({
     mode: isPhone ? 'append' : 'pages',
   });
@@ -111,6 +112,7 @@ export function UserDirectoryPageClient() {
             loadMoreError={loadMoreError}
             hasMore={hasMore}
             onLoadMore={loadMore}
+            onRetryLoadMore={retryLoadMore}
           />
         </>
       ) : null}
