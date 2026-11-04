@@ -1,6 +1,10 @@
 'use client';
 
-import { ConfirmDialog, useIsMobileState } from '@myorganiser/web-ui';
+import {
+  ConfirmDialog,
+  useDetailBreadcrumbLabel,
+  useIsMobileState,
+} from '@myorganiser/web-ui';
 import type { VaultHandle } from '@myorganiser/web-vault';
 import { VaultGate } from '@myorganiser/web-vault-ui';
 import { useRouter } from 'next/navigation';
@@ -145,6 +149,8 @@ function SubscriptionDetailInner({
   subscriptionId,
 }: SubscriptionDetailInnerProps) {
   const page = useSubscriptionsPage(handle);
+  const subscription = page.items.find((s) => s.id === subscriptionId);
+  useDetailBreadcrumbLabel(page.loading, subscription, (s) => s.name);
   // Render nothing until the breakpoint is decided, so a phone never paints
   // the desktop board on the first frame.
   const isPhone = useIsMobileState();

@@ -27,7 +27,7 @@ import type {
   VaultSyncQueue,
   VaultSyncQueueStatus,
 } from '@myorganiser/web-vault';
-import { SidebarProvider } from '@myorganiser/web-ui';
+import { BreadcrumbLabelProvider, SidebarProvider } from '@myorganiser/web-ui';
 import {
   VaultSessionContext,
   type VaultSessionContextValue,
@@ -252,7 +252,7 @@ export function ShellStoryFixtures({
             defaultOpen={shell.sidebarOpen ?? true}
             style={SHELL_SIDEBAR_STYLE}
           >
-            {children}
+            <BreadcrumbLabelProvider>{children}</BreadcrumbLabelProvider>
           </SidebarProvider>
         </VaultSessionContext.Provider>
       </AppRouterContext.Provider>

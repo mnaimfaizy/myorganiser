@@ -9,6 +9,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
+  useBreadcrumbLabel,
 } from '@myorganiser/web-ui';
 
 interface BreadcrumbNavItem {
@@ -98,7 +99,18 @@ export function getBreadcrumbItems(pathname: string): BreadcrumbNavItem[] {
 
 export function DynamicBreadcrumb(): React.ReactNode {
   const pathname = usePathname();
-  const breadcrumbItems = getBreadcrumbItems(pathname);
+  const pageLabel = useBreadcrumbLabel();
+  const pathItems = getBreadcrumbItems(pathname);
+
+  // A page can name its own last segment (e.g. a record's title). Copy the
+  // array rather than mutating the one getBreadcrumbItems returned.
+  const breadcrumbItems =
+    pageLabel !== null && pathItems.length > 0
+      ? [
+          ...pathItems.slice(0, -1),
+          { ...pathItems[pathItems.length - 1], label: pageLabel },
+        ]
+      : pathItems;
 
   // Should not happen, but ensures at least Dashboard is shown
   if (breadcrumbItems.length === 0) {

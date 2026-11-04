@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, userEvent, waitFor, within } from '@storybook/test';
 
+import { useSetBreadcrumbLabel } from '@myorganiser/web-ui';
 import { DashboardHeader } from './DashboardHeader';
 import { DESKTOP_PARAMETERS, shell, withShell } from './shell-story-fixtures';
 
@@ -145,6 +146,47 @@ export const DetailBreadcrumb: Story = {
       within(crumbs).getByRole('link', { name: 'Groceries' }),
     ).toHaveAttribute('href', '/dashboard/groceries');
     expect(canvas.getByText('Details', { selector: 'p' })).toBeVisible();
+  },
+};
+
+/** Supplies the record name the way a task detail page does (#1296). */
+function SuppliedTaskLabel() {
+  useSetBreadcrumbLabel('Renew passport');
+  return null;
+}
+
+/** The header beside a page that supplies its record name. */
+function HeaderWithSuppliedLabel() {
+  return (
+    <div className="w-full">
+      <SuppliedTaskLabel />
+      <DashboardHeader />
+    </div>
+  );
+}
+
+/**
+ * A task detail page supplies its record name. The breadcrumb's last segment
+ * and the header title both show it, in place of the "Details" fallback.
+ */
+export const SuppliedRecordLabel: Story = {
+  parameters: shell({ pathname: '/dashboard/tasks/task-1' }),
+  render: function Render() {
+    return <HeaderWithSuppliedLabel />;
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() => {
+      expect(
+        canvas.getByText('Renew passport', { selector: 'p' }),
+      ).toBeVisible();
+    });
+    const crumbs = canvas.getByRole('navigation', { name: /breadcrumb/i });
+    expect(within(crumbs).getByText('Renew passport')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(crumbs).queryByText('Details')).toBeNull();
   },
 };
 

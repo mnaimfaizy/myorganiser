@@ -29,7 +29,12 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
 import { VaultBlobType } from '@myorganiser/app-api-client';
-import { TooltipProvider, useSidebar } from '@myorganiser/web-ui';
+import {
+  BreadcrumbLabelProvider,
+  TooltipProvider,
+  useSetBreadcrumbLabel,
+  useSidebar,
+} from '@myorganiser/web-ui';
 import {
   describeVaultSyncStatus,
   useVaultLockState,
@@ -133,6 +138,29 @@ describe('DashboardHeader', () => {
       renderHeader();
 
       expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('page-supplied label', () => {
+    function SetLabel({ label }: { label: string }) {
+      useSetBreadcrumbLabel(label);
+      return null;
+    }
+
+    it('shows the page-supplied label as the title', () => {
+      (usePathname as jest.Mock).mockReturnValue('/dashboard/tasks/task-1');
+      render(
+        <TooltipProvider>
+          <BreadcrumbLabelProvider>
+            <SetLabel label="Renew passport" />
+            <DashboardHeader />
+          </BreadcrumbLabelProvider>
+        </TooltipProvider>,
+      );
+
+      expect(
+        screen.getByText('Renew passport', { selector: 'p' }),
+      ).toBeInTheDocument();
     });
   });
 
