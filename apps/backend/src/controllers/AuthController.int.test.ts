@@ -214,6 +214,7 @@ jest.mock('../services/UserService', () => ({
     update: jest.fn(),
     deleteById: jest.fn(),
     refreshToken: jest.fn(),
+    recordActivity: jest.fn(),
     logout: jest.fn(),
   },
 }));
@@ -697,6 +698,102 @@ describe('Auth HTTP routes (HTTP integration)', () => {
       expect(
         setCookie.some((cookie) => cookie.startsWith('refresh_cookie=')),
       ).toBe(false);
+    });
+  });
+
+  describe('POST /auth/refresh activity recording', () => {
+    test('records activity once with the refreshed user on a successful refresh', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.refreshToken.mockResolvedValueOnce(verifiedUser);
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(200);
+      expect(userService.recordActivity).toHaveBeenCalledTimes(1);
+      expect(userService.recordActivity).toHaveBeenCalledWith(verifiedUser);
+    });
+
+    test('does not record activity when the account is disabled', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.refreshToken.mockResolvedValueOnce(disabledUser);
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Account disabled' });
+      expect(userService.recordActivity).not.toHaveBeenCalled();
+    });
+
+    test('does not record activity when the email is not verified', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.refreshToken.mockResolvedValueOnce(unverifiedUser);
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(403);
+      expect(userService.recordActivity).not.toHaveBeenCalled();
+    });
+
+    test('does not record activity when sessions were invalidated after the token was issued', async () => {
+      const userService = require('../services/UserService').default;
+      const { decodeToken } = require('../helpers/jwtHelper');
+
+      const sessionsInvalidatedAt = new Date('2025-06-01T12:00:00.000Z');
+      userService.refreshToken.mockResolvedValueOnce({
+        ...verifiedUser,
+        sessions_invalidated_at: sessionsInvalidatedAt,
+      });
+      decodeToken.mockReturnValue({
+        userId: 'user-1',
+        iat: Math.floor(sessionsInvalidatedAt.getTime() / 1000 - 60),
+      });
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Session invalidated' });
+      expect(userService.recordActivity).not.toHaveBeenCalled();
+    });
+
+    test('does not record activity when the refresh token is blacklisted', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.refreshToken.mockResolvedValueOnce({
+        ...verifiedUser,
+        blacklisted_tokens: ['refresh-token-1'],
+      });
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ message: 'Unauthorized' });
+      expect(userService.recordActivity).not.toHaveBeenCalled();
+    });
+
+    test('does not record activity when the service resolves no user for the token', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.refreshToken.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .post('/auth/refresh')
+        .set('Cookie', ['refresh_cookie=refresh-token-1']);
+
+      expect(res.status).toBe(401);
+      expect(userService.recordActivity).not.toHaveBeenCalled();
     });
   });
 

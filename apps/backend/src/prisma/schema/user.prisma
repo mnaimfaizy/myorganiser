@@ -43,6 +43,8 @@ model User {
   youtube_acknowledged_at         DateTime?
   /// When the User last opened "Your reports" page. Compared against FeedbackReport.status_changed_at to show a "something changed" badge; null means the page has never been opened.
   feedback_reports_seen_at        DateTime?
+  /// When the User was last active: the most recent successful token refresh, recorded at most once per UTC calendar day. Null means no successful refresh since this column was added. Not an audit trail (Admin Audit Log is separate) and no history is kept.
+  last_active_at                  DateTime?
   /// Per-User toggle for Fix Notices (CONTEXT.md: Fix Notice), separate from
   /// a report's own fix_notice_opt_in captured at send time. Turned off only
   /// by the unauthenticated unsubscribe link every Fix Notice carries.

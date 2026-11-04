@@ -76,6 +76,7 @@ const userWithPhone: AdminUserIdentity = {
   emailVerified: false,
   youtubeAccess: false,
   createdAt: '2026-01-01T00:00:00.000Z',
+  lastActiveAt: null,
 };
 
 const userWithoutPhone: AdminUserIdentity = {
@@ -89,6 +90,7 @@ const userWithoutPhone: AdminUserIdentity = {
   emailVerified: true,
   youtubeAccess: false,
   createdAt: '2026-01-01T00:00:00.000Z',
+  lastActiveAt: null,
 };
 
 const emptyAuditPage: AdminAuditLogListResponse = {
@@ -189,7 +191,7 @@ describe('UserDetailPageClient', () => {
     });
 
     expect(screen.getByText(/grace@example\.com/)).toHaveTextContent(
-      'grace@example.com · +1-555-0100 · Joined',
+      /^grace@example\.com · \+1-555-0100 · Joined .+ · Never active$/,
     );
     expect(screen.getByRole('link', { name: 'All users' })).toHaveAttribute(
       'href',
@@ -211,7 +213,7 @@ describe('UserDetailPageClient', () => {
     });
 
     expect(screen.getByText(/ada@example\.com/)).toHaveTextContent(
-      /^ada@example\.com · Joined /,
+      /^ada@example\.com · Joined .+ · Never active$/,
     );
   });
 

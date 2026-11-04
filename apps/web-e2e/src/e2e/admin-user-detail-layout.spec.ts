@@ -68,6 +68,7 @@ const ANA: AdminUserIdentity = {
   emailVerified: true,
   youtubeAccess: true,
   createdAt: '2026-10-16T12:00:00.000Z',
+  lastActiveAt: null,
 };
 
 /** The persona's own identity, for the self-guard page. */
@@ -82,6 +83,7 @@ const SELF: AdminUserIdentity = {
   emailVerified: true,
   youtubeAccess: false,
   createdAt: '2026-10-01T12:00:00.000Z',
+  lastActiveAt: null,
 };
 
 const USERS: AdminUserIdentity[] = [ANA, SELF];
@@ -218,6 +220,9 @@ test.describe('Admin User detail layout (E2E)', () => {
       await openUserDetail(page, 'u-ana');
 
       await expectSingleH1(page, 'Ana Costa');
+      await expect(
+        page.locator('main').getByText(/Never active$/),
+      ).toBeVisible();
     });
 
     test('the back link reads All users and points to the user list', async ({

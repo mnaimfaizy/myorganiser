@@ -126,6 +126,10 @@ _Avoid_: Email token, magic link, one-time password
 The state where a client's Access Token is gone but it still holds enough to obtain a new one without credentials. A User in this state has not been signed out, and should not be shown a sign-in prompt.
 _Avoid_: Expired session, stale session, half-logged-in, partial session
 
+**Last Active**:
+The UTC day of a User's most recent successful Refresh Token use, shown only to Platform Admins. Recorded at most once per UTC day, and never by a refused refresh. It is not set by sign-in or Vault sync, keeps no history, and is not part of the Admin Audit Log. Server-stored account metadata, not vault data. Null until the User's first successful refresh.
+_Avoid_: Last seen, last login, last online, activity log
+
 **Guest**:
 A visitor with no Session and no means of restoring one. The only state that warrants a sign-in prompt.
 _Avoid_: Anonymous user, logged-out user, visitor, unauthenticated user

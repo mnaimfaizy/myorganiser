@@ -14,6 +14,8 @@ export interface User {
   blacklisted_tokens?: string[];
   role?: UserRole;
   disabled?: boolean;
+  /** When the User last successfully refreshed a Session (UTC day granularity). */
+  last_active_at?: Date | null;
 }
 
 export interface UserCreationBody {

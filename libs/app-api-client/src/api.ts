@@ -297,6 +297,10 @@ export interface AdminUserIdentity {
      * When the User joined (`User.created_at`).
      */
     'createdAt': string;
+    /**
+     * When the User last successfully refreshed a Session, recorded at most once per UTC day; null if never.
+     */
+    'lastActiveAt': string | null;
 }
 
 
@@ -1276,6 +1280,10 @@ export interface WithdrawYouTubeAccessResponse {
      * When the User joined (`User.created_at`).
      */
     'createdAt': string;
+    /**
+     * When the User last successfully refreshed a Session, recorded at most once per UTC day; null if never.
+     */
+    'lastActiveAt': string | null;
     'youtubeDisconnect': YouTubeDisconnectOutcome;
 }
 
