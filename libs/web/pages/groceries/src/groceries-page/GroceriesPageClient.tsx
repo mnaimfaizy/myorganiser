@@ -138,6 +138,7 @@ function GroceriesInner({ handle }: GroceriesInnerProps) {
       <Button
         variant="brand"
         onClick={handleNewRequest}
+        data-phone-fab
         className="fixed right-4 bottom-[calc(var(--toast-offset,0px)+1rem)] z-10 h-14 rounded-fab px-5 shadow-brand"
       >
         <Plus aria-hidden="true" />

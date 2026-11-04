@@ -130,6 +130,11 @@ export default function RootLayout({
           }}
         />
       </head>
+      {/*
+       * No class on <body>: an open BottomSheet is detected by the toast
+       * viewport itself, which pins to the top of the screen while a
+       * [data-bottom-sheet] is in the document. See Toast.tsx and BottomSheet.tsx.
+       */}
       <body>
         {children}
         {/*

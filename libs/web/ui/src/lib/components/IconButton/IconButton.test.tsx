@@ -69,4 +69,24 @@ describe('IconButton', () => {
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
     expect(ref.current).toBe(screen.getByRole('button', { name: 'Add' }));
   });
+
+  it('marks a fab-size button with data-phone-fab', () => {
+    render(<IconButton label="New list" size="fab" icon={<span />} />);
+
+    expect(screen.getByRole('button', { name: 'New list' })).toHaveAttribute(
+      'data-phone-fab',
+    );
+  });
+
+  it('does not mark a default-size button with data-phone-fab, whether size is omitted or explicit', () => {
+    render(<IconButton label="Open menu" icon={<span />} />);
+    render(<IconButton label="Close menu" size="default" icon={<span />} />);
+
+    expect(
+      screen.getByRole('button', { name: 'Open menu' }),
+    ).not.toHaveAttribute('data-phone-fab');
+    expect(
+      screen.getByRole('button', { name: 'Close menu' }),
+    ).not.toHaveAttribute('data-phone-fab');
+  });
 });

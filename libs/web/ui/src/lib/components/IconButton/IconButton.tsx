@@ -64,6 +64,11 @@ export interface IconButtonProps
  *
  * With `loading`, the spinner replaces the icon so the 44px target does not
  * overflow.
+ *
+ * `size="fab"` also marks the rendered button `data-phone-fab`, which
+ * apps/web/src/app/dashboard/layout.tsx reads to raise the shared toast's
+ * offset while a FAB is mounted (see Toast.tsx) — the FAB doesn't know about
+ * the toast and the toast doesn't know about the FAB.
  */
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
@@ -85,6 +90,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       type={type}
       size="icon"
       loading={loading}
+      data-phone-fab={size === 'fab' ? true : undefined}
       className={cn(iconButtonVariants({ variant, size }), className)}
       {...props}
       aria-label={label}

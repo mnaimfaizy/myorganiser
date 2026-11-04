@@ -18,6 +18,13 @@ import { cn } from '../../utils';
  * written as one arbitrary value. 6.5 spacing steps is 26px. env() resolves to
  * 0 on devices without a bottom inset, so the sheet is 26px there. The inset
  * only takes effect when the page sets `viewport-fit=cover`.
+ *
+ * `data-bottom-sheet` on the content is how the shared toast knows a sheet is
+ * open. On phone widths, ToastViewport pins itself to the top of the screen
+ * while any [data-bottom-sheet] is in the document (see Toast.tsx). Radix only
+ * mounts the content while open or still playing its close animation, so the
+ * toast stays clear through the slide-out too. The top pin rather than a bottom
+ * offset, because a sheet's rendered height varies and can be near full height.
  */
 
 const BottomSheet = DialogPrimitive.Root;
@@ -73,6 +80,7 @@ const BottomSheetContent = React.forwardRef<
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in-0" />
     <DialogPrimitive.Content
       ref={ref}
+      data-bottom-sheet
       className={cn(
         'fixed inset-x-0 bottom-0 z-50 flex flex-col gap-4 rounded-t-panel bg-card px-4 pt-1.5 pb-[calc(var(--spacing)*6.5+env(safe-area-inset-bottom))] shadow-dialog motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:slide-out-to-bottom motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:slide-in-from-bottom',
         className,
