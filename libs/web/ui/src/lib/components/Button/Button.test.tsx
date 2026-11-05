@@ -129,15 +129,39 @@ describe('Button', () => {
     });
   });
 
-  describe('link variant merge', () => {
-    it('md size is h-10 at every breakpoint', () => {
+  describe('size', () => {
+    it('md size is h-10 at every breakpoint with no responsive height override', () => {
       render(<Button size="md">Filter</Button>);
       const button = screen.getByRole('button', { name: 'Filter' });
+
       expect(button).toHaveClass('h-10');
-      expect(button).not.toHaveClass('md:h-11');
       expect(button).not.toHaveClass('h-12');
+      expect(button.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):h-/);
     });
 
+    it('md size uses the same type step as default from md up', () => {
+      render(
+        <>
+          <Button size="md">Filter</Button>
+          <Button size="default">Save</Button>
+        </>,
+      );
+      const md = screen.getByRole('button', { name: 'Filter' });
+      const dflt = screen.getByRole('button', { name: 'Save' });
+
+      for (const className of [
+        'text-field',
+        'font-semibold',
+        'md:text-body-sm',
+        'md:font-semibold',
+      ]) {
+        expect(md).toHaveClass(className);
+        expect(dflt).toHaveClass(className);
+      }
+    });
+  });
+
+  describe('link variant merge', () => {
     it('link variant with default size resolves to h-8 and drops the size height', () => {
       render(
         <Button variant="link" size="default">
@@ -152,6 +176,19 @@ describe('Button', () => {
       expect(button).not.toHaveClass('h-12');
       expect(button).not.toHaveClass('h-11');
       expect(button).not.toHaveClass('md:h-11');
+    });
+
+    it('link variant with md size resolves to h-8 and drops the md h-10', () => {
+      render(
+        <Button variant="link" size="md">
+          Details
+        </Button>,
+      );
+      const button = screen.getByRole('button', { name: 'Details' });
+
+      // The compound h-8 is appended after the md size's h-10; cn() keeps the last height.
+      expect(button).toHaveClass('h-8');
+      expect(button).not.toHaveClass('h-10');
     });
   });
 });
