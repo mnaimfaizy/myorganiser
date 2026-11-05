@@ -378,6 +378,12 @@ describe('telHref and smsHref', () => {
       'sms:+390612345678',
     ],
     [
+      'a Peru landline trunk zero dropped for +51',
+      makeMobileNumber({ countryCode: '+51', phoneNumber: '01 234 5678' }),
+      'tel:+5112345678',
+      'sms:+5112345678',
+    ],
+    [
       'a country absent from the table unchanged',
       makeMobileNumber({ countryCode: '+999', phoneNumber: '0123 456' }),
       'tel:+9990123456',

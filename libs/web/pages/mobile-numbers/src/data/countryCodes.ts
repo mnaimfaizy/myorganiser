@@ -139,9 +139,10 @@ export function countryNameForCode(code: string): string | undefined {
  * Source: ITU-T E.164 / ITU "National trunk prefixes" notifications, as
  * tabulated in Wikipedia's "List of country calling codes" (trunk prefix
  * column). Deliberately omitted, so the number is left as stored: Italy (+39),
- * Spain, Poland, Singapore, Mexico, Colombia, Chile, Peru (no trunk 0 to
- * drop), and +1 / +7 (trunk prefix is not 0). A code absent from this list is
- * never stripped.
+ * Spain, Poland, Singapore, Mexico, Colombia, Chile (no trunk 0 to drop), and
+ * +1 / +7 (trunk prefix is not 0). Peru (+51) is listed: its landlines carry a
+ * trunk 0 (01 for Lima); its mobiles have none, so they are unaffected. A code
+ * absent from this list is never stripped.
  */
 const TRUNK_ZERO_CALLING_CODES: ReadonlySet<string> = new Set([
   '+44',
@@ -177,6 +178,7 @@ const TRUNK_ZERO_CALLING_CODES: ReadonlySet<string> = new Set([
   '+972',
   '+55',
   '+54',
+  '+51',
 ]);
 
 /** Strips one leading trunk zero from `digits` when `countryCode` uses one. */
