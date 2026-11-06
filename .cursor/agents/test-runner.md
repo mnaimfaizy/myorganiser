@@ -55,7 +55,7 @@ If still not ready after 3 minutes: return ESCALATE with reason `node_modules un
 Run the targeted test file:
 
 ```bash
-yarn nx test <project> --testFile="<path>" --forceExit 2>&1
+yarn nx test <project> --testPathPatterns="<path>" --forceExit 2>&1
 ```
 
 ### Step 3 — Hang Detection (1-Minute Rule)

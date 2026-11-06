@@ -38,7 +38,7 @@ Provide all of the following fields to `TestScaffold`:
 9. **Out of scope**: scenarios not to test, especially unsupported retry/concurrency/timing flows.
 10. **Mocking boundaries**: what must be mocked and what must stay real, with the reason. The agent reads `docs/testing/projects/<project>.md` for the pattern itself.
 11. **Acceptance checks**: concrete assertions that must exist.
-12. **Focused run command**: the narrowest `--testFile` / `--testNamePattern` invocation. Do **not** ask for a full-project run or lint — `TestReviewer` owns `tsc`/`eslint` and `TestRunner` owns the authoritative run.
+12. **Focused run command**: the narrowest `--testPathPatterns` / `--testNamePattern` invocation. Do **not** ask for a full-project run or lint — `TestReviewer` owns `tsc`/`eslint` and `TestRunner` owns the authoritative run.
 13. **Batch scope**: if splitting, identify this batch and the total plan.
 
 ## Prompt Pattern
