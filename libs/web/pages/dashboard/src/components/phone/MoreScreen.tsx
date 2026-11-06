@@ -9,10 +9,10 @@ import {
   Illustration,
   type IllustrationKind,
   initialsOf,
+  openFeedbackDialog,
 } from '@myorganiser/web-ui';
 
 import { createFeedbackApi } from '../../lib/apiClient';
-import { openFeedbackDialog } from '../../hooks/use-feedback-dialog';
 import { useLogOut } from '../../hooks/use-log-out';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
 

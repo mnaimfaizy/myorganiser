@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   AppLogo,
   Illustration,
+  openFeedbackDialog,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -18,7 +19,6 @@ import {
 } from '@myorganiser/web-ui';
 import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
-import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { NavMain, type NavGroup } from './nav-main';
 import { SidebarVaultCard } from './SidebarVaultCard';
 
