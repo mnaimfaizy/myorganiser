@@ -18,6 +18,7 @@ import {
   smsHref,
   telHref,
 } from './mobile-summary';
+import { formatMobileNumber } from './formatMobileNumber';
 
 const TODAY = new Date(2026, 9, 22, 12);
 
@@ -326,6 +327,17 @@ describe('countryNameForCode', () => {
 });
 
 describe('telHref and smsHref', () => {
+  it('leaves the stored and displayed number untouched', () => {
+    const item = makeMobileNumber({
+      countryCode: '+61',
+      phoneNumber: '0412 345 678',
+    });
+    const before = formatMobileNumber(item);
+    telHref(item);
+    expect(item.phoneNumber).toBe('0412 345 678');
+    expect(formatMobileNumber(item)).toBe(before);
+  });
+
   it.each([
     [
       'a structured number, keeping the country code and digits only',
@@ -352,6 +364,36 @@ describe('telHref and smsHref', () => {
       }),
       null,
       null,
+    ],
+    [
+      'a trunk zero dropped for +61',
+      makeMobileNumber({ countryCode: '+61', phoneNumber: '0412 345 678' }),
+      'tel:+61412345678',
+      'sms:+61412345678',
+    ],
+    [
+      'Italy keeping its leading 0',
+      makeMobileNumber({ countryCode: '+39', phoneNumber: '06 1234 5678' }),
+      'tel:+390612345678',
+      'sms:+390612345678',
+    ],
+    [
+      'a Peru landline trunk zero dropped for +51',
+      makeMobileNumber({ countryCode: '+51', phoneNumber: '01 234 5678' }),
+      'tel:+5112345678',
+      'sms:+5112345678',
+    ],
+    [
+      'a country absent from the table unchanged',
+      makeMobileNumber({ countryCode: '+999', phoneNumber: '0123 456' }),
+      'tel:+9990123456',
+      'sms:+9990123456',
+    ],
+    [
+      'only one leading trunk zero dropped',
+      makeMobileNumber({ countryCode: '+44', phoneNumber: '007700 900123' }),
+      'tel:+4407700900123',
+      'sms:+4407700900123',
     ],
   ])('dials %s', (_label, item, tel, sms) => {
     expect(telHref(item)).toBe(tel);

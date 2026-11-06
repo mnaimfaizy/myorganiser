@@ -5,7 +5,10 @@ import {
   placeProgress,
 } from '@myorganiser/web-usage-locations';
 
-import { countryNameForCode } from '../data/countryCodes';
+import {
+  countryNameForCode,
+  stripNationalTrunkPrefix,
+} from '../data/countryCodes';
 import { formatMobileNumber } from './formatMobileNumber';
 
 function plural(count: number, one: string, many: string): string {
@@ -123,7 +126,8 @@ export function formatMobileUpdatedLine(
 /** The digits to dial: country code and number for a structured record, the legacy field kept to + and digits. */
 function dialNumber(item: MobileNumberRecord): string {
   if (item.countryCode && item.phoneNumber) {
-    return `${item.countryCode}${item.phoneNumber.replace(/\D/g, '')}`;
+    const digits = item.phoneNumber.replace(/\D/g, '');
+    return `${item.countryCode}${stripNationalTrunkPrefix(item.countryCode, digits)}`;
   }
   return (item.mobileNumber ?? '').replace(/[^+\d]/g, '');
 }
