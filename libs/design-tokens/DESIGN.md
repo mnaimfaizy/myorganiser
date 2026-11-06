@@ -50,12 +50,16 @@ option or a Brand pill.
 unlocked — the sync dot, the Vault-locked banner icon. Its soft, faint, edge and
 text forms build the Synced chip and the Trust pill and banner.
 
-**Every status tone is a family, not a value.** Success, warning, destructive
-and trust each carry a `-soft` ground for a pill or chip, a `-faint` ground and
+**Every status tone is a family, not a value.** Success, warning, destructive,
+trust and info each carry a `-soft` ground for a pill or chip, a `-faint` ground and
 an `-edge` for a banner, and a `-text` ink that reads on both. The filled tone
 is a dot, an icon or a fill; the words always sit in `-text` on `-soft` or
 `-faint`, so a pill or banner never relies on its colour alone. A neutral pill
-is `subtle` with `subtle-foreground`.
+is `subtle` with `subtle-foreground`. `info` is sky blue for a state that is neither
+good, cautionary nor failed — a report that is under review. A pill that is
+unresolved but not a plain caution — "Can't reproduce" — is the outline tone: a
+card ground with a `warning` border and `warning-text` ink, rather than a
+`-soft` fill.
 
 **Text has two steps between foreground and muted.** `foreground-secondary` is
 row text, icons and banner body copy; `foreground-supporting` is a description

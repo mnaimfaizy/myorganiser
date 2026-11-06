@@ -173,12 +173,12 @@ describe('platform labels', () => {
 describe('getStatusPillTone', () => {
   it.each<[FeedbackReportStatus, StatusPillTone]>([
     ['received', 'neutral'],
-    ['under_review', 'neutral'],
+    ['under_review', 'info'],
     ['planned', 'brand'],
     ['fixed', 'trust'],
     ['shipped', 'trust'],
     ['wont_do', 'danger'],
-    ['cannot_reproduce', 'warning'],
+    ['cannot_reproduce', 'outline'],
   ])('tones %p as %p', (status, tone) => {
     expect(getStatusPillTone(status)).toBe(tone);
   });

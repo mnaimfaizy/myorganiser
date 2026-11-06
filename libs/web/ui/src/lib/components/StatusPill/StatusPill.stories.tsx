@@ -13,7 +13,9 @@ const TONE_WORDS = {
   trust: ['Current', 'Active', 'Encrypted'],
   success: ['Done', 'Changed'],
   warning: ['Due today', 'Renews in 3 d'],
+  info: ['Under review'],
   danger: ['Overdue', 'Blocked', 'Disabled'],
+  outline: ["Can't reproduce"],
 } as const satisfies Record<StatusPillTone, readonly string[]>;
 
 const TONES = Object.keys(TONE_WORDS) as StatusPillTone[];
@@ -82,6 +84,14 @@ export const Success: Story = {
 
 export const Warning: Story = {
   render: () => <PillGroup tone="warning" words={TONE_WORDS.warning} />,
+};
+
+export const Info: Story = {
+  render: () => <PillGroup tone="info" words={TONE_WORDS.info} />,
+};
+
+export const Outline: Story = {
+  render: () => <PillGroup tone="outline" words={TONE_WORDS.outline} />,
 };
 
 export const Danger: Story = {

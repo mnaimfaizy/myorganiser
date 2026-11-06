@@ -19,12 +19,12 @@ export const DELIVERED_STATUS_BY_KIND = {
 // libs/web/pages/admin/src/lib/formatFeedbackReport.ts; page libs cannot import each other.
 export const REPORT_STATUS_CONFIG = {
   received: { label: 'Received', tone: 'neutral' },
-  under_review: { label: 'Under review', tone: 'neutral' },
+  under_review: { label: 'Under review', tone: 'info' },
   planned: { label: 'Planned', tone: 'brand' },
   fixed: { label: 'Fixed', tone: 'trust' },
   shipped: { label: 'Shipped', tone: 'trust' },
   wont_do: { label: "Won't do", tone: 'danger' },
-  cannot_reproduce: { label: "Can't reproduce", tone: 'warning' },
+  cannot_reproduce: { label: "Can't reproduce", tone: 'outline' },
 } as const satisfies Record<
   FeedbackReportStatus,
   {

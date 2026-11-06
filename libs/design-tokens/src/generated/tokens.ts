@@ -75,6 +75,18 @@ export const amber700 = "#b45309";
 export const amber700Var = 'var(--amber-700)';
 export const amber800 = "#92400e";
 export const amber800Var = 'var(--amber-800)';
+export const sky50 = "#f0f9ff";
+export const sky50Var = 'var(--sky-50)';
+export const sky100 = "#e0f2fe";
+export const sky100Var = 'var(--sky-100)';
+export const sky300 = "#7dd3fc";
+export const sky300Var = 'var(--sky-300)';
+export const sky400 = "#38bdf8";
+export const sky400Var = 'var(--sky-400)';
+export const sky700 = "#0369a1";
+export const sky700Var = 'var(--sky-700)';
+export const sky800 = "#075985";
+export const sky800Var = 'var(--sky-800)';
 export const green50 = "#f0fdf4";
 export const green50Var = 'var(--green-50)';
 export const green100 = "#dcfce7";
@@ -151,6 +163,12 @@ export const colorScrimOnDarkVar = 'var(--color-scrim-on-dark)';
 /** Dark-surface pairing for warning. 11.8:1 on the dark background. */
 export const colorWarningOnDark = "#fbbd23";
 export const colorWarningOnDarkVar = 'var(--color-warning-on-dark)';
+/** Informational sky blue. A state the User should know about that is neither good, cautionary nor failed — a report under review. Never for an action prompt (that is primary or brand). 5.9:1 on white, so it passes AA as body text. The dark-surface pairing is info-on-dark. */
+export const colorInfo = "#0369a1";
+export const colorInfoVar = 'var(--color-info)';
+/** Dark-surface pairing for info. Lighter than the light-mode blue rather than the same hue darkened. */
+export const colorInfoOnDark = "#38bdf8";
+export const colorInfoOnDarkVar = 'var(--color-info-on-dark)';
 /** Confirmation green. Something the User did completed, or a connection is healthy. Never for an action prompt — that is primary or brand. 4.5:1 on white, so it passes AA as body text. */
 export const colorSuccess = "#15803d";
 export const colorSuccessVar = 'var(--color-success)';
@@ -379,6 +397,12 @@ export const tokens = {
   'amber-300': { value: "#fcd34d", cssVar: 'var(--amber-300)' },
   'amber-700': { value: "#b45309", cssVar: 'var(--amber-700)' },
   'amber-800': { value: "#92400e", cssVar: 'var(--amber-800)' },
+  'sky-50': { value: "#f0f9ff", cssVar: 'var(--sky-50)' },
+  'sky-100': { value: "#e0f2fe", cssVar: 'var(--sky-100)' },
+  'sky-300': { value: "#7dd3fc", cssVar: 'var(--sky-300)' },
+  'sky-400': { value: "#38bdf8", cssVar: 'var(--sky-400)' },
+  'sky-700': { value: "#0369a1", cssVar: 'var(--sky-700)' },
+  'sky-800': { value: "#075985", cssVar: 'var(--sky-800)' },
   'green-50': { value: "#f0fdf4", cssVar: 'var(--green-50)' },
   'green-100': { value: "#dcfce7", cssVar: 'var(--green-100)' },
   'green-300': { value: "#86efac", cssVar: 'var(--green-300)' },
@@ -408,6 +432,8 @@ export const tokens = {
   'color-scrim': { value: "rgba(15, 23, 42, 0.4)", cssVar: 'var(--color-scrim)' },
   'color-scrim-on-dark': { value: "rgba(0, 0, 0, 0.6)", cssVar: 'var(--color-scrim-on-dark)' },
   'color-warning-on-dark': { value: "#fbbd23", cssVar: 'var(--color-warning-on-dark)' },
+  'color-info': { value: "#0369a1", cssVar: 'var(--color-info)' },
+  'color-info-on-dark': { value: "#38bdf8", cssVar: 'var(--color-info-on-dark)' },
   'color-success': { value: "#15803d", cssVar: 'var(--color-success)' },
   'color-success-on-dark': { value: "#4ade80", cssVar: 'var(--color-success-on-dark)' },
   'font-display': { value: "'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif", cssVar: 'var(--font-display)' },

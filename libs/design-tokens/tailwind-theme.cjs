@@ -118,6 +118,14 @@ module.exports = {
       edge: 'hsl(var(--warning-edge))',
       text: 'hsl(var(--warning-text))',
     },
+    info: {
+      DEFAULT: 'hsl(var(--info))',
+      foreground: 'hsl(var(--info-foreground))',
+      soft: 'hsl(var(--info-soft))',
+      faint: 'hsl(var(--info-faint))',
+      edge: 'hsl(var(--info-edge))',
+      text: 'hsl(var(--info-text))',
+    },
     success: {
       DEFAULT: 'hsl(var(--success))',
       foreground: 'hsl(var(--success-foreground))',
