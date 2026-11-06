@@ -11,13 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
   Illustration,
+  setFeedbackDialogOpen,
+  useFeedbackDialogOpen,
   useIsMobileState,
 } from '@myorganiser/web-ui';
 
-import {
-  useFeedbackDialogOpen,
-  setFeedbackDialogOpen,
-} from '../hooks/use-feedback-dialog';
 import { FEEDBACK_DIALOG_DESCRIPTION } from '../schemas/feedback-report';
 import { FeedbackReportForm } from './FeedbackReportForm';
 

@@ -42,12 +42,13 @@ import {
 import '@testing-library/jest-dom';
 import { usePathname } from 'next/navigation';
 import { FEEDBACK_REPORT_REQUIRED_MESSAGES } from '@myorganiser/core';
-import { useIsMobileState, useToast } from '@myorganiser/web-ui';
-import { createFeedbackApi } from '../lib/apiClient';
 import {
   openFeedbackDialog,
   setFeedbackDialogOpen,
-} from '../hooks/use-feedback-dialog';
+  useIsMobileState,
+  useToast,
+} from '@myorganiser/web-ui';
+import { createFeedbackApi } from '../lib/apiClient';
 import { FeedbackDialog } from './FeedbackDialog';
 
 // Polyfill ResizeObserver for Radix UI components used by the real form

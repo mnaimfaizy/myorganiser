@@ -8,7 +8,8 @@ jest.mock('../../lib/apiClient', () => ({
   createFeedbackApi: jest.fn(),
 }));
 
-jest.mock('../../hooks/use-feedback-dialog', () => ({
+jest.mock('@myorganiser/web-ui', () => ({
+  ...jest.requireActual('@myorganiser/web-ui'),
   openFeedbackDialog: jest.fn(),
 }));
 
@@ -24,7 +25,7 @@ import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { getCurrentUser } from '@myorganiser/auth';
 import { createFeedbackApi } from '../../lib/apiClient';
-import { openFeedbackDialog } from '../../hooks/use-feedback-dialog';
+import { openFeedbackDialog } from '@myorganiser/web-ui';
 import { useLogOut } from '../../hooks/use-log-out';
 import { useYouTubeNavVisible } from '../../hooks/useYouTubeNavVisible';
 import { MoreScreen } from './MoreScreen';

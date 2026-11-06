@@ -7,10 +7,6 @@ jest.mock('../hooks/useYouTubeNavVisible', () => ({
   useYouTubeNavVisible: jest.fn(),
 }));
 
-jest.mock('../hooks/use-feedback-dialog', () => ({
-  openFeedbackDialog: jest.fn(),
-}));
-
 jest.mock('@myorganiser/web-vault-ui', () => ({
   useVaultLockState: jest.fn(),
 }));
@@ -22,6 +18,7 @@ jest.mock('./SidebarVaultCard', () => ({
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
   useSidebar: jest.fn(),
+  openFeedbackDialog: jest.fn(),
   // The real root and rail read the module-local useSidebar, which a barrel
   // mock cannot reach, so both are stubbed. Header, content and footer are
   // plain containers and render for real.
@@ -42,10 +39,13 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
-import { TooltipProvider, useSidebar } from '@myorganiser/web-ui';
+import {
+  openFeedbackDialog,
+  TooltipProvider,
+  useSidebar,
+} from '@myorganiser/web-ui';
 import { useVaultLockState } from '@myorganiser/web-vault-ui';
 import { useYouTubeNavVisible } from '../hooks/useYouTubeNavVisible';
-import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { AppSidebar } from './app-sidebar';
 import { NavMain } from './nav-main';
 
