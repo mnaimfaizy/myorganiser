@@ -63,7 +63,8 @@ Report a blocked or crashed run and leave it alone. Sending it back to an agent 
 4. Schedule the plans as in [Scheduling QA sessions](#scheduling-qa-sessions), and give each one to its own QA session.
 5. Check each report against its plan before relying on it. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code. QA Artifacts from a failed run stay local.
 6. Show the results and list each QA Artifact with its path and what it shows. Ask which to upload; the default is none.
-7. Upload what was chosen, then post the QA Report.
+7. Upload what was chosen, then post the QA Report. Fill in [the QA Report](#the-qa-report) template for each one. Never post a local working note as the report.
+8. Finish as in [Closing report](#closing-report).
 
 ## Scheduling QA sessions
 
@@ -133,4 +134,15 @@ Commit: `<sha>`. Run by an agent. Result: QA passed | Failures listed below
 
 Say "QA passed" only when every scenario passed. An agent never marks a "Left for a person" item as passed, and those items do not block the report or the merge ([ADR 0048](../../../docs/adr/0048-a-qa-plan-carries-only-what-automation-does-not-prove.md)).
 
-Finish with each Pull Request's state, anything left for a person, and a recommended merge order. A later commit makes a QA Report stale, so say which ones are.
+## Closing report
+
+Pass 2 ends with a table: one row per Pull Request, giving its state (CI, review, QA result, and the commit the QA Report names), anything left for a person, and whether its QA Report is stale. Any commit after the commit the report names makes it stale.
+
+Then recommend a merge order. Number the Pull Requests, and give each a one-line reason. Order them by these rules, in this order:
+
+1. **Hold back** a Pull Request that has a failed or stale QA Report, red CI, or a finding waiting on a decision. List it after the others, and say what it is waiting on.
+2. **Conflicts decide first.** When two branches touch the same files, merge first the one that the other then has to rebase onto. Name the rebase this causes.
+3. **Then risk.** Documentation-only and tooling changes go first, then narrow fixes, then changes to a shared library (`libs/web/ui`, `libs/auth`, `libs/app-api-client`) or to a backend contract.
+4. **Keep related branches next to each other.** For example, two branches that move the same feature to the generated client merge one after the other.
+
+Say what to do after each merge: check that CI passes on the next Pull Request before merging it, because each QA Report was run on its branch alone.
