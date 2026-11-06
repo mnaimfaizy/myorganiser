@@ -121,6 +121,7 @@ export function AuditUserPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          size="md"
           id={id}
           type="button"
           variant="outline"
@@ -128,7 +129,7 @@ export function AuditUserPicker({
           aria-labelledby={`${labelId} ${valueId}`}
           aria-controls={open ? contentId : undefined}
           aria-expanded={open}
-          className="h-10 md:h-10 min-w-[160px] justify-between"
+          className="min-w-[160px] justify-between"
         >
           <span id={valueId} className="truncate">
             {value?.name ?? ANY_USER_LABEL}

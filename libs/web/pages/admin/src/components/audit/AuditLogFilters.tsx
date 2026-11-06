@@ -70,12 +70,13 @@ export function AuditLogFilters({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              size="md"
               id={actionTriggerId}
               type="button"
               variant="outline"
               aria-labelledby={`${actionLabelId} ${actionValueId}`}
               className={cn(
-                'h-10 md:h-10 min-w-[180px] justify-between',
+                'min-w-[180px] justify-between',
                 actions.length > 0 && 'border-2 border-brand',
               )}
             >
@@ -120,9 +121,10 @@ export function AuditLogFilters({
       </div>
 
       <Button
+        size="md"
         type="button"
         variant="ghost"
-        className="h-10 md:h-10 text-brand-text"
+        className="text-brand-text"
         disabled={!hasFilters}
         onClick={onClear}
       >
