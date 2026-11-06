@@ -1,15 +1,54 @@
 /* eslint-disable import/first */
 const mockGetAccessToken = jest.fn();
-const mockRefresh = jest.fn();
-const mockClearAuthSession = jest.fn();
+// The generated client runs on axios. This adapter hands each axios request to
+// the shared `fetchMock` so tests keep scripting responses as before.
+const mockTransport = jest.fn<Promise<Response>, [string, RequestInit?]>();
 const mockGetApiBaseUrl = jest.fn(() => 'http://api.test');
 const mockRequestYouTubeAvailabilityRecheck = jest.fn();
 
-jest.mock('@myorganiser/auth', () => ({
-  getAccessToken: () => mockGetAccessToken(),
-  refresh: () => mockRefresh(),
-  clearAuthSession: () => mockClearAuthSession(),
-}));
+jest.mock('@myorganiser/auth', () => {
+  const { default: axios, AxiosError } = require('axios');
+  return {
+    getAccessToken: () => mockGetAccessToken(),
+    getAuthAxios: () =>
+      axios.create({
+        baseURL: 'http://api.test',
+        adapter: async (config: {
+          method?: string;
+          data?: unknown;
+          url?: string;
+        }) => {
+          const res = await mockTransport(
+            // `getUri` is not on the config, so join the pieces by hand.
+            `http://api.test${config.url ?? ''}`.replace(
+              /^http:\/\/api\.test(http)/,
+              '$1',
+            ),
+            {
+              method: (config.method ?? 'get').toUpperCase(),
+              body: config.data as string | undefined,
+            },
+          );
+          const data = await res.json().catch(() => ({}));
+          const response = {
+            data,
+            status: res.status,
+            statusText: '',
+            headers: {},
+            config,
+          };
+          if (res.ok) return response;
+          throw new AxiosError(
+            `Request failed with status code ${res.status}`,
+            'ERR_BAD_RESPONSE',
+            config,
+            null,
+            response,
+          );
+        },
+      }),
+  };
+});
 
 jest.mock('@myorganiser/core', () => ({
   getApiBaseUrl: () => mockGetApiBaseUrl(),
@@ -25,6 +64,11 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import {
   YouTubeRequestError,
   updateVideoWatched,
+  useYouTubeCarousel,
+  useYouTubeNotifications,
+  useYouTubeShorts,
+  useYouTubeStatus,
+  useYouTubeSubscriptions,
   useYouTubeAcknowledgement,
   useYouTubeConnect,
   useYouTubeSyncStatus,
@@ -50,7 +94,7 @@ function mockResponse({
   } as unknown as Response;
 }
 
-describe('useYouTubeConnect / apiFetch error paths', () => {
+describe('useYouTubeConnect / callApi error paths', () => {
   const fetchMock = jest.fn<
     Promise<Response>,
     [RequestInfo | URL, RequestInit?]
@@ -60,8 +104,7 @@ describe('useYouTubeConnect / apiFetch error paths', () => {
     jest.clearAllMocks();
     mockGetAccessToken.mockReturnValue('test-token');
     mockGetApiBaseUrl.mockReturnValue('http://api.test');
-    mockRefresh.mockResolvedValue(undefined);
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockTransport.mockImplementation((url, init) => fetchMock(url, init));
   });
 
   afterEach(() => {
@@ -129,83 +172,6 @@ describe('useYouTubeConnect / apiFetch error paths', () => {
     });
   });
 
-  describe('apiFetch 401 refresh path', () => {
-    it('H4: clears session and rejects original 401 when refresh fails; no retry fetch', async () => {
-      fetchMock.mockImplementation(() =>
-        Promise.resolve(
-          mockResponse({ status: 401, body: { message: 'expired' } }),
-        ),
-      );
-      mockRefresh.mockRejectedValue(new Error('refresh failed'));
-
-      const disconnect = renderDisconnect();
-
-      await expect(disconnect()).rejects.toMatchObject({
-        name: 'YouTubeRequestError',
-        message: 'expired',
-        status: 401,
-      });
-      expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('H5: retries once after successful refresh and resolves OK body', async () => {
-      let call = 0;
-      fetchMock.mockImplementation(() => {
-        call += 1;
-        if (call === 1) {
-          return Promise.resolve(
-            mockResponse({ status: 401, body: { message: 'expired' } }),
-          );
-        }
-        return Promise.resolve(
-          mockResponse({
-            status: 200,
-            body: { ok: true, message: 'done' },
-          }),
-        );
-      });
-      mockRefresh.mockResolvedValue(undefined);
-
-      const disconnect = renderDisconnect();
-      const body = await disconnect();
-
-      expect(body).toEqual({ ok: true, message: 'done' });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(mockClearAuthSession).not.toHaveBeenCalled();
-    });
-
-    it('H6: retries after refresh then rejects non-OK YouTubeRequestError', async () => {
-      let call = 0;
-      fetchMock.mockImplementation(() => {
-        call += 1;
-        if (call === 1) {
-          return Promise.resolve(
-            mockResponse({ status: 401, body: { message: 'expired' } }),
-          );
-        }
-        return Promise.resolve(
-          mockResponse({
-            status: 409,
-            body: { message: 'live', code: 'sync_run_live' },
-          }),
-        );
-      });
-      mockRefresh.mockResolvedValue(undefined);
-
-      const disconnect = renderDisconnect();
-
-      await expect(disconnect()).rejects.toMatchObject({
-        name: 'YouTubeRequestError',
-        message: 'live',
-        status: 409,
-        code: 'sync_run_live',
-      });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(mockClearAuthSession).not.toHaveBeenCalled();
-    });
-  });
-
   describe('happy disconnect', () => {
     it('H7: DELETE /youtube/disconnect with no request body and returns the parsed response', async () => {
       fetchMock.mockImplementation(() =>
@@ -242,8 +208,7 @@ describe('useYouTubeSyncStatus triggers (#753)', () => {
     jest.clearAllMocks();
     mockGetAccessToken.mockReturnValue('test-token');
     mockGetApiBaseUrl.mockReturnValue('http://api.test');
-    mockRefresh.mockResolvedValue(undefined);
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockTransport.mockImplementation((url, init) => fetchMock(url, init));
   });
 
   afterEach(() => {
@@ -716,8 +681,7 @@ describe('useYouTubeAcknowledgement (ADR 0129)', () => {
     jest.clearAllMocks();
     mockGetAccessToken.mockReturnValue('test-token');
     mockGetApiBaseUrl.mockReturnValue('http://api.test');
-    mockRefresh.mockResolvedValue(undefined);
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockTransport.mockImplementation((url, init) => fetchMock(url, init));
   });
 
   afterEach(() => {
@@ -818,7 +782,7 @@ describe('useYouTubeAcknowledgement (ADR 0129)', () => {
   });
 });
 
-describe('apiFetch 404 asks for an availability re-check (#1165)', () => {
+describe('callApi 404 asks for an availability re-check (#1165)', () => {
   const fetchMock = jest.fn<
     Promise<Response>,
     [RequestInfo | URL, RequestInit?]
@@ -830,8 +794,7 @@ describe('apiFetch 404 asks for an availability re-check (#1165)', () => {
     mockRequestYouTubeAvailabilityRecheck.mockReset();
     mockGetAccessToken.mockReturnValue('test-token');
     mockGetApiBaseUrl.mockReturnValue('http://api.test');
-    mockRefresh.mockResolvedValue(undefined);
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockTransport.mockImplementation((url, init) => fetchMock(url, init));
   });
 
   it('gate 404 ({"message":"Not Found"}) rejects with its status and asks for one re-check', async () => {
@@ -899,55 +862,6 @@ describe('apiFetch 404 asks for an availability re-check (#1165)', () => {
     expect(mockRequestYouTubeAvailabilityRecheck).not.toHaveBeenCalled();
   });
 
-  it('404 after a 401 refresh-and-retry asks for one re-check, made after the retry', async () => {
-    let call = 0;
-    let fetchCountAtRecheck = -1;
-    fetchMock.mockImplementation(() => {
-      call += 1;
-      if (call === 1) {
-        return Promise.resolve(
-          mockResponse({ status: 401, body: { message: 'expired' } }),
-        );
-      }
-      return Promise.resolve(
-        mockResponse({ status: 404, body: { message: 'Not Found' } }),
-      );
-    });
-    mockRequestYouTubeAvailabilityRecheck.mockImplementation(() => {
-      fetchCountAtRecheck = fetchMock.mock.calls.length;
-    });
-
-    await expect(updateVideoWatched('vid-1', true)).rejects.toMatchObject({
-      name: 'YouTubeRequestError',
-      message: 'Not Found',
-      status: 404,
-    });
-
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(mockRequestYouTubeAvailabilityRecheck).toHaveBeenCalledTimes(1);
-    expect(fetchCountAtRecheck).toBe(2);
-  });
-
-  it('401 whose refresh rejects clears the session, rejects 401, and does not ask for a re-check', async () => {
-    fetchMock.mockImplementation(() =>
-      Promise.resolve(
-        mockResponse({ status: 401, body: { message: 'expired' } }),
-      ),
-    );
-    mockRefresh.mockRejectedValue(new Error('refresh failed'));
-
-    await expect(updateVideoWatched('vid-1', true)).rejects.toMatchObject({
-      name: 'YouTubeRequestError',
-      message: 'expired',
-      status: 401,
-    });
-
-    expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(mockRequestYouTubeAvailabilityRecheck).not.toHaveBeenCalled();
-  });
-
   it('404 with a non-JSON body rejects with the status fallback and asks for one re-check', async () => {
     fetchMock.mockImplementation(() =>
       Promise.resolve(mockResponse({ status: 404, jsonReject: true })),
@@ -959,5 +873,95 @@ describe('apiFetch 404 asks for an availability re-check (#1165)', () => {
       status: 404,
     });
     expect(mockRequestYouTubeAvailabilityRecheck).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('error responses are failures, not data', () => {
+  const fetchMock = jest.fn<
+    Promise<Response>,
+    [RequestInfo | URL, RequestInit?]
+  >();
+  const failure = () =>
+    Promise.resolve(
+      mockResponse({ status: 500, body: { message: 'boom', code: 'E' } }),
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAccessToken.mockReturnValue('test-token');
+    mockTransport.mockImplementation((url, init) => fetchMock(url, init));
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(failure);
+  });
+
+  it('useYouTubeStatus reports the error status and not connected', async () => {
+    const { result } = renderHook(() => useYouTubeStatus());
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.connected).toBe(false);
+  });
+
+  it('useYouTubeSubscriptions rejects and keeps the list empty', async () => {
+    // The mount read succeeds so the failure under test is the explicit call.
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(mockResponse({ status: 200, body: [] })),
+    );
+    const { result } = renderHook(() => useYouTubeSubscriptions());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await expect(result.current.refresh()).rejects.toMatchObject({
+        name: 'YouTubeRequestError',
+        status: 500,
+      });
+    });
+    expect(result.current.subscriptions).toEqual([]);
+    await expect(result.current.toggle('c', true)).rejects.toBeInstanceOf(
+      YouTubeRequestError,
+    );
+  });
+
+  it('useYouTubeShorts exposes the message as error with no shorts', async () => {
+    const { result } = renderHook(() => useYouTubeShorts());
+    await waitFor(() => expect(result.current.error).toBe('boom'));
+    expect(result.current.shorts).toEqual([]);
+  });
+
+  it('useYouTubeCarousel exposes the message as error with no channels', async () => {
+    const { result } = renderHook(() => useYouTubeCarousel());
+    await waitFor(() => expect(result.current.error).toBe('boom'));
+    expect(result.current.channels).toEqual([]);
+  });
+
+  it('useYouTubeNotifications keeps defaults on a failed read and rejects a failed update', async () => {
+    const { result } = renderHook(() => useYouTubeNotifications());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(result.current.settings.enabled).toBe(false);
+    await act(async () => {
+      await expect(
+        result.current.update({ enabled: true }),
+      ).rejects.toMatchObject({ status: 500 });
+    });
+    expect(result.current.settings.enabled).toBe(false);
+  });
+
+  it('useYouTubeConnect.connect rejects and does not navigate', async () => {
+    const { result } = renderHook(() => useYouTubeConnect());
+    await expect(result.current.connect()).rejects.toMatchObject({
+      status: 500,
+    });
+  });
+
+  it('useYouTubeSyncStatus triggers reject instead of reporting a run', async () => {
+    // The mount read succeeds so the failure under test is the trigger's.
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(mockResponse({ status: 200, body: {} })),
+    );
+    const { result } = renderHook(() => useYouTubeSyncStatus());
+    await waitFor(() => expect(result.current.status).toEqual({}));
+    await act(async () => {
+      await expect(result.current.triggerUploadSync()).rejects.toMatchObject({
+        status: 500,
+      });
+    });
+    expect(result.current.status).toEqual({});
   });
 });

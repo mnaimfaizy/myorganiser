@@ -1,10 +1,11 @@
 'use client';
 
-import { getApiBaseUrl } from '@myorganiser/core';
+import { isAxiosError } from 'axios';
 import { Button, Card, CardContent } from '@myorganiser/web-ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createAnonymousYouTubeApi } from '../lib/youtubeApi';
 
 type Status = 'working' | 'done' | 'invalid-link' | 'error';
 
@@ -21,28 +22,16 @@ export default function YouTubeUnsubscribeClient() {
 
   const performUnsubscribe = useCallback(async () => {
     try {
-      const res = await fetch(`${getApiBaseUrl()}/youtube/digest/unsubscribe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
+      const res = await createAnonymousYouTubeApi().unsubscribeFromDigest({
+        unsubscribeBody: { token },
       });
-
-      if (res.status === 404) {
-        setFetchStatus('invalid-link');
-        return;
-      }
-
-      if (!res.ok) {
-        setFetchStatus('error');
-        return;
-      }
-
-      const data = await res.json();
-      setFetchStatus(data.ok ? 'done' : 'error');
-    } catch {
-      setFetchStatus('error');
+      setFetchStatus(res.data.ok ? 'done' : 'error');
+    } catch (err) {
+      setFetchStatus(
+        isAxiosError(err) && err.response?.status === 404
+          ? 'invalid-link'
+          : 'error',
+      );
     }
   }, [token]);
 
