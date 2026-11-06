@@ -30,10 +30,7 @@ import {
   type FeedbackFormValues,
   type FeedbackReportFormVariant,
 } from '../schemas/feedback-report';
-import {
-  useFeedbackReportDraft,
-  type FeedbackReportDraft,
-} from '../hooks/use-feedback-report-draft';
+import { type FeedbackReportDraft } from '../hooks/use-feedback-report-draft';
 import { FeedbackKindField } from './FeedbackKindField';
 import { FeedbackDetailsFields } from './FeedbackDetailsFields';
 
@@ -100,33 +97,16 @@ export interface FeedbackReportFormProps {
   onCancel: () => void;
   /** Internal layout switch set by FeedbackDialog. Defaults to desktop. */
   variant?: FeedbackReportFormVariant;
-  /** Draft owned by the caller; omit to let the form own its own. */
-  draft?: FeedbackReportDraft;
-}
-
-function OwnedFeedbackReportForm(
-  props: Omit<FeedbackReportFormProps, 'draft'>,
-) {
-  const draft = useFeedbackReportDraft();
-  return <FeedbackReportFormView {...props} draft={draft} />;
+  /** Draft owned by the caller (FeedbackDialog), so it outlives a layout swap. */
+  draft: FeedbackReportDraft;
 }
 
 export function FeedbackReportForm({
-  draft,
-  ...props
-}: FeedbackReportFormProps) {
-  if (draft) {
-    return <FeedbackReportFormView {...props} draft={draft} />;
-  }
-  return <OwnedFeedbackReportForm {...props} />;
-}
-
-function FeedbackReportFormView({
   onSent,
   onCancel,
   variant = 'desktop',
   draft,
-}: FeedbackReportFormProps & { draft: FeedbackReportDraft }) {
+}: FeedbackReportFormProps) {
   const pathname = usePathname();
   const { toast } = useToast();
   const { form, serverError, setServerError } = draft;
