@@ -2,8 +2,7 @@
 
 import { useCallback, useId, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { useWatch } from 'react-hook-form';
 import { isAxiosError } from 'axios';
 import { TriangleAlert } from 'lucide-react';
 
@@ -28,10 +27,13 @@ import { createFeedbackApi } from '../lib/apiClient';
 import {
   FEEDBACK_DIALOG_DESCRIPTION,
   FEEDBACK_KIND_CHOICES,
-  feedbackFormSchema,
   type FeedbackFormValues,
   type FeedbackReportFormVariant,
 } from '../schemas/feedback-report';
+import {
+  useFeedbackReportDraft,
+  type FeedbackReportDraft,
+} from '../hooks/use-feedback-report-draft';
 import { FeedbackKindField } from './FeedbackKindField';
 import { FeedbackDetailsFields } from './FeedbackDetailsFields';
 
@@ -98,30 +100,39 @@ export interface FeedbackReportFormProps {
   onCancel: () => void;
   /** Internal layout switch set by FeedbackDialog. Defaults to desktop. */
   variant?: FeedbackReportFormVariant;
+  /** Draft owned by the caller; omit to let the form own its own. */
+  draft?: FeedbackReportDraft;
+}
+
+function OwnedFeedbackReportForm(
+  props: Omit<FeedbackReportFormProps, 'draft'>,
+) {
+  const draft = useFeedbackReportDraft();
+  return <FeedbackReportFormView {...props} draft={draft} />;
 }
 
 export function FeedbackReportForm({
+  draft,
+  ...props
+}: FeedbackReportFormProps) {
+  if (draft) {
+    return <FeedbackReportFormView {...props} draft={draft} />;
+  }
+  return <OwnedFeedbackReportForm {...props} />;
+}
+
+function FeedbackReportFormView({
   onSent,
   onCancel,
   variant = 'desktop',
-}: FeedbackReportFormProps) {
+  draft,
+}: FeedbackReportFormProps & { draft: FeedbackReportDraft }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const [serverError, setServerError] = useState<string | null>(null);
+  const { form, serverError, setServerError } = draft;
 
   // Capture report context once at mount, so the form shows and sends the same values.
   const [reportContext] = useState(() => readReportContext(pathname));
-
-  const form = useForm<FeedbackFormValues>({
-    resolver: zodResolver(feedbackFormSchema),
-    defaultValues: {
-      kind: 'bug_report',
-      title: '',
-      description: '',
-      expectedOutcome: '',
-      fixNoticeOptIn: true,
-    },
-  });
 
   const kind = useWatch({ control: form.control, name: 'kind' });
   const kindChoice = FEEDBACK_KIND_CHOICES[kind];
@@ -193,7 +204,7 @@ export function FeedbackReportForm({
         );
       }
     },
-    [kindChoice, toast, onSent, reportContext],
+    [kindChoice, toast, onSent, reportContext, setServerError],
   );
 
   return (

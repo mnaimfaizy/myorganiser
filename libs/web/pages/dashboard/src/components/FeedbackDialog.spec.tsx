@@ -278,6 +278,95 @@ describe('FeedbackDialog', () => {
       });
     });
 
+    it.each([
+      ['desktop to phone', false, true],
+      ['phone to desktop', true, false],
+    ])(
+      'should keep every typed value when the breakpoint crosses %s',
+      async (_name, startsPhone, endsPhone) => {
+        (useIsMobileState as jest.Mock).mockReturnValue(startsPhone);
+        const { rerender } = render(<FeedbackDialog />);
+
+        await act(async () => {
+          openFeedbackDialog();
+        });
+
+        fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+          target: { value: 'Login button not responsive' },
+        });
+        fireEvent.change(
+          screen.getByRole('textbox', { name: 'What happened?' }),
+          { target: { value: 'Clicking login does nothing.' } },
+        );
+        fireEvent.change(
+          screen.getByRole('textbox', { name: /What did you expect/ }),
+          { target: { value: 'It should sign me in.' } },
+        );
+
+        (useIsMobileState as jest.Mock).mockReturnValue(endsPhone);
+        await act(async () => {
+          rerender(<FeedbackDialog />);
+        });
+
+        expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue(
+          'Login button not responsive',
+        );
+        expect(
+          screen.getByRole('textbox', { name: 'What happened?' }),
+        ).toHaveValue('Clicking login does nothing.');
+        expect(
+          screen.getByRole('textbox', { name: /What did you expect/ }),
+        ).toHaveValue('It should sign me in.');
+      },
+    );
+
+    it('should keep the chosen kind when the breakpoint crosses', async () => {
+      (useIsMobileState as jest.Mock).mockReturnValue(false);
+      const { rerender } = render(<FeedbackDialog />);
+
+      await act(async () => {
+        openFeedbackDialog();
+      });
+
+      fireEvent.click(screen.getByRole('radio', { name: /Suggestion/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+        target: { value: 'Dark mode' },
+      });
+
+      (useIsMobileState as jest.Mock).mockReturnValue(true);
+      await act(async () => {
+        rerender(<FeedbackDialog />);
+      });
+
+      expect(screen.getByRole('radio', { name: /Suggestion/ })).toBeChecked();
+      expect(
+        screen.getByRole('textbox', { name: 'What would you like to see?' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue(
+        'Dark mode',
+      );
+    });
+
+    it('should start blank after the dialog is closed and reopened', async () => {
+      render(<FeedbackDialog />);
+
+      await act(async () => {
+        openFeedbackDialog();
+      });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+        target: { value: 'Stale draft' },
+      });
+
+      await act(async () => {
+        setFeedbackDialogOpen(false);
+      });
+      await act(async () => {
+        openFeedbackDialog();
+      });
+
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('');
+    });
+
     it('should show the title required message and keep the phone sheet open on an empty submit', async () => {
       (useIsMobileState as jest.Mock).mockReturnValue(true);
       render(<FeedbackDialog />);
