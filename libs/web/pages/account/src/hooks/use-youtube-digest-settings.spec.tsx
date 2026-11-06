@@ -15,6 +15,7 @@ jest.mock('@myorganiser/core', () => ({ detectTimeZone: jest.fn() }));
 
 import { detectTimeZone } from '@myorganiser/core';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { AxiosError, type AxiosResponse } from 'axios';
 
 import { useYouTubeDigestSettings } from './use-youtube-digest-settings';
 
@@ -23,6 +24,25 @@ function axiosError(message: string) {
     isAxiosError: true,
     response: { status: 500, data: { message } },
   });
+}
+
+// The backend answers 404 { message: 'Not Found' } when YouTube is off or the
+// User has no YouTube Access. A real AxiosError keeps isAxiosError true.
+function notFoundError() {
+  const response = {
+    status: 404,
+    statusText: 'Not Found',
+    headers: {},
+    config: { headers: {} },
+    data: { message: 'Not Found' },
+  } as AxiosResponse;
+  return new AxiosError(
+    'Request failed',
+    'ERR_BAD_REQUEST',
+    undefined,
+    undefined,
+    response,
+  );
 }
 
 describe('useYouTubeDigestSettings', () => {
@@ -64,6 +84,27 @@ describe('useYouTubeDigestSettings', () => {
     );
     const { result } = renderHook(() => useYouTubeDigestSettings());
     await waitFor(() => expect(result.current.loadError).toBe('No settings'));
+  });
+
+  it('treats a 404 status load as YouTube off, without an error', async () => {
+    mockApi.getConnectionStatus.mockRejectedValueOnce(notFoundError());
+    const { result } = renderHook(() => useYouTubeDigestSettings());
+    await waitFor(() => expect(mockApi.getConnectionStatus).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.loadError).toBeNull();
+    expect(result.current.connected).toBe(false);
+    expect(mockApi.getNotificationSettings).not.toHaveBeenCalled();
+  });
+
+  it('treats a 404 settings load as not connected, without an error', async () => {
+    mockApi.getNotificationSettings.mockRejectedValueOnce(notFoundError());
+    const { result } = renderHook(() => useYouTubeDigestSettings());
+    await waitFor(() =>
+      expect(mockApi.getNotificationSettings).toHaveBeenCalled(),
+    );
+    await act(async () => {});
+    expect(result.current.loadError).toBeNull();
+    expect(result.current.connected).toBe(false);
   });
 
   it('toasts the server message when save fails', async () => {

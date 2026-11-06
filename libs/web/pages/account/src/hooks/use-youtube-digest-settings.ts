@@ -70,6 +70,13 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
         setLoadError(null);
       } catch (error) {
         if (cancelled) return;
+        // A 404 is how the backend says YouTube is off or this User has no
+        // YouTube Access, so there is no digest to show and nothing failed.
+        if (isAxiosError(error) && error.response?.status === 404) {
+          setConnected(false);
+          setLoadError(null);
+          return;
+        }
         setLoadError(errorMessage(error, 'Failed to load digest settings.'));
       }
     })();
