@@ -447,6 +447,7 @@ class UserService {
         where: { id: targetUserId },
         data: {
           youtube_access: true,
+          youtube_access_withdrawn_at: null,
           youtube_access_first_granted_at:
             target.youtube_access_first_granted_at ?? new Date(),
         },
@@ -474,9 +475,21 @@ class UserService {
     await this.requireIdentityUser(targetUserId);
 
     return this.prisma.$transaction(async (tx) => {
+      // Stamp the withdrawal only when access is actually taken back: a repeat
+      // withdraw keeps the original date, and a never-granted User is not made
+      // to read as withdrawn (#1308).
+      const current = await tx.user.findUnique({
+        where: { id: targetUserId },
+        select: { youtube_access: true },
+      });
       const updated = await tx.user.update({
         where: { id: targetUserId },
-        data: { youtube_access: false },
+        data: {
+          youtube_access: false,
+          ...(current?.youtube_access === true
+            ? { youtube_access_withdrawn_at: new Date() }
+            : {}),
+        },
         select: ADMIN_IDENTITY_SELECT,
       });
       await this.writeAdminAuditLog(

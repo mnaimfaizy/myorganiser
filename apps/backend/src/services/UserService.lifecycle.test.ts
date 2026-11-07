@@ -323,34 +323,56 @@ describe('UserService lifecycle', () => {
     });
 
     test('grant sets access and first-granted time and writes one grant audit row', async () => {
-      mockGrantLookup(null);
-      mockPrisma.user.count.mockResolvedValue(0);
+      mockIdentityLookup();
       const granted = { ...identityUser, youtube_access: true };
-      mockPrisma.user.update.mockResolvedValue(granted);
-      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+      const tx = {
+        $executeRaw: jest.fn(),
+        user: {
+          findUnique: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ youtube_access_first_granted_at: null }),
+          count: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue(0),
+          update: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue(granted),
+        },
+        adminAuditLog: {
+          create: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({}),
+        },
+      };
+      mockPrisma.$transaction.mockImplementationOnce(
+        async (fn: (client: unknown) => unknown) => fn(tx),
+      );
 
       const result = await userService.grantYouTubeAccess(ACTOR_ID, TARGET_ID);
 
       expect(result).toEqual(granted);
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(tx.user.update).toHaveBeenCalledWith({
         where: { id: TARGET_ID },
         data: {
           youtube_access: true,
+          youtube_access_withdrawn_at: null,
           youtube_access_first_granted_at: expect.any(Date),
         },
         select: expect.objectContaining({ youtube_access: true }),
       });
       expect(
-        (mockPrisma.user.update.mock.calls[0][0] as { data: object }).data,
+        (tx.user.update.mock.calls[0][0] as { data: object }).data,
       ).not.toHaveProperty('youtube_acknowledged_at');
-      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledWith({
+      expect(tx.adminAuditLog.create).toHaveBeenCalledTimes(1);
+      expect(tx.adminAuditLog.create).toHaveBeenCalledWith({
         data: {
           actor_user_id: ACTOR_ID,
           target_user_id: TARGET_ID,
           action: 'youtube_access_grant',
         },
       });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
     });
 
     test('grant takes the last free place when one place is still left', async () => {
@@ -372,25 +394,45 @@ describe('UserService lifecycle', () => {
     });
 
     test('re-grant of a previously granted User succeeds at the ceiling and keeps the original first-granted time', async () => {
-      mockGrantLookup(FIRST_GRANTED_AT);
-      mockPrisma.user.count.mockResolvedValue(2);
-      mockPrisma.user.update.mockResolvedValue({
-        ...identityUser,
-        youtube_access: true,
-      });
-      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+      mockIdentityLookup();
+      // A re-grant never reaches the ceiling count, so the transaction holds
+      // no user.count; calling it would throw and fail the test.
+      const tx = {
+        $executeRaw: jest.fn(),
+        user: {
+          findUnique: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({
+              youtube_access_first_granted_at: FIRST_GRANTED_AT,
+            }),
+          update: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ ...identityUser, youtube_access: true }),
+        },
+        adminAuditLog: {
+          create: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({}),
+        },
+      };
+      mockPrisma.$transaction.mockImplementationOnce(
+        async (fn: (client: unknown) => unknown) => fn(tx),
+      );
 
       await userService.grantYouTubeAccess(ACTOR_ID, TARGET_ID);
 
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(tx.user.update).toHaveBeenCalledWith({
         where: { id: TARGET_ID },
         data: {
           youtube_access: true,
+          youtube_access_withdrawn_at: null,
           youtube_access_first_granted_at: FIRST_GRANTED_AT,
         },
         select: expect.objectContaining({ youtube_access: true }),
       });
-      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledTimes(1);
+      expect(tx.adminAuditLog.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
     });
 
     test('grant of a never-granted User at the ceiling throws and writes nothing', async () => {
@@ -405,32 +447,97 @@ describe('UserService lifecycle', () => {
       expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
     });
 
-    test('withdraw clears access without clearing first-granted and writes one withdraw audit row', async () => {
+    test('withdraw clears access, stamps the withdrawal time, keeps first-granted, and writes one withdraw audit row in the same transaction', async () => {
       mockIdentityLookup();
-      mockPrisma.user.update.mockResolvedValue({
-        ...identityUser,
-        youtube_access: false,
-      });
-      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+      const tx = {
+        user: {
+          findUnique: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ youtube_access: true }),
+          update: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ ...identityUser, youtube_access: false }),
+        },
+        adminAuditLog: {
+          create: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({}),
+        },
+      };
+      mockPrisma.$transaction.mockImplementationOnce(
+        async (fn: (client: unknown) => unknown) => fn(tx),
+      );
 
       await userService.withdrawYouTubeAccessGrant(ACTOR_ID, TARGET_ID);
 
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.user.findUnique).toHaveBeenCalledWith({
         where: { id: TARGET_ID },
-        data: { youtube_access: false },
+        select: { youtube_access: true },
+      });
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: TARGET_ID },
+        data: {
+          youtube_access: false,
+          youtube_access_withdrawn_at: expect.any(Date),
+        },
         select: expect.objectContaining({ youtube_access: true }),
       });
       expect(
-        (mockPrisma.user.update.mock.calls[0][0] as { data: object }).data,
+        (tx.user.update.mock.calls[0][0] as { data: object }).data,
       ).not.toHaveProperty('youtube_acknowledged_at');
-      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledWith({
+      expect(tx.adminAuditLog.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
+      expect(tx.adminAuditLog.create).toHaveBeenCalledWith({
         data: {
           actor_user_id: ACTOR_ID,
           target_user_id: TARGET_ID,
           action: 'youtube_access_withdraw',
         },
       });
+    });
+
+    test('withdraw of a User who no longer holds access clears the flag without restamping the withdrawal time, and still writes the audit row in the same transaction', async () => {
+      mockIdentityLookup();
+      const tx = {
+        user: {
+          findUnique: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ youtube_access: false }),
+          update: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({ ...identityUser, youtube_access: false }),
+        },
+        adminAuditLog: {
+          create: jest
+            .fn<(...args: unknown[]) => Promise<unknown>>()
+            .mockResolvedValue({}),
+        },
+      };
+      mockPrisma.$transaction.mockImplementationOnce(
+        async (fn: (client: unknown) => unknown) => fn(tx),
+      );
+
+      await userService.withdrawYouTubeAccessGrant(ACTOR_ID, TARGET_ID);
+
+      expect(tx.user.findUnique).toHaveBeenCalledWith({
+        where: { id: TARGET_ID },
+        select: { youtube_access: true },
+      });
+      expect(tx.user.update).toHaveBeenCalledTimes(1);
+      const updateArgs = tx.user.update.mock.calls[0][0] as { data: object };
+      expect(updateArgs.data).toStrictEqual({ youtube_access: false });
+      expect(updateArgs.data).not.toHaveProperty('youtube_access_withdrawn_at');
+      expect(tx.adminAuditLog.create).toHaveBeenCalledWith({
+        data: {
+          actor_user_id: ACTOR_ID,
+          target_user_id: TARGET_ID,
+          action: 'youtube_access_withdraw',
+        },
+      });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
     });
 
     test('grant of a missing User throws UserNotFoundError and writes nothing', async () => {

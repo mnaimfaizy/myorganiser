@@ -15,6 +15,7 @@ import { ShortsHardStop } from './ShortsHardStop';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
 import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
+import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 import { ShortsList } from './ShortsList';
 import { ShortsPlayerPanel } from './ShortsPlayerPanel';
 import type { YouTubeLayoutVariant } from '../types';
@@ -45,16 +46,15 @@ const SHORTS_PAGE_CLASS =
  * is false until acknowledged and not locked.
  */
 export function ShortsPageClient() {
-  const { available, error: availabilityError } = useYouTubeAvailability();
+  const availability = useYouTubeAvailability();
+  const { available } = availability;
 
   // Availability gate — fail closed. The Shorts list, budget meter and
   // keyboard listener live below it, so a User without YouTube Access makes no
   // YouTube request and starts no budget clock.
   if (available !== true) {
     return (
-      <YouTubeUnavailableNotice
-        reason={availabilityError ? 'unreachable' : 'unavailable'}
-      />
+      <YouTubeUnavailableNotice {...toUnavailableNoticeProps(availability)} />
     );
   }
 

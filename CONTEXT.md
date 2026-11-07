@@ -217,7 +217,7 @@ _Avoid_: fix email, resolution email, closed notification
 ## YouTube (focused watching)
 
 **YouTube Access**:
-A Platform Admin's permission for one User to use YouTube in MyOrganiser at all. It is granted to and withdrawn from a specific User, never claimed by the User and never transferable. Without it YouTube does not exist for that User. It comes before a YouTube Connection: Access is MyOrganiser letting the User in, the Connection is the User letting MyOrganiser read their account. Decided in ADR 0129.
+A Platform Admin's permission for one User to use YouTube in MyOrganiser at all. It is granted to and withdrawn from a specific User, never claimed by the User and never transferable. Without it YouTube does not exist for that User. It comes before a YouTube Connection: Access is MyOrganiser letting the User in, the Connection is the User letting MyOrganiser read their account. Decided in ADR 0129. A User without it is either never granted, or **withdrawn**: granted once and since taken back, which the User is told is permanent. A withdrawal records when it happened, and the next grant clears that record.
 _Avoid_: invitation, invite link, test user, beta access, allowlist
 
 **YouTube Connection**:

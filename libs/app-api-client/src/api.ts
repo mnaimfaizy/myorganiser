@@ -1290,10 +1290,30 @@ export interface WithdrawYouTubeAccessResponse {
 
 export interface YouTubeAccessResponse {
     /**
-     * Whether a Platform Admin has granted the signed-in User YouTube Access (ADR 0129).
+     * Whether a Platform Admin currently grants the signed-in User YouTube Access (ADR 0129).
      */
     'granted': boolean;
+    'state': YouTubeAccessState;
+    /**
+     * ISO time the grant was withdrawn. Present only when `state` is `withdrawn` and the withdrawal date is known; absent for Users withdrawn before it was recorded.
+     */
+    'withdrawnAt'?: string;
 }
+
+
+/**
+ * The signed-in User\'s YouTube Access state (ADR 0129): `granted` while a Platform Admin grants it, `withdrawn` once a grant has been taken back, and `not_granted` when it has never been granted.
+ */
+
+export const YouTubeAccessState = {
+    Granted: 'granted',
+    NotGranted: 'not_granted',
+    Withdrawn: 'withdrawn',
+} as const;
+
+export type YouTubeAccessState = typeof YouTubeAccessState[keyof typeof YouTubeAccessState];
+
+
 /**
  * Platform Admin read of the YouTube Access lifetime ceiling (ADR 0129).
  */
@@ -5270,7 +5290,7 @@ export const YouTubeApiAxiosParamCreator = function (configuration?: Configurati
             };
         },
         /**
-         * Whether the signed-in User has YouTube Access (ADR 0129). Reachable without the access scope, so the web can hide YouTube from Users without it.
+         * YouTube Access state for the signed-in User (ADR 0129): `granted`, `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date is known. `granted` is true only for `granted`. Reachable without the access scope, so the web can hide YouTube from Users without it.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -5939,7 +5959,7 @@ export const YouTubeApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * Whether the signed-in User has YouTube Access (ADR 0129). Reachable without the access scope, so the web can hide YouTube from Users without it.
+         * YouTube Access state for the signed-in User (ADR 0129): `granted`, `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date is known. `granted` is true only for `granted`. Reachable without the access scope, so the web can hide YouTube from Users without it.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -6180,7 +6200,7 @@ export const YouTubeApiFactory = function (configuration?: Configuration, basePa
             return localVarFp.disconnect(options).then((request) => request(axios, basePath));
         },
         /**
-         * Whether the signed-in User has YouTube Access (ADR 0129). Reachable without the access scope, so the web can hide YouTube from Users without it.
+         * YouTube Access state for the signed-in User (ADR 0129): `granted`, `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date is known. `granted` is true only for `granted`. Reachable without the access scope, so the web can hide YouTube from Users without it.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -6436,7 +6456,7 @@ export class YouTubeApi extends BaseAPI {
     }
 
     /**
-     * Whether the signed-in User has YouTube Access (ADR 0129). Reachable without the access scope, so the web can hide YouTube from Users without it.
+     * YouTube Access state for the signed-in User (ADR 0129): `granted`, `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date is known. `granted` is true only for `granted`. Reachable without the access scope, so the web can hide YouTube from Users without it.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */

@@ -27,7 +27,7 @@ import youtubeSyncService, {
   YouTubeVideoWithChannel,
   isShortDuration,
 } from '../services/YouTubeSyncService';
-import { VersionFloorRefusal } from '../types';
+import { type UserInterface, VersionFloorRefusal } from '../types';
 
 type YouTubeErrorResponse = { message: string };
 
@@ -56,10 +56,32 @@ interface YouTubeAvailabilityResponse {
   available: boolean;
 }
 
+/**
+ * The signed-in User's YouTube Access state (ADR 0129): `granted` while a
+ * Platform Admin grants it, `withdrawn` once a grant has been taken back, and
+ * `not_granted` when it has never been granted.
+ */
+export type YouTubeAccessState = 'granted' | 'not_granted' | 'withdrawn';
+
 interface YouTubeAccessResponse {
-  /** Whether a Platform Admin has granted the signed-in User YouTube Access (ADR 0129). */
+  /** Whether a Platform Admin currently grants the signed-in User YouTube Access (ADR 0129). */
   granted: boolean;
+  /** Derived YouTube Access state; `withdrawn` covers a grant taken back. */
+  state: YouTubeAccessState;
+  /**
+   * ISO time the grant was withdrawn. Present only when `state` is `withdrawn`
+   * and the withdrawal date is known; absent for Users withdrawn before it was recorded.
+   */
+  withdrawnAt?: string;
 }
+
+/** The User columns that decide YouTube Access. */
+export type YouTubeAccessFields = Pick<
+  UserInterface,
+  | 'youtube_access'
+  | 'youtube_access_first_granted_at'
+  | 'youtube_access_withdrawn_at'
+>;
 
 interface SubscriptionResponse {
   id: string;
@@ -257,6 +279,32 @@ function toNotificationSettingsResponse(settings: {
     preferredWeekday: settings.preferredWeekday,
     timeZone: settings.timeZone,
   };
+}
+
+/**
+ * Derives the YouTube Access response from the User row (ADR 0129). A current
+ * grant wins; otherwise a User granted at least once reads as `withdrawn`
+ * (with the date only when the withdrawal was recorded), and a User never
+ * granted reads as `not_granted`.
+ */
+export function toYouTubeAccessResponse(
+  user: YouTubeAccessFields,
+): YouTubeAccessResponse {
+  if (user.youtube_access === true) {
+    return { granted: true, state: 'granted' };
+  }
+  // Only a User granted at least once can have been withdrawn.
+  if (!user.youtube_access_first_granted_at) {
+    return { granted: false, state: 'not_granted' };
+  }
+  const withdrawnAt = user.youtube_access_withdrawn_at;
+  return withdrawnAt
+    ? {
+        granted: false,
+        state: 'withdrawn',
+        withdrawnAt: withdrawnAt.toISOString(),
+      }
+    : { granted: false, state: 'withdrawn' };
 }
 
 function toSyncResponse(result: YouTubeRefreshResult): SyncResponse {
@@ -596,8 +644,10 @@ export class YouTubeController extends Controller {
   }
 
   /**
-   * Whether the signed-in User has YouTube Access (ADR 0129). Reachable without
-   * the access scope, so the web can hide YouTube from Users without it.
+   * YouTube Access state for the signed-in User (ADR 0129): `granted`,
+   * `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date
+   * is known. `granted` is true only for `granted`. Reachable without the access
+   * scope, so the web can hide YouTube from Users without it.
    */
   @Get('/access')
   @Security('jwt')
@@ -605,7 +655,7 @@ export class YouTubeController extends Controller {
     @Request() req: ExRequest,
   ): Promise<YouTubeAccessResponse> {
     const user = getAuthenticatedUser(req);
-    return { granted: user.youtube_access === true };
+    return toYouTubeAccessResponse(user);
   }
 
   /**

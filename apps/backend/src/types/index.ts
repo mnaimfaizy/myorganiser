@@ -21,6 +21,10 @@ export interface UserInterface {
   disabled?: boolean;
   /** Whether a Platform Admin currently grants YouTube Access (ADR 0129). */
   youtube_access?: boolean;
+  /** When YouTube Access was first granted; null if never granted (ADR 0129). */
+  youtube_access_first_granted_at?: Date | null;
+  /** When YouTube Access was last withdrawn; null if never withdrawn or re-granted since (ADR 0129). */
+  youtube_access_withdrawn_at?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

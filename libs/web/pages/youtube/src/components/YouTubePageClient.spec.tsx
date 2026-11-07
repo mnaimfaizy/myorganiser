@@ -197,6 +197,7 @@ describe('YouTubePageClient', () => {
     mockUseIsMobileState.mockReturnValue(false);
     mockUseYouTubeAvailability.mockReturnValue({
       available: true,
+      access: null,
       loading: false,
       error: null,
     });
@@ -1162,6 +1163,7 @@ describe('YouTubePageClient', () => {
     it('should show unavailable when explicitly false', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -1181,6 +1183,7 @@ describe('YouTubePageClient', () => {
     it('should show unavailable while loading availability', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: true,
         error: null,
       });
@@ -1197,6 +1200,7 @@ describe('YouTubePageClient', () => {
     it('shows the unreachable notice with Try again when the availability check errored', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: false,
         error: new Error('Service unavailable'),
       });
@@ -1221,6 +1225,7 @@ describe('YouTubePageClient', () => {
     it('should show unavailable when available is null and not loading', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: false,
         error: null,
       });
@@ -1237,6 +1242,7 @@ describe('YouTubePageClient', () => {
     it('should show dashboard when available and connected', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: true,
+        access: null,
         loading: false,
         error: null,
       });
@@ -1259,6 +1265,7 @@ describe('YouTubePageClient', () => {
     it('should show unavailable even when user is connected', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -1281,6 +1288,7 @@ describe('YouTubePageClient', () => {
     it('should link back to /dashboard in unavailable state', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -1293,9 +1301,52 @@ describe('YouTubePageClient', () => {
       expect(backLink).toHaveAttribute('href', '/dashboard');
     });
 
+    it('shows the withdrawn notice with its date and makes no YouTube data hook call when access was withdrawn', () => {
+      mockUseYouTubeAvailability.mockReturnValue({
+        available: false,
+        access: {
+          state: 'withdrawn',
+          withdrawnAt: '2025-10-14T12:00:00.000Z',
+        },
+        loading: false,
+        error: null,
+      });
+
+      render(<YouTubePageClient />);
+
+      expect(
+        screen.getByRole('heading', {
+          name: 'YouTube is no longer available to you',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/withdrew your YouTube Access on 14 Oct 2025\./),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', {
+          name: /YouTube is not available right now/i,
+        }),
+      ).not.toBeInTheDocument();
+      [
+        mockUseYouTubeStatus,
+        mockUseYouTubeConnect,
+        mockUseYouTubeSubscriptions,
+        mockUseYouTubeCarousel,
+        mockUseYouTubeSyncStatus,
+        mockUseVideoQueue,
+        mockUseChannelUploads,
+      ].forEach((hook) => expect(hook).not.toHaveBeenCalled());
+    });
+
     it.each([
-      ['explicitly false', { available: false, loading: false, error: null }],
-      ['still loading', { available: null, loading: true, error: null }],
+      [
+        'explicitly false',
+        { available: false, access: null, loading: false, error: null },
+      ],
+      [
+        'still loading',
+        { available: null, access: null, loading: true, error: null },
+      ],
     ])(
       'makes no connection or data hook call when availability is %s',
       (_label, availability) => {
