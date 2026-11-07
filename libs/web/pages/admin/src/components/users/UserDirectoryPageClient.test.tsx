@@ -84,6 +84,7 @@ function userFixture(
     emailVerified: true,
     youtubeAccess: false,
     createdAt: JOINED_AT,
+    lastActiveAt: null,
     ...overrides,
   };
 }
@@ -260,6 +261,35 @@ describe('UserDirectoryPageClient', () => {
         expect(screen.queryByText(/accounts ·/)).not.toBeInTheDocument();
       },
     );
+
+    it('shows a LAST ACTIVE column that reads Never for a null day and Today for a day set now', async () => {
+      mockListUsers.mockResolvedValue(
+        listResponse(
+          [
+            userFixture({
+              id: 'u-ada',
+              name: 'Ada Lovelace',
+              email: 'ada@example.com',
+              lastActiveAt: new Date().toISOString(),
+            }),
+            userFixture({
+              id: 'u-alan',
+              name: 'Alan Turing',
+              email: 'alan@example.com',
+              lastActiveAt: null,
+            }),
+          ],
+          2,
+        ),
+      );
+      renderDirectory();
+
+      expect(await screen.findByText('LAST ACTIVE')).toBeInTheDocument();
+      const ada = await screen.findByRole('link', { name: /Ada Lovelace/ });
+      expect(within(ada).getByText('Today')).toBeInTheDocument();
+      const alan = screen.getByRole('link', { name: /Alan Turing/ });
+      expect(within(alan).getByText('Never')).toBeInTheDocument();
+    });
 
     it('renders the header and summary, and no list, while the breakpoint is undecided', async () => {
       (useIsMobileState as jest.Mock).mockReturnValue(undefined);

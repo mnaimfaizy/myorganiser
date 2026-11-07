@@ -4,7 +4,7 @@ import type {
   YouTubeAccessUsageResponse,
 } from '@myorganiser/app-api-client';
 
-import { formatJoinedDate } from './userDirectory';
+import { formatJoinedDate, formatLastActivePhrase } from './userDirectory';
 
 /** The two layouts the User detail page draws. Phone is below the md breakpoint. */
 export type UserDetailVariant = 'desktop' | 'phone';
@@ -223,8 +223,9 @@ function formatDayMonthYear(date: Date): string {
 }
 
 /**
- * The identity meta line: email, phone when set, then the join date. Desktop
- * always states the year. Phone states it only when it is not this year.
+ * The identity meta line: email, phone when set, the join date, then the
+ * last-active day ("Last active today", or "Never active"). Desktop always
+ * states the join year. Phone states it only when it is not this year.
  */
 export function identityMeta(
   user: AdminUserIdentity,
@@ -235,8 +236,9 @@ export function identityMeta(
     variant === 'desktop'
       ? `Joined ${formatDayMonthYear(new Date(user.createdAt))}`
       : `Joined ${formatJoinedDate(user.createdAt, now)}`;
+  const lastActive = formatLastActivePhrase(user.lastActiveAt, now);
   const parts = user.phone
-    ? [user.email, user.phone, joined]
-    : [user.email, joined];
+    ? [user.email, user.phone, joined, lastActive]
+    : [user.email, joined, lastActive];
   return parts.join(' · ');
 }

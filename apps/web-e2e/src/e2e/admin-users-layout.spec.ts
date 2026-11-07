@@ -113,6 +113,10 @@ test.describe('Admin Users layout (E2E)', () => {
       await expect(
         rows.and(page.locator(':not([href^="/admin/users/"])')),
       ).toHaveCount(0);
+      await expect(
+        page.getByText('LAST ACTIVE', { exact: true }),
+      ).toBeVisible();
+      await expect(rows.first()).toContainText('Last active Never');
 
       const pages = page.getByRole('navigation', {
         name: 'Pages',

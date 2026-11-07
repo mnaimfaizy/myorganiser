@@ -45,6 +45,7 @@ const ADMIN_IDENTITY_SELECT = {
   email_verification_timestamp: true,
   youtube_access: true,
   created_at: true,
+  last_active_at: true,
 } as const;
 
 export type AdminIdentityUser = Prisma.UserGetPayload<{
@@ -865,6 +866,42 @@ class UserService {
     });
 
     return updatedUser;
+  }
+
+  /**
+   * Records that the User was active (a successful token refresh), at most once
+   * per UTC calendar day. Writes `now` only when nothing is stored yet or the
+   * stored value falls on an earlier UTC day. The conditional updateMany keeps
+   * concurrent refreshes from double-writing. Never throws: a failure is logged
+   * with the userId only.
+   */
+  async recordActivity(
+    user: { id: string; last_active_at?: Date | null },
+    now: Date = new Date(),
+  ): Promise<void> {
+    try {
+      const today = now.toISOString().slice(0, 10);
+      if (user.last_active_at?.toISOString().slice(0, 10) === today) {
+        return;
+      }
+      const startOfUtcDay = new Date(`${today}T00:00:00.000Z`);
+      await this.prisma.user.updateMany({
+        where: {
+          id: user.id,
+          OR: [
+            { last_active_at: null },
+            { last_active_at: { lt: startOfUtcDay } },
+          ],
+        },
+        data: { last_active_at: now },
+      });
+    } catch (error) {
+      logErrorWithStack(
+        logger,
+        `Failed to record User activity for userId ${user.id}`,
+        error,
+      );
+    }
   }
 
   async refreshToken(refreshToken: string): Promise<User | null> {

@@ -266,6 +266,7 @@ export class AuthController extends Controller {
       this.setStatus(500);
       throw new Error('Failed to create auth tokens');
     }
+    await userService.recordActivity(user);
     const filteredUser = filterUser(user as UserInterface);
 
     setRefreshCookieIfPresent(req, newRefreshToken);

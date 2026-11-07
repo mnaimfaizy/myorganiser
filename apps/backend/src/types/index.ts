@@ -51,6 +51,8 @@ export interface AdminUserIdentity {
   youtubeAccess: boolean;
   /** When the User joined (`User.created_at`). */
   createdAt: Date;
+  /** When the User last successfully refreshed a Session, recorded at most once per UTC day; null if never. */
+  lastActiveAt: Date | null;
 }
 
 /**

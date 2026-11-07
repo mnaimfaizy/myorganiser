@@ -1311,6 +1311,12 @@ components:
           type: string
           format: date-time
           description: When the User joined (`User.created_at`).
+        lastActiveAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the User last successfully refreshed a Session, recorded at
+            most once per UTC day; null if never.
       required:
         - id
         - name
@@ -1322,6 +1328,7 @@ components:
         - emailVerified
         - youtubeAccess
         - createdAt
+        - lastActiveAt
       type: object
       additionalProperties: false
     AdminUserListResponse:

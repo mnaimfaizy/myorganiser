@@ -151,6 +151,67 @@ export function formatJoinedDate(iso: string, now: Date = new Date()): string {
   return formatDayMonth(new Date(iso), now);
 }
 
+const LAST_ACTIVE_RELATIVE = new Intl.RelativeTimeFormat('en-US', {
+  numeric: 'auto',
+});
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * The local calendar day as a whole-day number. Date.UTC of the local date
+ * parts ignores the clock and any DST shift, so the difference between two
+ * of these is the count of calendar days.
+ */
+function localDayNumber(date: Date): number {
+  return Math.round(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MS_PER_DAY,
+  );
+}
+
+/**
+ * How long ago the User's last active day was, lowercase and sentence-ready:
+ * "today", "yesterday", "3 days ago", "2 weeks ago", "5 months ago",
+ * "2 years ago". A future day (clock skew) reads "today". `undefined` when the
+ * User has no last-active day or it does not parse.
+ */
+export function lastActiveAgo(
+  iso: string | null,
+  now: Date = new Date(),
+): string | undefined {
+  if (iso === null) return undefined;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return undefined;
+
+  const days = Math.max(0, localDayNumber(now) - localDayNumber(then));
+  if (days < 7) return LAST_ACTIVE_RELATIVE.format(-days, 'day');
+  if (days < 30) {
+    return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 7), 'week');
+  }
+  if (days < 365) {
+    return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 30), 'month');
+  }
+  return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 365), 'year');
+}
+
+/** "Today", "Yesterday", "3 days ago"; "Never" when there is no last-active day. */
+export function formatLastActive(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  const ago = lastActiveAgo(iso, now);
+  if (ago === undefined) return 'Never';
+  return ago.charAt(0).toUpperCase() + ago.slice(1);
+}
+
+/** "Last active today", "Last active 3 days ago"; "Never active" when there is none. */
+export function formatLastActivePhrase(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  const ago = lastActiveAgo(iso, now);
+  return ago === undefined ? 'Never active' : `Last active ${ago}`;
+}
+
 /** "Showing 1–25 of 148"; zero rows reads "Showing 0 of {total}". */
 export function formatShowingRange(
   page: number,
@@ -210,13 +271,22 @@ export function avatarFillFor(userId: string): string {
   return fill ?? USER_AVATAR_FILLS[0];
 }
 
-/** The phone row's second line. There is no last-active field, so it is the join. */
+/**
+ * The phone row's second line: "Active 3 days ago" once the User has a
+ * last-active day, otherwise the join date. Platform admins take an "Admin ·"
+ * prefix in either case.
+ */
 export function phoneUserMeta(
   user: AdminUserIdentity,
   now: Date = new Date(),
 ): string {
-  const joined = `Joined ${formatJoinedDate(user.createdAt, now)}`;
-  return user.role === 'platform_admin' ? `Admin · ${joined}` : joined;
+  const isAdmin = user.role === 'platform_admin';
+  const ago = lastActiveAgo(user.lastActiveAt, now);
+  if (ago === undefined) {
+    const joined = `Joined ${formatJoinedDate(user.createdAt, now)}`;
+    return isAdmin ? `Admin · ${joined}` : joined;
+  }
+  return isAdmin ? `Admin · ${ago}` : `Active ${ago}`;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {

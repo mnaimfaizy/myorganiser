@@ -102,6 +102,7 @@ const MOCK_DIRECTORY_USERS: AdminUserIdentity[] = [
     emailVerified: true,
     youtubeAccess: false,
     createdAt: '2026-09-02T09:00:00.000Z',
+    lastActiveAt: null,
   },
   {
     id: 'a-1',
@@ -114,6 +115,7 @@ const MOCK_DIRECTORY_USERS: AdminUserIdentity[] = [
     emailVerified: true,
     youtubeAccess: false,
     createdAt: '2026-08-15T09:00:00.000Z',
+    lastActiveAt: null,
   },
 ];
 

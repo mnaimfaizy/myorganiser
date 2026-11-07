@@ -117,6 +117,7 @@ const anaUser: AdminUserIdentity = {
   emailVerified: true,
   youtubeAccess: false,
   createdAt: todayAt(8, 0),
+  lastActiveAt: null,
 };
 
 const sampleEntries: AdminAuditLogEntry[] = [

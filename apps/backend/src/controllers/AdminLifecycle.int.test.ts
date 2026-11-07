@@ -201,6 +201,7 @@ const expectedIdentityDto = {
   disabled: false,
   emailVerified: true,
   youtubeAccess: false,
+  lastActiveAt: null,
 };
 
 describe('Admin lifecycle mutations (HTTP integration)', () => {

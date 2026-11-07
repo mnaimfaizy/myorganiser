@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { formatUserDisplayName } from '../../lib/formatUserIdentity';
 import {
   formatJoinedDate,
+  formatLastActive,
   USER_DIRECTORY_MESSAGES,
   USER_ROLE_PILLS,
   USER_STATUS_PILLS,
@@ -23,7 +24,7 @@ export interface UserDirectoryListProps {
 }
 
 const ROW_GRID =
-  'grid grid-cols-[minmax(0,2.4fr)_120px_130px_120px_24px] items-center gap-4 px-5';
+  'grid grid-cols-[minmax(0,2.4fr)_120px_130px_120px_130px_24px] items-center gap-4 px-5';
 
 /** The desktop user table, drawn as a card of grid rows. Each row is a link. */
 export function UserDirectoryList({
@@ -48,6 +49,7 @@ export function UserDirectoryList({
         <span>ROLE</span>
         <span>STATUS</span>
         <span>JOINED</span>
+        <span>LAST ACTIVE</span>
         <span />
       </div>
       {loading ? (
@@ -96,6 +98,10 @@ export function UserDirectoryList({
                   <span className="text-body-sm text-muted-foreground">
                     <span className="sr-only">Joined </span>
                     {formatJoinedDate(user.createdAt)}
+                  </span>
+                  <span className="text-body-sm text-muted-foreground">
+                    <span className="sr-only">Last active </span>
+                    {formatLastActive(user.lastActiveAt)}
                   </span>
                   <ChevronRight
                     aria-hidden="true"

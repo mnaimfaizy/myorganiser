@@ -259,6 +259,7 @@ describe('AdminUsersController (HTTP integration)', () => {
             emailVerified: true,
             youtubeAccess: false,
             createdAt: '2024-01-01T00:00:00.000Z',
+            lastActiveAt: null,
           },
         ],
         total: 1,
@@ -371,6 +372,7 @@ describe('AdminUsersController (HTTP integration)', () => {
           'emailVerified',
           'firstName',
           'id',
+          'lastActiveAt',
           'lastName',
           'name',
           'role',
@@ -450,6 +452,7 @@ describe('AdminUsersController (HTTP integration)', () => {
         emailVerified: true,
         youtubeAccess: false,
         createdAt: '2024-01-01T00:00:00.000Z',
+        lastActiveAt: null,
       });
       for (const field of sensitiveFields) {
         expect(res.body).not.toHaveProperty(field);

@@ -5,6 +5,8 @@ import {
   avatarFillFor,
   formatAccountsSummary,
   formatJoinedDate,
+  formatLastActive,
+  formatLastActivePhrase,
   formatShowingRange,
   isAdminUserSort,
   phoneChipIdFor,
@@ -27,6 +29,7 @@ function userFixture(
     emailVerified: true,
     youtubeAccess: false,
     createdAt: new Date(2026, 9, 15, 12).toISOString(),
+    lastActiveAt: null,
     ...overrides,
   };
 }
@@ -179,6 +182,67 @@ describe('phoneUserMeta', () => {
       createdAt: new Date(2026, 8, 2, 12).toISOString(),
     });
     expect(phoneUserMeta(admin, now)).toBe('Admin · Joined 2 Sep');
+  });
+
+  it('shows Active and the relative last-active day once the user has one', () => {
+    const lastActiveNow = new Date(2026, 10, 4, 9);
+    expect(
+      phoneUserMeta(
+        userFixture({ lastActiveAt: lastActiveOn(3) }),
+        lastActiveNow,
+      ),
+    ).toBe('Active 3 days ago');
+  });
+
+  it('prefixes Admin to the relative last-active day for a platform admin', () => {
+    const admin = userFixture({
+      role: 'platform_admin',
+      lastActiveAt: lastActiveOn(1),
+    });
+    expect(phoneUserMeta(admin, new Date(2026, 10, 4, 9))).toBe(
+      'Admin · yesterday',
+    );
+  });
+});
+
+/** The ISO instant at noon, `days` calendar days before 4 Nov 2026 (negative: after). */
+function lastActiveOn(days: number): string {
+  return new Date(2026, 10, 4 - days, 12).toISOString();
+}
+
+describe('formatLastActive', () => {
+  const now = new Date(2026, 10, 4, 9);
+
+  it('gives Never for a null or unparseable last-active day', () => {
+    expect(formatLastActive(null, now)).toBe('Never');
+    expect(formatLastActive('not a date', now)).toBe('Never');
+  });
+
+  it.each([
+    ['the same local day', 0, 'Today'],
+    ['the previous day', 1, 'Yesterday'],
+    ['three days back', 3, '3 days ago'],
+    ['14 days back, in weeks', 14, '2 weeks ago'],
+    ['60 days back, in months', 60, '2 months ago'],
+    ['800 days back, in years', 800, '2 years ago'],
+  ])('reads %s as %s', (_label, days, expected) => {
+    expect(formatLastActive(lastActiveOn(days), now)).toBe(expected);
+  });
+
+  it('reads a future last-active day (clock skew) as Today', () => {
+    expect(formatLastActive(lastActiveOn(-2), now)).toBe('Today');
+  });
+});
+
+describe('formatLastActivePhrase', () => {
+  const now = new Date(2026, 10, 4, 9);
+
+  it.each([
+    ['today', lastActiveOn(0), 'Last active today'],
+    ['three days back', lastActiveOn(3), 'Last active 3 days ago'],
+    ['no last-active day', null, 'Never active'],
+  ] as const)('gives %s as %s', (_label, iso, expected) => {
+    expect(formatLastActivePhrase(iso, now)).toBe(expected);
   });
 });
 
