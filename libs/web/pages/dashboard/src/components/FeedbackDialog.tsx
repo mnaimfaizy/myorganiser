@@ -16,6 +16,7 @@ import {
   useIsMobileState,
 } from '@myorganiser/web-ui';
 
+import { useFeedbackReportDraft } from '../hooks/use-feedback-report-draft';
 import { FEEDBACK_DIALOG_DESCRIPTION } from '../schemas/feedback-report';
 import { FeedbackReportForm } from './FeedbackReportForm';
 
@@ -23,6 +24,8 @@ export function FeedbackDialog() {
   const isOpen = useFeedbackDialogOpen();
   // undefined until the breakpoint is decided (first effect); see useIsMobileState.
   const isPhone = useIsMobileState();
+  // Lives above the Dialog/BottomSheet swap so typed input survives a breakpoint change.
+  const draft = useFeedbackReportDraft(isOpen);
 
   const handleOpenChange = useCallback((open: boolean) => {
     setFeedbackDialogOpen(open);
@@ -48,6 +51,7 @@ export function FeedbackDialog() {
         <BottomSheetContent className="h-[calc(100dvh_-_2.5rem)] max-h-[calc(100dvh_-_2.5rem)] gap-0 overflow-hidden px-0">
           <FeedbackReportForm
             variant="phone"
+            draft={draft}
             onSent={handleSent}
             onCancel={handleCancel}
           />
@@ -67,7 +71,11 @@ export function FeedbackDialog() {
           </div>
         </DialogHeader>
 
-        <FeedbackReportForm onSent={handleSent} onCancel={handleCancel} />
+        <FeedbackReportForm
+          draft={draft}
+          onSent={handleSent}
+          onCancel={handleCancel}
+        />
       </DialogContent>
     </Dialog>
   );
