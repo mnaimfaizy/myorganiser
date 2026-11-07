@@ -41,6 +41,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -75,6 +76,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: true,
         error: null,
       });
@@ -109,6 +111,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -130,6 +133,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: true,
+        access: null,
         loading: false,
         error: null,
       });

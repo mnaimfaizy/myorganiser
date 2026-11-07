@@ -9,13 +9,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useYouTubeAvailability } from '../hooks';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
+import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 
 export default function YouTubeCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const didRun = useRef(false);
-  const { available, error: availabilityError } = useYouTubeAvailability();
+  const availability = useYouTubeAvailability();
+  const { available } = availability;
 
   const handleBack = useCallback(() => {
     router.replace('/dashboard');
@@ -66,7 +68,7 @@ export default function YouTubeCallbackClient() {
   if (isUnavailable) {
     return (
       <YouTubeUnavailableNotice
-        reason={availabilityError ? 'unreachable' : 'unavailable'}
+        {...toUnavailableNoticeProps(availability)}
         onBack={handleBack}
       />
     );

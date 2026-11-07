@@ -27,17 +27,17 @@ import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
 import { YouTubePageHeader } from './YouTubePageHeader';
 import { YouTubeSectionNav } from './YouTubeSectionNav';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
+import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 
 export function YouTubePageClient() {
-  const { available, error: availabilityError } = useYouTubeAvailability();
+  const availability = useYouTubeAvailability();
+  const { available } = availability;
 
   // Availability gate — fail closed. The connection and data hooks live below
   // it, so a User without YouTube Access makes no YouTube request at all.
   if (available !== true) {
     return (
-      <YouTubeUnavailableNotice
-        reason={availabilityError ? 'unreachable' : 'unavailable'}
-      />
+      <YouTubeUnavailableNotice {...toUnavailableNoticeProps(availability)} />
     );
   }
 

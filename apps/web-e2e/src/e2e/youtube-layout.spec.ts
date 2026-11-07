@@ -15,7 +15,9 @@ import { PHONE_VIEWPORT, signInToShell } from './helpers/shellLayout';
  *
  * The acceptance check: no horizontal overflow at 390px, one h1 per state, and
  * labelled controls with the right roles. Each state is checked at 1440px and
- * at 390px.
+ * at 390px. The unavailable notices are covered too: the unreachable notice
+ * (Try again), the withdrawn notice (a permanent alert with no Try again), and
+ * the never-granted notice (no alert and no Try again).
  *
  * Hermetic: every YouTube read is stubbed. Availability, access, status,
  * subscriptions, carousel, sync status, the acknowledgement and the Shorts
@@ -64,6 +66,7 @@ const SHORT_TWO = 'Layout Short Two';
 
 const SYNCED_AT = '2026-10-21T09:00:00.000Z';
 const PUBLISHED_AT = '2026-10-01T10:00:00.000Z';
+const WITHDRAWN_AT = '2026-10-14T12:00:00.000Z';
 
 const SUBSCRIPTIONS = [
   {
@@ -171,7 +174,7 @@ async function signIn(page: Page) {
  */
 async function stubConnectedYouTube(page: Page) {
   await stubJsonGet(page, AVAILABILITY_URL, { available: true });
-  await stubJsonGet(page, ACCESS_URL, { granted: true });
+  await stubJsonGet(page, ACCESS_URL, { granted: true, state: 'granted' });
   await stubJsonGet(page, STATUS_URL, { connected: true, status: 'connected' });
   await stubJsonGet(page, SUBSCRIPTIONS_URL, SUBSCRIPTIONS);
   await stubJsonGet(page, CAROUSEL_URL, CAROUSEL);
@@ -389,7 +392,7 @@ function defineLayoutTests(label: string, isPhone: boolean) {
 
       await signIn(page);
       await stubJsonGet(page, AVAILABILITY_URL, { available: true });
-      await stubJsonGet(page, ACCESS_URL, { granted: true });
+      await stubJsonGet(page, ACCESS_URL, { granted: true, state: 'granted' });
       await stubJsonGet(page, STATUS_URL, {
         connected: false,
         status: 'not_connected',
@@ -437,6 +440,84 @@ function defineLayoutTests(label: string, isPhone: boolean) {
       ).toBeVisible();
 
       await expectNoHorizontalOverflow(page, `YouTube unreachable at ${label}`);
+    });
+
+    test('withdrawn notice, when a Platform Admin withdrew YouTube Access, is a permanent alert with no Try again', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await stubJsonGet(page, AVAILABILITY_URL, { available: true });
+      await stubJsonGet(page, ACCESS_URL, {
+        granted: false,
+        state: 'withdrawn',
+        withdrawnAt: WITHDRAWN_AT,
+      });
+      await gotoStable(page, '/dashboard/youtube');
+
+      await expectSingleH1(page, 'YouTube is no longer available to you');
+
+      // The route announcer is also role="alert" and repeats the h1 text, so
+      // the notice is picked out by its own caps line.
+      const notice = page
+        .getByRole('alert')
+        .filter({ hasText: 'ACCESS WITHDRAWN · PERMANENT' });
+      await expect(notice).toBeVisible();
+      await expect(
+        page.getByText(/An admin withdrew your YouTube Access on 14 Oct/),
+      ).toBeVisible();
+      await expect(
+        page.getByText(
+          'If you think this is a mistake, contact the person who runs your MyOrganiser.',
+          { exact: true },
+        ),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Back to Dashboard', exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Try again', exact: true }),
+      ).toHaveCount(0);
+
+      await expectNoHorizontalOverflow(page, `YouTube withdrawn at ${label}`);
+    });
+
+    test('never-granted notice, when YouTube Access was never granted, shows no alert and no Try again', async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+
+      await signIn(page);
+      await stubJsonGet(page, AVAILABILITY_URL, { available: true });
+      await stubJsonGet(page, ACCESS_URL, {
+        granted: false,
+        state: 'not_granted',
+      });
+      await gotoStable(page, '/dashboard/youtube');
+
+      await expectSingleH1(page, 'YouTube is not available right now');
+      await expect(
+        page.getByText('Please try again later.', { exact: true }),
+      ).toBeVisible();
+
+      // The route announcer is role="alert" too, so exclude it by id: only the
+      // notice itself must not be an alert.
+      await expect(
+        page.locator('[role="alert"]:not(#__next-route-announcer__)'),
+      ).toHaveCount(0);
+      await expect(page.getByText('ACCESS WITHDRAWN')).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Try again', exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('link', { name: 'Back to Dashboard', exact: true }),
+      ).toBeVisible();
+
+      await expectNoHorizontalOverflow(
+        page,
+        `YouTube never granted at ${label}`,
+      );
     });
 
     test('callback without an authorization code shows Connection Failed with a way back', async ({

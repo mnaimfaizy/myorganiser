@@ -451,14 +451,39 @@ components:
           nullable: true
       type: object
       additionalProperties: false
+    YouTubeAccessState:
+      type: string
+      enum:
+        - granted
+        - not_granted
+        - withdrawn
+      description: >-
+        The signed-in User's YouTube Access state (ADR 0129): `granted` while a
+
+        Platform Admin grants it, `withdrawn` once a grant has been taken back,
+        and
+
+        `not_granted` when it has never been granted.
     YouTubeAccessResponse:
       properties:
         granted:
           type: boolean
-          description: Whether a Platform Admin has granted the signed-in User YouTube
-            Access (ADR 0129).
+          description: Whether a Platform Admin currently grants the signed-in User
+            YouTube Access (ADR 0129).
+        state:
+          $ref: "#/components/schemas/YouTubeAccessState"
+          description: Derived YouTube Access state; `withdrawn` covers a grant taken back.
+        withdrawnAt:
+          type: string
+          description: >-
+            ISO time the grant was withdrawn. Present only when `state` is
+            `withdrawn`
+
+            and the withdrawal date is known; absent for Users withdrawn before
+            it was recorded.
       required:
         - granted
+        - state
       type: object
       additionalProperties: false
     YouTubeAvailabilityResponse:
@@ -2364,10 +2389,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/VersionFloorRefusal"
       description: >-
-        Whether the signed-in User has YouTube Access (ADR 0129). Reachable
-        without
+        YouTube Access state for the signed-in User (ADR 0129): `granted`,
 
-        the access scope, so the web can hide YouTube from Users without it.
+        `not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal
+        date
+
+        is known. `granted` is true only for `granted`. Reachable without the
+        access
+
+        scope, so the web can hide YouTube from Users without it.
       tags:
         - YouTube
       security:
