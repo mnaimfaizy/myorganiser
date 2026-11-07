@@ -1410,3 +1410,76 @@ test('the real checker validates its own exemption list against this repo', () =
   assert.doesNotMatch(result.stderr, /EXPORT_BASENAME_EXEMPTIONS/);
   assert.match(result.stderr, /nothing was checked/i);
 });
+
+const MULTI_COMPONENT_SOURCE = [
+  "import * as React from 'react';",
+  '',
+  'export function FirstHelper() {',
+  '  return <div>first</div>;',
+  '}',
+  '',
+  'export function SecondHelper() {',
+  '  return <div>second</div>;',
+  '}',
+  '',
+].join('\n');
+
+test('a *-story-fixtures.tsx with several exported components has no Feature Component findings', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-story-fixtures.tsx',
+    MULTI_COMPONENT_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 0);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'story-fixtures');
+  assert.deepEqual(parsed.results[0].findings, []);
+});
+
+test('a non-fixture .tsx with the same content is still flagged', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-helpers.tsx',
+    MULTI_COMPONENT_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 1);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'feature');
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'export-basename'),
+  );
+});
+
+test('a *-story-fixtures.tsx is still held to the shared rules', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-story-fixtures.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function Helper() {',
+      '  React.useEffect(() => {',
+      "    window.addEventListener('resize', () => {});",
+      '  }, []);',
+      '  return <div />;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'effect-missing-cleanup'),
+  );
+});
