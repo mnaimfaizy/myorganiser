@@ -3,18 +3,23 @@
 import { detectTimeZone } from '@myorganiser/core';
 import { useToast } from '@myorganiser/web-ui';
 import { isAxiosError } from 'axios';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { createYouTubeApi } from '../lib/apiClient';
+import {
+  youTubeDigestSchema,
+  type YouTubeDigestValues,
+} from '../schemas/youtubeDigest';
 
 export interface YouTubeDigestSettings {
   /** The digest card is shown only when this is true. */
   connected: boolean;
   enabled: boolean;
-  setEnabled: Dispatch<SetStateAction<boolean>>;
+  setEnabled: (enabled: boolean) => void;
   weekday: number;
-  setWeekday: Dispatch<SetStateAction<number>>;
+  setWeekday: (weekday: number) => void;
   saving: boolean;
   /** PATCHes the digest settings. Nothing is sent until this runs. */
   save: () => Promise<void>;
@@ -42,8 +47,13 @@ function errorMessage(error: unknown, fallback: string): string {
 export function useYouTubeDigestSettings(): YouTubeDigestSettings {
   const { toast } = useToast();
 
-  const [enabled, setEnabled] = useState(false);
-  const [weekday, setWeekday] = useState(1);
+  const { control, setValue, reset, handleSubmit } =
+    useForm<YouTubeDigestValues>({
+      resolver: zodResolver(youTubeDigestSchema),
+      defaultValues: { enabled: false, weekday: 1 },
+    });
+  const enabled = useWatch({ control, name: 'enabled' });
+  const weekday = useWatch({ control, name: 'weekday' });
   const [saving, setSaving] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -65,8 +75,7 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
 
         const { data } = await api.getNotificationSettings();
         if (cancelled) return;
-        setEnabled(data.enabled);
-        setWeekday(data.preferredWeekday);
+        reset({ enabled: data.enabled, weekday: data.preferredWeekday });
         setLoadError(null);
       } catch (error) {
         if (cancelled) return;
@@ -83,37 +92,53 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
     return () => {
       cancelled = true;
     };
-  }, [loadAttempt]);
+  }, [loadAttempt, reset]);
 
   const retryLoad = useCallback(() => {
     setLoadError(null);
     setLoadAttempt((n) => n + 1);
   }, []);
 
-  const save = useCallback(async () => {
-    setSaving(true);
-    try {
-      await createYouTubeApi().updateNotificationSettings({
-        notificationSettingsBody: {
-          enabled,
-          preferredWeekday: weekday,
-          timeZone: detectTimeZone() || 'UTC',
-        },
-      });
-      toast({
-        title: 'Saved',
-        description: 'Weekly digest settings updated.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: errorMessage(error, 'Failed to update digest settings.'),
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  }, [enabled, weekday, toast]);
+  const setEnabled = useCallback(
+    (next: boolean) => setValue('enabled', next),
+    [setValue],
+  );
+  const setWeekday = useCallback(
+    (next: number) => setValue('weekday', next),
+    [setValue],
+  );
+
+  const save = useCallback(
+    () =>
+      handleSubmit(async (values) => {
+        setSaving(true);
+        try {
+          await createYouTubeApi().updateNotificationSettings({
+            notificationSettingsBody: {
+              enabled: values.enabled,
+              preferredWeekday: values.weekday,
+              timeZone: detectTimeZone() || 'UTC',
+            },
+          });
+          toast({
+            title: 'Saved',
+            description: 'Weekly digest settings updated.',
+          });
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: errorMessage(
+              error,
+              'Failed to update digest settings.',
+            ),
+            variant: 'destructive',
+          });
+        } finally {
+          setSaving(false);
+        }
+      })(),
+    [handleSubmit, toast],
+  );
 
   return {
     connected,
