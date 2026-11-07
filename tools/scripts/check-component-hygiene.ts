@@ -13,6 +13,13 @@
  * Companion to check-test-hygiene.ts; see docs/ui/GUIDELINES.md for the rules
  * this enforces and docs/adr/0014-component-pipeline-guardrails.md for why.
  *
+ * Storybook fixtures files (`*-story-fixtures.tsx`) are exempt from the
+ * Feature Component rules and keep only the shared ones (effect cleanup,
+ * generic names, JSX size). Why: they hold decorators and helper components
+ * for stories, so "one component per file" and callback-prop rules do not fit
+ * them (#1317, ADR 0085). Recognised by name only; detecting "imported only by
+ * stories" would need import-graph analysis on every commit.
+ *
  * Scopes: UI Primitives (libs/web/ui/src/lib/components/), Feature Components
  * (libs/web/pages/<route>/src/), Vault UI Components (libs/web/vault-ui/src/lib/),
  * and Feature Library Components — `.tsx` under `libs/web/<lib>/src/lib/` of any
@@ -97,7 +104,13 @@ abstraction quality — stay with ComponentReviewer.
  * absence is stated here rather than inferred from a regex that fails to match.
  */
 /** The scopes `scopeOf` can return. A file outside all of them is out of scope. */
-const SCOPES = ['primitive', 'feature', 'vault-ui', 'feature-library'] as const;
+const SCOPES = [
+  'primitive',
+  'feature',
+  'vault-ui',
+  'feature-library',
+  'story-fixtures',
+] as const;
 type HygieneScope = (typeof SCOPES)[number];
 
 /** A barrel rule: the barrel a scope publishes through, and the path shape it keys on. */
@@ -184,6 +197,18 @@ function posix(file: string): string {
 function scopeOf(file: string): HygieneScope | null {
   const p = posix(file);
   if (/\.(stories|test|spec)\.tsx?$/.test(p)) return null;
+  const scope = componentScopeOf(p);
+  // A Storybook fixtures file is not a Feature Component, whatever library it
+  // sits in. Recognised by name only (#1317): "imported only by stories" needs
+  // import-graph analysis in a gate that runs on every commit.
+  if (scope && STORY_FIXTURES_FILE.test(p)) return 'story-fixtures';
+  return scope;
+}
+
+/** `<name>-story-fixtures.tsx`: shared decorators and fixtures for stories. */
+const STORY_FIXTURES_FILE = /-story-fixtures\.tsx$/;
+
+function componentScopeOf(p: string): HygieneScope | null {
   if (p.includes('libs/web/ui/src/lib/components/')) return 'primitive';
   // `.tsx` only: this library keeps hooks and copy modules beside its
   // components in one flat directory, and a `.ts` hook reporting PASS as a
@@ -708,6 +733,7 @@ function checkExportBasename(
   }
 
   if (isReExportBarrel(code)) return;
+  if (scope === 'story-fixtures') return;
 
   const p = posix(file);
   if (scope === 'feature' && !p.includes('/components/')) return;
@@ -824,6 +850,9 @@ const SCOPE_RULES: Record<HygieneScope, string[]> = {
     'handlerCallbacks',
     'inlinePropsType',
   ],
+  // Exempt from the Feature Component shape rules (one component per file,
+  // callback props, and the like); the shared rules still apply (#1317).
+  'story-fixtures': [],
 };
 
 /** Rules every scope is checked against, whatever else applies. */

@@ -28,6 +28,8 @@ Feature Components in `libs/web/pages/` default to no story. They depend on doma
 
 The glob reaches `libs/web/pages/*/src/**` for the exceptions an issue asks for by name: a state carried by colour, which Jest cannot see (the groceries selection states), and the dashboard shell chrome (sidebar, header and account menu, phone tab bar, app bar and More, #1276). Such a story mounts the contexts the component reads — pathname, router, Vault Session, current user — from one fixtures file beside it; it does not mock modules.
 
+Name that fixtures file `<name>-story-fixtures.tsx`. `check-component-hygiene` recognises the name and exempts the file from the Feature Component rules (one exported component per file and the like); effect cleanup, generic-name, and JSX-size rules still apply (#1317).
+
 ## 2. Title and metadata
 
 ```typescript
