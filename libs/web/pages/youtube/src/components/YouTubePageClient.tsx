@@ -45,8 +45,22 @@ export function YouTubePageClient() {
 }
 
 function YouTubeConnectionState() {
-  const { connected, status } = useYouTubeStatus();
+  const { connected, status, refresh } = useYouTubeStatus();
   const { connect } = useYouTubeConnect();
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  // A rejected auth-url request must not escape as an unhandled rejection; the
+  // User stays on the prompt, sees why, and can press Connect again.
+  const handleConnect = useCallback(async () => {
+    setConnectError(null);
+    try {
+      await connect();
+    } catch {
+      setConnectError(
+        'Could not start the YouTube connection. Please try again.',
+      );
+    }
+  }, [connect]);
 
   if (status === 'loading') {
     return (
@@ -56,10 +70,27 @@ function YouTubeConnectionState() {
     );
   }
 
+  if (status === 'error') {
+    return (
+      <div
+        role="alert"
+        className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center"
+      >
+        <p className="text-body text-destructive-text">
+          Could not check your YouTube connection.
+        </p>
+        <Button variant="outline" onClick={() => void refresh()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   if (!connected) {
     return (
       <YouTubeConnectPrompt
-        onConnect={connect}
+        onConnect={handleConnect}
+        errorMessage={connectError ?? undefined}
         statusMessage={
           status === 'revoked'
             ? 'Your previous connection was revoked. Please reconnect.'

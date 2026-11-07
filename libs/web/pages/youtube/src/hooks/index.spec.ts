@@ -900,6 +900,24 @@ describe('error responses are failures, not data', () => {
     expect(result.current.connected).toBe(false);
   });
 
+  it('useYouTubeStatus refresh recovers once the request succeeds', async () => {
+    const { result } = renderHook(() => useYouTubeStatus());
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(
+        mockResponse({
+          status: 200,
+          body: { connected: true, status: 'connected' },
+        }),
+      ),
+    );
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.status).toBe('connected');
+    expect(result.current.connected).toBe(true);
+  });
+
   it('useYouTubeSubscriptions rejects and keeps the list empty', async () => {
     // The mount read succeeds so the failure under test is the explicit call.
     fetchMock.mockImplementationOnce(() =>

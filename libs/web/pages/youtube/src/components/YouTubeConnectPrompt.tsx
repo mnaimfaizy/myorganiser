@@ -21,6 +21,9 @@ interface YouTubeConnectPromptProps {
    */
   statusMessage?: ReactNode;
 
+  /** Shown as an alert when the last connect attempt failed. */
+  errorMessage?: string;
+
   /**
    * Optional fallback link destination when onConnect is not provided.
    * If not provided and onConnect is absent, defaults to "/dashboard/youtube".
@@ -30,6 +33,7 @@ interface YouTubeConnectPromptProps {
 
 interface YouTubeConnectHeroProps {
   statusMessage?: ReactNode;
+  errorMessage?: string;
   /** The Connect action when no acknowledgement form is shown; null otherwise. */
   action: ReactNode;
 }
@@ -37,6 +41,7 @@ interface YouTubeConnectHeroProps {
 /** The navy hero: illustration, title, lead, status pill and the hero action. */
 function YouTubeConnectHero({
   statusMessage,
+  errorMessage,
   action,
 }: YouTubeConnectHeroProps) {
   const headingId = useId();
@@ -67,6 +72,14 @@ function YouTubeConnectHero({
               className="inline-flex items-center gap-2 self-start rounded-control bg-warning-text px-3 py-2 text-body-sm font-semibold text-navy-foreground"
             >
               {statusMessage}
+            </p>
+          ) : null}
+          {errorMessage ? (
+            <p
+              role="alert"
+              className="inline-flex items-center gap-2 self-start rounded-control bg-destructive-faint px-3 py-2 text-body-sm font-semibold text-destructive-text"
+            >
+              {errorMessage}
             </p>
           ) : null}
           {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
@@ -112,6 +125,7 @@ function YouTubeDataStorageCard() {
 interface YouTubeConnectPromptActionProps {
   onConnect: () => void;
   statusMessage?: ReactNode;
+  errorMessage?: string;
 }
 
 /**
@@ -127,6 +141,7 @@ interface YouTubeConnectPromptActionProps {
 function YouTubeConnectPromptAction({
   onConnect,
   statusMessage,
+  errorMessage,
 }: YouTubeConnectPromptActionProps) {
   const { acknowledged, loading, accept } = useYouTubeAcknowledgement();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -148,6 +163,7 @@ function YouTubeConnectPromptAction({
     <div className="flex flex-col gap-5">
       <YouTubeConnectHero
         statusMessage={statusMessage}
+        errorMessage={errorMessage}
         action={
           needsAcknowledgement ? null : (
             <Button
@@ -183,6 +199,7 @@ function YouTubeConnectPromptAction({
 export function YouTubeConnectPrompt({
   onConnect,
   statusMessage,
+  errorMessage,
   fallbackHref = '/dashboard/youtube',
 }: YouTubeConnectPromptProps) {
   return (
@@ -191,6 +208,7 @@ export function YouTubeConnectPrompt({
         <YouTubeConnectPromptAction
           onConnect={onConnect}
           statusMessage={statusMessage}
+          errorMessage={errorMessage}
         />
       ) : (
         <>
