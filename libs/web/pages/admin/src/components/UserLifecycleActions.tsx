@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../lib/adminVariant';
 import type {
   AdminUserIdentity,
   YouTubeAccessUsageResponse,
@@ -21,7 +22,6 @@ import {
   type LifecycleActionCopy,
   platformAdminDescription,
   SELF_GUARD_NOTE,
-  type UserDetailVariant,
   youtubeAccessDescription,
 } from '../lib/userDetail';
 import { UserActionRow } from './user-detail/UserActionRow';
@@ -34,7 +34,7 @@ interface UserLifecycleActionsProps {
   youtubeUsage: YouTubeAccessUsageResponse | null;
   /** The usage call failed. With no usage and no failure, the row reads as loading. */
   youtubeUsageFailed: boolean;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
   /** Called after each action's API call succeeds. Lets the page refresh what the action changed. */
   onActionCompleted?: (action: LifecycleAction) => void;
 }
@@ -75,7 +75,7 @@ interface LifecycleGroupProps {
   title: string;
   /** Sign-in actions carry the danger border and the destructive heading ink. */
   danger?: boolean;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
   /** The self-guard note. Inside the card on desktop, under it on phone. */
   footer?: ReactNode;
   children: ReactNode;
@@ -139,7 +139,7 @@ function LifecycleGroup({
 
 interface LifecycleRowProps {
   action: LifecycleAction;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
   /** Omit for the rows whose text is in the copy table. */
   description?: string;
   tone?: 'default' | 'danger';

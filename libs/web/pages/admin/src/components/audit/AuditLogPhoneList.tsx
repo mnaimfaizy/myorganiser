@@ -1,13 +1,14 @@
 'use client';
 
 import type { AdminAuditLogEntry } from '@myorganiser/app-api-client';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 import {
   AUDIT_LOG_MESSAGES,
   formatAuditTime,
   groupAuditEntriesByDay,
 } from '../../lib/auditLog';
+import { PhoneLoadMoreFooter } from '../paged-list/PhoneLoadMoreFooter';
 import { AuditActionPill } from './AuditActionPill';
 import { AuditPartyName } from './AuditPartyName';
 
@@ -41,39 +42,7 @@ export function AuditLogPhoneList({
   emptyMessage,
   onLoadMore,
 }: AuditLogPhoneListProps) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => groupAuditEntriesByDay(entries), [entries]);
-
-  useEffect(() => {
-    let observer: IntersectionObserver | undefined;
-    const node = sentinelRef.current;
-
-    // jsdom has no IntersectionObserver; there the list simply does not grow.
-    // After a failed append the sentinel stays quiet: no retry loop.
-    if (
-      node !== null &&
-      hasMore &&
-      !loadingMore &&
-      !loadMoreError &&
-      typeof IntersectionObserver !== 'undefined'
-    ) {
-      observer = new IntersectionObserver((observed) => {
-        if (observed.some((item) => item.isIntersecting)) {
-          onLoadMore();
-        }
-      });
-      observer.observe(node);
-    }
-
-    return () => observer?.disconnect();
-  }, [hasMore, loadingMore, loadMoreError, onLoadMore]);
-
-  const countLabel =
-    entries.length === 0
-      ? null
-      : hasMore
-        ? `Scroll for more · ${entries.length} of ${total}`
-        : `${entries.length} of ${total}`;
 
   return (
     <>
@@ -138,16 +107,15 @@ export function AuditLogPhoneList({
           </div>
         ))
       )}
-      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-      {loadMoreError ? (
-        <p className="text-center text-caption text-destructive">
-          {AUDIT_LOG_MESSAGES.error}
-        </p>
-      ) : countLabel !== null ? (
-        <p className="text-center text-caption text-muted-foreground">
-          {countLabel}
-        </p>
-      ) : null}
+      <PhoneLoadMoreFooter
+        shownCount={entries.length}
+        total={total}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        loadMoreError={loadMoreError}
+        errorMessage={AUDIT_LOG_MESSAGES.error}
+        onLoadMore={onLoadMore}
+      />
     </>
   );
 }

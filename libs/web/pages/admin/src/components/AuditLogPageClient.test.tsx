@@ -43,7 +43,7 @@ import {
 import '@testing-library/jest-dom';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
-import { formatDayMonth } from '../lib/userDirectory';
+import { formatDayMonth } from '../lib/formatDayMonth';
 
 import { AuditLogPageClient } from './AuditLogPageClient';
 

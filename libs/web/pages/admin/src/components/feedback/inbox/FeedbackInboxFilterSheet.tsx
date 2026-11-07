@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@myorganiser/web-ui';
-import { type ChangeEvent, useCallback, useId } from 'react';
+import { useId } from 'react';
 
 import {
   FEEDBACK_REPORT_KINDS,
@@ -29,6 +29,7 @@ import {
   formatFeedbackReportPlatform,
   type FeedbackInboxFilters as FeedbackFilterValues,
 } from '../../../lib/feedbackInbox';
+import { useFeedbackFilterHandlers } from '../../../hooks/use-feedback-filter-handlers';
 
 const ALL_KINDS_VALUE = 'all';
 const ANY_PLATFORM_VALUE = 'any';
@@ -57,32 +58,8 @@ export function FeedbackInboxFilterSheet({
   const activeCount = countFeedbackSheetFilters(filters);
   const triggerLabel = activeCount > 0 ? `Filters · ${activeCount}` : 'Filters';
 
-  const handleKindChange = useCallback(
-    (value: string) => {
-      onChange({
-        kind: FEEDBACK_REPORT_KINDS.find((kind) => kind === value),
-      });
-    },
-    [onChange],
-  );
-
-  const handlePlatformChange = useCallback(
-    (value: string) => {
-      onChange({
-        platform: FEEDBACK_REPORT_PLATFORMS.find(
-          (platform) => platform === value,
-        ),
-      });
-    },
-    [onChange],
-  );
-
-  const handleTrackingIssueChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      onChange({ trackingIssue: event.target.value });
-    },
-    [onChange],
-  );
+  const { handleKindChange, handlePlatformChange, handleTrackingIssueChange } =
+    useFeedbackFilterHandlers(onChange);
 
   return (
     <BottomSheet>

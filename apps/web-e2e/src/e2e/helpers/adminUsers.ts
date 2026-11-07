@@ -2,6 +2,7 @@ import type { AdminUserIdentity } from '@myorganiser/app-api-client';
 import { type Page } from '@playwright/test';
 import { routeApi } from './apiStub';
 import { corsHeaders } from './adminSession';
+import { positiveInt } from './adminPaging';
 
 /**
  * Deterministic `GET /admin/users` stub for the admin Users directory.
@@ -81,11 +82,6 @@ function sortUsers(
   return sorted.sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   );
-}
-
-function positiveInt(raw: string | null, fallback: number): number {
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 /**

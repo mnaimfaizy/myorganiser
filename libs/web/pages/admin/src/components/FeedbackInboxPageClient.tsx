@@ -1,15 +1,16 @@
 'use client';
 
+import type { AdminVariant } from '../lib/adminVariant';
 import type { FeedbackReportStatus } from '@myorganiser/app-api-client';
 import { useIsMobileState } from '@myorganiser/web-ui';
 import { useCallback } from 'react';
 
 import { useFeedbackInbox } from '../hooks/use-feedback-inbox';
-import type { FeedbackInboxVariant } from '../lib/feedbackInbox';
+import { formatFeedbackShowingRange } from '../lib/feedbackInbox';
+import { AdminPager } from './paged-list/AdminPager';
 import { FeedbackInboxFilterSheet } from './feedback/inbox/FeedbackInboxFilterSheet';
 import { FeedbackInboxFilters } from './feedback/inbox/FeedbackInboxFilters';
 import { FeedbackInboxHeader } from './feedback/inbox/FeedbackInboxHeader';
-import { FeedbackInboxPager } from './feedback/inbox/FeedbackInboxPager';
 import { FeedbackInboxPhoneList } from './feedback/inbox/FeedbackInboxPhoneList';
 import { FeedbackInboxTable } from './feedback/inbox/FeedbackInboxTable';
 import { FeedbackStatusChips } from './feedback/inbox/FeedbackStatusChips';
@@ -23,7 +24,7 @@ export function FeedbackInboxPageClient() {
   // Until the breakpoint is known, only the header and a placeholder render.
   // The hook still runs, so it is unconditional.
   const isPhone = useIsMobileState();
-  const variant: FeedbackInboxVariant = isPhone ? 'phone' : 'desktop';
+  const variant: AdminVariant = isPhone ? 'phone' : 'desktop';
   const {
     reports,
     total,
@@ -82,12 +83,20 @@ export function FeedbackInboxPageClient() {
             error={error}
             footer={
               showPager ? (
-                <FeedbackInboxPager
+                <AdminPager
+                  className="border-t border-border-subtle"
                   page={page}
                   pageSize={pageSize}
-                  shownCount={reports.length}
                   total={total}
-                  filtered={filtered}
+                  range={formatFeedbackShowingRange(
+                    page,
+                    pageSize,
+                    reports.length,
+                    total,
+                    filtered,
+                  )}
+                  previousLabel="Newer"
+                  nextLabel="Older"
                   onPageChange={goToPage}
                 />
               ) : null

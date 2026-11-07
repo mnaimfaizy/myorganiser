@@ -5,7 +5,8 @@ import type {
 import { localDateKey } from '@myorganiser/core';
 
 import { AUDIT_ACTION_LABELS, formatAuditAction } from './formatAuditLog';
-import { formatDayMonth, formatShowingRange } from './userDirectory';
+import { formatDayMonth } from './formatDayMonth';
+import { formatShowingRange } from './userDirectory';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */
 export const AUDIT_LOG_PAGE_SIZE = 25;
@@ -17,8 +18,6 @@ export const AUDIT_LOG_MESSAGES = {
   empty: 'No audit log entries yet.',
   filteredEmpty: 'No audit log entries match these filters.',
 } as const;
-
-export type AuditLogVariant = 'desktop' | 'phone';
 
 /** Every action, in the label table's order. The request key relies on this order. */
 export const AUDIT_ACTION_VALUES = Object.keys(
