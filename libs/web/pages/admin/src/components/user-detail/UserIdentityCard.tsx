@@ -11,6 +11,7 @@ import {
 } from '../../lib/userDirectory';
 import { identityMeta, type UserDetailVariant } from '../../lib/userDetail';
 import { UserAvatar } from '../users/UserAvatar';
+import { UserIdRow } from './UserIdRow';
 
 export interface UserIdentityCardProps {
   user: AdminUserIdentity;
@@ -66,6 +67,7 @@ export function UserIdentityCard({ user, variant }: UserIdentityCardProps) {
           </div>
         </div>
         <p className="text-caption text-muted-foreground">{meta}</p>
+        <UserIdRow userId={user.id} variant={variant} />
       </section>
     );
   }
@@ -86,6 +88,7 @@ export function UserIdentityCard({ user, variant }: UserIdentityCardProps) {
           </StatusPill>
           {youtubePill}
         </div>
+        <UserIdRow userId={user.id} variant={variant} />
       </div>
     </section>
   );
