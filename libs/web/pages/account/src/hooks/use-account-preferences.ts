@@ -7,47 +7,73 @@ import {
 } from '@myorganiser/core';
 import type { CurrencyCode } from '@myorganiser/vault-core';
 import { useToast } from '@myorganiser/web-ui';
-import { useCallback, useEffect, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useCallback, useEffect } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+
+import { invalidSaveToast } from '../lib/invalidSaveToast';
+import {
+  accountPreferencesSchema,
+  type AccountPreferencesValues,
+} from '../schemas/accountPreferences';
 
 export interface AccountPreferences {
   countryCode: string;
-  setCountryCode: Dispatch<SetStateAction<string>>;
+  setCountryCode: (countryCode: string) => void;
   preferredCurrency: CurrencyCode;
-  setPreferredCurrency: Dispatch<SetStateAction<CurrencyCode>>;
+  setPreferredCurrency: (currency: CurrencyCode) => void;
   /** Persists both picks. Nothing is stored until this runs. */
-  save: () => void;
+  save: () => Promise<void>;
 }
 
 /**
- * Country and currency preferences. Picks stay local until `save`, which is
- * the only call that writes them (and the only one that toasts).
+ * Country and currency preferences. Picks stay in the form until `save`,
+ * which is the only call that writes them (and the only one that toasts).
  */
 export function useAccountPreferences(): AccountPreferences {
   const { toast } = useToast();
 
-  const [countryCode, setCountryCode] = useState<string>('AU');
-  const [preferredCurrency, setPreferredCurrency] =
-    useState<CurrencyCode>('AUD');
+  const { control, setValue, reset, handleSubmit } =
+    useForm<AccountPreferencesValues>({
+      resolver: zodResolver(accountPreferencesSchema),
+      // Static defaults keep the first render identical on server and client;
+      // the effect below applies the stored settings.
+      defaultValues: { countryCode: 'AU', preferredCurrency: 'AUD' },
+    });
 
   useEffect(() => {
-    const apply = () => {
-      const settings = getAccountSettings();
-      setCountryCode(settings.countryCode);
-      setPreferredCurrency(settings.preferredCurrency);
-    };
+    const apply = () => reset(getAccountSettings());
 
     apply();
     return subscribeAccountSettings(apply);
-  }, []);
+  }, [reset]);
 
-  const save = useCallback(() => {
-    setAccountSettings({ countryCode, preferredCurrency });
-    toast({
-      title: 'Saved',
-      description: 'Account settings updated.',
-    });
-  }, [countryCode, preferredCurrency, toast]);
+  const countryCode = useWatch({ control, name: 'countryCode' });
+  const preferredCurrency = useWatch({ control, name: 'preferredCurrency' });
+
+  const setCountryCode = useCallback(
+    (next: string) => setValue('countryCode', next),
+    [setValue],
+  );
+  const setPreferredCurrency = useCallback(
+    (next: CurrencyCode) => setValue('preferredCurrency', next),
+    [setValue],
+  );
+
+  const save = useCallback(
+    () =>
+      handleSubmit(
+        (values) => {
+          setAccountSettings(values);
+          toast({
+            title: 'Saved',
+            description: 'Account settings updated.',
+          });
+        },
+        (errors) => toast(invalidSaveToast(errors)),
+      )(),
+    [handleSubmit, toast],
+  );
 
   return {
     countryCode,

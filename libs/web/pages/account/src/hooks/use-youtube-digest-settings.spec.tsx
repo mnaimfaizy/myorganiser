@@ -144,3 +144,52 @@ describe('useYouTubeDigestSettings', () => {
     ).toBe('UTC');
   });
 });
+
+describe('useYouTubeDigestSettings edits', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (detectTimeZone as jest.Mock).mockReturnValue('UTC');
+    mockApi.getConnectionStatus.mockResolvedValue({
+      data: { connected: true },
+    });
+    mockApi.getNotificationSettings.mockResolvedValue({
+      data: { enabled: true, preferredWeekday: 3 },
+    });
+    mockApi.updateNotificationSettings.mockResolvedValue({ data: {} });
+  });
+
+  it('sends the edited values and toasts on success', async () => {
+    const { result } = renderHook(() => useYouTubeDigestSettings());
+    await waitFor(() => expect(result.current.weekday).toBe(3));
+    act(() => {
+      result.current.setEnabled(false);
+      result.current.setWeekday(5);
+    });
+    await act(() => result.current.save());
+    expect(mockApi.updateNotificationSettings).toHaveBeenCalledWith({
+      notificationSettingsBody: {
+        enabled: false,
+        preferredWeekday: 5,
+        timeZone: 'UTC',
+      },
+    });
+    expect(mockToast).toHaveBeenCalledWith({
+      title: 'Saved',
+      description: 'Weekly digest settings updated.',
+    });
+  });
+
+  it('sends nothing when the weekday is invalid and says why', async () => {
+    const { result } = renderHook(() => useYouTubeDigestSettings());
+    await waitFor(() => expect(result.current.weekday).toBe(3));
+    act(() => result.current.setWeekday(9));
+    await act(() => result.current.save());
+    expect(mockApi.updateNotificationSettings).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: 'Not saved',
+      description: 'Select a day.',
+      variant: 'destructive',
+    });
+  });
+});
