@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../../paged-list/adminVariant';
 import type { AdminAuditLogEntry } from '@myorganiser/app-api-client';
 import { cn } from '@myorganiser/web-ui';
 import Link from 'next/link';
@@ -11,14 +12,13 @@ import { AUDIT_LOG_MESSAGES, formatAuditWhen } from '../../lib/auditLog';
 import {
   RECENT_ACTIVITY_EMPTY,
   RECENT_ACTIVITY_LIMIT,
-  type UserDetailVariant,
 } from '../../lib/userDetail';
 import { AuditActionPill } from '../audit/AuditActionPill';
 import { AuditPartyName } from '../audit/AuditPartyName';
 
 export interface UserRecentActivityProps {
   userId: string;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
 }
 
 /**
@@ -114,7 +114,7 @@ function bodyClass(isPhone: boolean, tone: string): string {
 interface ActivityRowProps {
   entry: AdminAuditLogEntry;
   userId: string;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
 }
 
 /**

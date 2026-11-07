@@ -1,12 +1,11 @@
 'use client';
 
+import type { AdminVariant } from '../../paged-list/adminVariant';
 import { Illustration } from '@myorganiser/web-ui';
 import type { ReactNode } from 'react';
 
-import type { AuditLogVariant } from '../../lib/auditLog';
-
 export interface AuditLogHeaderProps {
-  variant: AuditLogVariant;
+  variant: AdminVariant;
   /** Phone places the Filters trigger here, at the end of the title row. */
   children?: ReactNode;
 }

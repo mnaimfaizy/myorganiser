@@ -1,16 +1,16 @@
 'use client';
 
+import type { AdminVariant } from '../../../paged-list/adminVariant';
 import { Illustration } from '@myorganiser/web-ui';
 import type { ReactNode } from 'react';
 
 import {
   formatFeedbackInboxPhoneSubtitle,
   formatFeedbackInboxSubtitle,
-  type FeedbackInboxVariant,
 } from '../../../lib/feedbackInbox';
 
 export interface FeedbackInboxHeaderProps {
-  variant: FeedbackInboxVariant;
+  variant: AdminVariant;
   /** Received reports across the whole inbox. Undefined until known. */
   receivedCount: number | undefined;
   /** Phone places the Filters trigger here, at the end of the title row. */

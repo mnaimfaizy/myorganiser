@@ -3,13 +3,13 @@
 import type { AdminFeedbackReportListItemDto } from '@myorganiser/app-api-client';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
 
 import {
   FEEDBACK_INBOX_MESSAGES,
   formatFeedbackPhoneSent,
 } from '../../../lib/feedbackInbox';
 import { formatFeedbackReportKind } from '../../../lib/formatFeedbackReport';
+import { PhoneLoadMoreFooter } from '../../../paged-list/PhoneLoadMoreFooter';
 
 export interface FeedbackInboxPhoneListProps {
   /** Every report loaded so far. */
@@ -38,39 +38,6 @@ export function FeedbackInboxPhoneList({
   hasMore,
   onLoadMore,
 }: FeedbackInboxPhoneListProps) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let observer: IntersectionObserver | undefined;
-    const node = sentinelRef.current;
-
-    // jsdom has no IntersectionObserver; there the list simply does not grow.
-    // After a failed append the sentinel stays quiet: no retry loop.
-    if (
-      node !== null &&
-      hasMore &&
-      !loadingMore &&
-      !loadMoreError &&
-      typeof IntersectionObserver !== 'undefined'
-    ) {
-      observer = new IntersectionObserver((observed) => {
-        if (observed.some((item) => item.isIntersecting)) {
-          onLoadMore();
-        }
-      });
-      observer.observe(node);
-    }
-
-    return () => observer?.disconnect();
-  }, [hasMore, loadingMore, loadMoreError, onLoadMore]);
-
-  const countLabel =
-    reports.length === 0
-      ? null
-      : hasMore
-        ? `Scroll for more · ${reports.length} of ${total}`
-        : `${reports.length} of ${total}`;
-
   return (
     <>
       <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-raised-surface">
@@ -122,16 +89,15 @@ export function FeedbackInboxPhoneList({
           </ul>
         )}
       </div>
-      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-      {loadMoreError ? (
-        <p className="text-center text-caption text-destructive">
-          {FEEDBACK_INBOX_MESSAGES.error}
-        </p>
-      ) : countLabel !== null ? (
-        <p className="text-center text-caption text-muted-foreground">
-          {countLabel}
-        </p>
-      ) : null}
+      <PhoneLoadMoreFooter
+        shownCount={reports.length}
+        total={total}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        loadMoreError={loadMoreError}
+        errorMessage={FEEDBACK_INBOX_MESSAGES.error}
+        onLoadMore={onLoadMore}
+      />
     </>
   );
 }

@@ -1,14 +1,13 @@
 'use client';
 
+import type { AdminVariant } from '../../paged-list/adminVariant';
 import * as React from 'react';
 import { Button, useToast } from '@myorganiser/web-ui';
 import { Check, Copy } from 'lucide-react';
 
-import type { UserDetailVariant } from '../../lib/userDetail';
-
 export interface UserIdRowProps {
   userId: string;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
 }
 
 const COPIED_FEEDBACK_MS = 2000;

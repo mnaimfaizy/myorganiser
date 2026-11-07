@@ -1,10 +1,9 @@
 'use client';
 
 import type { AdminUserIdentity } from '@myorganiser/app-api-client';
-import { Button, StatusPill } from '@myorganiser/web-ui';
+import { StatusPill } from '@myorganiser/web-ui';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
 
 import { formatUserDisplayName } from '../../lib/formatUserIdentity';
 import {
@@ -13,6 +12,7 @@ import {
   USER_STATUS_PILLS,
   userDirectoryStatus,
 } from '../../lib/userDirectory';
+import { PhoneLoadMoreFooter } from '../../paged-list/PhoneLoadMoreFooter';
 import { UserAvatar } from './UserAvatar';
 
 export interface UserDirectoryPhoneListProps {
@@ -45,39 +45,6 @@ export function UserDirectoryPhoneList({
   onLoadMore,
   onRetryLoadMore,
 }: UserDirectoryPhoneListProps) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let observer: IntersectionObserver | undefined;
-    const node = sentinelRef.current;
-
-    // jsdom has no IntersectionObserver; there the list simply does not grow.
-    // After a failed append the sentinel stays quiet: no retry loop.
-    if (
-      node !== null &&
-      hasMore &&
-      !loadingMore &&
-      !loadMoreError &&
-      typeof IntersectionObserver !== 'undefined'
-    ) {
-      observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          onLoadMore();
-        }
-      });
-      observer.observe(node);
-    }
-
-    return () => observer?.disconnect();
-  }, [hasMore, loadingMore, loadMoreError, onLoadMore]);
-
-  const countLabel =
-    users.length === 0
-      ? null
-      : hasMore
-        ? `Scroll for more · ${users.length} of ${total}`
-        : `${users.length} of ${total}`;
-
   return (
     <>
       <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-raised-surface">
@@ -130,25 +97,17 @@ export function UserDirectoryPhoneList({
           </ul>
         )}
       </div>
-      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-      {loadMoreError ? (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-center text-caption text-destructive">
-            {USER_DIRECTORY_MESSAGES.error}
-          </p>
-          <Button variant="outline" size="sm" onClick={onRetryLoadMore}>
-            Try again
-          </Button>
-        </div>
-      ) : loadingMore ? (
-        <p className="text-center text-caption text-muted-foreground">
-          {USER_DIRECTORY_MESSAGES.loading}
-        </p>
-      ) : countLabel !== null ? (
-        <p className="text-center text-caption text-muted-foreground">
-          {countLabel}
-        </p>
-      ) : null}
+      <PhoneLoadMoreFooter
+        shownCount={users.length}
+        total={total}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        loadMoreError={loadMoreError}
+        errorMessage={USER_DIRECTORY_MESSAGES.error}
+        loadingMoreMessage={USER_DIRECTORY_MESSAGES.loading}
+        onLoadMore={onLoadMore}
+        onRetry={onRetryLoadMore}
+      />
     </>
   );
 }

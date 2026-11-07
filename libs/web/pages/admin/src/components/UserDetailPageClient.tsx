@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../paged-list/adminVariant';
 import { getCurrentUser } from '@myorganiser/auth';
 import { cn, useIsMobileState } from '@myorganiser/web-ui';
 import { ChevronLeft } from 'lucide-react';
@@ -9,17 +10,16 @@ import { useCallback, useState } from 'react';
 
 import { useAdminUser } from '../hooks/use-admin-user';
 import { ADMIN_SECTIONS } from '../lib/adminNav';
-import type { UserDetailVariant } from '../lib/userDetail';
 import { UserIdentityCard } from './user-detail/UserIdentityCard';
 import { UserRecentActivity } from './user-detail/UserRecentActivity';
 import { UserLifecycleActions } from './UserLifecycleActions';
 
-const PAGE_CLASS: Record<UserDetailVariant, string> = {
+const PAGE_CLASS: Record<AdminVariant, string> = {
   desktop: 'mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-8',
   phone: 'mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-4 py-3',
 };
 
-const ACTIONS_CLASS: Record<UserDetailVariant, string> = {
+const ACTIONS_CLASS: Record<AdminVariant, string> = {
   desktop:
     'grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] items-start gap-5',
   phone: 'flex flex-col gap-3',
@@ -57,7 +57,7 @@ export function UserDetailPageClient() {
     return <div aria-hidden="true" className="min-h-96" />;
   }
 
-  const variant: UserDetailVariant = isPhone ? 'phone' : 'desktop';
+  const variant: AdminVariant = isPhone ? 'phone' : 'desktop';
   const currentUserId = getCurrentUser()?.id;
   const isSelf = user !== null && user.id === currentUserId;
 

@@ -1,3 +1,4 @@
+import type { AdminVariant } from '../paged-list/adminVariant';
 import type {
   AdminUserIdentity,
   UserRole,
@@ -7,8 +8,6 @@ import type {
 import { formatJoinedDate, formatLastActivePhrase } from './userDirectory';
 
 /** The two layouts the User detail page draws. Phone is below the md breakpoint. */
-export type UserDetailVariant = 'desktop' | 'phone';
-
 /** Audit entries the Recent activity card shows. The full log is one link away. */
 export const RECENT_ACTIVITY_LIMIT = 5;
 
@@ -163,7 +162,7 @@ export const LIFECYCLE_ACTION_COPY = {
 /** The row description for a row whose text does not depend on the User's state. */
 export function lifecycleRowDescription(
   action: LifecycleAction,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string | undefined {
   const copy: LifecycleActionCopy = LIFECYCLE_ACTION_COPY[action];
   return copy.rowDescription?.[variant];
@@ -185,7 +184,7 @@ export function youtubeAccessDescription(
   granted: boolean,
   usage: YouTubeAccessUsageResponse | null,
   usageFailed: boolean,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string {
   const state = granted ? 'Granted' : 'Not granted';
   if (usage === null) {
@@ -199,7 +198,7 @@ export function youtubeAccessDescription(
 
 export function platformAdminDescription(
   role: UserRole,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string {
   if (variant === 'phone') {
     return role === 'platform_admin' ? 'Admin' : 'Not an admin';
@@ -229,7 +228,7 @@ function formatDayMonthYear(date: Date): string {
  */
 export function identityMeta(
   user: AdminUserIdentity,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
   now: Date = new Date(),
 ): string {
   const joined =

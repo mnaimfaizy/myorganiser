@@ -1,15 +1,15 @@
 'use client';
 
+import type { AdminVariant } from '../../paged-list/adminVariant';
 import type { AdminAuditAction } from '@myorganiser/app-api-client';
 import { cn, StatusPill } from '@myorganiser/web-ui';
 
-import type { AuditLogVariant } from '../../lib/auditLog';
 import { formatAuditAction } from '../../lib/formatAuditLog';
 import { AUDIT_ACTION_TONE } from '../../lib/overview';
 
 export interface AuditActionPillProps {
   action: AdminAuditAction;
-  variant: AuditLogVariant;
+  variant: AdminVariant;
   /** Extra classes, merged last. */
   className?: string;
 }

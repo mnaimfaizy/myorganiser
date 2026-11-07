@@ -1,11 +1,10 @@
+import type { AdminVariant } from '../../../paged-list/adminVariant';
 import { cn } from '@myorganiser/web-ui';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
-import type { ReportVariant } from '../../../lib/feedbackReportView';
-
 export interface ReportBackLinkProps {
-  variant: ReportVariant;
+  variant: AdminVariant;
 }
 
 /**
