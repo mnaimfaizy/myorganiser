@@ -179,11 +179,17 @@ describe('useYouTubeDigestSettings edits', () => {
     });
   });
 
-  it('sends nothing when the weekday is invalid', async () => {
+  it('sends nothing when the weekday is invalid and says why', async () => {
     const { result } = renderHook(() => useYouTubeDigestSettings());
     await waitFor(() => expect(result.current.weekday).toBe(3));
     act(() => result.current.setWeekday(9));
     await act(() => result.current.save());
     expect(mockApi.updateNotificationSettings).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: 'Not saved',
+      description: 'Select a day.',
+      variant: 'destructive',
+    });
   });
 });

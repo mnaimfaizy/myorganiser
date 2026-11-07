@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
 import { createYouTubeApi } from '../lib/apiClient';
+import { invalidSaveToast } from '../lib/invalidSaveToast';
 import {
   youTubeDigestSchema,
   type YouTubeDigestValues,
@@ -110,33 +111,36 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
 
   const save = useCallback(
     () =>
-      handleSubmit(async (values) => {
-        setSaving(true);
-        try {
-          await createYouTubeApi().updateNotificationSettings({
-            notificationSettingsBody: {
-              enabled: values.enabled,
-              preferredWeekday: values.weekday,
-              timeZone: detectTimeZone() || 'UTC',
-            },
-          });
-          toast({
-            title: 'Saved',
-            description: 'Weekly digest settings updated.',
-          });
-        } catch (error) {
-          toast({
-            title: 'Error',
-            description: errorMessage(
-              error,
-              'Failed to update digest settings.',
-            ),
-            variant: 'destructive',
-          });
-        } finally {
-          setSaving(false);
-        }
-      })(),
+      handleSubmit(
+        async (values) => {
+          setSaving(true);
+          try {
+            await createYouTubeApi().updateNotificationSettings({
+              notificationSettingsBody: {
+                enabled: values.enabled,
+                preferredWeekday: values.weekday,
+                timeZone: detectTimeZone() || 'UTC',
+              },
+            });
+            toast({
+              title: 'Saved',
+              description: 'Weekly digest settings updated.',
+            });
+          } catch (error) {
+            toast({
+              title: 'Error',
+              description: errorMessage(
+                error,
+                'Failed to update digest settings.',
+              ),
+              variant: 'destructive',
+            });
+          } finally {
+            setSaving(false);
+          }
+        },
+        (errors) => toast(invalidSaveToast(errors)),
+      )(),
     [handleSubmit, toast],
   );
 

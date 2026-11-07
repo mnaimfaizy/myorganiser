@@ -65,13 +65,18 @@ describe('useAccountPreferences', () => {
     expect(result.current.preferredCurrency).toBe('GBP');
   });
 
-  it('does not save an empty country', async () => {
+  it('does not save an empty country and says why', async () => {
     const { result } = renderHook(() => useAccountPreferences());
     await waitFor(() => expect(result.current.countryCode).toBe('NZ'));
     act(() => result.current.setCountryCode(''));
     await act(() => result.current.save());
     expect(mockSet).not.toHaveBeenCalled();
-    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: 'Not saved',
+      description: 'Select a country.',
+      variant: 'destructive',
+    });
   });
 });
 

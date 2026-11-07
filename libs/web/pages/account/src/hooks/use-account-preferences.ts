@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
+import { invalidSaveToast } from '../lib/invalidSaveToast';
 import {
   accountPreferencesSchema,
   type AccountPreferencesValues,
@@ -61,13 +62,16 @@ export function useAccountPreferences(): AccountPreferences {
 
   const save = useCallback(
     () =>
-      handleSubmit((values) => {
-        setAccountSettings(values);
-        toast({
-          title: 'Saved',
-          description: 'Account settings updated.',
-        });
-      })(),
+      handleSubmit(
+        (values) => {
+          setAccountSettings(values);
+          toast({
+            title: 'Saved',
+            description: 'Account settings updated.',
+          });
+        },
+        (errors) => toast(invalidSaveToast(errors)),
+      )(),
     [handleSubmit, toast],
   );
 
