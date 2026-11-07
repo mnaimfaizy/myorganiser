@@ -9,7 +9,9 @@ export type StatusPillTone =
   | 'trust'
   | 'success'
   | 'warning'
-  | 'danger';
+  | 'info'
+  | 'danger'
+  | 'outline';
 
 // Each tone is a -soft ground with its -text ink (DESIGN.md: the words always
 // sit in -text on -soft, so the pill never relies on its colour alone).
@@ -19,7 +21,12 @@ const statusPillTone = {
   trust: 'bg-trust-soft text-trust-text',
   success: 'bg-success-soft text-success-text',
   warning: 'bg-warning-soft text-warning-text',
+  info: 'bg-info-soft text-info-text',
   danger: 'bg-destructive-soft text-destructive-text',
+  // A card ground with a warning border and ink: the artboard's amber outline
+  // for a state that is not resolved ("Can't reproduce"). The border is the
+  // full warning colour, not -edge, so it keeps 3:1 against the ground.
+  outline: 'border border-warning bg-card text-warning-text',
 } as const satisfies Record<StatusPillTone, string>;
 
 const statusPillVariants = cva(
