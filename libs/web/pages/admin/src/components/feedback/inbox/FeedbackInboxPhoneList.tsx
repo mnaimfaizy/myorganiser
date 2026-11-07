@@ -9,7 +9,7 @@ import {
   formatFeedbackPhoneSent,
 } from '../../../lib/feedbackInbox';
 import { formatFeedbackReportKind } from '../../../lib/formatFeedbackReport';
-import { PhoneLoadMoreFooter } from '../../../paged-list/PhoneLoadMoreFooter';
+import { PhoneLoadMoreFooter } from '../../paged-list/PhoneLoadMoreFooter';
 
 export interface FeedbackInboxPhoneListProps {
   /** Every report loaded so far. */

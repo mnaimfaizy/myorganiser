@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from '../lib/adminVariant';
 import type {
   AdminUserIdentity,
   YouTubeAccessUsageResponse,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from '../lib/adminVariant';
 import { getCurrentUser } from '@myorganiser/auth';
 import { cn, useIsMobileState } from '@myorganiser/web-ui';
 import { ChevronLeft } from 'lucide-react';

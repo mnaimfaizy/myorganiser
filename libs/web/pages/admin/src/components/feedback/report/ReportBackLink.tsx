@@ -1,4 +1,4 @@
-import type { AdminVariant } from '../../../paged-list/adminVariant';
+import type { AdminVariant } from '../../../lib/adminVariant';
 import { cn } from '@myorganiser/web-ui';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';

@@ -12,7 +12,7 @@ import {
   USER_STATUS_PILLS,
   userDirectoryStatus,
 } from '../../lib/userDirectory';
-import { PhoneLoadMoreFooter } from '../../paged-list/PhoneLoadMoreFooter';
+import { PhoneLoadMoreFooter } from '../paged-list/PhoneLoadMoreFooter';
 import { UserAvatar } from './UserAvatar';
 
 export interface UserDirectoryPhoneListProps {

@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../../paged-list/adminVariant';
+import type { AdminVariant } from '../../lib/adminVariant';
 import * as React from 'react';
 import { Button, useToast } from '@myorganiser/web-ui';
 import { Check, Copy } from 'lucide-react';

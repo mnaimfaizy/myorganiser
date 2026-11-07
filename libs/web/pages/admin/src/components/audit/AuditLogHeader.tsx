@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../../paged-list/adminVariant';
+import type { AdminVariant } from '../../lib/adminVariant';
 import { Illustration } from '@myorganiser/web-ui';
 import type { ReactNode } from 'react';
 

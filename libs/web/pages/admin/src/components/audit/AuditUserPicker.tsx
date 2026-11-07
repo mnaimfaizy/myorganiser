@@ -19,7 +19,7 @@ import { createPlatformAdminApi } from '../../lib/apiClient';
 import type { AuditLogUserFilter } from '../../lib/auditLog';
 import { formatUserDisplayName } from '../../lib/formatUserIdentity';
 import { USER_DIRECTORY_MESSAGES } from '../../lib/userDirectory';
-import { useKeyedFetch } from '../../paged-list/use-keyed-fetch';
+import { useKeyedFetch } from '../../hooks/use-keyed-fetch';
 
 /** The picker shows the first ten Users by name when the search is empty. */
 const PICKER_PAGE_SIZE = 10;

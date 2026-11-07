@@ -5,7 +5,7 @@ import type {
 import { useCallback, useEffect, useState } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
-import { type PagedListMode, usePagedList } from '../paged-list/use-paged-list';
+import { type PagedListMode, usePagedList } from './use-paged-list';
 import {
   FEEDBACK_INBOX_PAGE_SIZE,
   type FeedbackInboxFilters,

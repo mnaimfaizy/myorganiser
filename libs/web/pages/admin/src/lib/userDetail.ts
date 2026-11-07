@@ -1,4 +1,4 @@
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from './adminVariant';
 import type {
   AdminUserIdentity,
   UserRole,
@@ -7,7 +7,6 @@ import type {
 
 import { formatJoinedDate, formatLastActivePhrase } from './userDirectory';
 
-/** The two layouts the User detail page draws. Phone is below the md breakpoint. */
 /** Audit entries the Recent activity card shows. The full log is one link away. */
 export const RECENT_ACTIVITY_LIMIT = 5;
 

@@ -1,13 +1,13 @@
 'use client';
 
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from '../lib/adminVariant';
 import type { FeedbackReportStatus } from '@myorganiser/app-api-client';
 import { useIsMobileState } from '@myorganiser/web-ui';
 import { useCallback } from 'react';
 
 import { useFeedbackInbox } from '../hooks/use-feedback-inbox';
 import { formatFeedbackShowingRange } from '../lib/feedbackInbox';
-import { AdminPager } from '../paged-list/AdminPager';
+import { AdminPager } from './paged-list/AdminPager';
 import { FeedbackInboxFilterSheet } from './feedback/inbox/FeedbackInboxFilterSheet';
 import { FeedbackInboxFilters } from './feedback/inbox/FeedbackInboxFilters';
 import { FeedbackInboxHeader } from './feedback/inbox/FeedbackInboxHeader';

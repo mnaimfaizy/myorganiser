@@ -5,7 +5,7 @@ import type {
 import { localDateKey } from '@myorganiser/core';
 
 import { AUDIT_ACTION_LABELS, formatAuditAction } from './formatAuditLog';
-import { formatDayMonth } from '../paged-list/formatDayMonth';
+import { formatDayMonth } from './formatDayMonth';
 import { formatShowingRange } from './userDirectory';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */

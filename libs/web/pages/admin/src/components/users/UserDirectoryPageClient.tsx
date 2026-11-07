@@ -1,11 +1,11 @@
 'use client';
 
-import type { AdminVariant } from '../../paged-list/adminVariant';
+import type { AdminVariant } from '../../lib/adminVariant';
 import { useIsMobileState } from '@myorganiser/web-ui';
 
 import { useUserDirectory } from '../../hooks/use-user-directory';
 import { formatShowingRange } from '../../lib/userDirectory';
-import { AdminPager } from '../../paged-list/AdminPager';
+import { AdminPager } from '../paged-list/AdminPager';
 import { UserDirectoryFilters } from './UserDirectoryFilters';
 import { UserDirectoryList } from './UserDirectoryList';
 import { UserDirectoryPhoneList } from './UserDirectoryPhoneList';

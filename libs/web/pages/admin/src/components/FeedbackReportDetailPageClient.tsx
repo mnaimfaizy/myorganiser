@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from '../lib/adminVariant';
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 import { Button, useIsMobileState } from '@myorganiser/web-ui';
 import { isAxiosError } from 'axios';

@@ -1,11 +1,11 @@
 'use client';
 
-import type { AdminVariant } from '../paged-list/adminVariant';
+import type { AdminVariant } from '../lib/adminVariant';
 import { useIsMobileState } from '@myorganiser/web-ui';
 
 import { useAuditLog } from '../hooks/use-audit-log';
 import { AUDIT_LOG_MESSAGES, formatAuditShowingRange } from '../lib/auditLog';
-import { AdminPager } from '../paged-list/AdminPager';
+import { AdminPager } from './paged-list/AdminPager';
 import { AuditLogFilterChips } from './audit/AuditLogFilterChips';
 import { AuditLogFilterSheet } from './audit/AuditLogFilterSheet';
 import { AuditLogFilters } from './audit/AuditLogFilters';

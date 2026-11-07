@@ -8,7 +8,7 @@ import {
   formatAuditTime,
   groupAuditEntriesByDay,
 } from '../../lib/auditLog';
-import { PhoneLoadMoreFooter } from '../../paged-list/PhoneLoadMoreFooter';
+import { PhoneLoadMoreFooter } from '../paged-list/PhoneLoadMoreFooter';
 import { AuditActionPill } from './AuditActionPill';
 import { AuditPartyName } from './AuditPartyName';
 

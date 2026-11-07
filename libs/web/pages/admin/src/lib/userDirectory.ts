@@ -6,8 +6,8 @@ import type {
 } from '@myorganiser/app-api-client';
 import type { StatusPillTone } from '@myorganiser/web-ui';
 
-import { type AdminVariant } from '../paged-list/adminVariant';
-import { formatDayMonth } from '../paged-list/formatDayMonth';
+import { type AdminVariant } from './adminVariant';
+import { formatDayMonth } from './formatDayMonth';
 import { formatUserDisplayName } from './formatUserIdentity';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */

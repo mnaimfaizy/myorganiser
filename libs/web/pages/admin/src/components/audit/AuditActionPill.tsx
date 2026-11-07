@@ -1,6 +1,6 @@
 'use client';
 
-import type { AdminVariant } from '../../paged-list/adminVariant';
+import type { AdminVariant } from '../../lib/adminVariant';
 import type { AdminAuditAction } from '@myorganiser/app-api-client';
 import { cn, StatusPill } from '@myorganiser/web-ui';
 

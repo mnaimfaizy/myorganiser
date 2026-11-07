@@ -5,7 +5,7 @@ import {
 } from '@myorganiser/app-api-client';
 
 import { formatAuditTime, relativeDayLabel } from './auditLog';
-import { formatDayMonth } from '../paged-list/formatDayMonth';
+import { formatDayMonth } from './formatDayMonth';
 import { formatShowingRange } from './userDirectory';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */

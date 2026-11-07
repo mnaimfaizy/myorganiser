@@ -6,7 +6,7 @@ import type {
 import { useCallback, useState } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
-import { type PagedListMode, usePagedList } from '../paged-list/use-paged-list';
+import { type PagedListMode, usePagedList } from './use-paged-list';
 import {
   USER_DIRECTORY_PAGE_SIZE,
   type UserDirectoryFilterValues,
