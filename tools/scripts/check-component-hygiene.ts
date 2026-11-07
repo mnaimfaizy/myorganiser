@@ -13,12 +13,14 @@
  * Companion to check-test-hygiene.ts; see docs/ui/GUIDELINES.md for the rules
  * this enforces and docs/adr/0014-component-pipeline-guardrails.md for why.
  *
- * Storybook fixtures files (`*-story-fixtures.tsx`) are exempt from the
- * Feature Component rules and keep only the shared ones (effect cleanup,
- * generic names, JSX size). Why: they hold decorators and helper components
- * for stories, so "one component per file" and callback-prop rules do not fit
- * them (#1317, ADR 0085). Recognised by name only; detecting "imported only by
- * stories" would need import-graph analysis on every commit.
+ * Storybook fixtures files (`*-story-fixtures.tsx`) in a page library
+ * (`libs/web/pages/**`) are exempt from the Feature Component rules and keep
+ * only the shared ones (effect cleanup, generic names, JSX size). A fixtures
+ * file in any other scope keeps that scope's rules. Why: they hold decorators
+ * and helper components for stories, so "one component per file" and
+ * callback-prop rules do not fit them (#1317, ADR 0085). Recognised by name
+ * only; detecting "imported only by stories" would need import-graph analysis
+ * on every commit.
  *
  * Scopes: UI Primitives (libs/web/ui/src/lib/components/), Feature Components
  * (libs/web/pages/<route>/src/), Vault UI Components (libs/web/vault-ui/src/lib/),
@@ -198,10 +200,13 @@ function scopeOf(file: string): HygieneScope | null {
   const p = posix(file);
   if (/\.(stories|test|spec)\.tsx?$/.test(p)) return null;
   const scope = componentScopeOf(p);
-  // A Storybook fixtures file is not a Feature Component, whatever library it
-  // sits in. Recognised by name only (#1317): "imported only by stories" needs
-  // import-graph analysis in a gate that runs on every commit.
-  if (scope && STORY_FIXTURES_FILE.test(p)) return 'story-fixtures';
+  // A Storybook fixtures file in a page library is not a Feature Component.
+  // Recognised by name only (#1317): "imported only by stories" needs
+  // import-graph analysis in a gate that runs on every commit. Other scopes
+  // keep their rules, so the name alone never relaxes a primitive check.
+  if (scope === 'feature' && STORY_FIXTURES_FILE.test(p)) {
+    return 'story-fixtures';
+  }
   return scope;
 }
 
