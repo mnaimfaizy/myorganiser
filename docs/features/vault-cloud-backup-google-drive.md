@@ -454,11 +454,11 @@ Two old routes redirect here permanently:
 
 The backend exposes three JWT-protected endpoints under `/api/v1/vault/backups`:
 
-| Method | Path                                              | Purpose                                         |
-| ------ | ------------------------------------------------- | ----------------------------------------------- |
-| POST   | `/vault/backups`                                  | Append an audit row (called by `AuditReporter`) |
-| GET    | `/vault/backups/latest?status=…&source=…&event=…` | Fetch latest matching audit row (404 if none)   |
-| GET    | `/vault/backups?cursor=…&limit=…&source=…`        | Cursor-paginated list of audit rows             |
+| Method | Path                                              | Purpose                                            |
+| ------ | ------------------------------------------------- | -------------------------------------------------- |
+| POST   | `/vault/backups`                                  | Append an audit row (called by `AuditReporter`)    |
+| GET    | `/vault/backups/latest?status=…&source=…&event=…` | Fetch latest matching audit row (200 null if none) |
+| GET    | `/vault/backups?cursor=…&limit=…&source=…`        | Cursor-paginated list of audit rows                |
 
 Schema highlights (Prisma model `VaultBackupRecord`):
 
