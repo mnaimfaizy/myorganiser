@@ -34,19 +34,24 @@ type PassphraseRewriteOptions = {
  * `changePassphraseWithCurrent` verifies the current passphrase;
  * `resetPassphraseAfterRecoveryAndAnnounce` does not.
  */
+async function changeWithCurrentPassphrase(
+  options: PassphraseRewriteOptions,
+): Promise<ChangePassphraseOutcome> {
+  const result = await changePassphraseWithCurrent({
+    api: createVaultApi(),
+    handle: options.handle,
+    currentPassphrase: options.currentPassphrase,
+    newPassphrase: options.newPassphrase,
+  });
+  announcePassphraseChange(result, options.toast);
+  return 'ok';
+}
+
 const PASSPHRASE_REWRITE_FOR_UNLOCK_SECRET = {
-  passphrase: async (
-    options: PassphraseRewriteOptions,
-  ): Promise<ChangePassphraseOutcome> => {
-    const result = await changePassphraseWithCurrent({
-      api: createVaultApi(),
-      handle: options.handle,
-      currentPassphrase: options.currentPassphrase,
-      newPassphrase: options.newPassphrase,
-    });
-    announcePassphraseChange(result, options.toast);
-    return 'ok';
-  },
+  passphrase: changeWithCurrentPassphrase,
+  // A passkey unlock never counts as knowing the passphrase (ADR 0136): the
+  // change still verifies the current one, exactly as a passphrase unlock.
+  passkey: changeWithCurrentPassphrase,
   'recovery-key': (
     options: PassphraseRewriteOptions,
   ): Promise<ChangePassphraseOutcome> =>

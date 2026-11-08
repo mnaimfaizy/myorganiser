@@ -11,13 +11,17 @@ export interface ChangePassphraseMode {
   submitLabel: string;
 }
 
+const CHANGE_WITH_CURRENT_PASSPHRASE_MODE = {
+  title: 'Change passphrase',
+  description:
+    'Choose a new passphrase for unlocking your vault on this device.',
+  submitLabel: 'Change passphrase',
+} as const satisfies ChangePassphraseMode;
+
 const CHANGE_PASSPHRASE_MODE_FOR_UNLOCK_SECRET = {
-  passphrase: {
-    title: 'Change passphrase',
-    description:
-      'Choose a new passphrase for unlocking your vault on this device.',
-    submitLabel: 'Change passphrase',
-  },
+  passphrase: CHANGE_WITH_CURRENT_PASSPHRASE_MODE,
+  // A passkey unlock changes the passphrase the way a passphrase unlock does.
+  passkey: CHANGE_WITH_CURRENT_PASSPHRASE_MODE,
   'recovery-key': {
     title: 'Set new passphrase',
     description:

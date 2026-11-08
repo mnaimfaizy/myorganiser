@@ -1457,6 +1457,103 @@ describe('VaultSessionProvider', () => {
       expect(mockCheckVaultAbsentEvidence).not.toHaveBeenCalled();
     });
   });
+
+  describe('passkey unlock secret (ADR 0136)', () => {
+    test('a passkey unlock records "passkey" and owes no passphrase reset prompt', async () => {
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+
+      const { result } = renderHook(() => useVaultSession(), { wrapper });
+
+      act(() => {
+        result.current.setMasterKeyBytes(new Uint8Array([1, 2, 3]), 'passkey');
+      });
+
+      await waitFor(() => {
+        expect(result.current.unlockSecret).toBe('passkey');
+        expect(result.current.masterKeyBytes).toEqual(
+          new Uint8Array([1, 2, 3]),
+        );
+        expect(result.current.passphraseResetPromptOwed).toBe(false);
+      });
+    });
+
+    test('skip and complete on a passkey session are no-ops: nothing owed, secret unchanged', async () => {
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+
+      const { result } = renderHook(() => useVaultSession(), { wrapper });
+
+      act(() => {
+        result.current.setMasterKeyBytes(new Uint8Array([4, 5, 6]), 'passkey');
+      });
+
+      await waitFor(() => {
+        expect(result.current.unlockSecret).toBe('passkey');
+      });
+
+      act(() => {
+        result.current.skipPassphraseResetPrompt();
+        result.current.completePassphraseResetPrompt();
+      });
+
+      await waitFor(() => {
+        expect(result.current.passphraseResetPromptOwed).toBe(false);
+        expect(result.current.unlockSecret).toBe('passkey');
+      });
+    });
+
+    test('a recovery-key unlock after a passkey session still owes the prompt', async () => {
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+
+      const { result } = renderHook(() => useVaultSession(), { wrapper });
+
+      act(() => {
+        result.current.setMasterKeyBytes(new Uint8Array([7, 8, 9]), 'passkey');
+      });
+
+      await waitFor(() => {
+        expect(result.current.unlockSecret).toBe('passkey');
+      });
+
+      act(() => {
+        result.current.setMasterKeyBytes(
+          new Uint8Array([10, 11, 12]),
+          'recovery-key',
+        );
+      });
+
+      await waitFor(() => {
+        expect(result.current.unlockSecret).toBe('recovery-key');
+        expect(result.current.passphraseResetPromptOwed).toBe(true);
+      });
+    });
+
+    test('lock clears the passkey unlock secret', async () => {
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+
+      const { result } = renderHook(() => useVaultSession(), { wrapper });
+
+      act(() => {
+        result.current.setMasterKeyBytes(
+          new Uint8Array([13, 14, 15]),
+          'passkey',
+        );
+      });
+
+      await waitFor(() => {
+        expect(result.current.unlockSecret).toBe('passkey');
+      });
+
+      act(() => {
+        result.current.lock();
+      });
+
+      await waitFor(() => {
+        expect(result.current.masterKeyBytes).toBeNull();
+        expect(result.current.unlockSecret).toBeNull();
+        expect(result.current.passphraseResetPromptOwed).toBe(false);
+      });
+    });
+  });
 });
 
 describe('useVaultSession', () => {

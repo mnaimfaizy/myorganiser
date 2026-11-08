@@ -36,8 +36,13 @@ import {
 /**
  * Which secret produced the current in-memory Vault Unlock.
  * Session-scoped only — never persisted into the Local Vault.
+ *
+ * `passkey` is Passkey Unlock (ADR 0136): it authorizes what `passphrase`
+ * does except that it never counts as knowing the passphrase — a change still
+ * asks for the current one, and only `recovery-key` owes the Passphrase Reset
+ * Prompt or authorizes a reset.
  */
-export type VaultUnlockSecret = 'passphrase' | 'recovery-key';
+export type VaultUnlockSecret = 'passphrase' | 'recovery-key' | 'passkey';
 
 /**
  * How this recovery-unlocked session answered the Passphrase Reset Prompt.

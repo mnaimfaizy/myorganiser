@@ -285,6 +285,65 @@ describe('useChangePassphrase', () => {
         }),
       );
     });
+
+    test('14: unlockSecret "passkey" → changePassphraseWithCurrent with current+new, not resetPassphraseAfterRecovery, and the reset prompt is not completed', async () => {
+      const mockHandle = createMockHandle();
+      const mockCompletePassphraseResetPrompt = jest.fn();
+      (useOptionalVaultSession as jest.Mock).mockReturnValue({
+        handle: mockHandle,
+        masterKeyBytes: new Uint8Array(32),
+        unlockSecret: 'passkey',
+        completePassphraseResetPrompt: mockCompletePassphraseResetPrompt,
+      });
+      (changePassphraseWithCurrent as jest.Mock).mockResolvedValue({
+        push: { kind: 'pushed' },
+      });
+
+      const { result } = renderHook(() => useChangePassphrase());
+
+      let callResult: 'ok' | 'wrong-passphrase' | 'error' | undefined;
+      await act(async () => {
+        callResult = await result.current.changePassphrase({
+          currentPassphrase: 'oldpass1234',
+          newPassphrase: 'newpass12345',
+        });
+      });
+
+      expect(callResult).toBe('ok');
+      expect(changePassphraseWithCurrent).toHaveBeenCalledWith({
+        api: {},
+        handle: mockHandle,
+        currentPassphrase: 'oldpass1234',
+        newPassphrase: 'newpass12345',
+      });
+      expect(resetPassphraseAfterRecovery).not.toHaveBeenCalled();
+      expect(mockCompletePassphraseResetPrompt).not.toHaveBeenCalled();
+    });
+
+    test('15: unlockSecret "passkey" with a wrong current passphrase → returns "wrong-passphrase" and never resets', async () => {
+      (useOptionalVaultSession as jest.Mock).mockReturnValue({
+        handle: createMockHandle(),
+        masterKeyBytes: new Uint8Array(32),
+        unlockSecret: 'passkey',
+        completePassphraseResetPrompt: jest.fn(),
+      });
+      (changePassphraseWithCurrent as jest.Mock).mockRejectedValue(
+        new VaultSecretMismatchError('passphrase'),
+      );
+
+      const { result } = renderHook(() => useChangePassphrase());
+
+      let callResult: 'ok' | 'wrong-passphrase' | 'error' | undefined;
+      await act(async () => {
+        callResult = await result.current.changePassphrase({
+          currentPassphrase: 'wrongpass123',
+          newPassphrase: 'newpass12345',
+        });
+      });
+
+      expect(callResult).toBe('wrong-passphrase');
+      expect(resetPassphraseAfterRecovery).not.toHaveBeenCalled();
+    });
   });
 
   describe('Push outcomes — all non-destructive despite reaching server', () => {

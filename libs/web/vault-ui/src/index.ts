@@ -3,6 +3,10 @@ export * from './lib/formatDate';
 export * from './lib/LastBackupCard';
 export * from './lib/metaConvergeRunner';
 export * from './lib/newPassphraseFields';
+export * from './lib/PasskeyUnlockOffer';
+export * from './lib/passkeyUnlockOfferRunner';
+export * from './lib/PasskeyUnlockOption';
+export * from './lib/passkeyPlatformContext';
 export * from './lib/passphraseResetPrompt';
 export * from './lib/PassphraseUnlockForm';
 export * from './lib/recoveryPassphraseReset';
@@ -18,6 +22,8 @@ export * from './lib/syncStatusWidget';
 export * from './lib/UnacknowledgedRecoveryKeyBanner';
 export * from './lib/useExportVault';
 export * from './lib/useLocalVaultRevision';
+export * from './lib/usePasskeyUnlock';
+export * from './lib/usePasskeyUnlockOffer';
 export * from './lib/useServerReachability';
 // The two evidence hooks are deliberately not exported. They are called from
 // `VaultSessionProvider` and nowhere else (libs/web/vault-ui/AGENTS.md); a

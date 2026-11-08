@@ -25,6 +25,28 @@ export type {
 } from './lib/vault/vaultHandle';
 export * from './lib/vault/localVaultRevision';
 export * from './lib/vault/passphrasePolicy';
+// The Passkey Unlock policy and its browser Platform Adapter. The wrapping
+// record's storage stays internal: every function here names an owner first,
+// for the same reason the Vault Handle does (ADR 0047, ADR 0136).
+export {
+  PASSKEY_PRF_OUTPUT_LENGTH,
+  PASSKEY_USER_VERIFICATION,
+  canOfferPasskeyUnlock,
+  enrolPasskeyUnlock,
+  isPasskeyUnlockEnrolled,
+  recordPasskeyUnlockOffered,
+  unlockWithPasskey,
+} from './lib/vault/passkeyUnlock';
+export type {
+  PasskeyAssertionRequest,
+  PasskeyAssertionResult,
+  PasskeyCreationRequest,
+  PasskeyCreationResult,
+  PasskeyEnrolmentOutcome,
+  PasskeyPlatform,
+  PasskeyUnlockOutcome,
+} from './lib/vault/passkeyUnlock';
+export { createBrowserPasskeyPlatform } from './lib/vault/passkeyPlatform';
 // The mint only. `rotateRecoveryKeyWithPassphrase` is exported with the other
 // wrapping changes from `vaultMetaPush`, and the Local Vault write it reaches
 // stays behind the Vault Handle (ADR 0047).

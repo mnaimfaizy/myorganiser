@@ -28,6 +28,8 @@ import {
   type RecoveryKeyClaimAnswer,
 } from './RecoveryKeyClaimOffer';
 import { PassphraseUnlockForm } from './PassphraseUnlockForm';
+import { PasskeyUnlockOption } from './PasskeyUnlockOption';
+import { usePasskeyUnlock } from './usePasskeyUnlock';
 import { RecoveryKeyAcknowledgment } from './RecoveryKeyAcknowledgment';
 import { UnacknowledgedRecoveryKeyBanner } from './UnacknowledgedRecoveryKeyBanner';
 import { VaultGateFrame } from './VaultGateFrame';
@@ -61,6 +63,15 @@ export function VaultGate(props: VaultGateProps) {
 
   const vaultSession = useOptionalVaultSession();
   const handle = vaultSession?.handle ?? null;
+
+  const {
+    available: passkeyAvailable,
+    unlocking: passkeyUnlocking,
+    unlock: unlockWithPasskey,
+  } = usePasskeyUnlock();
+  const handlePasskeyUnlock = useCallback(() => {
+    void unlockWithPasskey();
+  }, [unlockWithPasskey]);
 
   // Both read from the Vault Session rather than asked here. The session asks
   // once per owner and `VaultReconcileRunner` waits on the same claim answer,
@@ -727,6 +738,12 @@ export function VaultGate(props: VaultGateProps) {
     >
       {showRemountRecoveryKeyBanner && (
         <UnacknowledgedRecoveryKeyBanner surface="locked" />
+      )}
+      {passkeyAvailable && (
+        <PasskeyUnlockOption
+          unlocking={passkeyUnlocking}
+          onUnlock={handlePasskeyUnlock}
+        />
       )}
       <PassphraseUnlockForm
         value={passphrase}
