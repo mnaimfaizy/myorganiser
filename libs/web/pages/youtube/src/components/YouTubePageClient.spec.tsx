@@ -286,6 +286,53 @@ describe('YouTubePageClient', () => {
     expect(connect).toHaveBeenCalledTimes(1);
   });
 
+  it('shows an error and Retry when the status request fails', () => {
+    const refresh = jest.fn();
+    mockUseYouTubeStatus.mockReturnValue({
+      connected: false,
+      status: 'error',
+      refresh,
+    });
+    render(<YouTubePageClient />);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not check your YouTube connection.',
+    );
+    expect(screen.queryByText('Connect YouTube')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error and keeps Connect usable when connect rejects', async () => {
+    let attempts = 0;
+    const connect = jest.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('boom');
+    });
+    mockUseYouTubeStatus.mockReturnValue({
+      connected: false,
+      status: 'disconnected',
+      refresh: jest.fn(),
+    });
+    mockUseYouTubeConnect.mockReturnValue({
+      connect,
+      disconnect: jest.fn(),
+    });
+    render(<YouTubePageClient />);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Connect YouTube'));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not start the YouTube connection.',
+    );
+    const button = screen.getByRole('button', { name: 'Connect YouTube' });
+    expect(button).toBeEnabled();
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('should show connected dashboard when connected', () => {
     mockUseYouTubeStatus.mockReturnValue({
       connected: true,
