@@ -43,7 +43,7 @@ import {
 import '@testing-library/jest-dom';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
-import { formatDayMonth } from '../lib/userDirectory';
+import { formatDayMonth } from '../lib/formatDayMonth';
 
 import { AuditLogPageClient } from './AuditLogPageClient';
 
@@ -117,6 +117,7 @@ const anaUser: AdminUserIdentity = {
   emailVerified: true,
   youtubeAccess: false,
   createdAt: todayAt(8, 0),
+  lastActiveAt: null,
 };
 
 const sampleEntries: AdminAuditLogEntry[] = [

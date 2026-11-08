@@ -13,6 +13,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('@myorganiser/web-ui', () => ({
   ...jest.requireActual('@myorganiser/web-ui'),
   useToast: jest.fn(),
+  openFeedbackDialog: jest.fn(),
 }));
 
 jest.mock('@myorganiser/web-vault-ui', () => ({
@@ -20,20 +21,15 @@ jest.mock('@myorganiser/web-vault-ui', () => ({
   useVaultLockState: jest.fn(),
 }));
 
-jest.mock('../hooks/use-feedback-dialog', () => ({
-  openFeedbackDialog: jest.fn(),
-}));
-
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCurrentUser, logout } from '@myorganiser/auth';
-import { useToast } from '@myorganiser/web-ui';
+import { openFeedbackDialog, useToast } from '@myorganiser/web-ui';
 import { useRouter } from 'next/navigation';
 import {
   useOptionalVaultSession,
   useVaultLockState,
 } from '@myorganiser/web-vault-ui';
-import { openFeedbackDialog } from '../hooks/use-feedback-dialog';
 import { AccountMenu } from './AccountMenu';
 
 type Role = 'platform_admin' | 'user';

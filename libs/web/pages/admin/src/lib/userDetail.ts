@@ -1,13 +1,11 @@
+import type { AdminVariant } from './adminVariant';
 import type {
   AdminUserIdentity,
   UserRole,
   YouTubeAccessUsageResponse,
 } from '@myorganiser/app-api-client';
 
-import { formatJoinedDate } from './userDirectory';
-
-/** The two layouts the User detail page draws. Phone is below the md breakpoint. */
-export type UserDetailVariant = 'desktop' | 'phone';
+import { formatJoinedDate, formatLastActivePhrase } from './userDirectory';
 
 /** Audit entries the Recent activity card shows. The full log is one link away. */
 export const RECENT_ACTIVITY_LIMIT = 5;
@@ -163,7 +161,7 @@ export const LIFECYCLE_ACTION_COPY = {
 /** The row description for a row whose text does not depend on the User's state. */
 export function lifecycleRowDescription(
   action: LifecycleAction,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string | undefined {
   const copy: LifecycleActionCopy = LIFECYCLE_ACTION_COPY[action];
   return copy.rowDescription?.[variant];
@@ -185,7 +183,7 @@ export function youtubeAccessDescription(
   granted: boolean,
   usage: YouTubeAccessUsageResponse | null,
   usageFailed: boolean,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string {
   const state = granted ? 'Granted' : 'Not granted';
   if (usage === null) {
@@ -199,7 +197,7 @@ export function youtubeAccessDescription(
 
 export function platformAdminDescription(
   role: UserRole,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
 ): string {
   if (variant === 'phone') {
     return role === 'platform_admin' ? 'Admin' : 'Not an admin';
@@ -223,20 +221,22 @@ function formatDayMonthYear(date: Date): string {
 }
 
 /**
- * The identity meta line: email, phone when set, then the join date. Desktop
- * always states the year. Phone states it only when it is not this year.
+ * The identity meta line: email, phone when set, the join date, then the
+ * last-active day ("Last active today", or "Never active"). Desktop always
+ * states the join year. Phone states it only when it is not this year.
  */
 export function identityMeta(
   user: AdminUserIdentity,
-  variant: UserDetailVariant,
+  variant: AdminVariant,
   now: Date = new Date(),
 ): string {
   const joined =
     variant === 'desktop'
       ? `Joined ${formatDayMonthYear(new Date(user.createdAt))}`
       : `Joined ${formatJoinedDate(user.createdAt, now)}`;
+  const lastActive = formatLastActivePhrase(user.lastActiveAt, now);
   const parts = user.phone
-    ? [user.email, user.phone, joined]
-    : [user.email, joined];
+    ? [user.email, user.phone, joined, lastActive]
+    : [user.email, joined, lastActive];
   return parts.join(' · ');
 }

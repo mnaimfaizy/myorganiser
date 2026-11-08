@@ -46,6 +46,7 @@ const ADMIN_IDENTITY_SELECT = {
   email_verification_timestamp: true,
   youtube_access: true,
   created_at: true,
+  last_active_at: true,
 } as const;
 
 export type AdminIdentityUser = Prisma.UserGetPayload<{
@@ -453,6 +454,7 @@ class UserService {
         where: { id: targetUserId },
         data: {
           youtube_access: true,
+          youtube_access_withdrawn_at: null,
           youtube_access_first_granted_at:
             target.youtube_access_first_granted_at ?? new Date(),
         },
@@ -480,9 +482,21 @@ class UserService {
     await this.requireIdentityUser(targetUserId);
 
     return this.prisma.$transaction(async (tx) => {
+      // Stamp the withdrawal only when access is actually taken back: a repeat
+      // withdraw keeps the original date, and a never-granted User is not made
+      // to read as withdrawn (#1308).
+      const current = await tx.user.findUnique({
+        where: { id: targetUserId },
+        select: { youtube_access: true },
+      });
       const updated = await tx.user.update({
         where: { id: targetUserId },
-        data: { youtube_access: false },
+        data: {
+          youtube_access: false,
+          ...(current?.youtube_access === true
+            ? { youtube_access_withdrawn_at: new Date() }
+            : {}),
+        },
         select: ADMIN_IDENTITY_SELECT,
       });
       await this.writeAdminAuditLog(
@@ -872,6 +886,42 @@ class UserService {
     });
 
     return updatedUser;
+  }
+
+  /**
+   * Records that the User was active (a successful token refresh), at most once
+   * per UTC calendar day. Writes `now` only when nothing is stored yet or the
+   * stored value falls on an earlier UTC day. The conditional updateMany keeps
+   * concurrent refreshes from double-writing. Never throws: a failure is logged
+   * with the userId only.
+   */
+  async recordActivity(
+    user: { id: string; last_active_at?: Date | null },
+    now: Date = new Date(),
+  ): Promise<void> {
+    try {
+      const today = now.toISOString().slice(0, 10);
+      if (user.last_active_at?.toISOString().slice(0, 10) === today) {
+        return;
+      }
+      const startOfUtcDay = new Date(`${today}T00:00:00.000Z`);
+      await this.prisma.user.updateMany({
+        where: {
+          id: user.id,
+          OR: [
+            { last_active_at: null },
+            { last_active_at: { lt: startOfUtcDay } },
+          ],
+        },
+        data: { last_active_at: now },
+      });
+    } catch (error) {
+      logErrorWithStack(
+        logger,
+        `Failed to record User activity for userId ${user.id}`,
+        error,
+      );
+    }
   }
 
   async refreshToken(refreshToken: string): Promise<User | null> {

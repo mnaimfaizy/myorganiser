@@ -8,6 +8,7 @@ import type {
 import { type Page } from '@playwright/test';
 import { routeApi } from './apiStub';
 import { corsHeaders } from './adminSession';
+import { pad3, positiveInt } from './adminPaging';
 
 /**
  * Deterministic admin feedback fixtures and a paged `GET /admin/feedback/reports`
@@ -42,10 +43,6 @@ export interface AdminFeedbackReportRequest {
   trackingIssueNumber: string | null;
   page: number;
   pageSize: number;
-}
-
-function pad3(value: number): string {
-  return String(value).padStart(3, '0');
 }
 
 function reporterFor(
@@ -153,11 +150,6 @@ export function buildAdminFeedbackReportDetail(
     fixNoticeOptIn: true,
     ...overrides,
   };
-}
-
-function positiveInt(raw: string | null, fallback: number): number {
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 export interface StubAdminFeedbackReportsOptions {

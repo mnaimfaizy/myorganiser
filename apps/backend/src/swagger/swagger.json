@@ -618,15 +618,33 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"YouTubeAccessState": {
+				"type": "string",
+				"enum": [
+					"granted",
+					"not_granted",
+					"withdrawn"
+				],
+				"description": "The signed-in User's YouTube Access state (ADR 0129): `granted` while a\nPlatform Admin grants it, `withdrawn` once a grant has been taken back, and\n`not_granted` when it has never been granted."
+			},
 			"YouTubeAccessResponse": {
 				"properties": {
 					"granted": {
 						"type": "boolean",
-						"description": "Whether a Platform Admin has granted the signed-in User YouTube Access (ADR 0129)."
+						"description": "Whether a Platform Admin currently grants the signed-in User YouTube Access (ADR 0129)."
+					},
+					"state": {
+						"$ref": "#/components/schemas/YouTubeAccessState",
+						"description": "Derived YouTube Access state; `withdrawn` covers a grant taken back."
+					},
+					"withdrawnAt": {
+						"type": "string",
+						"description": "ISO time the grant was withdrawn. Present only when `state` is `withdrawn`\nand the withdrawal date is known; absent for Users withdrawn before it was recorded."
 					}
 				},
 				"required": [
-					"granted"
+					"granted",
+					"state"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -1831,6 +1849,12 @@
 						"type": "string",
 						"format": "date-time",
 						"description": "When the User joined (`User.created_at`)."
+					},
+					"lastActiveAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true,
+						"description": "When the User last successfully refreshed a Session, recorded at most once per UTC day; null if never."
 					}
 				},
 				"required": [
@@ -1843,7 +1867,8 @@
 					"disabled",
 					"emailVerified",
 					"youtubeAccess",
-					"createdAt"
+					"createdAt",
+					"lastActiveAt"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -3363,7 +3388,7 @@
 						}
 					}
 				},
-				"description": "Whether the signed-in User has YouTube Access (ADR 0129). Reachable without\nthe access scope, so the web can hide YouTube from Users without it.",
+				"description": "YouTube Access state for the signed-in User (ADR 0129): `granted`,\n`not_granted`, or `withdrawn`, with `withdrawnAt` when the withdrawal date\nis known. `granted` is true only for `granted`. Reachable without the access\nscope, so the web can hide YouTube from Users without it.",
 				"tags": [
 					"YouTube"
 				],

@@ -61,6 +61,7 @@ describe('toAdminUserIdentity', () => {
       disabled: false,
       emailVerified: true,
       youtubeAccess: false,
+      lastActiveAt: null,
     });
   });
 
@@ -87,5 +88,27 @@ describe('toAdminUserIdentity', () => {
     });
 
     expect(result.emailVerified).toBe(false);
+  });
+
+  test('passes last_active_at through as lastActiveAt', () => {
+    const lastActiveAt = new Date('2026-11-03T12:00:00.000Z');
+
+    const result = toAdminUserIdentity({
+      id: 'u4',
+      name: 'Dana',
+      email: 'dana@example.com',
+      last_active_at: lastActiveAt,
+    });
+
+    expect(result.lastActiveAt).toBe(lastActiveAt);
+  });
+
+  test('maps a missing or null last_active_at to null lastActiveAt', () => {
+    const base = { id: 'u5', name: 'Eve', email: 'eve@example.com' };
+
+    expect(toAdminUserIdentity(base).lastActiveAt).toBeNull();
+    expect(
+      toAdminUserIdentity({ ...base, last_active_at: null }).lastActiveAt,
+    ).toBeNull();
   });
 });

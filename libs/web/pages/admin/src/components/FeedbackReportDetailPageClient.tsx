@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../lib/adminVariant';
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 import { Button, useIsMobileState } from '@myorganiser/web-ui';
 import { isAxiosError } from 'axios';
@@ -12,7 +13,6 @@ import { FeedbackReportTriageActions } from './FeedbackReportTriageActions';
 import { ReportBackLink } from './feedback/report/ReportBackLink';
 import { ReportHeader } from './feedback/report/ReportHeader';
 import { ReportReadingColumn } from './feedback/report/ReportReadingColumn';
-import type { ReportVariant } from '../lib/feedbackReportView';
 
 /**
  * One admin feedback report. The reading column (what was reported) sits
@@ -30,7 +30,7 @@ export function FeedbackReportDetailPageClient() {
   // resolve, so the report body never renders with it undecided. Until then the
   // back link takes the desktop wording.
   const isPhone = useIsMobileState();
-  const variant: ReportVariant = isPhone ? 'phone' : 'desktop';
+  const variant: AdminVariant = isPhone ? 'phone' : 'desktop';
 
   const [report, setReport] = useState<AdminFeedbackReportDetailDto | null>(
     null,

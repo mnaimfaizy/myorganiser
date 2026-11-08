@@ -13,6 +13,7 @@ import { DeleteAccountSection } from './DeleteAccountSection';
 import { InstallAppSection } from './InstallAppSection';
 import { PreferencesSection } from './PreferencesSection';
 import { YourReportsSummaryLink } from './YourReportsSummaryLink';
+import { YouTubeDigestLoadError } from './YouTubeDigestLoadError';
 import { YouTubeDigestSection } from './YouTubeDigestSection';
 
 const DESKTOP_LAYOUT = 'mx-auto flex w-full max-w-[880px] flex-col gap-6 p-8';
@@ -48,6 +49,12 @@ export function AccountPageClient() {
         onPreferredCurrencyChange={preferences.setPreferredCurrency}
         onSave={preferences.save}
       />
+      {digest.loadError && (
+        <YouTubeDigestLoadError
+          message={digest.loadError}
+          onRetry={digest.retryLoad}
+        />
+      )}
       {digest.connected && (
         <YouTubeDigestSection
           variant={variant}

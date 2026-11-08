@@ -4,3 +4,6 @@ apps/backend/src/prisma/prisma-client
 .sandcastle/patches/
 .sandcastle/node_modules_linux_cache/
 .claude/worktrees/
+# deploy-staging.yml checks tools/scripts out again into .deploy-tools;
+# Nx must not read that copy as a second, nameless project.
+.deploy-tools/

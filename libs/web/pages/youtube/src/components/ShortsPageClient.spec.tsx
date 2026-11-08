@@ -183,6 +183,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     (useIsMobileState as jest.Mock).mockReturnValue(false);
     (useYouTubeAvailability as jest.Mock).mockReturnValue({
       available: true,
+      access: null,
       loading: false,
       error: null,
     });
@@ -304,6 +305,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     it('shows unavailable notice and no Shorts UI when availability is false', () => {
       (useYouTubeAvailability as jest.Mock).mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -326,6 +328,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     it('shows unavailable notice and no Shorts UI while availability is loading', () => {
       (useYouTubeAvailability as jest.Mock).mockReturnValue({
         available: null,
+        access: null,
         loading: true,
         error: null,
       });
@@ -348,6 +351,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     it('shows unavailable notice and no Shorts UI when availability is null', () => {
       (useYouTubeAvailability as jest.Mock).mockReturnValue({
         available: null,
+        access: null,
         loading: false,
         error: null,
       });
@@ -368,8 +372,14 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     });
 
     it.each([
-      ['explicitly false', { available: false, loading: false, error: null }],
-      ['still loading', { available: null, loading: true, error: null }],
+      [
+        'explicitly false',
+        { available: false, access: null, loading: false, error: null },
+      ],
+      [
+        'still loading',
+        { available: null, access: null, loading: true, error: null },
+      ],
     ])(
       'makes no connection, Shorts or budget hook call when availability is %s',
       (_label, availability) => {
@@ -588,6 +598,7 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
     it('shows the unreachable notice, with Try again, and makes no Shorts or budget call', () => {
       (useYouTubeAvailability as jest.Mock).mockReturnValue({
         available: null,
+        access: null,
         loading: false,
         error: new Error('network down'),
       });

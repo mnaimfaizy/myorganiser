@@ -179,7 +179,7 @@ Before reporting success, inspect the edited file for structural mistakes:
 
 Then run the narrowest meaningful validation, and nothing wider:
 
-- Jest: `yarn nx test <project> --testFile="<path>"` when supported, otherwise a focused `--testNamePattern`.
+- Jest: `yarn nx test <project> --testPathPatterns="<path>"`, or a focused `--testNamePattern`.
 - Playwright: none. Report `NOT RUN (E2E — human execution required)`.
 
 ## Constraints

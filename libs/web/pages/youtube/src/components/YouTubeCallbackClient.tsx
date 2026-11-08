@@ -1,20 +1,23 @@
 'use client';
 
+import { isAxiosError } from 'axios';
+import { createYouTubeApi } from '../lib/youtubeApi';
 import { getAccessToken } from '@myorganiser/auth';
-import { getApiBaseUrl } from '@myorganiser/core';
 import { Button, Illustration } from '@myorganiser/web-ui';
 import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useYouTubeAvailability } from '../hooks';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
+import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 
 export default function YouTubeCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const didRun = useRef(false);
-  const { available, error: availabilityError } = useYouTubeAvailability();
+  const availability = useYouTubeAvailability();
+  const { available } = availability;
 
   const handleBack = useCallback(() => {
     router.replace('/dashboard');
@@ -42,27 +45,22 @@ export default function YouTubeCallbackClient() {
       }
 
       try {
-        // Raw fetch, not the generated client: the callback's contract is kept as it was.
-        const res = await fetch(`${getApiBaseUrl()}/youtube/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: 'include',
-          body: JSON.stringify({ code }),
+        const res = await createYouTubeApi().handleCallback({
+          handleCallbackRequest: { code },
         });
-
-        const data = await res.json();
-
-        if (!res.ok || !data.ok) {
-          setError(data.message ?? 'Failed to connect YouTube.');
+        if (!res.data.ok) {
+          setError(res.data.message ?? 'Failed to connect YouTube.');
           return;
         }
 
         router.replace('/dashboard/youtube');
-      } catch {
-        setError('Something went wrong while connecting YouTube.');
+      } catch (err) {
+        const body = isAxiosError(err)
+          ? (err.response?.data as { message?: string } | undefined)
+          : undefined;
+        setError(
+          body?.message ?? 'Something went wrong while connecting YouTube.',
+        );
       }
     })();
   }, [searchParams, router, isUnavailable]);
@@ -70,7 +68,7 @@ export default function YouTubeCallbackClient() {
   if (isUnavailable) {
     return (
       <YouTubeUnavailableNotice
-        reason={availabilityError ? 'unreachable' : 'unavailable'}
+        {...toUnavailableNoticeProps(availability)}
         onBack={handleBack}
       />
     );

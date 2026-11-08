@@ -6,6 +6,8 @@ import type {
 } from '@myorganiser/app-api-client';
 import type { StatusPillTone } from '@myorganiser/web-ui';
 
+import { type AdminVariant } from './adminVariant';
+import { formatDayMonth } from './formatDayMonth';
 import { formatUserDisplayName } from './formatUserIdentity';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */
@@ -17,8 +19,6 @@ export const USER_DIRECTORY_MESSAGES = {
   error: 'Unable to load users. Please try again.',
   empty: 'No users found.',
 } as const;
-
-export type UserDirectoryVariant = 'desktop' | 'phone';
 
 export type UserDirectoryStatus = 'active' | 'unverified' | 'disabled';
 
@@ -128,27 +128,69 @@ export function isAdminUserSort(value: string): value is AdminUserSort {
   return Object.prototype.hasOwnProperty.call(USER_SORT_LABELS, value);
 }
 
-/**
- * "2 Sep"; the year is appended (" 2025") only when it differs from `now`'s
- * year. The day and the three-letter month come from en-US formatToParts,
- * because en-GB prints "Sept" for September. Local time zone, as before.
- * Shared by the user directory and the audit log.
- */
-export function formatDayMonth(date: Date, now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-    month: 'short',
-  }).formatToParts(date);
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const base = `${day} ${month}`;
-  return date.getFullYear() === now.getFullYear()
-    ? base
-    : `${base} ${date.getFullYear()}`;
-}
-
 export function formatJoinedDate(iso: string, now: Date = new Date()): string {
   return formatDayMonth(new Date(iso), now);
+}
+
+const LAST_ACTIVE_RELATIVE = new Intl.RelativeTimeFormat('en-US', {
+  numeric: 'auto',
+});
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * The local calendar day as a whole-day number. Date.UTC of the local date
+ * parts ignores the clock and any DST shift, so the difference between two
+ * of these is the count of calendar days.
+ */
+function localDayNumber(date: Date): number {
+  return Math.round(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MS_PER_DAY,
+  );
+}
+
+/**
+ * How long ago the User's last active day was, lowercase and sentence-ready:
+ * "today", "yesterday", "3 days ago", "2 weeks ago", "5 months ago",
+ * "2 years ago". A future day (clock skew) reads "today". `undefined` when the
+ * User has no last-active day or it does not parse.
+ */
+export function lastActiveAgo(
+  iso: string | null,
+  now: Date = new Date(),
+): string | undefined {
+  if (iso === null) return undefined;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return undefined;
+
+  const days = Math.max(0, localDayNumber(now) - localDayNumber(then));
+  if (days < 7) return LAST_ACTIVE_RELATIVE.format(-days, 'day');
+  if (days < 30) {
+    return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 7), 'week');
+  }
+  if (days < 365) {
+    return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 30), 'month');
+  }
+  return LAST_ACTIVE_RELATIVE.format(-Math.floor(days / 365), 'year');
+}
+
+/** "Today", "Yesterday", "3 days ago"; "Never" when there is no last-active day. */
+export function formatLastActive(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  const ago = lastActiveAgo(iso, now);
+  if (ago === undefined) return 'Never';
+  return ago.charAt(0).toUpperCase() + ago.slice(1);
+}
+
+/** "Last active today", "Last active 3 days ago"; "Never active" when there is none. */
+export function formatLastActivePhrase(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  const ago = lastActiveAgo(iso, now);
+  return ago === undefined ? 'Never active' : `Last active ${ago}`;
 }
 
 /** "Showing 1–25 of 148"; zero rows reads "Showing 0 of {total}". */
@@ -210,13 +252,22 @@ export function avatarFillFor(userId: string): string {
   return fill ?? USER_AVATAR_FILLS[0];
 }
 
-/** The phone row's second line. There is no last-active field, so it is the join. */
+/**
+ * The phone row's second line: "Active 3 days ago" once the User has a
+ * last-active day, otherwise the join date. Platform admins take an "Admin ·"
+ * prefix in either case.
+ */
 export function phoneUserMeta(
   user: AdminUserIdentity,
   now: Date = new Date(),
 ): string {
-  const joined = `Joined ${formatJoinedDate(user.createdAt, now)}`;
-  return user.role === 'platform_admin' ? `Admin · ${joined}` : joined;
+  const isAdmin = user.role === 'platform_admin';
+  const ago = lastActiveAgo(user.lastActiveAt, now);
+  if (ago === undefined) {
+    const joined = `Joined ${formatJoinedDate(user.createdAt, now)}`;
+    return isAdmin ? `Admin · ${joined}` : joined;
+  }
+  return isAdmin ? `Admin · ${ago}` : `Active ${ago}`;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {
@@ -226,7 +277,7 @@ function plural(count: number, singular: string, pluralForm: string): string {
 /** "148 accounts · 3 platform admins" on desktop, "148 accounts" on phone. */
 export function formatAccountsSummary(
   overview: Pick<AdminOverviewResponse, 'users' | 'platformAdmins'>,
-  variant: UserDirectoryVariant,
+  variant: AdminVariant,
 ): string {
   const accounts = plural(overview.users, 'account', 'accounts');
   if (variant === 'phone') {

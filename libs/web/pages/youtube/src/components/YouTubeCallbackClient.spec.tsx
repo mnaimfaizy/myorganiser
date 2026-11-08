@@ -16,30 +16,32 @@ jest.mock('@myorganiser/auth', () => ({
   getAccessToken: jest.fn(),
 }));
 
+const mockHandleCallback = jest.fn();
+jest.mock('../lib/youtubeApi', () => ({
+  createYouTubeApi: () => ({ handleCallback: mockHandleCallback }),
+}));
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { getAccessToken } from '@myorganiser/auth';
+import { AxiosError, AxiosHeaders } from 'axios';
 import YouTubeCallbackClient from './YouTubeCallbackClient';
 
 describe('YouTubeCallbackClient — fail-closed availability', () => {
   const mockGetAccessToken = getAccessToken as jest.Mock;
-  const fetchMock = jest.fn<
-    Promise<Response>,
-    [RequestInfo | URL, RequestInit?]
-  >();
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockReplace.mockClear();
     mockSearchParams.value = new URLSearchParams('code=test-auth-code');
-    fetchMock.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockHandleCallback.mockReset();
   });
 
   describe('when available=false', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -63,7 +65,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
       render(<YouTubeCallbackClient />);
 
       await waitFor(() => {
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(mockHandleCallback).not.toHaveBeenCalled();
       });
       expect(mockGetAccessToken).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/youtube');
@@ -74,6 +76,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: true,
         error: null,
       });
@@ -97,7 +100,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
       render(<YouTubeCallbackClient />);
 
       await waitFor(() => {
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(mockHandleCallback).not.toHaveBeenCalled();
       });
       expect(mockGetAccessToken).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/youtube');
@@ -108,6 +111,7 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
     beforeEach(() => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: false,
+        access: null,
         loading: false,
         error: null,
       });
@@ -122,6 +126,67 @@ describe('YouTubeCallbackClient — fail-closed availability', () => {
 
       expect(mockReplace).toHaveBeenCalledWith('/dashboard');
       expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('when available=true', () => {
+    beforeEach(() => {
+      mockUseYouTubeAvailability.mockReturnValue({
+        available: true,
+        access: null,
+        loading: false,
+        error: null,
+      });
+      mockGetAccessToken.mockReturnValue('token');
+    });
+
+    it('exchanges the code through the generated client and routes to YouTube', async () => {
+      mockHandleCallback.mockResolvedValue({ data: { ok: true, message: '' } });
+      render(<YouTubeCallbackClient />);
+
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard/youtube'),
+      );
+      expect(mockHandleCallback).toHaveBeenCalledWith({
+        handleCallbackRequest: { code: 'test-auth-code' },
+      });
+    });
+
+    it('shows the server message when the exchange reports ok=false', async () => {
+      mockHandleCallback.mockResolvedValue({
+        data: { ok: false, message: 'Code expired' },
+      });
+      render(<YouTubeCallbackClient />);
+
+      expect(await screen.findByText('Code expired')).toBeInTheDocument();
+      expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/youtube');
+    });
+
+    it('shows the error response message when the request is rejected', async () => {
+      mockHandleCallback.mockRejectedValue(
+        new AxiosError('bad', 'ERR_BAD_REQUEST', undefined, null, {
+          status: 400,
+          statusText: '',
+          headers: {},
+          config: { headers: new AxiosHeaders() },
+          data: { message: 'Invalid grant' },
+        }),
+      );
+      render(<YouTubeCallbackClient />);
+
+      expect(await screen.findByText('Invalid grant')).toBeInTheDocument();
+      expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/youtube');
+    });
+
+    it('shows a generic message when the request fails without a response', async () => {
+      mockHandleCallback.mockRejectedValue(new Error('network'));
+      render(<YouTubeCallbackClient />);
+
+      expect(
+        await screen.findByText(
+          'Something went wrong while connecting YouTube.',
+        ),
+      ).toBeInTheDocument();
     });
   });
 });

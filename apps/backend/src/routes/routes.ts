@@ -247,10 +247,17 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "YouTubeAccessState": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["granted"]},{"dataType":"enum","enums":["not_granted"]},{"dataType":"enum","enums":["withdrawn"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "YouTubeAccessResponse": {
         "dataType": "refObject",
         "properties": {
             "granted": {"dataType":"boolean","required":true},
+            "state": {"ref":"YouTubeAccessState","required":true},
+            "withdrawnAt": {"dataType":"string"},
         },
         "additionalProperties": false,
     },
@@ -742,6 +749,7 @@ const models: TsoaRoute.Models = {
             "emailVerified": {"dataType":"boolean","required":true},
             "youtubeAccess": {"dataType":"boolean","required":true},
             "createdAt": {"dataType":"datetime","required":true},
+            "lastActiveAt": {"dataType":"union","subSchemas":[{"dataType":"datetime"},{"dataType":"enum","enums":[null]}],"required":true},
         },
         "additionalProperties": false,
     },

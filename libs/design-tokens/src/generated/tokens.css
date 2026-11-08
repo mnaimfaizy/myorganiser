@@ -38,6 +38,12 @@
   --amber-300: #fcd34d;
   --amber-700: #b45309;
   --amber-800: #92400e;
+  --sky-50: #f0f9ff;
+  --sky-100: #e0f2fe;
+  --sky-300: #7dd3fc;
+  --sky-400: #38bdf8;
+  --sky-700: #0369a1;
+  --sky-800: #075985;
   --green-50: #f0fdf4;
   --green-100: #dcfce7;
   --green-300: #86efac;
@@ -67,6 +73,8 @@
   --color-scrim: rgba(15, 23, 42, 0.4);
   --color-scrim-on-dark: rgba(0, 0, 0, 0.6);
   --color-warning-on-dark: #fbbd23;
+  --color-info: #0369a1;
+  --color-info-on-dark: #38bdf8;
   --color-success: #15803d;
   --color-success-on-dark: #4ade80;
   --font-display: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

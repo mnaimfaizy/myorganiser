@@ -1,16 +1,14 @@
 'use client';
 
+import type { AdminVariant } from '../../lib/adminVariant';
 import { Illustration } from '@myorganiser/web-ui';
 import type { ReactNode } from 'react';
 
 import { useAdminOverview } from '../../hooks/use-admin-overview';
-import {
-  formatAccountsSummary,
-  type UserDirectoryVariant,
-} from '../../lib/userDirectory';
+import { formatAccountsSummary } from '../../lib/userDirectory';
 
 export interface UsersHeaderProps {
-  variant: UserDirectoryVariant;
+  variant: AdminVariant;
   /** The search form. It sits right of the title on desktop, below it on phone. */
   children?: ReactNode;
 }

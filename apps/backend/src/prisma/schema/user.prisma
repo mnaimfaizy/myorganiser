@@ -39,10 +39,14 @@ model User {
   youtube_access                  Boolean   @default(false)
   /// When YouTube Access was first ever granted. Set once on the first grant and never cleared; the lifetime ceiling counts Users where this is not null.
   youtube_access_first_granted_at DateTime?
+  /// When a Platform Admin last withdrew this User's YouTube Access (issue #1308). Set by the withdrawal and cleared by the next grant, in the same transaction as the access change. Null while access is held, for a never-granted User, and for Users withdrawn before this column existed (no backfill).
+  youtube_access_withdrawn_at     DateTime?
   /// When the User accepted the one-time YouTube acknowledgement before a first connect (ADR 0129). Set once and never cleared: kept across YouTube Disconnects and across a withdrawal and re-grant of YouTube Access.
   youtube_acknowledged_at         DateTime?
   /// When the User last opened "Your reports" page. Compared against FeedbackReport.status_changed_at to show a "something changed" badge; null means the page has never been opened.
   feedback_reports_seen_at        DateTime?
+  /// When the User was last active: the most recent successful token refresh, recorded at most once per UTC calendar day. Null means no successful refresh since this column was added. Not an audit trail (Admin Audit Log is separate) and no history is kept.
+  last_active_at                  DateTime?
   /// Per-User toggle for Fix Notices (CONTEXT.md: Fix Notice), separate from
   /// a report's own fix_notice_opt_in captured at send time. Turned off only
   /// by the unauthenticated unsubscribe link every Fix Notice carries.

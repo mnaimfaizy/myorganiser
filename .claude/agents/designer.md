@@ -20,7 +20,7 @@ nobody asked you to render, you have left this agent — say so and stop.
 2. **One sibling page**, as the reference implementation — read
    `docs/sandcastle/gates.html` unless the brief names a closer sibling. Read it for
    the shape of things: the pre-paint theme block, the notes Popover, the manifest.
-   Do not read all five; they share a convention, not content.
+   Do not read every roster page; they share a convention, not content.
 
 Do not read `TECH_STACK.md`. These pages ship no dependencies, so no version in it
 can change what you write.
@@ -54,7 +54,7 @@ verify them (see **Contradictions are findings**); you do not go looking for mor
 
 3. Write the page, following **House Conventions** below.
 4. Add the page to `.prettierignore` and to `ROSTER` in
-   `tools/scripts/check-design-hygiene.ts`. A page outside the roster is ungated,
+   `tools/scripts/lib/design-page-roster.ts`. A page outside the roster is ungated,
    and CI fails a page in neither `ROSTER` nor `LEGACY` — being new is not an excuse
    the gate accepts.
 5. Wire the manifest. If the brief carries a machine-readable requirement, the page

@@ -126,6 +126,10 @@ _Avoid_: Email token, magic link, one-time password
 The state where a client's Access Token is gone but it still holds enough to obtain a new one without credentials. A User in this state has not been signed out, and should not be shown a sign-in prompt.
 _Avoid_: Expired session, stale session, half-logged-in, partial session
 
+**Last Active**:
+The UTC day of a User's most recent successful Refresh Token use, shown only to Platform Admins. Recorded at most once per UTC day, and never by a refused refresh. It is not set by sign-in or Vault sync, keeps no history, and is not part of the Admin Audit Log. Server-stored account metadata, not vault data. Null until the User's first successful refresh.
+_Avoid_: Last seen, last login, last online, activity log
+
 **Guest**:
 A visitor with no Session and no means of restoring one. The only state that warrants a sign-in prompt.
 _Avoid_: Anonymous user, logged-out user, visitor, unauthenticated user
@@ -213,7 +217,7 @@ _Avoid_: fix email, resolution email, closed notification
 ## YouTube (focused watching)
 
 **YouTube Access**:
-A Platform Admin's permission for one User to use YouTube in MyOrganiser at all. It is granted to and withdrawn from a specific User, never claimed by the User and never transferable. Without it YouTube does not exist for that User. It comes before a YouTube Connection: Access is MyOrganiser letting the User in, the Connection is the User letting MyOrganiser read their account. Decided in ADR 0129.
+A Platform Admin's permission for one User to use YouTube in MyOrganiser at all. It is granted to and withdrawn from a specific User, never claimed by the User and never transferable. Without it YouTube does not exist for that User. It comes before a YouTube Connection: Access is MyOrganiser letting the User in, the Connection is the User letting MyOrganiser read their account. Decided in ADR 0129. A User without it is either never granted, or **withdrawn**: granted once and since taken back, which the User is told is permanent. A withdrawal records when it happened, and the next grant clears that record.
 _Avoid_: invitation, invite link, test user, beta access, allowlist
 
 **YouTube Connection**:

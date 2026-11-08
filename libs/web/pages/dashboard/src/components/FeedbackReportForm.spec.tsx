@@ -22,9 +22,9 @@ global.ResizeObserver = jest.fn().mockImplementation(() => ({
   unobserve: jest.fn(),
   disconnect: jest.fn(),
 }));
-import { useToast } from '@myorganiser/web-ui';
+import { setFeedbackDialogOpen, useToast } from '@myorganiser/web-ui';
 import { createFeedbackApi } from '../lib/apiClient';
-import { setFeedbackDialogOpen } from '../hooks/use-feedback-dialog';
+import { useFeedbackReportDraft } from '../hooks/use-feedback-report-draft';
 import { FeedbackReportForm } from './FeedbackReportForm';
 
 const mockCreateReport = jest.fn();
@@ -38,8 +38,19 @@ function setupMocks() {
   });
 }
 
+// FeedbackDialog owns the draft in the app; this harness stands in for it.
+function FeedbackReportFormHarness(props: {
+  onSent: () => void;
+  onCancel: () => void;
+}) {
+  const draft = useFeedbackReportDraft();
+  return <FeedbackReportForm {...props} draft={draft} />;
+}
+
 function renderForm(onSent = jest.fn(), onCancel = jest.fn()) {
-  return render(<FeedbackReportForm onSent={onSent} onCancel={onCancel} />);
+  return render(
+    <FeedbackReportFormHarness onSent={onSent} onCancel={onCancel} />,
+  );
 }
 
 describe('FeedbackReportForm', () => {

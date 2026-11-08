@@ -2,6 +2,7 @@ import type { AdminUserIdentity } from '@myorganiser/app-api-client';
 import { type Page } from '@playwright/test';
 import { routeApi } from './apiStub';
 import { corsHeaders } from './adminSession';
+import { positiveInt } from './adminPaging';
 
 /**
  * Deterministic `GET /admin/users` stub for the admin Users directory.
@@ -52,6 +53,7 @@ export function buildAdminUsers(count: number): AdminUserIdentity[] {
       emailVerified: n % 3 !== 0,
       youtubeAccess: false,
       createdAt: new Date(Date.UTC(2026, 0, n)).toISOString(),
+      lastActiveAt: null,
     };
   });
 }
@@ -80,11 +82,6 @@ function sortUsers(
   return sorted.sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   );
-}
-
-function positiveInt(raw: string | null, fallback: number): number {
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 /**

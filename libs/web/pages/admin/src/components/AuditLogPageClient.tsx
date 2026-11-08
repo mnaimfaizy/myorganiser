@@ -1,14 +1,15 @@
 'use client';
 
+import type { AdminVariant } from '../lib/adminVariant';
 import { useIsMobileState } from '@myorganiser/web-ui';
 
 import { useAuditLog } from '../hooks/use-audit-log';
-import { AUDIT_LOG_MESSAGES, type AuditLogVariant } from '../lib/auditLog';
+import { AUDIT_LOG_MESSAGES, formatAuditShowingRange } from '../lib/auditLog';
+import { AdminPager } from './paged-list/AdminPager';
 import { AuditLogFilterChips } from './audit/AuditLogFilterChips';
 import { AuditLogFilterSheet } from './audit/AuditLogFilterSheet';
 import { AuditLogFilters } from './audit/AuditLogFilters';
 import { AuditLogHeader } from './audit/AuditLogHeader';
-import { AuditLogPager } from './audit/AuditLogPager';
 import { AuditLogPhoneList } from './audit/AuditLogPhoneList';
 import { AuditLogTable } from './audit/AuditLogTable';
 
@@ -21,7 +22,7 @@ export function AuditLogPageClient() {
   // Until the breakpoint is known, only the header and a placeholder render.
   // The hook still runs, so it is unconditional.
   const isPhone = useIsMobileState();
-  const variant: AuditLogVariant = isPhone ? 'phone' : 'desktop';
+  const variant: AdminVariant = isPhone ? 'phone' : 'desktop';
   const {
     entries,
     total,
@@ -84,12 +85,19 @@ export function AuditLogPageClient() {
             emptyMessage={emptyMessage}
             footer={
               showPager ? (
-                <AuditLogPager
+                <AdminPager
                   page={page}
                   pageSize={pageSize}
-                  shownCount={entries.length}
                   total={total}
-                  filtered={filtered}
+                  range={formatAuditShowingRange(
+                    page,
+                    pageSize,
+                    entries.length,
+                    total,
+                    filtered,
+                  )}
+                  previousLabel="Newer"
+                  nextLabel="Older"
                   onPageChange={goToPage}
                 />
               ) : null

@@ -8,7 +8,7 @@ const REPOSITORY_URL = 'https://github.com/mnaimfaizy/myorganiser';
 
 export interface FeedbackReportStatusRule {
   label: string;
-  /** The StatusPill tone. Under review has no blue role in the tokens yet, so it shares Received's neutral. */
+  /** The StatusPill tone. Under review is info blue; Can't reproduce is the warning outline. */
   tone: StatusPillTone;
   adminSettable: boolean;
   /** A final status cannot be changed again; the backend refuses every admin action on it. */
@@ -34,7 +34,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   under_review: {
     label: 'Under review',
     isFinal: false,
-    tone: 'neutral',
+    tone: 'info',
     adminSettable: true,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
@@ -74,7 +74,7 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   cannot_reproduce: {
     label: "Can't reproduce",
     isFinal: false,
-    tone: 'warning',
+    tone: 'outline',
     adminSettable: true,
     requiresStatusNote: true,
     kinds: ['bug_report'],

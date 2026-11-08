@@ -34,6 +34,7 @@ function userFixture(
     emailVerified: true,
     youtubeAccess: false,
     createdAt: new Date(2026, 9, 16, 12).toISOString(),
+    lastActiveAt: null,
     ...overrides,
   };
 }
@@ -109,40 +110,55 @@ describe('emailVerificationDescription', () => {
 });
 
 describe('identityMeta', () => {
-  it('states the year on desktop even when the join date is in the current year', () => {
+  it('states the year on desktop and ends with Never active when there is no last-active day', () => {
     expect(identityMeta(userFixture(), 'desktop', NOW)).toBe(
-      'ana@example.com · Joined 16 Oct 2026',
+      'ana@example.com · Joined 16 Oct 2026 · Never active',
     );
   });
 
   it('omits the year on phone in the same year and includes it in an earlier year', () => {
     expect(identityMeta(userFixture(), 'phone', NOW)).toBe(
-      'ana@example.com · Joined 16 Oct',
+      'ana@example.com · Joined 16 Oct · Never active',
     );
     const earlier = userFixture({
       createdAt: new Date(2025, 9, 16, 12).toISOString(),
     });
     expect(identityMeta(earlier, 'phone', NOW)).toBe(
-      'ana@example.com · Joined 16 Oct 2025',
+      'ana@example.com · Joined 16 Oct 2025 · Never active',
     );
   });
 
   it.each(['desktop', 'phone'] as const)(
-    'places the phone between the email and Joined on %s',
+    'places the phone between the email and Joined on %s, and Never active last',
     (variant) => {
       const user = userFixture({ phone: '+44 20 7946 0018' });
       expect(identityMeta(user, variant, NOW).split(' · ')).toEqual([
         'ana@example.com',
         '+44 20 7946 0018',
         variant === 'desktop' ? 'Joined 16 Oct 2026' : 'Joined 16 Oct',
+        'Never active',
       ]);
     },
   );
 
-  it('gives exactly two parts when no phone is set', () => {
+  it('ends with Last active today after a phone and Joined when the user was active today', () => {
+    const user = userFixture({
+      phone: '+44 20 7946 0018',
+      lastActiveAt: new Date(2026, 9, 22, 8).toISOString(),
+    });
+    expect(identityMeta(user, 'desktop', NOW).split(' · ')).toEqual([
+      'ana@example.com',
+      '+44 20 7946 0018',
+      'Joined 16 Oct 2026',
+      'Last active today',
+    ]);
+  });
+
+  it('gives three parts when no phone is set', () => {
     expect(identityMeta(userFixture(), 'desktop', NOW).split(' · ')).toEqual([
       'ana@example.com',
       'Joined 16 Oct 2026',
+      'Never active',
     ]);
   });
 });

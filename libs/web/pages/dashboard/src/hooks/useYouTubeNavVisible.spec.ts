@@ -17,6 +17,7 @@ describe('useYouTubeNavVisible', () => {
   it('returns false while availability is null (loading)', () => {
     mockUseYouTubeAvailability.mockReturnValue({
       available: null,
+      access: null,
       loading: true,
       error: null,
     });
@@ -30,6 +31,7 @@ describe('useYouTubeNavVisible', () => {
   it('returns true when available is strictly true', () => {
     mockUseYouTubeAvailability.mockReturnValue({
       available: true,
+      access: null,
       loading: false,
       error: null,
     });
@@ -43,6 +45,7 @@ describe('useYouTubeNavVisible', () => {
   it('returns false when available is false', () => {
     mockUseYouTubeAvailability.mockReturnValue({
       available: false,
+      access: null,
       loading: false,
       error: null,
     });
@@ -55,6 +58,7 @@ describe('useYouTubeNavVisible', () => {
   it('returns false when an error is present', () => {
     mockUseYouTubeAvailability.mockReturnValue({
       available: false,
+      access: null,
       loading: false,
       error: new Error('network failure'),
     });
