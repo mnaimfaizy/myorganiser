@@ -16,6 +16,10 @@ import { createYouTubeAvailabilityGate } from './middleware/youtubeAvailabilityG
 import { vaultRateLimiter } from './middleware/vaultRateLimit';
 import { bootstrapPlatformAdminFromEnv } from './bootstrap/platformAdminBootstrap';
 import { deleteSupersededTodosBlobsOnBoot } from './bootstrap/deleteSupersededTodosBlobs';
+import {
+  logMissingColumnHint,
+  warnPendingMigrationsOnBoot,
+} from './bootstrap/warnPendingMigrations';
 import { RegisterRoutes } from './routes/routes';
 import usersRouter from './routes/user';
 import passport from './utils/passport';
@@ -187,6 +191,7 @@ app.use(
       console.warn(`Caught Validation Error for ${req.path}:`, err.fields);
     },
     onUnhandledError: (err, req) => {
+      logMissingColumnHint(err, isProd);
       if (isProd) {
         console.error(
           `Unhandled error on ${req.method} ${req.path}:`,
@@ -204,6 +209,7 @@ const server = app.listen(port, () => {
   console.log(`Listening at: http://localhost:${port}/`);
   void bootstrapPlatformAdminFromEnv();
   void deleteSupersededTodosBlobsOnBoot();
+  void warnPendingMigrationsOnBoot();
 });
 server.on('error', console.error);
 
