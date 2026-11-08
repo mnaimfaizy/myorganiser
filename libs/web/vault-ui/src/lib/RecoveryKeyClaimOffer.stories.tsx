@@ -111,3 +111,17 @@ export const ClaimInFlight: Story = {
     });
   },
 };
+
+export const LinkTrigger: Story = {
+  args: {
+    triggerStyle: 'link',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The collapsed trigger in the link style the unlock and recover screens use, labelled for a Recovery Key from a different vault. Clicking it expands the same form as the button style.',
+      },
+    },
+  },
+};

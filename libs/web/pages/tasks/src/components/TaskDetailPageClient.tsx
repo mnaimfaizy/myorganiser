@@ -153,7 +153,7 @@ function TaskDetailInner({ handle, taskId }: TaskDetailInnerProps) {
 
 export function TaskDetailPageClient({ taskId }: TaskDetailPageClientProps) {
   return (
-    <VaultGate title="Tasks">
+    <VaultGate title="Tasks" encryptedItems="tasks">
       {({ handle }) =>
         handle ? <TaskDetailInner handle={handle} taskId={taskId} /> : null
       }

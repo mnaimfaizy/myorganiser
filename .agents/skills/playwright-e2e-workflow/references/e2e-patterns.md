@@ -52,9 +52,10 @@ broke the nightly WebKit leg from `tasks.spec.ts` (issue #597). Do not write a t
 
 What the shared helpers encode, and why:
 
-- **The gate's panel must be required, never probed.** Both modes of the unlock panel render a
-  "Use passphrase" toggle, so that button appearing is the panel's readiness signal, and clicking it
-  is idempotent. The old copies probed each state with `isVisible({ timeout })` — which samples once
+- **The gate's panel must be required, never probed.** The unlock panel renders `#unlock-passphrase`
+  and the recover screen renders a "Use passphrase" link back to it, so `input.or(usePassphrase)`
+  appearing is the panel's readiness signal, and the helper clicks the link only when the recover
+  screen is the one showing. The old copies probed each state with `isVisible({ timeout })` — which samples once
   and never waits — then returned early on the miss: eight keyed that early return on
   `if ((await input.count()) === 0) return;`, and the groceries three on the toggle's own
   visibility. Count is also 0 before React has rendered the panel, and the toggle is equally

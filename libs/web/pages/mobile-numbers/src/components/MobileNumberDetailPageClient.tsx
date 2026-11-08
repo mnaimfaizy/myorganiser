@@ -275,7 +275,7 @@ export function MobileNumberDetailPageClient({
   params,
 }: MobileNumberDetailPageClientProps) {
   return (
-    <VaultGate title="Mobile Number">
+    <VaultGate title="Mobile Number" encryptedItems="mobile numbers">
       {({ handle }) =>
         handle ? (
           <MobileNumberDetailInner handle={handle} mobileNumberId={params.id} />

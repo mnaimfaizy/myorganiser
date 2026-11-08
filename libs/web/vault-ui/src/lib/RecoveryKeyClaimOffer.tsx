@@ -31,6 +31,14 @@ export type RecoveryKeyClaimAnswer = 'claimed' | 'no-match' | 'replace-offer';
 export type RecoveryKeyClaimOfferProps = {
   /** Attempt the claim with the recovery key the User supplied, trimmed. */
   onClaim: (recoveryKey: string) => Promise<RecoveryKeyClaimAnswer>;
+  /**
+   * How the collapsed trigger is drawn. `button` (the default) is the secondary
+   * button every gate screen shows. `link` is the quiet link-style control the
+   * unlock and recover screens use, labelled for a Recovery Key from a
+   * different vault. Only the collapsed trigger changes: the expanded form and
+   * its single no-match message are the same for both.
+   */
+  triggerStyle?: 'button' | 'link';
 };
 
 /**
@@ -99,6 +107,19 @@ export function RecoveryKeyClaimOffer(
     setRecoveryKeyInput('');
     setErrorMessage(null);
   }, []);
+
+  if (!isExpanded && props.triggerStyle === 'link') {
+    return (
+      <Button
+        type="button"
+        variant="link"
+        className="h-auto min-h-8 self-start whitespace-normal text-left text-caption text-foreground-supporting md:h-auto"
+        onClick={() => setIsExpanded(true)}
+      >
+        I have a Recovery Key for a different vault on this device
+      </Button>
+    );
+  }
 
   if (!isExpanded) {
     return (

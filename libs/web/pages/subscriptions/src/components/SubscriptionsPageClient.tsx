@@ -42,7 +42,7 @@ export function SubscriptionsPageClient({
   initialSelectedId,
 }: SubscriptionsPageClientProps) {
   return (
-    <VaultGate title="Subscriptions">
+    <VaultGate title="Subscriptions" encryptedItems="subscriptions">
       {({ handle }) =>
         handle ? (
           <SubscriptionsInner
