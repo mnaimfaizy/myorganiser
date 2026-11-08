@@ -15,6 +15,7 @@ import { Request as ExRequest } from 'express';
 import {
   EmailAlreadyVerifiedError,
   LastPlatformAdminError,
+  SelfLifecycleActionError,
   UserNotFoundError,
   VerificationCooldownError,
   VerificationSendFailedError,
@@ -112,10 +113,12 @@ export class AdminUsersController extends PlatformAdminControllerBase {
    */
   @Post('{userId}/disable')
   @Response(404, 'User not found')
+  @Response(409, 'Cannot disable your own account')
   async disableUser(
     @Request() req: ExRequest,
     @Path() userId: string,
     @Res() notFound: TsoaResponse<404, { message: string }>,
+    @Res() conflict: TsoaResponse<409, { message: string }>,
   ): Promise<AdminUserIdentity> {
     const actor = this.assertPlatformAdmin(req);
     try {
@@ -124,6 +127,9 @@ export class AdminUsersController extends PlatformAdminControllerBase {
     } catch (err) {
       if (err instanceof UserNotFoundError) {
         return notFound(404, { message: err.message });
+      }
+      if (err instanceof SelfLifecycleActionError) {
+        return conflict(409, { message: err.message });
       }
       throw err;
     }
@@ -233,11 +239,11 @@ export class AdminUsersController extends PlatformAdminControllerBase {
 
   /**
    * Demote a Platform Admin to a normal User.
-   * Rejects demotion of the last Platform Admin.
+   * Rejects self-demotion and demotion of the last Platform Admin.
    */
   @Post('{userId}/demote')
   @Response(404, 'User not found')
-  @Response(409, 'Cannot demote the last Platform Admin')
+  @Response(409, 'Cannot demote yourself or the last Platform Admin')
   async demoteUser(
     @Request() req: ExRequest,
     @Path() userId: string,
@@ -252,7 +258,10 @@ export class AdminUsersController extends PlatformAdminControllerBase {
       if (err instanceof UserNotFoundError) {
         return notFound(404, { message: err.message });
       }
-      if (err instanceof LastPlatformAdminError) {
+      if (
+        err instanceof LastPlatformAdminError ||
+        err instanceof SelfLifecycleActionError
+      ) {
         return conflict(409, { message: err.message });
       }
       throw err;

@@ -5,6 +5,7 @@ import request from 'supertest';
 import { ValidateError } from 'tsoa';
 import {
   LastPlatformAdminError,
+  SelfLifecycleActionError,
   UserNotFoundError,
   VerificationCooldownError,
   YouTubeAccessCeilingReachedError,
@@ -321,6 +322,64 @@ describe('Admin lifecycle mutations (HTTP integration)', () => {
     });
   });
 
+  describe('self-action refusals', () => {
+    test.each([
+      ['disable', 'disableUser'],
+      ['demote', 'demoteUser'],
+    ] as const)(
+      'POST %s on the caller returns 409 with the self message',
+      async (path, method) => {
+        const userService = require('../services/UserService').default;
+        userService[method].mockRejectedValueOnce(
+          new SelfLifecycleActionError(path),
+        );
+
+        const res = await request(app)
+          .post(`/admin/users/admin-1/${path}`)
+          .set('Authorization', 'Bearer admin');
+
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({
+          message: `You can't ${path} your own account`,
+        });
+        expect(userService[method]).toHaveBeenCalledWith('admin-1', 'admin-1');
+      },
+    );
+
+    test('self force-logout still succeeds', async () => {
+      const userService = require('../services/UserService').default;
+      userService.forceLogoutUser.mockResolvedValueOnce(identityRow);
+
+      const res = await request(app)
+        .post('/admin/users/admin-1/force-logout')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(userService.forceLogoutUser).toHaveBeenCalledWith(
+        'admin-1',
+        'admin-1',
+      );
+    });
+
+    test('self YouTube Access withdraw still succeeds', async () => {
+      const access = require('../services/YouTubeAccessService').default;
+      access.withdrawYouTubeAccess.mockResolvedValueOnce({
+        user: identityRow,
+        youtubeDisconnect: 'not_connected',
+      });
+
+      const res = await request(app)
+        .post('/admin/users/admin-1/youtube-access/withdraw')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(access.withdrawYouTubeAccess).toHaveBeenCalledWith(
+        'admin-1',
+        'admin-1',
+      );
+    });
+  });
+
   describe('POST /admin/users/:userId/demote', () => {
     test('returns 409 when demoting the last Platform Admin', async () => {
       const userService = require('../services/UserService').default;
@@ -330,14 +389,14 @@ describe('Admin lifecycle mutations (HTTP integration)', () => {
       );
 
       const res = await request(app)
-        .post('/admin/users/admin-1/demote')
+        .post('/admin/users/u1/demote')
         .set('Authorization', 'Bearer admin');
 
       expect(res.status).toBe(409);
       expect(res.body).toEqual({
         message: 'Cannot demote the last Platform Admin',
       });
-      expect(userService.demoteUser).toHaveBeenCalledWith('admin-1', 'admin-1');
+      expect(userService.demoteUser).toHaveBeenCalledWith('admin-1', 'u1');
     });
 
     test('returns 200 and calls demoteUser for platform_admin', async () => {

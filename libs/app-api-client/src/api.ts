@@ -2547,7 +2547,7 @@ export const PlatformAdminApiAxiosParamCreator = function (configuration?: Confi
             };
         },
         /**
-         * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
+         * Demote a Platform Admin to a normal User. Rejects self-demotion and demotion of the last Platform Admin.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -3347,7 +3347,7 @@ export const PlatformAdminApiFp = function(configuration?: Configuration) {
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
-         * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
+         * Demote a Platform Admin to a normal User. Rejects self-demotion and demotion of the last Platform Admin.
          * @param {string} userId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -3607,7 +3607,7 @@ export const PlatformAdminApiFactory = function (configuration?: Configuration, 
             return localVarFp.changeFeedbackReportStatus(requestParameters.reportId, requestParameters.changeFeedbackReportStatusRequest, options).then((request) => request(axios, basePath));
         },
         /**
-         * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
+         * Demote a Platform Admin to a normal User. Rejects self-demotion and demotion of the last Platform Admin.
          * @param {PlatformAdminApiDemoteUserRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -4001,7 +4001,7 @@ export class PlatformAdminApi extends BaseAPI {
     }
 
     /**
-     * Demote a Platform Admin to a normal User. Rejects demotion of the last Platform Admin.
+     * Demote a Platform Admin to a normal User. Rejects self-demotion and demotion of the last Platform Admin.
      * @param {PlatformAdminApiDemoteUserRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}

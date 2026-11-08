@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import {
   EmailAlreadyVerifiedError,
   LastPlatformAdminError,
+  SelfLifecycleActionError,
   UserNotFoundError,
   VerificationCooldownError,
   YouTubeAccessCeilingReachedError,
@@ -156,6 +157,16 @@ describe('UserService lifecycle', () => {
       });
     });
 
+    test('refuses self-disable (so the last Platform Admin can no longer be disabled) with no update and no audit entry', async () => {
+      await expect(userService.disableUser(ACTOR_ID, ACTOR_ID)).rejects.toThrow(
+        SelfLifecycleActionError,
+      );
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
+    });
+
     test('throws UserNotFoundError when target is missing', async () => {
       mockIdentityLookup(null);
 
@@ -273,6 +284,27 @@ describe('UserService lifecycle', () => {
           action: 'demote',
         },
       });
+    });
+
+    test('refuses self-demote even when another admin exists', async () => {
+      mockPrisma.user.count.mockResolvedValue(2);
+
+      await expect(userService.demoteUser(ACTOR_ID, ACTOR_ID)).rejects.toThrow(
+        SelfLifecycleActionError,
+      );
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.adminAuditLog.create).not.toHaveBeenCalled();
+    });
+
+    test('another admin acting on the last Platform Admin is still refused', async () => {
+      mockIdentityLookup({ ...identityUser, role: 'platform_admin' });
+      mockPrisma.user.count.mockResolvedValue(1);
+
+      await expect(userService.demoteUser(ACTOR_ID, TARGET_ID)).rejects.toThrow(
+        LastPlatformAdminError,
+      );
     });
 
     test('throws LastPlatformAdminError when target is the last platform admin', async () => {

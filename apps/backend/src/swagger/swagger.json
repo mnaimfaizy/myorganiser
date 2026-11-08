@@ -5355,6 +5355,24 @@
 							}
 						}
 					},
+					"409": {
+						"description": "",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"message": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"message"
+									],
+									"type": "object"
+								}
+							}
+						}
+					},
 					"426": {
 						"description": "Below the Version Floor",
 						"content": {
@@ -5758,7 +5776,7 @@
 						}
 					}
 				},
-				"description": "Demote a Platform Admin to a normal User.\nRejects demotion of the last Platform Admin.",
+				"description": "Demote a Platform Admin to a normal User.\nRejects self-demotion and demotion of the last Platform Admin.",
 				"tags": [
 					"Platform Admin"
 				],
