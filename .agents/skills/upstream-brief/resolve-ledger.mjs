@@ -24,6 +24,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isEntryPoint } from './entry-point.mjs';
 import {
   applyDeclinedOpportunities,
   carryForwardCheckedAndClear,
@@ -271,5 +272,4 @@ function main(argv) {
     console.log(line);
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`)
-  main(process.argv.slice(2));
+if (isEntryPoint(import.meta.url)) main(process.argv.slice(2));
