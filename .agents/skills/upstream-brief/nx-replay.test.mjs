@@ -1,9 +1,9 @@
 /**
- * Replay fixture: the Nx brief's three corrected claims (ADR 0084, Context),
+ * Replay fixture: the Nx brief's three corrected claims (DESIGN.md, Lessons),
  * restated under the structured report contract and its domain rules.
  *
  * `docs/research/2026-08-21-upstream-brief-nx.md` carries two Correction
- * blocks for three wrong claims, written under ADR 0018's free-Markdown
+ * blocks for three wrong claims, written as the first free-Markdown
  * rules with no validator to catch any of them before they were committed:
  *
  *   1. "Absence from the CLI reference" was read as "removed" — an earlier
@@ -20,7 +20,7 @@
  *
  *   1. Restated as the earlier draft actually wrote it — `type: mismatch`,
  *      `evidence: absent` — it is refused, not accepted as a mismatch
- *      (ADR 0084 item 3, this slice's own rule). The corrected shape (a
+ *      (DESIGN.md §3, this slice's own rule). The corrected shape (a
  *      missed-improvement or a claim citing something the docs affirmatively
  *      say) is a different finding this fixture does not need to restate to
  *      make the point.
@@ -55,8 +55,13 @@ const treeReader = (file) => {
 };
 
 const fixtureReport = () => JSON.parse(readFileSync(FIXTURE, 'utf8'));
+// The replayed run's host routed Incidental Observations to its own audit
+// owner, declared in that host's adapter as `incidental_owners`.
 const normalize = (raw = fixtureReport()) =>
-  normalizeUpstreamReport(raw, { readSource: treeReader });
+  normalizeUpstreamReport(raw, {
+    readSource: treeReader,
+    incidentalOwners: ['Audit'],
+  });
 
 test('claim 1 — "absent from the CLI reference, therefore removed" is not accepted as a mismatch', () => {
   const report = normalize();
@@ -69,7 +74,7 @@ test('claim 1 — "absent from the CLI reference, therefore removed" is not acce
   assert.match(rejected.label, /absent from the Nx CLI reference/);
 
   // It did not silently disappear — the Ecosystem's other, valid finding
-  // still stands (ADR 0084's own rule: one bad entry does not sink the rest).
+  // still stands (DESIGN.md §3: one bad entry does not sink the rest).
   assert.equal(report.counts.findings, 1);
 });
 
@@ -94,7 +99,7 @@ test('claim 3 — the rename "called deliberate" is an Incidental Observation, n
   const incidental = report.ecosystems[0].incidental[0];
   assert.match(incidental.summary, /no upstream statement grounds/);
   assert.equal(incidental.owner, 'Audit');
-  // Never in the findings list, and never counted as one (ADR 0084 item 7).
+  // Never in the findings list, and never counted as one (DESIGN.md §7).
   assert.equal(
     report.ecosystems[0].findings.some((f) => f.claim.includes('deliberate')),
     false,

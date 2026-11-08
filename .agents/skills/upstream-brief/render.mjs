@@ -5,7 +5,7 @@
  * validates, and nothing here decides — `report.mjs` already dropped every
  * entry the contract refused, so a section that renders empty renders
  * `_None._` rather than disappearing. A section that vanishes when it has
- * nothing in it reads as a section nobody ran; `_None._` is ADR 0084 item 8's
+ * nothing in it reads as a section nobody ran; `_None._` is DESIGN.md §8's
  * "zero is allowed and says what was considered", applied to every section.
  *
  * Imports nothing, for the reason written at the top of `report.mjs` beyond
@@ -13,7 +13,7 @@
  *
  * SECTION ORDER IS THE CONTRACT. `BRIEF_SECTIONS` is the order, in one place,
  * and `render.test.mjs` asserts the rendered headings against it in sequence.
- * Two of the three briefs written under ADR 0018 invented a "checked and
+ * Two of the three briefs written before the report contract invented a "checked and
  * clear" section the template lacked, which is what a fixed order is for.
  */
 
@@ -28,7 +28,7 @@ import {
  *
  * `Upstream Findings` carries the `plan`-disposed findings and `Follow-on`
  * carries the `follow-on`-disposed ones — a finding appears in exactly one of
- * the two, never both. That split is ADR 0084 item 9 (the proposed plan may
+ * the two, never both. That split is DESIGN.md §9 (the proposed plan may
  * touch instructions, Skills, hygiene scripts, and the adapter, and nothing
  * else) read as a rendering rule: the plan section is the plan.
  */
@@ -124,7 +124,7 @@ const findingLines = (finding, lead) => [
         `  - **Executed:** ${code(finding.executed.command)} → exit ${finding.executed.exitCode}`,
       ]
     : []),
-  // ADR 0084 item 5: a downgrade is recorded, not just applied silently —
+  // DESIGN.md §5: a downgrade is recorded, not just applied silently —
   // a reader comparing this to the claim's own wording should see why its
   // urgency is not the one the worker originally gave it.
   ...(finding.downgradedFrom
@@ -165,7 +165,7 @@ const incidentalLines = (entry) => [
  * Both the plan section and the Follow-on section are this shape, and the only
  * thing that differs is which disposition they take — so it is written once.
  * Urgency is the outer grouping rather than the Ecosystem because urgency
- * orders the plan (ADR 0084 item 5); the Ecosystem is recorded on each finding
+ * orders the plan (DESIGN.md §5); the Ecosystem is recorded on each finding
  * instead.
  */
 const findingsByUrgency = (report, disposition) =>
@@ -211,7 +211,7 @@ export function renderUpstreamBrief(report) {
   }
   lines.push('');
 
-  // 1. Delta (ADR 0084 item 11). Absent on the first run per Ecosystem, which
+  // 1. Delta (DESIGN.md §11). Absent on the first run per Ecosystem, which
   //    has no ledger to carry forward and so starts a fresh delta.
   const delta = report.delta;
   lines.push(
@@ -228,7 +228,7 @@ export function renderUpstreamBrief(report) {
   );
 
   // 3. Checked and clear — the other half of the two-directional audit
-  //    (ADR 0084 item 6). An Instruction Claim that held is a result.
+  //    (DESIGN.md §6). An Instruction Claim that held is a result.
   lines.push(
     ...section(
       'Checked and clear',
@@ -242,7 +242,7 @@ export function renderUpstreamBrief(report) {
     ),
   );
 
-  // 4. Upstream Opportunities (ADR 0084 item 8).
+  // 4. Upstream Opportunities (DESIGN.md §8).
   lines.push(
     ...section(
       'Upstream Opportunities',
@@ -257,7 +257,7 @@ export function renderUpstreamBrief(report) {
   );
 
   // 5. Incidental Observations — real defects no upstream statement grounds
-  //    (ADR 0084 item 7). Routed to an owner, never counted, never in the plan.
+  //    (DESIGN.md §7). Routed to an owner, never counted, never in the plan.
   lines.push(
     ...section(
       'Incidental Observations',
@@ -276,7 +276,7 @@ export function renderUpstreamBrief(report) {
 
   // 7. Unverified — what the validator refused, and why. The reason is the
   //    point: an Ecosystem's good findings stand, and the dropped one is
-  //    named rather than silently absent (ADR 0084 item 3).
+  //    named rather than silently absent (DESIGN.md §3).
   lines.push(
     ...section(
       'Unverified',
@@ -288,7 +288,7 @@ export function renderUpstreamBrief(report) {
     ),
   );
 
-  // 8. Failed hops — a failed hop still yields a partial brief (ADR 0018,
+  // 8. Failed hops — a failed hop still yields a partial brief (DESIGN.md, Boundary,
   //    retained), so it is recorded rather than allowed to sink the run.
   lines.push(
     ...section(
@@ -298,7 +298,7 @@ export function renderUpstreamBrief(report) {
   );
 
   // 9. Scanned — what the run actually read. "None in scanned files" named no
-  //    scanned files in every brief before ADR 0084; this is the fix.
+  //    scanned files in every early brief (DESIGN.md §6); this is the fix.
   lines.push(
     ...section(
       'Scanned',

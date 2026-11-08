@@ -1,5 +1,5 @@
 /**
- * The Baseline resolver (ADR 0084 items 1 and 2).
+ * The Baseline resolver (DESIGN.md §1 and §2).
  *
  * Turns one Ecosystem declaration — a lead package name, plus companions an
  * adapter explicitly adds or removes — into what an Upstream Brief anchors
@@ -11,18 +11,18 @@
  *   a manifest's `dependencies` field states (`^22.0.0`), the *version
  *   record* a repo keeps for humans (a tech-stack table), and the *installed*
  *   version an installed package's own manifest states. Only the installed
- *   version is the Baseline (ADR 0084 item 1) — a declared range is a
+ *   version is the Baseline (DESIGN.md §1) — a declared range is a
  *   promise, not a fact, and a version record is a document that drifts (the
  *   ADR's own example: recorded 22.3.3, installed 22.7.7). The other two are
  *   compared against, never read from: disagreement becomes a drift note,
  *   never a different Baseline.
  *
  * WHY THIS FILE IMPORTS NOTHING
- *   The skill is portable (ADR 0018, retained by ADR 0084), like `report.mjs`
+ *   The skill is portable (DESIGN.md, Boundary), like `report.mjs`
  *   beside it. Every version lookup and every membership discovery is
  *   injected as a function, so this module never touches a filesystem, and a
  *   caller supplies node_modules, a lockfile, or a fixture map identically.
- *   `.agents/skills/upstream-brief/report.test.mjs` asserts every module in
+ *   `report.test.mjs` asserts every module in
  *   this directory stays import-free of anything but Node built-ins and its
  *   own siblings, and that assertion already covers this file.
  *

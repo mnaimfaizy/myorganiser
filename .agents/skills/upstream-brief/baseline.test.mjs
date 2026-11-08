@@ -1,5 +1,5 @@
 /**
- * Contract suite for the Baseline resolver (ADR 0084 items 1 and 2).
+ * Contract suite for the Baseline resolver (DESIGN.md §1 and §2).
  *
  * What it proves:
  *   - the Baseline is the installed version, never a declared range or a

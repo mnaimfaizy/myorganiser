@@ -11,7 +11,7 @@
 // Both sides are compared as real paths, so a run through a symlinked skill
 // directory (`.claude/skills` → `.agents/skills`) still counts as the entry point.
 //
-// The skill is portable (ADR 0018, retained by ADR 0084): Node built-ins only.
+// The skill is portable (DESIGN.md, Boundary): Node built-ins only.
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

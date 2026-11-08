@@ -1,133 +1,108 @@
 # Upstream Brief adapter
 
-The adapter is host facts only. The skill body does not name a host. A consuming repo may add `upstream-brief.config.yml` (also `.yaml` or `.json`) at the repository root. Missing file or missing keys use the defaults below.
+The adapter holds the host's facts; the skill body names no host. A repository may add `upstream-brief.config.json` (or `.yml` / `.yaml`) at its root. A missing file, or a missing key, takes the default below. Every command reads it through one reader, `adapter.mjs`.
 
-## Lookup order
+## Lookup order and dialects
 
-1. Repo-root `upstream-brief.config.yml` / `.yaml` / `.json`
-2. Defaults in this file
+The first file present is the adapter: `upstream-brief.config.yml`, then `.yaml`, then `.json`. A key it does not carry takes the default; the search does not continue into another file.
+
+**JSON** is read whole and is the dialect for anything the YAML subset cannot say.
+
+**YAML** is read in this subset only:
+
+- block mappings and block sequences, indented with spaces; a sequence may sit at its key's own indent (`ecosystems:` then `- lead: nx`);
+- plain, single-quoted, or double-quoted scalars, and flow lists of scalars (`[a, 'b']`, `[]`);
+- full-line `#` comments anywhere, and a trailing ` # comment` after a value — except inside `declined_opportunities`, where a value runs to the end of its line, so a URL fragment or a `#` in a reason survives;
+- every value is a string.
+
+Tabs, anchors, aliases, flow mappings, multi-line scalars, duplicate keys, unknown top-level keys, and values of the wrong shape are **problems**. A problem is never a silent default: it is named with its line, `check-reports.mjs` fails on it, and `resolve-baseline.mjs` and `resolve-ledger.mjs` print it and exit 1.
 
 ## Keys
 
-| Key                      | Required | Default                               | Meaning                                                                                                                                                                                                                                                         |
-| ------------------------ | -------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version_record.path`    | no       | `package.json` if present, else unset | A file this repo maintains that records versions for humans (a tech-stack table, for example). The Baseline resolver only **compares** it against each Ecosystem's installed version and names a drift note on disagreement — never a source (ADR 0084 item 1). |
-| `ecosystems`             | no       | none declared                         | A list of Ecosystem declarations. See below.                                                                                                                                                                                                                    |
-| `declined_opportunities` | no       | none                                  | Upstream Opportunities a human said no to, remembered between runs. See below.                                                                                                                                                                                  |
-| `instruction_globs`      | no       | See defaults                          | Repo-owned files that teach agents how to write code.                                                                                                                                                                                                           |
-| `brief_dir`              | no       | `docs/research`                       | Directory for the Upstream Brief and the structured report committed beside it. Create it if missing.                                                                                                                                                           |
-| `source_globs`           | no       | unset                                 | Optional application-code globs to _sample_ for mismatch evidence.                                                                                                                                                                                              |
-| `script_globs`           | no       | unset                                 | Optional hygiene/test-script globs to _sample_.                                                                                                                                                                                                                 |
-| `issue`                  | no       | unset                                 | When omitted, print a proposed issue and do not file.                                                                                                                                                                                                           |
+| Key                      | Default                   | Meaning                                                                                                                                                                                                    |
+| ------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version_record.path`    | `package.json`            | A file the host maintains that records versions for humans. The Baseline resolver only **compares** it with what is installed and names a drift note on disagreement; it is never a source (DESIGN.md §1). |
+| `ecosystems`             | none                      | The Ecosystems a run may name. See below.                                                                                                                                                                  |
+| `declined_opportunities` | none                      | Upstream Opportunities a human said no to, remembered between runs. See below.                                                                                                                             |
+| `instruction_globs`      | see below                 | Repo-owned files that teach agents how to write code: the files a run audits.                                                                                                                              |
+| `source_globs`           | unset                     | Application-code globs to _sample_ for evidence. Never inventoried.                                                                                                                                        |
+| `script_globs`           | unset                     | Hygiene and test-script globs to _sample_.                                                                                                                                                                 |
+| `brief_dir`              | `docs/research`           | Where the brief and its structured report are committed. Created if missing.                                                                                                                               |
+| `incidental_owners`      | `[ad-hoc-issue]`          | Who an Incidental Observation may be routed to (DESIGN.md §7): the host's own owners, such as an audit agent or a dependency auditor. The validator refuses any other owner.                               |
+| `issue`                  | unset: print, do not file | Where the proposed issue goes. See below.                                                                                                                                                                  |
 
 ### `ecosystems` entries
 
-Each entry declares one Ecosystem (ADR 0084 item 2):
+| Key              | Required | Meaning                                                                                           |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `lead`           | yes      | The lead package. Its installed version is the Ecosystem's Baseline.                              |
+| `members.add`    | no       | Companions the lead's scope convention misses (an unscoped package such as `eslint-config-next`). |
+| `members.remove` | no       | Companions to drop from the discovered set.                                                       |
 
-| Key              | Required | Meaning                                                                                                        |
-| ---------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `lead`           | yes      | The lead package name. Its installed version is the Ecosystem's Baseline.                                      |
-| `members.add`    | no       | Companion package names the lead's scope convention misses (an unscoped package such as `eslint-config-next`). |
-| `members.remove` | no       | Companion package names to drop from the discovered set.                                                       |
+Members are otherwise discovered by the lead's npm scope: `nx` names companions installed under `@nx/*`; a lead already scoped (`@remix-run/react`) names companions under its own scope. An Ecosystem whose lead is not installed fails closed with a reason, and the others still resolve.
 
-Members are otherwise discovered by the lead's npm scope prefix: `nx` names companions
-installed under `@nx/*`; a lead already scoped (`@remix-run/react`) names companions under its
-own scope (`@remix-run/*`). The Baseline resolver — `.agents/skills/upstream-brief/baseline.mjs`
-(dependency-free) plus `resolve-baseline.mjs` (its CLI) — ships inside the skill, like the report
-validator. An Ecosystem whose lead is not installed fails closed with a reason and does not stop
-the rest from resolving.
-
-```yaml
-ecosystems:
-  - lead: nx
-  - lead: next
-    members:
-      add: [eslint-config-next]
-      remove: []
-```
+**Package managers.** Installed versions come from the package resolver, `npm-resolver.mjs`, which reads each package's own manifest under `node_modules`. That covers npm, pnpm, and Yarn with the node-modules linker. It does not cover Yarn Plug'n'Play, or any other ecosystem's install tree (pip, uv, Cargo, Go modules): there, every lead fails closed. A resolver for another package manager implements the same two functions and is chosen in `resolverFor`.
 
 ### `declined_opportunities` entries
 
-An Upstream Opportunity a human declined, remembered so the next run does not propose it again
-(ADR 0084 item 12). Suppression, resurfacing, and validation are [the ledger](LEDGER.md)'s.
+An Upstream Opportunity a human declined, remembered so the next run does not propose it again (DESIGN.md §12). Suppression and resurfacing are [the ledger](LEDGER.md)'s.
 
-| Key              | Required | Meaning                                                                           |
-| ---------------- | -------- | --------------------------------------------------------------------------------- |
-| `ecosystem`      | yes      | The lead package name of the Ecosystem it was proposed for. Part of its identity. |
-| `url`            | yes      | The upstream page the Opportunity cited. Part of its identity.                    |
-| `site`           | yes      | The local site path it named. Part of its identity.                               |
-| `reason`         | yes      | One line: why not.                                                                |
-| `baseline_range` | yes      | The Baseline range it was declined at — `22.x`, `16.2.6`, or `>=22.0.0 <23.0.0`.  |
-| `quote`          | yes      | The upstream statement at the time, so a page that changes its mind is noticed.   |
+| Key              | Meaning                                                                         |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `ecosystem`      | The lead of the Ecosystem it was proposed for. Part of its identity.            |
+| `url`            | The upstream page the Opportunity cited. Part of its identity.                  |
+| `site`           | The local site path it named. Part of its identity.                             |
+| `reason`         | One line: why not.                                                              |
+| `baseline_range` | The Baseline range it was declined at: `22.x`, `16.2.6`, or `>=22.0.0 <23.0.0`. |
+| `quote`          | The upstream statement at the time, so a page that changes its mind is noticed. |
 
-```yaml
-declined_opportunities:
-  - ecosystem: nx
-    url: https://nx.dev/concepts/inferred-tasks
-    site: tools/scripts/check-component-hygiene.ts
-    reason: the migration is tracked for next quarter, not this one
-    baseline_range: '>=22.0.0 <23.0.0'
-    quote: Inferred tasks keep project configuration in step with the tools actually installed.
-```
-
-A value runs to the end of its line, so a URL keeps its colons and a `#` is part of the value
-rather than a comment. An entry is **suppressed** while the Baseline stays inside
-`baseline_range` and the upstream quote is unchanged, and **resurfaces** when either moves — a
-decline is about one suggestion at one version, not about the Ecosystem forever. `quote` is required
-for that second axis to exist at all: without it nothing could ever lift the suppression except a
-version bump.
-
-An entry whose `ecosystem` is no longer declared, or whose `site` is no longer in the tree,
-**fails** — it silences nothing and records a decision about something that is not there. In this
-repository that failure is `yarn upstream:briefs:check`.
+All six are required. An entry is **suppressed** while the Baseline stays inside `baseline_range` and the upstream quote is unchanged, and **resurfaces** when either moves: a decline is about one suggestion at one version, not about the Ecosystem forever. An entry whose `ecosystem` is no longer declared, or whose `site` is gone from the tree, **fails** `check-reports.mjs`: it silences nothing and records a decision about something that is not there.
 
 ### `issue` map
 
 | Key               | Meaning                                                      |
 | ----------------- | ------------------------------------------------------------ |
 | `tracker`         | `github`, `gitlab`, or `none`                                |
-| `repository`      | Host `owner/name` when the tracker needs it                  |
-| `labels.research` | Label for “this came from an Upstream Brief”                 |
-| `labels.hitl`     | Label meaning a human must decide before an agent implements |
+| `repository`      | `owner/name`, when the tracker needs it                      |
+| `labels.research` | The label meaning "this came from an Upstream Brief"         |
+| `labels.hitl`     | The label meaning a human decides before an agent implements |
 
-Two labels, and no third. A `labels.quality` role was mapped until ADR 0084 item 13 removed it:
-in this repository it resolved to `qa`, which [ADR 0049](../../../docs/adr/0049-qa-and-grilling-are-orchestration-labels.md)
-reserves for a QA Plan Issue, so a brief's issue arrived claiming to be something it was not. Do
-not map a dependencies role either, and do not add `ready-for-agent`.
+Two labels, and no third ([DESIGN.md](DESIGN.md) §13). A third "quality" role once mapped to a label its host reserved for something else, so every brief issue arrived claiming to be something it was not. Map no dependencies role either, and add no "ready for agent" label: a human decides first.
 
-## Default `instruction_globs`
+### Default `instruction_globs`
 
-```yaml
-instruction_globs:
-  - AGENTS.md
-  - CLAUDE.md
-  - GEMINI.md
-  - .github/copilot-instructions.md
-  - .agents/skills/**/*.md
-  - .claude/commands/*.md
+```json
+["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".agents/skills/**/*.md", ".claude/skills/**/*.md", ".claude/commands/*.md"]
 ```
 
-Always exclude, even when a glob would match:
-
-```text
-node_modules/**
-.yarn/**
-vendor/**
-.git/**
-**/generated/**
-```
-
-Third-party skill install trees are not repo-owned. Do not add them to `instruction_globs`. If a hop shows an installed third-party skill contradicting upstream, record **follow-on**: update or pin that skill.
+Always excluded, even when a glob matches: `node_modules/**`, `.yarn/**`, `vendor/**`, `.git/**`, `**/generated/**`. Third-party skill install trees are not repo-owned; leave them out of `instruction_globs`. When a hop shows an installed third-party skill contradicting upstream, record **follow-on**: update or pin that skill.
 
 ## Example
 
-```yaml
-version_record:
-  path: package.json
-ecosystems:
-  - lead: nx
-brief_dir: docs/research
-# source_globs and script_globs omitted — instructions only
-# issue omitted — print the proposal, do not file
-# declined_opportunities omitted — nothing has been declined yet
+```json
+{
+  "version_record": { "path": "package.json" },
+  "ecosystems": [{ "lead": "nx" }, { "lead": "next", "members": { "add": ["eslint-config-next"] } }],
+  "brief_dir": "docs/research",
+  "incidental_owners": ["ad-hoc-issue"],
+  "issue": {
+    "tracker": "github",
+    "repository": "owner/name",
+    "labels": { "research": "research", "hitl": "needs-human" }
+  }
+}
 ```
+
+## Wiring a host
+
+Every command takes `--repo <dir>` (default: the working directory) and needs Node 22 or later. Paths below are relative to this folder.
+
+| Command                | What it does                                                        | Where a host runs it                                             |
+| ---------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `check-reports.mjs`    | The gate: adapter, committed reports, declined entries. Exit 0/1/2. | CI, with full history (`fetch-depth: 0`); optionally pre-commit. |
+| `suggest-run.mjs`      | One line per Ecosystem whose Baseline has moved. Always exit 0.     | A hook after any dependency install, upgrade, or removal.        |
+| `resolve-baseline.mjs` | What a run would anchor to.                                         | By hand, before a run.                                           |
+| `resolve-ledger.mjs`   | What a run would carry forward and re-research.                     | By hand, before a run.                                           |
+| `validate-report.mjs`  | Validates and renders one report during a run (SKILL.md step 8).    | The run itself.                                                  |
+
+The contract suites are every `*.test.mjs` in this folder: `node --test <this folder>/*.test.mjs`. `portability.test.mjs` among them copies the folder alone into an empty repository and runs everything there.

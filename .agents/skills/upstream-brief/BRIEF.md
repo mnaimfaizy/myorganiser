@@ -45,4 +45,4 @@ A finding without a primary-source URL is not a finding. When two official pages
 
 ## The unmigrated briefs
 
-The three briefs written before [ADR 0084](../../../docs/adr/0084-an-upstream-brief-is-anchored-to-what-is-installed-and-accepted-on-checked-evidence.md) are free Markdown with no structured report beside them. They are read like any other frozen brief and are not migrated: a rule requiring a report beside every brief would fail on three documents nobody intends to change.
+The three briefs written before [DESIGN.md](DESIGN.md) are free Markdown with no structured report beside them. They are read like any other frozen brief and are not migrated: a rule requiring a report beside every brief would fail on three documents nobody intends to change.

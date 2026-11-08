@@ -2,7 +2,7 @@
 
 A run writes a **structured report** and renders the Markdown brief from it. The report is the
 checkable artifact; the brief is a view of it. Both are committed to the brief directory, and a
-Wired Gate re-validates every committed report offline ([ADR 0084](../../../docs/adr/0084-an-upstream-brief-is-anchored-to-what-is-installed-and-accepted-on-checked-evidence.md)
+Wired Gate re-validates every committed report offline ([DESIGN.md](DESIGN.md)
 items 3 and 10).
 
 Three modules, none of which import anything outside this directory except Node built-ins — the
@@ -17,7 +17,7 @@ skill is portable, and a validator that needed a host repository's dependencies 
 ## Running it
 
 ```bash
-node .agents/skills/upstream-brief/validate-report.mjs <report.json> \
+node <skill>/validate-report.mjs <report.json> \
   --out <normalized.json> --render <brief.md>
 ```
 
@@ -46,7 +46,7 @@ report arrives carrying them: a derived field the author can forge is not derive
 
 ## Domain rules
 
-On top of the shape above, the validator enforces the parts of ADR 0084 that are about one
+On top of the shape above, the validator enforces the parts of [DESIGN.md](DESIGN.md) that are about one
 report's own entries. Everything that reads the _previous_ committed report — the carry-forward,
 the delta, declined Upstream Opportunities — is [the ledger](LEDGER.md)'s, in `ledger.mjs`:
 
@@ -79,16 +79,16 @@ Closed vocabularies:
 | `urgency`     | `broken-now`, `removal-scheduled`, `deprecated`, `advisory` |
 | `evidence`    | `executed`, `cited`, `inferred`, `absent`                   |
 | `disposition` | `plan`, `follow-on`                                         |
-| `owner`       | `DepAudit`, `Audit`, `ad-hoc-issue`                         |
+| `owner`       | the adapter's `incidental_owners`, default `ad-hoc-issue`   |
 
 `delta` is `{newFindings[], resolved[], stillPresent[]}`, computed by [the ledger](LEDGER.md) from
 the previous committed report and validated here like any other field. It is absent on the first
 run for an Ecosystem, which has no ledger to carry forward.
 
 An Ecosystem's own `lead`, `members`, `baseline`, and `driftNotes` are not authored by a worker —
-they come from the Baseline resolver (`baseline.mjs`, and `resolve-baseline.mjs` for this repo's
+they come from the Baseline resolver (`baseline.mjs`, and `resolve-baseline.mjs` over the host's
 adapter), which turns an Ecosystem declaration and the installed package tree into exactly those
-four fields before any research hop runs (ADR 0084 items 1 and 2). This contract still validates
+four fields before any research hop runs (DESIGN.md §1 and §2). This contract still validates
 them as any other report field; it does not resolve them itself.
 
 ## Unverified
@@ -134,9 +134,8 @@ checks is the drift the assertion exists to stop.
 Upstream Findings are grouped by urgency, most urgent first, because urgency orders the plan. A
 finding dispositioned `follow-on` renders under Follow-on and nowhere else.
 
-## In this repository
+## After the run
 
-`yarn upstream:briefs:check` re-validates every committed report and every declined Upstream
-Opportunity the adapter records (a thin adapter, `tools/scripts/check-upstream-briefs.ts`, so the
-Meta-Gate can see the gate). It runs in `yarn gates:run` and in CI. `yarn upstream:briefs:test` is
-the contract suite for all of it, and `yarn upstream:ledger` prints what a run would carry forward.
+`check-reports.mjs` re-validates every committed report at the commit it records, along with the
+adapter and its declined Upstream Opportunities. A host runs it as a gate; [ADAPTER.md](ADAPTER.md)
+says where. `resolve-ledger.mjs` prints what the next run would carry forward.

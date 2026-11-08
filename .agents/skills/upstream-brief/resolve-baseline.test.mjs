@@ -1,7 +1,7 @@
 /**
  * Contract suite for the Baseline resolver's CLI adapter: the narrow
  * `ecosystems:` / `version_record.path` config parsing, and the end-to-end
- * `run()` over a fixture repo tree (ADR 0084 items 1 and 2).
+ * `run()` over a fixture repo tree (DESIGN.md §1 and §2).
  */
 
 import assert from 'node:assert/strict';

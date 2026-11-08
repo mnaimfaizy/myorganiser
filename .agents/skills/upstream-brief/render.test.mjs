@@ -1,7 +1,7 @@
 /**
  * Contract suite for the Upstream Brief renderer.
  *
- * The rule under test is the one two of the three ADR 0018 briefs broke by
+ * The rule under test is the one two of the first three briefs broke by
  * inventing a section the template lacked: the brief emits **every** section,
  * always, in one fixed order, and an empty one says `_None._` rather than
  * disappearing. A section that vanishes when empty is indistinguishable from
@@ -87,10 +87,10 @@ test('an Ecosystem renders its Baseline, its members, and whether it has a Horiz
 });
 
 test('BRIEF.md documents the section order the renderer actually emits', () => {
-  // ADR 0085: an artifact states no claim it does not assert. BRIEF.md tells a
+  // DESIGN.md, Principles: an artifact states no claim it does not assert. BRIEF.md tells a
   // reader what the brief looks like, so it names every section in order — and
   // a template restating an order nothing checks is exactly the drift the two
-  // ADR 0018 briefs demonstrated by inventing a section the template lacked.
+  // first briefs demonstrated by inventing a section the template lacked.
   const brief = readFileSync(
     fileURLToPath(new URL('./BRIEF.md', import.meta.url)),
     'utf8',
@@ -110,7 +110,7 @@ test('Upstream Findings are grouped by urgency, most urgent first', () => {
     .split('\n')
     .filter((line) => line.startsWith('### '))
     .map((line) => line.slice(4));
-  // Urgency orders the plan (ADR 0084 item 5), so it is the outer grouping.
+  // Urgency orders the plan (DESIGN.md §5), so it is the outer grouping.
   assert.deepEqual(order, ['Broken now', 'Removal scheduled', 'Deprecated']);
 });
 
@@ -166,7 +166,7 @@ test("an Opportunity renders the upstream's own benefit statement and its minimu
 test('an Incidental Observation renders its owner and is never in the plan', () => {
   const markdown = renderUpstreamBrief(normalize());
   const body = sectionBody(markdown, 'Incidental Observations');
-  assert.match(body, /\*\*Owner:\*\* `Audit`/);
+  assert.match(body, /\*\*Owner:\*\* `ad-hoc-issue`/);
   assert.ok(
     !sectionBody(markdown, 'Upstream Findings').includes('contract suite'),
   );
