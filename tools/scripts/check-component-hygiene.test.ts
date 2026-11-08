@@ -1410,3 +1410,160 @@ test('the real checker validates its own exemption list against this repo', () =
   assert.doesNotMatch(result.stderr, /EXPORT_BASENAME_EXEMPTIONS/);
   assert.match(result.stderr, /nothing was checked/i);
 });
+
+const MULTI_COMPONENT_SOURCE = [
+  "import * as React from 'react';",
+  '',
+  'export function FirstHelper() {',
+  '  return <div>first</div>;',
+  '}',
+  '',
+  'export function SecondHelper() {',
+  '  return <div>second</div>;',
+  '}',
+  '',
+].join('\n');
+
+test('a *-story-fixtures.tsx with several exported components has no Feature Component findings', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-story-fixtures.tsx',
+    MULTI_COMPONENT_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 0);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'story-fixtures');
+  assert.deepEqual(parsed.results[0].findings, []);
+});
+
+test('a non-fixture .tsx with the same content is still flagged', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-helpers.tsx',
+    MULTI_COMPONENT_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 1);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'feature');
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'export-basename'),
+  );
+});
+
+test('a *-story-fixtures.tsx is still held to the shared rules', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/pages/todos/src/components/todo-story-fixtures.tsx',
+    [
+      "import * as React from 'react';",
+      '',
+      'export function Helper() {',
+      '  React.useEffect(() => {',
+      "    window.addEventListener('resize', () => {});",
+      '  }, []);',
+      '  return <div />;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'effect-missing-cleanup'),
+  );
+});
+
+// --- a fixtures file outside a page library keeps its own scope --------------
+
+/** A forwardRef with no displayName: a rule every non-feature scope checks. */
+const UNNAMED_FORWARD_REF_SOURCE = [
+  "import * as React from 'react';",
+  '',
+  'const Badge = React.forwardRef<HTMLSpanElement, { label: string }>(',
+  '  ({ label }, ref) => <span ref={ref}>{label}</span>,',
+  ');',
+  '',
+  'export { Badge };',
+  '',
+].join('\n');
+
+test('a *-story-fixtures.tsx in the UI Primitive folder keeps the primitive scope and its displayName finding', (t) => {
+  const workspace = createWorkspace(t);
+  const fixtures = writeFixture(
+    workspace,
+    'libs/web/ui/src/lib/components/badge/badge-story-fixtures.tsx',
+    UNNAMED_FORWARD_REF_SOURCE,
+  );
+  const plain = writeFixture(
+    workspace,
+    'libs/web/ui/src/lib/components/badge/badge-plain.tsx',
+    UNNAMED_FORWARD_REF_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', fixtures, plain);
+
+  assert.equal(result.status, 1);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  const [fixtureResult, plainResult] = parsed.results;
+  assert.equal(fixtureResult.scope, 'primitive');
+  assert.equal(plainResult.scope, 'primitive');
+  // Same file content, same primitive rule: the fixtures name does not relax it.
+  assert.ok(
+    fixtureResult.findings.some((f) => f.rule === 'forwardref-displayname'),
+    JSON.stringify(fixtureResult.findings),
+  );
+  assert.ok(
+    plainResult.findings.some((f) => f.rule === 'forwardref-displayname'),
+    JSON.stringify(plainResult.findings),
+  );
+});
+
+test('a *-story-fixtures.tsx in the Vault UI folder keeps the vault-ui scope and its displayName finding', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'libs/web/vault-ui/src/lib/vault-status-story-fixtures.tsx',
+    UNNAMED_FORWARD_REF_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 1);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'vault-ui');
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'forwardref-displayname'),
+    JSON.stringify(parsed.results[0].findings),
+  );
+});
+
+test('a *-story-fixtures.tsx in a Feature Library keeps the feature-library scope and its displayName finding', (t) => {
+  const workspace = createWorkspace(t);
+  writeWebLibraryProject(workspace, 'usage-locations', FEATURE_LIBRARY_TAGS);
+  const file = writeFixture(
+    workspace,
+    'libs/web/usage-locations/src/lib/usage-story-fixtures.tsx',
+    UNNAMED_FORWARD_REF_SOURCE,
+  );
+
+  const result = runChecker(workspace, '--json', file);
+
+  assert.equal(result.status, 1);
+  const parsed = JSON.parse(result.stdout) as HygieneReport;
+  assert.equal(parsed.results[0].scope, 'feature-library');
+  assert.ok(
+    parsed.results[0].findings.some((f) => f.rule === 'forwardref-displayname'),
+    JSON.stringify(parsed.results[0].findings),
+  );
+});
