@@ -1,3 +1,4 @@
+import type { AdminVariant } from '../../../lib/adminVariant';
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 
 import { ReportCard } from './ReportCard';
@@ -6,12 +7,11 @@ import { ReportSender } from './ReportSender';
 import {
   getFixNoticeSentence,
   REPORT_BODY_CLASS_NAME,
-  type ReportVariant,
 } from '../../../lib/feedbackReportView';
 
 export interface ReportReadingColumnProps {
   report: AdminFeedbackReportDetailDto;
-  variant: ReportVariant;
+  variant: AdminVariant;
 }
 
 /**

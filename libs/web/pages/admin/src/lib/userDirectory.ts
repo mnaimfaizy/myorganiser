@@ -6,6 +6,8 @@ import type {
 } from '@myorganiser/app-api-client';
 import type { StatusPillTone } from '@myorganiser/web-ui';
 
+import { type AdminVariant } from './adminVariant';
+import { formatDayMonth } from './formatDayMonth';
 import { formatUserDisplayName } from './formatUserIdentity';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */
@@ -17,8 +19,6 @@ export const USER_DIRECTORY_MESSAGES = {
   error: 'Unable to load users. Please try again.',
   empty: 'No users found.',
 } as const;
-
-export type UserDirectoryVariant = 'desktop' | 'phone';
 
 export type UserDirectoryStatus = 'active' | 'unverified' | 'disabled';
 
@@ -126,25 +126,6 @@ export const USER_SORT_VALUES = Object.keys(
 
 export function isAdminUserSort(value: string): value is AdminUserSort {
   return Object.prototype.hasOwnProperty.call(USER_SORT_LABELS, value);
-}
-
-/**
- * "2 Sep"; the year is appended (" 2025") only when it differs from `now`'s
- * year. The day and the three-letter month come from en-US formatToParts,
- * because en-GB prints "Sept" for September. Local time zone, as before.
- * Shared by the user directory and the audit log.
- */
-export function formatDayMonth(date: Date, now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-    month: 'short',
-  }).formatToParts(date);
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const base = `${day} ${month}`;
-  return date.getFullYear() === now.getFullYear()
-    ? base
-    : `${base} ${date.getFullYear()}`;
 }
 
 export function formatJoinedDate(iso: string, now: Date = new Date()): string {
@@ -296,7 +277,7 @@ function plural(count: number, singular: string, pluralForm: string): string {
 /** "148 accounts · 3 platform admins" on desktop, "148 accounts" on phone. */
 export function formatAccountsSummary(
   overview: Pick<AdminOverviewResponse, 'users' | 'platformAdmins'>,
-  variant: UserDirectoryVariant,
+  variant: AdminVariant,
 ): string {
   const accounts = plural(overview.users, 'account', 'accounts');
   if (variant === 'phone') {

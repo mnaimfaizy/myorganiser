@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../../lib/adminVariant';
 import type { AdminUserSort, UserRole } from '@myorganiser/app-api-client';
 import {
   ChoiceChip,
@@ -22,11 +23,10 @@ import {
   USER_STATUS_CHIPS,
   type UserDirectoryFilterValues,
   type UserDirectoryStatus,
-  type UserDirectoryVariant,
 } from '../../lib/userDirectory';
 
 export interface UserDirectoryFiltersProps {
-  variant: UserDirectoryVariant;
+  variant: AdminVariant;
   status: UserDirectoryStatus | undefined;
   role: UserRole | undefined;
   sort: AdminUserSort;

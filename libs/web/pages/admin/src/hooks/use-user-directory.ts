@@ -3,9 +3,10 @@ import type {
   AdminUserSort,
   UserRole,
 } from '@myorganiser/app-api-client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { createPlatformAdminApi } from '../lib/apiClient';
+import { type PagedListMode, usePagedList } from './use-paged-list';
 import {
   USER_DIRECTORY_PAGE_SIZE,
   type UserDirectoryFilterValues,
@@ -16,7 +17,7 @@ import {
  * `pages`: desktop, `users` is the current page. `append`: phone, `users` is
  * every page loaded so far and `loadMore()` fetches the next one.
  */
-export type UserDirectoryMode = 'pages' | 'append';
+export type UserDirectoryMode = PagedListMode;
 
 export interface UseUserDirectoryOptions {
   mode: UserDirectoryMode;
@@ -52,35 +53,11 @@ export interface UserDirectoryState {
   retryLoadMore: () => void;
 }
 
-interface UserDirectoryPaging {
-  mode: UserDirectoryMode;
-  page: number;
-  /** Set only by loadMore. Every other change replaces the list. */
-  append: boolean;
-}
-
-/** The last settled fetch. `key` names the request it answers. */
-interface UserDirectorySettled {
-  key: string | null;
-  users: AdminUserIdentity[];
-  total: number;
-  /** A replace failed: the list is blank and the error shows. */
-  error: boolean;
-  /** An append failed: the rows loaded so far are kept. */
-  appendError: boolean;
-}
-
-const NO_USERS: AdminUserIdentity[] = [];
-
 /**
- * Owns the directory's query, filters, sort, and paging, and fetches the
- * list. Every filter, query, sort, or mode change resets to page 1 and
- * replaces the list. Setting a value to what it already is changes nothing,
- * so a pressed chip stays pressed.
- *
- * Pending and error flags are derived, not stored. A result is settled only
- * when its request key matches the current key, so a stale response can never
- * overwrite a newer one.
+ * Owns the directory's query, filters, and sort, and fetches the list through
+ * `usePagedList`. Every filter, query, sort, or mode change resets to page 1
+ * and replaces the list. Setting a value to what it already is changes
+ * nothing, so a pressed chip stays pressed.
  */
 export function useUserDirectory({
   mode,
@@ -91,98 +68,36 @@ export function useUserDirectory({
   );
   const [role, setRoleValue] = useState<UserRole | undefined>(undefined);
   const [sort, setSortValue] = useState<AdminUserSort>('newest');
-  // Paging remembers which mode it was set in. A mode switch then reads as
-  // page 1 without a reset effect.
-  const [paging, setPaging] = useState<UserDirectoryPaging>({
-    mode,
-    page: 1,
-    append: false,
-  });
-  const page = paging.mode === mode ? paging.page : 1;
-  const append = paging.mode === mode && paging.append;
-  // Bumped only by retryLoadMore, so a retry re-requests the same page
-  // without page/query/filter/sort changing.
-  const [retryToken, setRetryToken] = useState(0);
 
-  const requestKey = JSON.stringify([
-    query,
-    status,
-    role,
-    sort,
+  const {
+    rows: users,
+    total,
     page,
-    retryToken,
-  ]);
-
-  const [settled, setSettled] = useState<UserDirectorySettled>({
-    key: null,
-    users: NO_USERS,
-    total: 0,
-    error: false,
-    appendError: false,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    hasMore,
+    resetToFirstPage,
+    goToPage,
+    loadMore,
+    retryLoadMore,
+  } = usePagedList<AdminUserIdentity>({
+    mode,
+    pageSize: USER_DIRECTORY_PAGE_SIZE,
+    filterKey: JSON.stringify([query, status, role, sort]),
+    fetchPage: (nextPage) =>
+      createPlatformAdminApi()
+        .listUsers({
+          q: query,
+          status,
+          role,
+          sort,
+          page: nextPage,
+          pageSize: USER_DIRECTORY_PAGE_SIZE,
+        })
+        .then(({ data }) => ({ rows: data.users, total: data.total })),
   });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    createPlatformAdminApi()
-      .listUsers({
-        q: query,
-        status,
-        role,
-        sort,
-        page,
-        pageSize: USER_DIRECTORY_PAGE_SIZE,
-      })
-      .then((response) => {
-        // A newer request has started; this response is stale.
-        if (cancelled) return;
-        const data = response.data;
-        setSettled((previous) => ({
-          key: requestKey,
-          users: append ? [...previous.users, ...data.users] : data.users,
-          total: data.total,
-          error: false,
-          appendError: false,
-        }));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSettled((previous) =>
-          append
-            ? // A failed append keeps the rows and total already loaded.
-              {
-                key: requestKey,
-                users: previous.users,
-                total: previous.total,
-                error: false,
-                appendError: true,
-              }
-            : {
-                key: requestKey,
-                users: NO_USERS,
-                total: 0,
-                error: true,
-                appendError: false,
-              },
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [requestKey, query, status, role, sort, page, append]);
-
-  const pending = settled.key !== requestKey;
-  const loadingMore = pending && append;
-  const loading = pending && !loadingMore;
-  const error = !pending && settled.error;
-  const loadMoreError = !pending && settled.appendError;
-  const users = settled.error ? NO_USERS : settled.users;
-  const total = settled.total;
-
-  const resetToFirstPage = useCallback(() => {
-    setPaging({ mode, page: 1, append: false });
-  }, [mode]);
 
   const setQuery = useCallback(
     (raw: string) => {
@@ -230,28 +145,6 @@ export function useUserDirectory({
     },
     [sort, resetToFirstPage],
   );
-
-  const goToPage = useCallback(
-    (next: number) => {
-      setPaging({ mode, page: Math.max(1, Math.floor(next)), append: false });
-    },
-    [mode],
-  );
-
-  const hasMore = page * USER_DIRECTORY_PAGE_SIZE < total;
-
-  // A failed append is not retried by a loop: loadMore holds until a filter,
-  // query, or sort change replaces the request, or retryLoadMore re-requests
-  // the same page explicitly.
-  const loadMore = useCallback(() => {
-    if (!hasMore || pending || loadMoreError) return;
-    setPaging({ mode, page: page + 1, append: true });
-  }, [hasMore, pending, loadMoreError, mode, page]);
-
-  const retryLoadMore = useCallback(() => {
-    if (!loadMoreError) return;
-    setRetryToken((token) => token + 1);
-  }, [loadMoreError]);
 
   return {
     users,

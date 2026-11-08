@@ -1,8 +1,7 @@
 'use client';
 
+import type { AdminVariant } from '../../lib/adminVariant';
 import { Button, cn } from '@myorganiser/web-ui';
-
-import type { UserDetailVariant } from '../../lib/userDetail';
 
 export interface UserActionRowProps {
   title: string;
@@ -17,7 +16,7 @@ export interface UserActionRowProps {
   /** The id of the visible note that explains a disabled button. */
   describedBy?: string;
   onAction: () => void;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
   /** Replaces the idle label while the action runs. */
   busyLabel?: string;
 }

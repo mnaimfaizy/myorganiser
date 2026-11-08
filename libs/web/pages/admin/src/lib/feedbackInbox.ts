@@ -5,7 +5,8 @@ import {
 } from '@myorganiser/app-api-client';
 
 import { formatAuditTime, relativeDayLabel } from './auditLog';
-import { formatDayMonth, formatShowingRange } from './userDirectory';
+import { formatDayMonth } from './formatDayMonth';
+import { formatShowingRange } from './userDirectory';
 
 /** Rows per page. Desktop pages through it; phone appends one page at a time. */
 export const FEEDBACK_INBOX_PAGE_SIZE = 25;
@@ -16,8 +17,6 @@ export const FEEDBACK_INBOX_MESSAGES = {
   error: 'Unable to load feedback reports. Please try again.',
   empty: 'No feedback reports match these filters.',
 } as const;
-
-export type FeedbackInboxVariant = 'desktop' | 'phone';
 
 /**
  * The Platform filter's labels. The backend owns the same labels but does not

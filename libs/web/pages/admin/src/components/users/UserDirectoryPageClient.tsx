@@ -1,12 +1,13 @@
 'use client';
 
+import type { AdminVariant } from '../../lib/adminVariant';
 import { useIsMobileState } from '@myorganiser/web-ui';
 
 import { useUserDirectory } from '../../hooks/use-user-directory';
-import type { UserDirectoryVariant } from '../../lib/userDirectory';
+import { formatShowingRange } from '../../lib/userDirectory';
+import { AdminPager } from '../paged-list/AdminPager';
 import { UserDirectoryFilters } from './UserDirectoryFilters';
 import { UserDirectoryList } from './UserDirectoryList';
-import { UserDirectoryPager } from './UserDirectoryPager';
 import { UserDirectoryPhoneList } from './UserDirectoryPhoneList';
 import { UserDirectorySearch } from './UserDirectorySearch';
 import { UsersHeader } from './UsersHeader';
@@ -21,7 +22,7 @@ export function UserDirectoryPageClient() {
   // Until the breakpoint is known, only the header and a placeholder render.
   // The hook still runs, so it is unconditional.
   const isPhone = useIsMobileState();
-  const variant: UserDirectoryVariant = isPhone ? 'phone' : 'desktop';
+  const variant: AdminVariant = isPhone ? 'phone' : 'desktop';
   const {
     users,
     total,
@@ -78,11 +79,18 @@ export function UserDirectoryPageClient() {
             error={error}
             footer={
               showPager ? (
-                <UserDirectoryPager
+                <AdminPager
                   page={page}
                   pageSize={pageSize}
-                  shownCount={users.length}
                   total={total}
+                  range={formatShowingRange(
+                    page,
+                    pageSize,
+                    users.length,
+                    total,
+                  )}
+                  previousLabel="Previous"
+                  nextLabel="Next"
                   onPageChange={goToPage}
                 />
               ) : null

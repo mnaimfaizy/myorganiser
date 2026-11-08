@@ -1,5 +1,6 @@
 'use client';
 
+import type { AdminVariant } from '../../lib/adminVariant';
 import type { AdminUserIdentity } from '@myorganiser/app-api-client';
 import { StatusPill } from '@myorganiser/web-ui';
 
@@ -9,13 +10,13 @@ import {
   USER_STATUS_PILLS,
   userDirectoryStatus,
 } from '../../lib/userDirectory';
-import { identityMeta, type UserDetailVariant } from '../../lib/userDetail';
+import { identityMeta } from '../../lib/userDetail';
 import { UserAvatar } from '../users/UserAvatar';
 import { UserIdRow } from './UserIdRow';
 
 export interface UserIdentityCardProps {
   user: AdminUserIdentity;
-  variant: UserDetailVariant;
+  variant: AdminVariant;
 }
 
 /**

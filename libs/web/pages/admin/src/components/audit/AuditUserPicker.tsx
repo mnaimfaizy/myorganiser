@@ -13,12 +13,13 @@ import {
   PopoverTrigger,
 } from '@myorganiser/web-ui';
 import { ChevronsUpDown } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { createPlatformAdminApi } from '../../lib/apiClient';
 import type { AuditLogUserFilter } from '../../lib/auditLog';
 import { formatUserDisplayName } from '../../lib/formatUserIdentity';
 import { USER_DIRECTORY_MESSAGES } from '../../lib/userDirectory';
+import { useKeyedFetch } from '../../hooks/use-keyed-fetch';
 
 /** The picker shows the first ten Users by name when the search is empty. */
 const PICKER_PAGE_SIZE = 10;
@@ -38,9 +39,8 @@ export interface AuditUserPickerProps {
   onChange: (next: AuditLogUserFilter | undefined) => void;
 }
 
-/** The last settled search. `key` is the search it answers. */
+/** The last settled search. */
 interface AuditUserPickerSettled {
-  key: string | null;
   users: AdminUserIdentity[];
   error: boolean;
 }
@@ -62,46 +62,30 @@ export function AuditUserPicker({
   const contentId = `${id}-listbox`;
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const requestKey = search.trim();
-  const [settled, setSettled] = useState<AuditUserPickerSettled>({
-    key: null,
-    users: NO_USERS,
-    error: false,
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-
-    // The request still fires for an empty search: that is the first ten by name.
-    const timer = window.setTimeout(() => {
+  const searchKey = search.trim();
+  // Closed means idle. The request still fires for an empty search: that is
+  // the first ten by name.
+  const { state: settled, pending } = useKeyedFetch<
+    AdminUserIdentity[],
+    AuditUserPickerSettled
+  >({
+    key: open ? searchKey : null,
+    initial: { users: NO_USERS, error: false },
+    delayMs: SEARCH_DEBOUNCE_MS,
+    load: () =>
       createPlatformAdminApi()
         .listUsers({
-          q: requestKey || undefined,
+          q: searchKey || undefined,
           pageSize: PICKER_PAGE_SIZE,
           sort: 'name',
         })
-        .then((response) => {
-          if (cancelled) return;
-          setSettled({
-            key: requestKey,
-            users: response.data.users,
-            error: false,
-          });
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSettled({ key: requestKey, users: NO_USERS, error: true });
-        });
-    }, SEARCH_DEBOUNCE_MS);
+        .then((response) => response.data.users),
+    settle: (_previous, outcome) =>
+      outcome.ok
+        ? { users: outcome.value, error: false }
+        : { users: NO_USERS, error: true },
+  });
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [open, requestKey]);
-
-  const pending = settled.key !== requestKey;
   const users = pending || settled.error ? NO_USERS : settled.users;
 
   const handleSelect = useCallback(

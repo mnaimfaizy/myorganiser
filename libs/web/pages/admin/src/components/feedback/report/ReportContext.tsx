@@ -1,16 +1,14 @@
+import type { AdminVariant } from '../../../lib/adminVariant';
 import type { AdminFeedbackReportDetailDto } from '@myorganiser/app-api-client';
 import { Fragment } from 'react';
 
 import { formatFeedbackReportTimestamp } from '../../../lib/formatFeedbackReport';
 import { ReportCard } from './ReportCard';
-import {
-  REPORT_NOTE_CLASS_NAME,
-  type ReportVariant,
-} from '../../../lib/feedbackReportView';
+import { REPORT_NOTE_CLASS_NAME } from '../../../lib/feedbackReportView';
 
 export interface ReportContextProps {
   report: AdminFeedbackReportDetailDto;
-  variant: ReportVariant;
+  variant: AdminVariant;
 }
 
 interface ContextRow {

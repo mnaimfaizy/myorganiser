@@ -6,6 +6,7 @@ import type {
 import { type Page } from '@playwright/test';
 import { routeApi } from './apiStub';
 import { corsHeaders } from './adminSession';
+import { pad3, positiveInt } from './adminPaging';
 
 /**
  * Deterministic, paged `GET /admin/audit-logs` stub for the Audit log page.
@@ -65,10 +66,6 @@ export interface AdminAuditLogRequest {
   pageSize: number;
 }
 
-function pad3(value: number): string {
-  return String(value).padStart(3, '0');
-}
-
 /**
  * `count` audit entries, newest first, all deterministic. Entry n (0-based)
  * has action `ACTIONS[n % 5]`, actor `ACTORS[n % 2]`, and target
@@ -92,11 +89,6 @@ export function buildAdminAuditEntries(count: number): AdminAuditLogEntry[] {
       createdAt: new Date(BASE_MS - index * STEP_MS).toISOString(),
     };
   });
-}
-
-function positiveInt(raw: string | null, fallback: number): number {
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 /**

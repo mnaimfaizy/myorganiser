@@ -11,8 +11,6 @@ import {
   SelectValue,
   cn,
 } from '@myorganiser/web-ui';
-import { type ChangeEvent, useCallback } from 'react';
-
 import {
   FEEDBACK_REPORT_KINDS,
   FEEDBACK_REPORT_STATUSES,
@@ -24,6 +22,7 @@ import {
   formatFeedbackReportPlatform,
   type FeedbackInboxFilters as FeedbackFilterValues,
 } from '../../../lib/feedbackInbox';
+import { useFeedbackFilterHandlers } from '../../../hooks/use-feedback-filter-handlers';
 
 /** Radix Select rejects an empty value, so the "all" options use these. */
 const ALL_STATUSES_VALUE = 'all';
@@ -46,41 +45,12 @@ export function FeedbackInboxFilters({
   onChange,
   onClear,
 }: FeedbackInboxFiltersProps) {
-  const handleStatusChange = useCallback(
-    (value: string) => {
-      onChange({
-        status: FEEDBACK_REPORT_STATUSES.find((status) => status === value),
-      });
-    },
-    [onChange],
-  );
-
-  const handleKindChange = useCallback(
-    (value: string) => {
-      onChange({
-        kind: FEEDBACK_REPORT_KINDS.find((kind) => kind === value),
-      });
-    },
-    [onChange],
-  );
-
-  const handlePlatformChange = useCallback(
-    (value: string) => {
-      onChange({
-        platform: FEEDBACK_REPORT_PLATFORMS.find(
-          (platform) => platform === value,
-        ),
-      });
-    },
-    [onChange],
-  );
-
-  const handleTrackingIssueChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      onChange({ trackingIssue: event.target.value });
-    },
-    [onChange],
-  );
+  const {
+    handleStatusChange,
+    handleKindChange,
+    handlePlatformChange,
+    handleTrackingIssueChange,
+  } = useFeedbackFilterHandlers(onChange);
 
   return (
     <div
