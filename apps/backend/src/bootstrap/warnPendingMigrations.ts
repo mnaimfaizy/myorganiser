@@ -5,7 +5,28 @@ import { runBootTask } from './runBootTask';
 
 export const MIGRATE_HINT = 'Run `yarn nx run backend:migrate` to apply them.';
 
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'prisma', 'migrations');
+/**
+ * Dev runs a webpack bundle whose `__dirname` is `dist/apps/backend`, so the
+ * source tree is found from the working directory as well.
+ */
+export function resolveMigrationsDir(
+  cwd: string = process.cwd(),
+  exists: (p: string) => boolean = fs.existsSync,
+): string {
+  const candidates = [
+    path.join(__dirname, '..', 'prisma', 'migrations'),
+    path.join(cwd, 'apps', 'backend', 'src', 'prisma', 'migrations'),
+    path.join(cwd, 'src', 'prisma', 'migrations'),
+    path.join(cwd, 'prisma', 'migrations'),
+  ];
+  const found = candidates.find((c) => exists(c));
+  if (!found) {
+    throw new Error(
+      `migrations directory not found (looked in: ${candidates.join(', ')})`,
+    );
+  }
+  return found;
+}
 
 export function listLocalMigrations(dir: string): string[] {
   return fs
@@ -54,7 +75,8 @@ export async function warnPendingMigrationsOnBoot(
     '[bootstrap] Skipped pending-migration check:',
     async () => {
       const local = (
-        deps.localMigrations ?? (() => listLocalMigrations(MIGRATIONS_DIR))
+        deps.localMigrations ??
+        (() => listLocalMigrations(resolveMigrationsDir()))
       )();
       const applied = await (deps.appliedMigrations ?? listAppliedMigrations)();
       const pending = findPendingMigrations(local, applied);

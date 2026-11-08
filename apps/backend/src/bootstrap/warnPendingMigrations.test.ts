@@ -10,7 +10,9 @@ import {
 import {
   findPendingMigrations,
   isMissingColumnError,
+  listLocalMigrations,
   logMissingColumnHint,
+  resolveMigrationsDir,
   warnPendingMigrationsOnBoot,
 } from './warnPendingMigrations';
 
@@ -91,5 +93,20 @@ describe('warnPendingMigrations', () => {
     expect(logMissingColumnHint(err, true)).toBe(false);
     expect(logMissingColumnHint(new Error('other'), false)).toBe(false);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  test('resolves the real migrations directory from the workspace root or backend dir', () => {
+    const fromRoot = resolveMigrationsDir(process.cwd());
+    expect(listLocalMigrations(fromRoot).length).toBeGreaterThan(0);
+    const bundled = resolveMigrationsDir('/nonexistent', (p) =>
+      p.endsWith('/nonexistent/src/prisma/migrations'),
+    );
+    expect(bundled).toBe('/nonexistent/src/prisma/migrations');
+  });
+
+  test('throws when no migrations directory exists', () => {
+    expect(() => resolveMigrationsDir('/nonexistent', () => false)).toThrow(
+      /not found/,
+    );
   });
 });
