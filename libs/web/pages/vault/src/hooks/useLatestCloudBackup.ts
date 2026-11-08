@@ -29,7 +29,7 @@ export type LatestCloudBackupApiFactory = () => {
     status?: string;
     source?: string;
     event?: string;
-  }) => Promise<{ data: LatestBackupRecord }>;
+  }) => Promise<{ data: LatestBackupRecord | null }>;
 };
 
 /**
@@ -56,6 +56,11 @@ export function useLatestCloudBackup(
         source: 'google-drive',
         event: 'export',
       });
+      // 200 with a null body means no backup exists yet.
+      if (!response.data) {
+        setState({ status: 'empty', record: null });
+        return;
+      }
       setState({ status: 'loaded', record: response.data });
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };

@@ -67,6 +67,17 @@ describe('useLatestCloudBackup', () => {
     expect(screen.getByTestId('record-id').textContent).toBe('cloud-1');
   });
 
+  test('resolves to empty when the API answers with a null body', async () => {
+    const factory = makeApiFactory(async () => ({ data: null }));
+
+    await act(async () => {
+      render(<HookProbe apiFactory={factory} />);
+    });
+
+    expect(screen.getByTestId('status').textContent).toBe('empty');
+    expect(screen.getByTestId('record-id').textContent).toBe('');
+  });
+
   test('resolves to empty on 404', async () => {
     const factory = makeApiFactory(async () => {
       const err: { response: { status: number } } = {

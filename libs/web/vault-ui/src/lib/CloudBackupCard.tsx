@@ -136,6 +136,9 @@ export function CloudBackupCard({
         className="h-4 w-48 animate-pulse rounded bg-muted"
       />
     );
+  } else if (latestRecord === null && connection.status === 'not-linked') {
+    // Nothing is linked, so a missing Drive copy is not news: say nothing.
+    latestBody = null;
   } else if (latestRecord === null) {
     latestBody = (
       <p data-testid="cloud-backup-latest-empty">

@@ -6,7 +6,7 @@ import type { BackupState } from '../home-view';
 
 /**
  * The most recent successful export, for the Vault space line. Only fetched
- * while the vault is unlocked. 404 means no backup has been recorded yet.
+ * while the vault is unlocked. A null body means no backup has been recorded yet.
  */
 export function useLatestBackupSummary(enabled: boolean): BackupState {
   const [state, setState] = useState<BackupState>({ status: 'pending' });
@@ -20,6 +20,10 @@ export function useLatestBackupSummary(enabled: boolean): BackupState {
       .getLatestBackup({ status: 'success', event: 'export' })
       .then((response) => {
         if (!isActive) return;
+        if (!response.data) {
+          setState({ status: 'empty' });
+          return;
+        }
         setState({
           status: 'loaded',
           record: {

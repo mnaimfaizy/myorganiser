@@ -278,19 +278,22 @@ describe('VaultBackupController (HTTP integration)', () => {
     expect(svc.recordEvent).not.toHaveBeenCalled();
   });
 
-  test('returns 404 when no latest backup exists', async () => {
+  test('returns 200 with a null body when no latest backup exists', async () => {
     const svc = require('../services/VaultBackupService').default;
     svc.getLatest.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      body: { message: 'No backup records' },
+      ok: true,
+      status: 200,
+      body: null,
     });
 
     const res = await request(app)
       .get('/vault/backups/latest')
       .set('Authorization', 'Bearer user-1');
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    // tsoa writes a null return as an empty body under the status the
+    // controller set; there is no JSON document on the wire.
+    expect(res.text).toBe('');
   });
 
   test('returns latest record filtered by status=success', async () => {

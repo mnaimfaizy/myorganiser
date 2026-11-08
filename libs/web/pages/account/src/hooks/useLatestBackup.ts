@@ -27,7 +27,7 @@ export type LatestBackupState =
 /**
  * Fetch the most recent successful export record on mount.
  * - 200 → `loaded` with the record
- * - 404 → `empty` (no backups yet)
+ * - 200 with a null body → `empty` (no backups yet)
  * - any other error → `error`
  */
 export function useLatestBackup(
@@ -35,12 +35,12 @@ export function useLatestBackup(
     getLatestBackup: (req: {
       status?: string;
       event?: string;
-    }) => Promise<{ data: LatestBackupRecord }>;
+    }) => Promise<{ data: LatestBackupRecord | null }>;
   } = createVaultBackupsApi as unknown as () => {
     getLatestBackup: (req: {
       status?: string;
       event?: string;
-    }) => Promise<{ data: LatestBackupRecord }>;
+    }) => Promise<{ data: LatestBackupRecord | null }>;
   },
 ): LatestBackupState {
   const [state, setState] = useState<LatestBackupState>({
@@ -56,6 +56,11 @@ export function useLatestBackup(
         status: 'success',
         event: 'export',
       });
+      // 200 with a null body means no backup exists yet.
+      if (!response.data) {
+        setState({ status: 'empty', record: null });
+        return;
+      }
       setState({ status: 'loaded', record: response.data });
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };
