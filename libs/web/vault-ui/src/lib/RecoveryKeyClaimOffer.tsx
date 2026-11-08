@@ -113,7 +113,7 @@ export function RecoveryKeyClaimOffer(
       <Button
         type="button"
         variant="link"
-        className="self-start text-caption text-foreground-supporting"
+        className="h-auto min-h-8 self-start whitespace-normal text-left text-caption text-foreground-supporting md:h-auto"
         onClick={() => setIsExpanded(true)}
       >
         I have a Recovery Key for a different vault on this device

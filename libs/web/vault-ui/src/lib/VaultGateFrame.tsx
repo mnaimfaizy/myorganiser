@@ -38,7 +38,7 @@ export function VaultGateFrame({
 }: VaultGateFrameProps) {
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-4 md:pt-14">
-      <Card className="flex w-full flex-col gap-4 p-6 md:max-w-[30rem] md:gap-4.5 md:rounded-[var(--radius-2xl)] md:p-9 md:shadow-popover">
+      <Card className="flex w-full flex-col gap-4 p-6 md:max-w-120 md:gap-4.5 md:rounded-2xl md:p-9 md:shadow-popover">
         <div className="flex flex-col items-center gap-3.5 text-center md:items-start md:gap-4.5 md:text-left">
           <Illustration kind="vault" size={96} className="size-26 md:size-22" />
           <div className="flex flex-col items-center gap-1.5 md:items-start">

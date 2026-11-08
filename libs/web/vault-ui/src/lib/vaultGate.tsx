@@ -662,7 +662,7 @@ export function VaultGate(props: VaultGateProps) {
             <Button
               type="button"
               variant="link"
-              className="self-start text-body-sm"
+              className="h-auto min-h-8 self-start whitespace-normal text-left text-body-sm md:h-auto"
               onClick={() => setUseRecovery(false)}
             >
               Use passphrase
@@ -713,7 +713,7 @@ export function VaultGate(props: VaultGateProps) {
           <Button
             type="button"
             variant="link"
-            className="self-start text-body-sm"
+            className="h-auto min-h-8 self-start whitespace-normal text-left text-body-sm md:h-auto"
             onClick={() => setUseRecovery(true)}
           >
             Forgot it? Use your Recovery Key
