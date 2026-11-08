@@ -66,6 +66,11 @@ import {
   listTrackedMarkdown,
   type CheckerFail,
 } from './lib/doc-paths.ts';
+import {
+  exemptionKey,
+  readClaimExemptions,
+  type Exemption,
+} from './lib/exemptions.ts';
 import { GraphUnavailableError, loadProjectGraph } from './lib/nx-graph.ts';
 import { tokenize } from './lib/shell-command.ts';
 
@@ -377,13 +382,6 @@ export function unresolvedReason(
   }
 }
 
-/** One entry of the exemption list, once read and validated. */
-interface Exemption {
-  file: string;
-  claim: string;
-  reason: string;
-}
-
 function readExemptions({
   cwd,
   path = EXEMPTIONS_PATH,
@@ -391,62 +389,16 @@ function readExemptions({
   cwd: string;
   path?: string;
 }): Exemption[] {
-  const absolute = join(cwd, path);
-  if (!existsSync(absolute)) {
-    fail(`${path} not found — the exemption list is a required artifact`);
-  }
-  /** The file as it arrives: untrusted, read field by field below. */
-  interface ExemptionsFile {
-    schemaVersion?: unknown;
-    exemptions?: unknown;
-  }
-
-  let parsed: ExemptionsFile;
-  try {
-    parsed = JSON.parse(readFileSync(absolute, 'utf8')) as ExemptionsFile;
-  } catch (error) {
-    fail(
-      `${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (parsed?.schemaVersion !== SCHEMA_VERSION) {
-    fail(
-      `${path}: expected "schemaVersion": ${SCHEMA_VERSION}, found ${JSON.stringify(parsed?.schemaVersion)}`,
-    );
-  }
-  if (!Array.isArray(parsed?.exemptions)) {
-    fail(`${path}: expected an "exemptions" array`);
-  }
-
-  const seen = new Set<string>();
-  const exemptions: Exemption[] = [];
-  parsed.exemptions.forEach((raw: unknown, index: number) => {
-    const at = `${path}[${index}]`;
-    const entry = (raw ?? {}) as Record<string, unknown>;
-    const file = typeof entry.file === 'string' ? entry.file.trim() : '';
-    const claim = typeof entry.claim === 'string' ? entry.claim.trim() : '';
-    const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
-    if (!file)
-      fail(`${at}: entry names no documenting file (\`file\` is required)`);
-    if (!claim) fail(`${at}: exemption for \`${file}\` names no claim`);
-    if (!reason) {
-      fail(
-        `${at}: exemption for \`${file}\` → \`${claim}\` carries no written reason. ` +
-          'An exemption is a decision somebody made, not a gap nobody saw.',
-      );
-    }
-    const key = exemptionKey(file, claim);
-    if (seen.has(key))
-      fail(`${at}: \`${file}\` → \`${claim}\` is exempted twice`);
-    seen.add(key);
-    exemptions.push({ file, claim, reason });
+  return readClaimExemptions({
+    cwd,
+    path,
+    schemaVersion: SCHEMA_VERSION,
+    fail,
+    requireFile: false,
   });
-  return exemptions;
 }
 
-export function exemptionKey(file: string, claim: string): string {
-  return `${file}\0${claim}`;
-}
+export { exemptionKey };
 
 const isFrozen = (file: string): boolean =>
   file.startsWith('docs/research/') || file === 'CHANGELOG.md';

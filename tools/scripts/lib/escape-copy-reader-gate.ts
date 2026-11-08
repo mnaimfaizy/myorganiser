@@ -362,3 +362,60 @@ export function spacingLiteralFindings(html: string): string[] {
 
   return Array.from(findings);
 }
+
+/**
+ * What the fresh-envelope harness hands back — the fields the gate reads of
+ * `FreshEscapeCopy` in `apps/escape-copy-reader/src/gate/mintFreshEscapeCopy.ts`.
+ *
+ * The gate reaches the harness through a runtime `require`, so a type pinned
+ * to the app's interface would see nothing of the value that actually drifts,
+ * and importing it would cross a program boundary (ADR 0103, ADR 0120). The
+ * value is checked instead, by `freshEnvelopeFindings`.
+ */
+export interface FreshEnvelope {
+  text: string;
+  passphrase: string;
+  recoveryKey: string;
+  expected: Record<string, unknown>;
+  schemaVersion: number;
+}
+
+/** Each field the gate reads, with the `typeof` its use depends on. */
+const FRESH_ENVELOPE_FIELDS = {
+  text: 'string',
+  passphrase: 'string',
+  recoveryKey: 'string',
+  expected: 'object',
+  schemaVersion: 'number',
+} as const satisfies Record<keyof FreshEnvelope, string>;
+
+/**
+ * One finding per field of the harness output that is missing or of the wrong
+ * type, each naming the field. A field renamed in `FreshEscapeCopy` would
+ * otherwise read `undefined` here and still typecheck.
+ */
+export function freshEnvelopeFindings(value: unknown): string[] {
+  const where =
+    'apps/escape-copy-reader/src/gate/mintFreshEscapeCopy.ts (`FreshEscapeCopy`)';
+  if (typeof value !== 'object' || value === null) {
+    return [
+      `the fresh-envelope harness returned ${value === null ? 'null' : typeof value}, not an object. Update this gate to match ${where}.`,
+    ];
+  }
+  const record = value as Record<string, unknown>;
+  const findings: string[] = [];
+  for (const [field, expected] of Object.entries(FRESH_ENVELOPE_FIELDS)) {
+    const actual = record[field];
+    const ok =
+      expected === 'object'
+        ? typeof actual === 'object' && actual !== null
+        : typeof actual === expected;
+    if (ok) continue;
+    findings.push(
+      `the fresh-envelope harness output has no usable \`${field}\` ` +
+        `(expected ${expected}, found ${actual === undefined ? 'nothing' : typeof actual}). ` +
+        `The gate reads it; ${where} has drifted from it.`,
+    );
+  }
+  return findings;
+}

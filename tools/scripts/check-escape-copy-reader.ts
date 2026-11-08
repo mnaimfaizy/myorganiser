@@ -80,26 +80,14 @@ import {
   capabilityFindings,
   checksumFindings,
   customPropertyFindings,
+  freshEnvelopeFindings,
+  type FreshEnvelope,
   publishedNameFindings,
   spacingLiteralFindings,
   schemaVersionFindings,
   sectionFindings,
   type OpenedEnvelope,
 } from './lib/escape-copy-reader-gate.ts';
-
-/**
- * What the fresh-envelope harness hands back — `FreshEscapeCopy` in
- * `apps/escape-copy-reader/src/gate/mintFreshEscapeCopy.ts`. Declared here
- * rather than imported: that file belongs to the reader app's own program,
- * which compiles against the DOM, and this one does not.
- */
-interface FreshEnvelope {
-  text: string;
-  passphrase: string;
-  recoveryKey: string;
-  expected: Record<string, unknown>;
-  schemaVersion: number;
-}
 
 /** One secret an envelope can be opened with. */
 interface EscapeCopySecret {
@@ -225,9 +213,20 @@ async function mintFreshEnvelope(scratchDir: string): Promise<FreshEnvelope> {
   });
 
   const module = createRequire(import.meta.url)(outfile) as {
-    mintFreshEscapeCopy: () => Promise<FreshEnvelope>;
+    mintFreshEscapeCopy: () => Promise<unknown>;
   };
-  return module.mintFreshEscapeCopy();
+  const minted: unknown = await module.mintFreshEscapeCopy();
+  // The bundle is reached through a runtime `require`, so the type above is a
+  // claim, not a check. Assert every field this gate reads is really there.
+  const drift = freshEnvelopeFindings(minted);
+  if (drift.length) {
+    console.error(
+      'escape-copy-reader: the fresh-envelope harness has drifted\n',
+    );
+    for (const item of drift) console.error(`  - ${item}`);
+    process.exit(1);
+  }
+  return minted as FreshEnvelope;
 }
 
 let scratchDir: string | undefined;

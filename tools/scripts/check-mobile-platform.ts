@@ -111,6 +111,8 @@ import { join } from 'node:path';
 // because this script runs without a bundler and `typescript` is a devDependency.
 import type * as TypeScript from 'typescript';
 
+import { readPathExemptions } from './lib/exemptions.ts';
+
 const require = createRequire(import.meta.url);
 const cwd = process.cwd();
 const printOnly = process.argv.includes('--print');
@@ -173,58 +175,12 @@ function readExemptions({
   cwd: root = cwd,
   path = EXEMPTIONS_PATH,
 }: ReadFromWorkspace = {}): Map<string, string> {
-  const absolute = join(root, path);
-  if (!existsSync(absolute)) {
-    fail(`${path} not found — the exemption list is a required artifact`);
-  }
-  /** The file as it arrives: untrusted, read field by field below. */
-  interface ExemptionsFile {
-    schemaVersion?: unknown;
-    exemptions?: unknown;
-  }
-
-  let parsed: ExemptionsFile;
-  try {
-    parsed = JSON.parse(readFileSync(absolute, 'utf8')) as ExemptionsFile;
-  } catch (error) {
-    fail(
-      `${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (parsed?.schemaVersion !== SCHEMA_VERSION) {
-    fail(
-      `${path}: expected "schemaVersion": ${SCHEMA_VERSION}, found ${JSON.stringify(parsed?.schemaVersion)}`,
-    );
-  }
-  if (!Array.isArray(parsed?.exemptions)) {
-    fail(`${path}: expected an "exemptions" array`);
-  }
-
-  const seen = new Set<string>();
-  const exemptions = new Map<string, string>();
-  parsed.exemptions.forEach((raw: unknown, index: number) => {
-    const at = `${path}[${index}]`;
-    const entry = (raw ?? {}) as Record<string, unknown>;
-    const entryPath = typeof entry.path === 'string' ? entry.path.trim() : '';
-    const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
-    if (!entryPath) fail(`${at}: entry names no file (\`path\` is required)`);
-    if (!reason) {
-      fail(
-        `${at}: exemption for \`${entryPath}\` carries no written reason. An ` +
-          'exemption is a decision somebody made, not a gap nobody saw.',
-      );
-    }
-    if (seen.has(entryPath)) fail(`${at}: \`${entryPath}\` is exempted twice`);
-    seen.add(entryPath);
-    if (!existsSync(join(root, entryPath))) {
-      fail(
-        `${at}: \`${entryPath}\` does not exist. An exemption naming a file ` +
-          'that is gone is a hole nobody sees.',
-      );
-    }
-    exemptions.set(entryPath, reason);
+  return readPathExemptions({
+    cwd: root,
+    path,
+    schemaVersion: SCHEMA_VERSION,
+    fail,
   });
-  return exemptions;
 }
 
 /**
