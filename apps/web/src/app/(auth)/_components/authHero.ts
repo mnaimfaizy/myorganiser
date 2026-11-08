@@ -28,7 +28,8 @@ export const AUTH_HERO_COPY: Record<AuthHeroScreen, AuthHeroCopy> = {
   },
   forgot: {
     title: 'Recover access',
-    subtitle: 'Reset securely. Your encrypted vault stays on your device.',
+    subtitle:
+      'Reset securely. Resetting your account password does not decrypt or expose your Vault.',
   },
   'check-email': {
     title: 'Almost there',
