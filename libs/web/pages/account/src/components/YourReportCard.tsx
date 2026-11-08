@@ -4,7 +4,11 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 
 import { type FeedbackReportListItemDto } from '@myorganiser/app-api-client';
-import { NewTabLink, StatusPill } from '@myorganiser/web-ui';
+import {
+  FEEDBACK_REPORT_STATUS_TONES,
+  NewTabLink,
+  StatusPill,
+} from '@myorganiser/web-ui';
 
 import type { AccountVariant } from '../account-view';
 import {
@@ -39,7 +43,10 @@ export function YourReportCard({ report, variant }: YourReportCardProps) {
   const dateLabel = format(new Date(currentReport.createdAt), 'PP');
 
   const statusPill = (
-    <StatusPill tone={statusConfig.tone} className="normal-case">
+    <StatusPill
+      tone={FEEDBACK_REPORT_STATUS_TONES[currentReport.status]}
+      className="normal-case"
+    >
       {statusConfig.label}
     </StatusPill>
   );
