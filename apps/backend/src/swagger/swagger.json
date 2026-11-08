@@ -1225,7 +1225,8 @@
 					{
 						"$ref": "#/components/schemas/ErrorResponse"
 					}
-				]
+				],
+				"nullable": true
 			},
 			"VaultBackupHistoryPage": {
 				"properties": {
@@ -4042,7 +4043,12 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/GetLatestVaultBackupResponse"
+									"allOf": [
+										{
+											"$ref": "#/components/schemas/GetLatestVaultBackupResponse"
+										}
+									],
+									"nullable": true
 								}
 							}
 						}

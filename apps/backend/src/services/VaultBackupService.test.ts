@@ -96,11 +96,10 @@ describe('VaultBackupService source filtering', () => {
     expect(prisma.vaultBackupRecord.findFirst).not.toHaveBeenCalled();
   });
 
-  test('getLatest returns 404 when no row matches', async () => {
+  test('getLatest returns ok 200 with a null body when no row matches', async () => {
     prisma.vaultBackupRecord.findFirst.mockResolvedValueOnce(null);
     const result = await service.getLatest('user-1', 'success', 'google-drive');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(404);
+    expect(result).toEqual({ ok: true, status: 200, body: null });
   });
 
   test('getLatest filters by event when provided', async () => {

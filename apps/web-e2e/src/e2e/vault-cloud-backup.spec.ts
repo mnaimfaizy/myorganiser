@@ -154,10 +154,10 @@ function setupBackend(page: Page) {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (matching.length === 0) {
       await route.fulfill({
-        status: 404,
+        status: 200,
         headers,
         contentType: 'application/json',
-        body: JSON.stringify({ message: 'No backup records' }),
+        body: '',
       });
       return;
     }
@@ -705,20 +705,25 @@ test.describe('Vault cloud backup via Google Drive (E2E)', () => {
 
     await gotoVaultSettings(page);
 
-    // Initially disconnected, latest cloud backup empty.
+    // Initially disconnected: no latest-backup line while Drive is not linked.
     await expect(page.getByTestId('cloud-backup-card')).toBeVisible({
       timeout: 60000,
     });
     await expect(
       page.getByTestId('cloud-backup-connection-not-linked'),
     ).toBeVisible();
-    await expect(page.getByTestId('cloud-backup-latest-empty')).toBeVisible();
+    await expect(page.getByTestId('cloud-backup-latest-empty')).toHaveCount(0);
 
     // Connect.
     await page.getByTestId('cloud-backup-connect-button').click();
     await expect(
       page.getByTestId('cloud-backup-connection-linked'),
     ).toBeVisible({ timeout: 30000 });
+
+    // Linked with no copy yet: the empty line returns.
+    await expect(page.getByTestId('cloud-backup-latest-empty')).toBeVisible({
+      timeout: 30000,
+    });
 
     // Manual backup.
     const backupNow = page.getByTestId('cloud-backup-now-button');

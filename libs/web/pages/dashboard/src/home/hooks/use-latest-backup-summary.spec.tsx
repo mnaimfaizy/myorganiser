@@ -46,6 +46,16 @@ describe('useLatestBackupSummary', () => {
     });
   });
 
+  it('reads as empty when the API answers with a null body (no backup recorded yet)', async () => {
+    getLatestBackup.mockResolvedValue({ data: null });
+
+    const { result } = renderHook(() => useLatestBackupSummary(true));
+
+    await waitFor(() => {
+      expect(result.current).toEqual({ status: 'empty' });
+    });
+  });
+
   it('reads as empty when the API answers 404 (no backup recorded yet)', async () => {
     getLatestBackup.mockRejectedValue({ response: { status: 404 } });
 

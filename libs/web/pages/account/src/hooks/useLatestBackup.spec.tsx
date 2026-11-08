@@ -52,6 +52,16 @@ describe('useLatestBackup', () => {
     expect(screen.getByTestId('record-id').textContent).toBe('rec-1');
   });
 
+  test('resolves to empty when the API answers with a null body', async () => {
+    const factory = makeApiFactory(async () => ({ data: null }));
+
+    await act(async () => {
+      render(<HookProbe apiFactory={factory} />);
+    });
+
+    expect(screen.getByTestId('status').textContent).toBe('empty');
+  });
+
   test('resolves to empty on 404', async () => {
     const factory = makeApiFactory(async () => {
       const err: { response: { status: number } } = {

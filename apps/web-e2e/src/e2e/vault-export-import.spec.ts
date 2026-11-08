@@ -145,10 +145,10 @@ function setupBackend(page: Page) {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (matching.length === 0) {
       await route.fulfill({
-        status: 404,
+        status: 200,
         headers,
         contentType: 'application/json',
-        body: JSON.stringify({ message: 'No backup records' }),
+        body: '',
       });
       return;
     }

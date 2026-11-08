@@ -210,7 +210,7 @@ export class VaultBackupService {
     status?: string,
     source?: string,
     event?: string,
-  ): Promise<ServiceResult<VaultBackupRecordDto>> {
+  ): Promise<ServiceResult<VaultBackupRecordDto | null>> {
     if (status !== undefined && !isVaultBackupStatus(status)) {
       return {
         ok: false,
@@ -244,7 +244,7 @@ export class VaultBackupService {
     });
 
     if (!row) {
-      return { ok: false, status: 404, body: { message: 'No backup records' } };
+      return { ok: true, status: 200, body: null };
     }
 
     return { ok: true, status: 200, body: toDto(row) };

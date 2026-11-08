@@ -58,9 +58,7 @@ export function CloudBackupLiveCard({
       });
       const created = response.data?.createdAt;
       return created ? Date.parse(created) : null;
-    } catch (err: unknown) {
-      const e = err as { response?: { status?: number } };
-      if (e?.response?.status === 404) return null;
+    } catch {
       return null;
     }
   }, []);

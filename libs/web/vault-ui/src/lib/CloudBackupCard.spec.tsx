@@ -223,11 +223,30 @@ describe('CloudBackupCard', () => {
       expect(screen.getByTestId('cloud-backup-latest-loading')).toBeTruthy();
     });
 
-    test('renders empty state when latestRecord is null', () => {
-      renderCard({ latestRecord: null });
+    test('renders empty state when latestRecord is null and linked', () => {
+      renderCard({ connection: { status: 'linked' }, latestRecord: null });
       expect(screen.getByTestId('cloud-backup-latest-empty')).toHaveTextContent(
         'No copy in Google Drive yet',
       );
+    });
+
+    test('renders empty state when latestRecord is null and reconnect is needed', () => {
+      renderCard({
+        connection: { status: 'reconnect-needed' },
+        latestRecord: null,
+      });
+      expect(screen.getByTestId('cloud-backup-latest-empty')).toHaveTextContent(
+        'No copy in Google Drive yet',
+      );
+    });
+
+    test('renders no latest-line text when latestRecord is null and Drive is not linked', () => {
+      renderCard({ connection: { status: 'not-linked' }, latestRecord: null });
+      expect(
+        screen.queryByTestId('cloud-backup-latest-empty'),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/No copy in/)).not.toBeInTheDocument();
+      expect(screen.getByTestId('cloud-backup-latest')).toBeEmptyDOMElement();
     });
 
     test('renders unknown state when latestRecord is undefined', () => {

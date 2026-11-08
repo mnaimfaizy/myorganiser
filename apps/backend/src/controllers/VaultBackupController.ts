@@ -36,7 +36,7 @@ export interface RecordVaultBackupRequest {
 
 type RecordVaultBackupResponse = VaultBackupRecordDto | ErrorResponse;
 
-type GetLatestVaultBackupResponse = VaultBackupRecordDto | ErrorResponse;
+type GetLatestVaultBackupResponse = VaultBackupRecordDto | null | ErrorResponse;
 
 interface VaultBackupHistoryPage {
   items: VaultBackupRecordDto[];
@@ -68,7 +68,7 @@ export class VaultBackupController extends Controller {
     @Query() status?: VaultBackupStatus,
     @Query() source?: VaultBackupSource,
     @Query() event?: VaultBackupEvent,
-  ): Promise<GetLatestVaultBackupResponse> {
+  ): Promise<GetLatestVaultBackupResponse | null> {
     const userId = requireUserId(req);
 
     const result = await vaultBackupService.getLatest(
