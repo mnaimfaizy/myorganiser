@@ -35,6 +35,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { isEntryPoint } from './entry-point.mjs';
 import { UpstreamReportRejected, normalizeUpstreamReport } from './report.mjs';
 import { renderUpstreamBrief } from './render.mjs';
 
@@ -183,8 +184,7 @@ export function main(
   return report;
 }
 
-// `import.meta.url` vs argv[1] rather than a helper: this file may not import
-// anything outside the skill directory, and a two-line comparison is cheaper
-// than a shared module the skill would have to carry to stay portable.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`)
-  main(process.argv.slice(2));
+// The helper lives in this directory, so the skill stays portable. It exists
+// because the inline `file://${argv[1]}` comparison never matched on Windows,
+// and the validator then exited 0 having validated nothing.
+if (isEntryPoint(import.meta.url)) main(process.argv.slice(2));
