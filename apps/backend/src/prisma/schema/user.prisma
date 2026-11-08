@@ -39,6 +39,8 @@ model User {
   youtube_access                  Boolean   @default(false)
   /// When YouTube Access was first ever granted. Set once on the first grant and never cleared; the lifetime ceiling counts Users where this is not null.
   youtube_access_first_granted_at DateTime?
+  /// When a Platform Admin last withdrew this User's YouTube Access (issue #1308). Set by the withdrawal and cleared by the next grant, in the same transaction as the access change. Null while access is held, for a never-granted User, and for Users withdrawn before this column existed (no backfill).
+  youtube_access_withdrawn_at     DateTime?
   /// When the User accepted the one-time YouTube acknowledgement before a first connect (ADR 0129). Set once and never cleared: kept across YouTube Disconnects and across a withdrawal and re-grant of YouTube Access.
   youtube_acknowledged_at         DateTime?
   /// When the User last opened "Your reports" page. Compared against FeedbackReport.status_changed_at to show a "something changed" badge; null means the page has never been opened.

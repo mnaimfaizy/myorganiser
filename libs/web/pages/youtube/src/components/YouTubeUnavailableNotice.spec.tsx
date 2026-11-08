@@ -144,4 +144,128 @@ describe('YouTubeUnavailableNotice', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe('reason: withdrawn', () => {
+    const WITHDRAWAL_ENDING =
+      'Your YouTube connection was ended and its cached data deleted. The rest of MyOrganiser is unaffected.';
+    const CONTACT_LINE =
+      'If you think this is a mistake, contact the person who runs your MyOrganiser.';
+    // Fixed year other than the current one, so the year is appended.
+    const WITHDRAWN_LAST_YEAR = '2025-10-14T12:00:00.000Z';
+    // Current year, computed at test time, so the year is omitted.
+    const WITHDRAWN_THIS_YEAR = new Date(
+      Date.UTC(new Date().getFullYear(), 9, 14, 12),
+    ).toISOString();
+
+    it('renders the permanent alert with its caps line, h1, and dated body', () => {
+      render(
+        <YouTubeUnavailableNotice
+          reason="withdrawn"
+          withdrawnAt={WITHDRAWN_LAST_YEAR}
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(
+        within(alert).getByText('ACCESS WITHDRAWN · PERMANENT'),
+      ).toBeInTheDocument();
+      expect(
+        within(alert).getByRole('heading', {
+          name: 'YouTube is no longer available to you',
+          level: 1,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(alert).getByText(
+          `An admin withdrew your YouTube Access on 14 Oct 2025. ${WITHDRAWAL_ENDING}`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('omits the year from the date when the withdrawal is in the current year', () => {
+      render(
+        <YouTubeUnavailableNotice
+          reason="withdrawn"
+          withdrawnAt={WITHDRAWN_THIS_YEAR}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          `An admin withdrew your YouTube Access on 14 Oct. ${WITHDRAWAL_ENDING}`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      ['absent', undefined],
+      ['null', null],
+      ['unparsable', 'not-a-date'],
+    ])(
+      'drops the date from the body when withdrawnAt is %s',
+      (_label, withdrawnAt) => {
+        render(
+          <YouTubeUnavailableNotice
+            reason="withdrawn"
+            withdrawnAt={withdrawnAt}
+          />,
+        );
+
+        expect(
+          screen.getByText(
+            `An admin withdrew your YouTube Access. ${WITHDRAWAL_ENDING}`,
+          ),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it('shows the contact line and no TEMPORARY label or Try again button', () => {
+      render(
+        <YouTubeUnavailableNotice
+          reason="withdrawn"
+          withdrawnAt={WITHDRAWN_LAST_YEAR}
+        />,
+      );
+
+      expect(screen.getByText(CONTACT_LINE)).toBeInTheDocument();
+      expect(screen.queryByText('TEMPORARY')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(requestYouTubeAvailabilityRecheck).not.toHaveBeenCalled();
+    });
+
+    it('renders Back to Dashboard as a link to /dashboard when onBack is omitted', () => {
+      render(
+        <YouTubeUnavailableNotice
+          reason="withdrawn"
+          withdrawnAt={WITHDRAWN_LAST_YEAR}
+        />,
+      );
+
+      expect(
+        screen.getByRole('link', { name: 'Back to Dashboard' }),
+      ).toHaveAttribute('href', '/dashboard');
+    });
+
+    it('renders Back to Dashboard as a button that calls onBack when onBack is given', () => {
+      const onBack = jest.fn();
+      render(
+        <YouTubeUnavailableNotice
+          reason="withdrawn"
+          withdrawnAt={WITHDRAWN_LAST_YEAR}
+          onBack={onBack}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Back to Dashboard' }),
+      );
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByRole('link', { name: 'Back to Dashboard' }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

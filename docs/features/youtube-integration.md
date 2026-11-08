@@ -159,7 +159,12 @@ All under `/api/v1/youtube`, JWT-secured unless noted.
 signed-in User to hold YouTube Access; without it the route answers
 `404 { "message": "Not Found" }`, the same body the `YOUTUBE_AVAILABLE` switch
 produces (the switch is checked first). `GET /youtube/access` returns
-`{ granted }` for the signed-in User and is reachable without access. The
+`{ granted, state, withdrawnAt? }` for the signed-in User and is reachable
+without access. `state` is `granted`, `not_granted` (never granted) or
+`withdrawn` (granted once, now taken back); `withdrawnAt` is the time of the
+withdrawal, stored in `User.youtube_access_withdrawn_at` — set by withdraw,
+cleared by grant — and absent for Users withdrawn before that column existed.
+The YouTube pages show the "Access withdrawn" notice for `withdrawn`. The
 availability report, digest unsubscribe and cron routes are outside the
 per-User check, and the sync and digest workers skip Users without access.
 A Platform Admin grants and withdraws access with

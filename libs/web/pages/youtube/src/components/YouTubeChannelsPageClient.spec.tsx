@@ -139,6 +139,7 @@ describe('YouTubeChannelsPageClient', () => {
     jest.clearAllMocks();
     mockUseYouTubeAvailability.mockReturnValue({
       available: true,
+      access: null,
       loading: false,
       error: null,
     });
@@ -568,8 +569,14 @@ describe('YouTubeChannelsPageClient', () => {
 
   describe('YouTube availability gate', () => {
     it.each([
-      ['explicitly false', { available: false, loading: false, error: null }],
-      ['still loading', { available: null, loading: true, error: null }],
+      [
+        'explicitly false',
+        { available: false, access: null, loading: false, error: null },
+      ],
+      [
+        'still loading',
+        { available: null, access: null, loading: true, error: null },
+      ],
     ])(
       'shows the unavailable notice and makes no connection or data hook call when availability is %s',
       (_label, availability) => {
@@ -683,6 +690,7 @@ describe('YouTubeChannelsPageClient', () => {
     it('shows the unreachable notice and makes no YouTube hook call when the availability check errors', () => {
       mockUseYouTubeAvailability.mockReturnValue({
         available: null,
+        access: null,
         loading: false,
         error: new Error('Network down'),
       });

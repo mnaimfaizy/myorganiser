@@ -59,31 +59,97 @@ describe('getYouTubeAvailability', () => {
     expect(mockGetAccess).toHaveBeenCalledTimes(1);
   });
 
-  it('returns true when the switch is on and YouTube Access is granted', async () => {
+  it('returns available with granted access when the switch is on and YouTube Access is granted', async () => {
     mockGetAvailability.mockResolvedValue({ data: { available: true } });
-    mockGetAccess.mockResolvedValue({ data: { granted: true } });
+    mockGetAccess.mockResolvedValue({
+      data: { granted: true, state: 'granted' },
+    });
 
-    await expect(getYouTubeAvailability()).resolves.toBe(true);
+    await expect(getYouTubeAvailability()).resolves.toEqual({
+      available: true,
+      access: { state: 'granted', withdrawnAt: null },
+    });
+  });
+
+  it('returns not_granted access and available false when the switch is on and access is not granted', async () => {
+    mockGetAvailability.mockResolvedValue({ data: { available: true } });
+    mockGetAccess.mockResolvedValue({
+      data: { granted: false, state: 'not_granted' },
+    });
+
+    await expect(getYouTubeAvailability()).resolves.toEqual({
+      available: false,
+      access: { state: 'not_granted', withdrawnAt: null },
+    });
+  });
+
+  it('returns withdrawn access with the recorded withdrawal time', async () => {
+    mockGetAvailability.mockResolvedValue({ data: { available: true } });
+    mockGetAccess.mockResolvedValue({
+      data: {
+        granted: false,
+        state: 'withdrawn',
+        withdrawnAt: '2026-10-14T09:00:00.000Z',
+      },
+    });
+
+    await expect(getYouTubeAvailability()).resolves.toEqual({
+      available: false,
+      access: {
+        state: 'withdrawn',
+        withdrawnAt: '2026-10-14T09:00:00.000Z',
+      },
+    });
+  });
+
+  it('returns withdrawn access with a null withdrawnAt when the date was not recorded', async () => {
+    mockGetAvailability.mockResolvedValue({ data: { available: true } });
+    mockGetAccess.mockResolvedValue({
+      data: { granted: false, state: 'withdrawn' },
+    });
+
+    await expect(getYouTubeAvailability()).resolves.toEqual({
+      available: false,
+      access: { state: 'withdrawn', withdrawnAt: null },
+    });
   });
 
   it.each([
-    ['false', false],
-    ['a non-boolean value ("yes")', 'yes'],
+    [
+      'granted true with no state (older backend)',
+      { granted: true },
+      { available: true, access: { state: 'granted', withdrawnAt: null } },
+    ],
+    [
+      'granted false with no state (older backend)',
+      { granted: false },
+      { available: false, access: { state: 'not_granted', withdrawnAt: null } },
+    ],
+    [
+      'a non-boolean granted with no state',
+      { granted: 'yes' },
+      { available: false, access: { state: 'not_granted', withdrawnAt: null } },
+    ],
   ])(
-    'returns false when the switch is on but granted is %s',
-    async (_label, granted) => {
+    'maps %s to the matching access state',
+    async (_label, accessData, expected) => {
       mockGetAvailability.mockResolvedValue({ data: { available: true } });
-      mockGetAccess.mockResolvedValue({ data: { granted } });
+      mockGetAccess.mockResolvedValue({ data: accessData });
 
-      await expect(getYouTubeAvailability()).resolves.toBe(false);
+      await expect(getYouTubeAvailability()).resolves.toEqual(expected);
     },
   );
 
-  it('returns false and never calls the access endpoint when the switch is off, even for a granted User', async () => {
+  it('returns available false with null access and never calls the access endpoint when the switch is off, even for a granted User', async () => {
     mockGetAvailability.mockResolvedValue({ data: { available: false } });
-    mockGetAccess.mockResolvedValue({ data: { granted: true } });
+    mockGetAccess.mockResolvedValue({
+      data: { granted: true, state: 'granted' },
+    });
 
-    await expect(getYouTubeAvailability()).resolves.toBe(false);
+    await expect(getYouTubeAvailability()).resolves.toEqual({
+      available: false,
+      access: null,
+    });
 
     expect(mockGetAccess).not.toHaveBeenCalled();
     expect(YouTubeApi).toHaveBeenCalledTimes(1);
@@ -95,11 +161,14 @@ describe('getYouTubeAvailability', () => {
     ['null', null],
     ['undefined', undefined],
   ])(
-    'returns false when available is a non-boolean value (%s)',
+    'returns available false with null access when available is a non-boolean value (%s)',
     async (_label, available) => {
       mockGetAvailability.mockResolvedValue({ data: { available } });
 
-      await expect(getYouTubeAvailability()).resolves.toBe(false);
+      await expect(getYouTubeAvailability()).resolves.toEqual({
+        available: false,
+        access: null,
+      });
       expect(mockGetAccess).not.toHaveBeenCalled();
     },
   );

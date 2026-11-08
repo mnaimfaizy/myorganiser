@@ -148,8 +148,18 @@ function makeApp() {
   return app;
 }
 
-/** Makes the User that a 'Bearer test' token resolves to, with or without YouTube Access. */
-function signInAs(youtube_access: boolean) {
+/**
+ * Makes the User that a 'Bearer test' token resolves to, with or without YouTube
+ * Access. The optional grant columns let /youtube/access see a withdrawn or
+ * previously-granted row.
+ */
+function signInAs(
+  youtube_access: boolean,
+  grantColumns: {
+    youtube_access_first_granted_at?: Date | null;
+    youtube_access_withdrawn_at?: Date | null;
+  } = {},
+) {
   const userService = require('../services/UserService').default;
   userService.getById.mockResolvedValue({
     id: 'user-1',
@@ -157,6 +167,7 @@ function signInAs(youtube_access: boolean) {
     disabled: false,
     sessions_invalidated_at: null,
     youtube_access,
+    ...grantColumns,
   });
 }
 
@@ -1074,26 +1085,66 @@ describe('YouTube Access — per-User gate', () => {
     expect(youtubeSyncService.disconnect).toHaveBeenCalledWith('user-1');
   });
 
-  test('GET /youtube/access returns granted false for a User without YouTube Access', async () => {
-    signInAs(false);
+  test('GET /youtube/access returns granted with no withdrawnAt for a User with YouTube Access', async () => {
+    signInAs(true, {
+      youtube_access_first_granted_at: new Date('2025-01-01T00:00:00.000Z'),
+    });
 
     const res = await request(app)
       .get('/youtube/access')
       .set('Authorization', 'Bearer test');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ granted: false });
+    expect(res.body).toEqual({ granted: true, state: 'granted' });
+    expect(res.body).not.toHaveProperty('withdrawnAt');
   });
 
-  test('GET /youtube/access returns granted true for a User with YouTube Access', async () => {
-    signInAs(true);
+  test('GET /youtube/access returns not_granted for a User who was never granted', async () => {
+    signInAs(false, {
+      youtube_access_first_granted_at: null,
+      youtube_access_withdrawn_at: null,
+    });
 
     const res = await request(app)
       .get('/youtube/access')
       .set('Authorization', 'Bearer test');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ granted: true });
+    expect(res.body).toEqual({ granted: false, state: 'not_granted' });
+    expect(res.body).not.toHaveProperty('withdrawnAt');
+  });
+
+  test('GET /youtube/access returns withdrawn with the ISO withdrawnAt for a withdrawn User', async () => {
+    signInAs(false, {
+      youtube_access_first_granted_at: new Date('2025-01-01T00:00:00.000Z'),
+      youtube_access_withdrawn_at: new Date('2026-06-15T12:30:00.000Z'),
+    });
+
+    const res = await request(app)
+      .get('/youtube/access')
+      .set('Authorization', 'Bearer test');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      granted: false,
+      state: 'withdrawn',
+      withdrawnAt: '2026-06-15T12:30:00.000Z',
+    });
+  });
+
+  test('GET /youtube/access returns withdrawn without withdrawnAt when only the first grant time is known', async () => {
+    signInAs(false, {
+      youtube_access_first_granted_at: new Date('2025-01-01T00:00:00.000Z'),
+      youtube_access_withdrawn_at: null,
+    });
+
+    const res = await request(app)
+      .get('/youtube/access')
+      .set('Authorization', 'Bearer test');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ granted: false, state: 'withdrawn' });
+    expect(res.body).not.toHaveProperty('withdrawnAt');
   });
 
   test('digest unsubscribe, cron routes and availability stay reachable for a User without YouTube Access', async () => {

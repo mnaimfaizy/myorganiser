@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getYouTubeAvailability } from './web-youtube';
+import { getYouTubeAvailability, type YouTubeAccess } from './web-youtube';
 import { onYouTubeAvailabilityRecheck } from './youtube-availability-recheck';
 
 export interface YouTubeAvailabilityState {
   available: boolean | null;
+  /**
+   * The User's YouTube Access from the last answer, or null when it was not
+   * asked (switch off, still loading, or the first check failed). Lets a page
+   * tell a withdrawal from "switched off".
+   */
+  access: YouTubeAccess | null;
   loading: boolean;
   error: Error | null;
 }
@@ -28,6 +34,7 @@ const toError = (error: unknown) =>
 export function useYouTubeAvailability(): YouTubeAvailabilityState {
   const [state, setState] = useState<YouTubeAvailabilityState>({
     available: null,
+    access: null,
     loading: true,
     error: null,
   });
@@ -41,9 +48,9 @@ export function useYouTubeAvailability(): YouTubeAvailabilityState {
     const check = (isRecheck: boolean) => {
       const id = ++latest;
       getYouTubeAvailability()
-        .then((available) => {
+        .then(({ available, access }) => {
           if (!cancelled && id === latest) {
-            setState({ available, loading: false, error: null });
+            setState({ available, access, loading: false, error: null });
           }
         })
         .catch((error: unknown) => {
@@ -51,7 +58,12 @@ export function useYouTubeAvailability(): YouTubeAvailabilityState {
             setState((previous) =>
               isRecheck
                 ? { ...previous, error: toError(error) }
-                : { available: false, loading: false, error: toError(error) },
+                : {
+                    available: false,
+                    access: null,
+                    loading: false,
+                    error: toError(error),
+                  },
             );
           }
         });
