@@ -12,7 +12,6 @@ import {
   EmailAlreadyVerifiedError,
   LastPlatformAdminError,
   SelfLifecycleActionError,
-  SelfLifecycleActionError,
   UserNotFoundError,
   VerificationCooldownError,
   YouTubeAccessCeilingReachedError,
