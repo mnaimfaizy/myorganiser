@@ -344,7 +344,7 @@ if (options.all) {
           rule: 'unclassified-page',
           line: 1,
           message:
-            'Not in ROSTER and not in LEGACY. Add it to ROSTER if it follows the House Explainer Page convention, or to LEGACY with the reason it does not (tools/scripts/check-design-hygiene.ts).',
+            'Not in ROSTER and not in LEGACY. Add it to ROSTER if it follows the House Explainer Page convention, or to LEGACY with the reason it does not (tools/scripts/lib/design-page-roster.ts).',
         },
       ],
     });
