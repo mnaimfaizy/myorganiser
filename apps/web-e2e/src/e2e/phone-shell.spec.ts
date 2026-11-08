@@ -192,23 +192,26 @@ test.describe('Phone shell (E2E)', () => {
       },
     });
 
-    await expectSingleH1(page, 'Tasks: Unlock');
+    // The unlock screen is titled "Unlock your vault" on every gated page.
+    await expectSingleH1(page, 'Unlock your vault');
     await expect(
       page.getByRole('button', {
-        name: 'I have a recovery key for a vault on this device',
+        name: 'I have a Recovery Key for a different vault on this device',
       }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, 'Tasks unlock');
 
-    // Forgot passphrase switches the gate to recovery; its claim offer opens
-    // the claim form.
-    await page.getByRole('button', { name: 'Forgot passphrase' }).click();
+    // "Forgot it? Use your Recovery Key" switches the gate to recovery; its
+    // claim offer opens the claim form.
+    await page
+      .getByRole('button', { name: 'Forgot it? Use your Recovery Key' })
+      .click();
     await expectSingleH1(page, 'Tasks: Recover');
     await expectNoHorizontalOverflow(page, 'Tasks recover');
 
     await page
       .getByRole('button', {
-        name: 'I have a recovery key for a vault on this device',
+        name: 'I have a Recovery Key for a different vault on this device',
       })
       .click();
     await expect(page.locator('#claim-recovery-key')).toBeVisible();
@@ -216,7 +219,7 @@ test.describe('Phone shell (E2E)', () => {
 
     await bar.getByRole('link', { name: 'Groceries', exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard\/groceries\/?$/);
-    await expectSingleH1(page, 'Groceries: Unlock');
+    await expectSingleH1(page, 'Unlock your vault');
     await expectNoHorizontalOverflow(page, 'Groceries unlock');
 
     await bar.getByRole('link', { name: 'More', exact: true }).click();
@@ -225,14 +228,14 @@ test.describe('Phone shell (E2E)', () => {
       .getByRole('link', { name: 'Subscriptions', exact: true })
       .click();
     await expect(page).toHaveURL(/\/dashboard\/subscriptions\/?$/);
-    await expectSingleH1(page, 'Subscriptions: Unlock');
+    await expectSingleH1(page, 'Unlock your vault');
     await expectNoHorizontalOverflow(page, 'Subscriptions unlock');
     await page.getByRole('link', { name: 'Back to More' }).click();
     await expect(page).toHaveURL(/\/dashboard\/more\/?$/);
 
     await page.getByRole('link', { name: 'Addresses', exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard\/addresses\/?$/);
-    await expectSingleH1(page, 'Addresses: Unlock');
+    await expectSingleH1(page, 'Unlock your vault');
     await expectNoHorizontalOverflow(page, 'Addresses unlock');
     await page.getByRole('link', { name: 'Back to More' }).click();
     await expect(page).toHaveURL(/\/dashboard\/more\/?$/);
@@ -241,7 +244,7 @@ test.describe('Phone shell (E2E)', () => {
       .getByRole('link', { name: 'Mobile numbers', exact: true })
       .click();
     await expect(page).toHaveURL(/\/dashboard\/mobile-numbers\/?$/);
-    await expectSingleH1(page, 'Mobile Numbers: Unlock');
+    await expectSingleH1(page, 'Unlock your vault');
     await expectNoHorizontalOverflow(page, 'Mobile numbers unlock');
   });
 

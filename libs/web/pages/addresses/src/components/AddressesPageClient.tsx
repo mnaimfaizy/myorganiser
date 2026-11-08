@@ -26,7 +26,7 @@ function AddressesInner({ handle }: AddressesInnerProps) {
 
 export function AddressesPageClient() {
   return (
-    <VaultGate title="Addresses">
+    <VaultGate title="Addresses" encryptedItems="addresses">
       {({ handle }) => (handle ? <AddressesInner handle={handle} /> : null)}
     </VaultGate>
   );

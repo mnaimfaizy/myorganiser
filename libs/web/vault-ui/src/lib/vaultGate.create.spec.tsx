@@ -102,9 +102,7 @@ async function createVaultThroughGate(): Promise<void> {
 }
 
 async function unlockWithPassphrase(): Promise<void> {
-  const unlockInput = screen.getByLabelText(
-    /Encryption passphrase/,
-  ) as HTMLInputElement;
+  const unlockInput = screen.getByLabelText('Passphrase') as HTMLInputElement;
   fireEvent.change(unlockInput, {
     target: { value: TEST_PASSPHRASE },
   });
@@ -466,8 +464,10 @@ describe('VaultGate (create recovery key flow)', () => {
     });
 
     // Unlock panel should be shown (passphrase unlock input)
-    expect(screen.getByLabelText(/Encryption passphrase/)).toBeInTheDocument();
-    expect(screen.getByText(/Tasks: Unlock/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+    ).toBeInTheDocument();
 
     // Children still not rendered (session is locked)
     expect(screen.queryByTestId('children')).not.toBeInTheDocument();
@@ -509,8 +509,10 @@ describe('VaultGate (create recovery key flow)', () => {
       ),
     ).not.toBeInTheDocument();
 
-    expect(screen.getByText(/Tasks: Unlock/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Encryption passphrase/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
     expect(screen.queryByTestId('children')).not.toBeInTheDocument();
   }, 15000);
 
@@ -654,7 +656,9 @@ describe('VaultGate (create recovery key flow)', () => {
     renderVaultGate();
 
     await waitFor(() => {
-      expect(screen.getByText(/Tasks: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
     });
 
     expect(

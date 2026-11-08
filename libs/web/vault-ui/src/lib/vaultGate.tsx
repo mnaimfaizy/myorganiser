@@ -1,7 +1,14 @@
 'use client';
 
 import { Button, Input, Label, useToast } from '@myorganiser/web-ui';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   type VaultHandle,
@@ -20,6 +27,7 @@ import {
   RecoveryKeyClaimOffer,
   type RecoveryKeyClaimAnswer,
 } from './RecoveryKeyClaimOffer';
+import { PassphraseUnlockForm } from './PassphraseUnlockForm';
 import { RecoveryKeyAcknowledgment } from './RecoveryKeyAcknowledgment';
 import { UnacknowledgedRecoveryKeyBanner } from './UnacknowledgedRecoveryKeyBanner';
 import { VaultGateFrame } from './VaultGateFrame';
@@ -31,8 +39,20 @@ import { VAULT_ABSENT_EVIDENCE_GATE_VIEWS } from './vaultAbsentEvidenceGateView'
 import { VAULT_CLAIM_EVIDENCE_GATE_VIEWS } from './vaultClaimEvidenceGateView';
 import { VaultReplaceOffer } from './VaultReplaceOffer';
 
+/**
+ * Shown under the unlock field when the passphrase does not open this vault.
+ * The toast says the same thing and stays; this is the field-level answer.
+ */
+const PASSPHRASE_MISMATCH_MESSAGE =
+  "That passphrase didn't unlock your vault. Nothing was changed.";
+
 type VaultGateProps = {
   title: string;
+  /**
+   * The plural, lower-case name of what the gate withholds ("tasks"). Used in
+   * the unlock screen's explanatory line. Omit it and the line is generic.
+   */
+  encryptedItems?: string;
   children: (ctx: { handle: VaultHandle | null }) => React.ReactNode;
 };
 
@@ -95,6 +115,11 @@ export function VaultGate(props: VaultGateProps) {
   const [passphrase, setPassphrase] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryInput, setRecoveryInput] = useState('');
+  const [passphraseError, setPassphraseError] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+  // The state drives the busy render; the ref stops a second submit that lands
+  // before the render that disables the button has happened.
+  const unlockInFlight = useRef(false);
 
   const isUnlocked = masterKeyBytes !== null;
 
@@ -372,6 +397,7 @@ export function VaultGate(props: VaultGateProps) {
       });
     } catch (e: unknown) {
       if (e instanceof VaultSecretMismatchError) {
+        setPassphraseError(PASSPHRASE_MISMATCH_MESSAGE);
         toast({
           title: "That passphrase didn't unlock this vault",
           description:
@@ -389,7 +415,42 @@ export function VaultGate(props: VaultGateProps) {
     }
   }, [handle, passphrase, setMasterKeyBytes, toast]);
 
+  const handlePassphraseChange = useCallback((value: string): void => {
+    setPassphrase(value);
+    setPassphraseError(null);
+  }, []);
+
+  const handleUnlockSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+      event.preventDefault();
+      if (unlockInFlight.current) return;
+      unlockInFlight.current = true;
+      setPassphraseError(null);
+      setUnlocking(true);
+      try {
+        await handleUnlockWithPassphrase();
+      } finally {
+        unlockInFlight.current = false;
+        setUnlocking(false);
+      }
+    },
+    [handleUnlockWithPassphrase],
+  );
+
+  const handleRecoverSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>): void => {
+      event.preventDefault();
+      if (recoveryInput.trim().length === 0) return;
+      void handleUnlockWithRecoveryKey();
+    },
+    [recoveryInput, handleUnlockWithRecoveryKey],
+  );
+
   const title = useMemo(() => props.title, [props.title]);
+
+  const unlockDescription = props.encryptedItems
+    ? `Your ${props.encryptedItems} are encrypted. Enter your passphrase to open them on this device.`
+    : 'Your data is encrypted. Enter your passphrase to open it on this device.';
 
   // Recovery Key Acknowledgment: the User just created a Vault and needs to
   // record their key. This branch sits above the children branch so it is shown
@@ -597,89 +658,83 @@ export function VaultGate(props: VaultGateProps) {
           /* A User who is already `owned` here may also hold a recovery key
              for a second, unclaimed Vault on this device, and this is where
              they say so. */
-          <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="link"
+              className="self-start text-body-sm"
+              onClick={() => setUseRecovery(false)}
+            >
+              Use passphrase
+            </Button>
+            <RecoveryKeyClaimOffer
+              triggerStyle="link"
+              onClaim={claimWithRecoveryKey}
+            />
+          </div>
         }
       >
         {showRemountRecoveryKeyBanner && (
           <UnacknowledgedRecoveryKeyBanner surface="locked" />
         )}
-        <div className="flex flex-wrap gap-2">
+        <form onSubmit={handleRecoverSubmit} className="flex flex-col gap-4.5">
+          <div className="space-y-2">
+            <Label htmlFor="recovery-key">Recovery key</Label>
+            <Input
+              id="recovery-key"
+              value={recoveryInput}
+              onChange={(e) => setRecoveryInput(e.target.value)}
+              placeholder="Paste your recovery key"
+            />
+          </div>
+
           <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setUseRecovery(false)}
+            type="submit"
+            variant="brand"
+            className="w-full"
+            disabled={!canRecover}
           >
-            Use passphrase
+            Unlock with recovery key
           </Button>
-          <Button type="button" variant="default">
-            Forgot passphrase
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="recovery-key">Recovery key</Label>
-          <Input
-            id="recovery-key"
-            value={recoveryInput}
-            onChange={(e) => setRecoveryInput(e.target.value)}
-            placeholder="Paste your recovery key"
-          />
-        </div>
-
-        <Button
-          className="w-full"
-          disabled={!canRecover}
-          onClick={handleUnlockWithRecoveryKey}
-        >
-          Unlock with recovery key
-        </Button>
+        </form>
       </VaultGateFrame>
     );
   }
 
   return (
     <VaultGateFrame
-      title={`${title}: Unlock`}
+      title="Unlock your vault"
+      description={unlockDescription}
       footer={
         /* A User who is already `owned` here may also hold a recovery key
            for a second, unclaimed Vault on this device, and this is where
            they say so. */
-        <RecoveryKeyClaimOffer onClaim={claimWithRecoveryKey} />
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="link"
+            className="self-start text-body-sm"
+            onClick={() => setUseRecovery(true)}
+          >
+            Forgot it? Use your Recovery Key
+          </Button>
+          <RecoveryKeyClaimOffer
+            triggerStyle="link"
+            onClaim={claimWithRecoveryKey}
+          />
+        </div>
       }
     >
       {showRemountRecoveryKeyBanner && (
         <UnacknowledgedRecoveryKeyBanner surface="locked" />
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant={useRecovery ? 'secondary' : 'default'}
-          onClick={() => setUseRecovery(false)}
-        >
-          Use passphrase
-        </Button>
-        <Button
-          type="button"
-          variant={useRecovery ? 'default' : 'secondary'}
-          onClick={() => setUseRecovery(true)}
-        >
-          Forgot passphrase
-        </Button>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="unlock-passphrase">Encryption passphrase</Label>
-        <Input
-          id="unlock-passphrase"
-          type="password"
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-        />
-      </div>
-
-      <Button className="w-full" onClick={handleUnlockWithPassphrase}>
-        Unlock
-      </Button>
+      <PassphraseUnlockForm
+        value={passphrase}
+        onChange={handlePassphraseChange}
+        onSubmit={handleUnlockSubmit}
+        error={passphraseError}
+        unlocking={unlocking}
+      />
     </VaultGateFrame>
   );
 }

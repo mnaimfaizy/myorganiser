@@ -241,7 +241,7 @@ function GroceriesInner({ handle }: GroceriesInnerProps) {
 
 export function GroceriesPageClient() {
   return (
-    <VaultGate title="Groceries">
+    <VaultGate title="Groceries" encryptedItems="groceries">
       {({ handle }) => (handle ? <GroceriesInner handle={handle} /> : null)}
     </VaultGate>
   );

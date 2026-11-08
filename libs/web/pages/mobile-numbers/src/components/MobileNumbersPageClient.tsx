@@ -28,7 +28,7 @@ function MobileNumbersInner({ handle }: MobileNumbersInnerProps) {
 
 export function MobileNumbersPageClient() {
   return (
-    <VaultGate title="Mobile Numbers">
+    <VaultGate title="Mobile Numbers" encryptedItems="mobile numbers">
       {({ handle }) => (handle ? <MobileNumbersInner handle={handle} /> : null)}
     </VaultGate>
   );

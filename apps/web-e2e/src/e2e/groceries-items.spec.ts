@@ -232,14 +232,14 @@ async function gotoGroceriesAndUnlock(
   // The page is ready once it has settled into one of its two states: the
   // vault gate, or the unlocked list. `networkidle` was DISCOURAGED and hung
   // here against a production build (ADR 0050, issue #524).
-  const unlockButton = page.getByRole('button', { name: 'Use passphrase' });
+  const unlockInput = page.locator('#unlock-passphrase');
   await expect(
-    unlockButton
+    unlockInput
       .or(page.getByRole('heading', { level: 1, name: 'Groceries' }))
       .first(),
   ).toBeVisible({ timeout: 30000 });
 
-  const isLocked = await unlockButton
+  const isLocked = await unlockInput
     .isVisible({ timeout: 10000 })
     .catch(() => false);
 
@@ -327,9 +327,7 @@ async function openListByName(
       );
     }
     await passphraseInput.fill(passphraseParam);
-    const unlockBtn = page
-      .getByRole('button', { name: /Unlock|Confirm/ })
-      .first();
+    const unlockBtn = page.getByRole('button', { name: /^Unlock$/ }).first();
     await unlockBtn.click();
     // The gate closing is the unlock signal, not network quiet.
     await expect(

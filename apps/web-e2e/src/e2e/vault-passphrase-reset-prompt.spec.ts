@@ -179,13 +179,12 @@ test.describe('Passphrase Reset Prompt (E2E)', () => {
     await assertRecoveryModeChangePassphraseCard(page);
 
     await page.reload();
-    // Reload keeps the vault URL. That page's locked card is passphrase-only
-    // ("Unlock"); recovery unlock is the gate on a gated route.
+    // Reload keeps the vault URL. The gated route lands on the passphrase
+    // unlock panel; recovery is one link away ("Forgot it? Use your Recovery
+    // Key") and is taken by unlockWithRecoveryKey below.
     await gotoStable(page, '/dashboard/addresses');
 
-    await expect(
-      page.getByRole('button', { name: 'Use passphrase' }),
-    ).toBeVisible({
+    await expect(page.locator('#unlock-passphrase')).toBeVisible({
       timeout: PBKDF2_BUDGET_MS,
     });
 

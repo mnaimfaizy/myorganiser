@@ -4,6 +4,7 @@ export * from './lib/LastBackupCard';
 export * from './lib/metaConvergeRunner';
 export * from './lib/newPassphraseFields';
 export * from './lib/passphraseResetPrompt';
+export * from './lib/PassphraseUnlockForm';
 export * from './lib/recoveryPassphraseReset';
 export * from './lib/pullRunner';
 export * from './lib/RecoveryKeyAcknowledgment';

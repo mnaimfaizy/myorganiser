@@ -16,20 +16,20 @@ export class GroceriesPage {
   async gotoAndUnlock(passphrase: string): Promise<void> {
     await this.page.goto('/dashboard/groceries');
 
-    const unlockButton = this.page.getByRole('button', {
-      name: 'Use passphrase',
-    });
+    // The locked gate's passphrase field is the readiness signal. "Use
+    // passphrase" exists only on the recover screen, not the unlock panel.
+    const unlockInput = this.page.locator('#unlock-passphrase');
 
     // The route is ready once it has settled into one of its two states —
     // the vault gate, or the unlocked Trip Board. Waiting for network quiet
     // said nothing about either (issue #524).
     await expect(
-      unlockButton
+      unlockInput
         .or(this.page.getByRole('heading', { level: 1, name: 'Groceries' }))
         .first(),
     ).toBeVisible({ timeout: 30000 });
 
-    const isLocked = await unlockButton
+    const isLocked = await unlockInput
       .isVisible({ timeout: 10000 })
       .catch(() => false);
 
@@ -152,7 +152,7 @@ export class GroceriesPage {
       }
       await passphraseInput.fill(passphraseParam);
       const unlockBtn = this.page
-        .getByRole('button', { name: /Unlock|Confirm/ })
+        .getByRole('button', { name: /^Unlock$/ })
         .first();
       await unlockBtn.click();
       // The gate closing is the unlock signal, not network quiet.

@@ -12,7 +12,7 @@ export function GroceriesListDetailPage({
   listId,
 }: GroceriesListDetailPageProps) {
   return (
-    <VaultGate title="Grocery List">
+    <VaultGate title="Grocery List" encryptedItems="groceries">
       {({ handle }) => (
         <GroceriesListDetailClient listId={listId} handle={handle!} />
       )}

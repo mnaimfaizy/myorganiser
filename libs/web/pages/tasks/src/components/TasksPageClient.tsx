@@ -39,7 +39,7 @@ export function TasksPageClient({
   initialSelectedTaskId,
 }: TasksPageClientProps) {
   return (
-    <VaultGate title="Tasks">
+    <VaultGate title="Tasks" encryptedItems="tasks">
       {({ handle }) =>
         handle ? (
           <TasksInner

@@ -355,4 +355,63 @@ describe('RecoveryKeyClaimOffer', () => {
       expect(screen.queryByText(/passphrase/i)).not.toBeInTheDocument();
     });
   });
+
+  describe('triggerStyle link', () => {
+    const LINK_TRIGGER_NAME =
+      'I have a Recovery Key for a different vault on this device';
+
+    test('should render the link trigger with the different-vault name and not the default button name', () => {
+      render(<RecoveryKeyClaimOffer onClaim={jest.fn()} triggerStyle="link" />);
+
+      expect(
+        screen.getByRole('button', { name: LINK_TRIGGER_NAME }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: /I have a recovery key for a vault on this device/,
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    test('should expand the same claim form when the link trigger is pressed', () => {
+      const { container } = render(
+        <RecoveryKeyClaimOffer onClaim={jest.fn()} triggerStyle="link" />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: LINK_TRIGGER_NAME }));
+
+      expect(
+        container.querySelector('#claim-recovery-key'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Claim this vault/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: LINK_TRIGGER_NAME }),
+      ).not.toBeInTheDocument();
+    });
+
+    test('should show the same single no-match message and keep the typed key', async () => {
+      const onClaim = jest.fn().mockResolvedValue('no-match');
+      const { container } = render(
+        <RecoveryKeyClaimOffer onClaim={onClaim} triggerStyle="link" />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: LINK_TRIGGER_NAME }));
+
+      const input = container.querySelector(
+        '#claim-recovery-key',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'test-key-link' } });
+      fireEvent.click(screen.getByRole('button', { name: /Claim this vault/ }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+      expect(screen.getByRole('alert').textContent).toBe(
+        'That recovery key did not unlock a vault on this device. Nothing on this device was changed.',
+      );
+      expect(input.value).toBe('test-key-link');
+    });
+  });
 });

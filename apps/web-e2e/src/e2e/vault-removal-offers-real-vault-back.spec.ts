@@ -372,17 +372,17 @@ test.describe('Vault Removal Offers Real Vault Back (E2E)', () => {
     // Step 11: Assert unlock panel appears (not create form)
     // This proves reconcile ran and downloaded the server vault instead of
     // falling back to the create offer.
-    // VaultGate's unlock panel shows "Use passphrase" button when owned
-    await expect(
-      page.getByRole('button', { name: 'Use passphrase' }),
-    ).toBeVisible({ timeout: 60000 });
+    // VaultGate's unlock panel shows the passphrase field when owned
+    await expect(page.locator('#unlock-passphrase')).toBeVisible({
+      timeout: 60000,
+    });
 
     // Step 12: Assert create form is NOT present
     // The create form's passphrase input has id="setup-passphrase" (vaultGate.tsx:482)
     await expect(page.locator('#setup-passphrase')).toHaveCount(0);
 
     // Step 13: Unlock with the original passphrase
-    // This proves the real vault came back, not a freshly created one
+    // This proves the real vault came back, not a freshly created one.
     await unlockWithPassphrase(page, PASSPHRASE);
 
     // Step 14: Assert task reappears after unlock and (if needed) re-navigation

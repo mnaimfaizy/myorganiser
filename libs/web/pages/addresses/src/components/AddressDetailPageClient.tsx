@@ -323,7 +323,7 @@ export function AddressDetailPageClient({
   params,
 }: AddressDetailPageClientProps) {
   return (
-    <VaultGate title="Address">
+    <VaultGate title="Address" encryptedItems="addresses">
       {({ handle }) =>
         handle ? (
           <AddressDetailInner handle={handle} addressId={params.id} />

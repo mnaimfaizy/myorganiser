@@ -143,7 +143,7 @@ test.describe('Recovery Key Rotation (E2E)', () => {
 
     // 6. Prove the retired key fails as "wrong secret" (not corruption)
     const forgotPassphraseButton = page.getByRole('button', {
-      name: 'Forgot passphrase',
+      name: 'Forgot it? Use your Recovery Key',
     });
     await forgotPassphraseButton.click();
 

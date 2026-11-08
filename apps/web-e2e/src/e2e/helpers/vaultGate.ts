@@ -99,21 +99,31 @@ export async function createOwnedVaultWithRecoveryKey(
 /**
  * Unlock `VaultGate` on the current page with `recoveryKey`.
  *
- * Requires the unlock panel, switches to recovery via "Forgot passphrase",
- * fills `#recovery-key` (not `#claim-recovery-key`), clicks "Unlock with
- * recovery key", and waits for that field to leave — same landing signal as
- * passphrase unlock.
+ * Accepts either entry state. On the unlock panel, "Forgot it? Use your
+ * Recovery Key" switches to the recover screen; if the recover screen is
+ * already showing (`#recovery-key`), that switch is skipped. Fills
+ * `#recovery-key` (not `#claim-recovery-key`), clicks "Unlock with recovery
+ * key", and waits for that field to leave — same landing signal as passphrase
+ * unlock.
  */
 export async function unlockWithRecoveryKey(
   page: Page,
   recoveryKey: string,
 ): Promise<void> {
-  const usePassphrase = page.getByRole('button', { name: 'Use passphrase' });
-  await expect(usePassphrase).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
-
-  await page.getByRole('button', { name: 'Forgot passphrase' }).click();
-
+  const forgot = page.getByRole('button', {
+    name: 'Forgot it? Use your Recovery Key',
+  });
   const input = page.locator('#recovery-key');
+  await expect(forgot.or(input).first()).toBeVisible({
+    timeout: PBKDF2_BUDGET_MS,
+  });
+
+  // The two states are mutually exclusive, so this sample runs after the
+  // readiness wait has already settled which one is on screen.
+  if (await forgot.isVisible()) {
+    await forgot.click();
+  }
+
   await expect(input).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
   await input.fill(recoveryKey);
 
@@ -135,26 +145,34 @@ export async function unlockWithRecoveryKey(
  *
  * `masterKeyBytes` lives only in React state, so every full page load re-locks
  * the vault and every landing on a gated route has to unlock again.
+ *
+ * "Use passphrase" is the link back from the recover screen only, so it is the
+ * readiness fallback there and is never present on the unlock panel.
  */
 export async function unlockWithPassphrase(
   page: Page,
   passphrase: string,
 ): Promise<void> {
-  // Both modes of the unlock panel render this toggle, so it appearing is the
-  // panel's readiness signal, and clicking it is idempotent — it forces
-  // passphrase mode whichever mode the gate settled into.
-  const usePassphrase = page.getByRole('button', { name: 'Use passphrase' });
-  await expect(usePassphrase).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
-  await usePassphrase.click();
-
   const input = page.locator('#unlock-passphrase');
+  const usePassphrase = page.getByRole('button', { name: 'Use passphrase' });
+  await expect(input.or(usePassphrase).first()).toBeVisible({
+    timeout: PBKDF2_BUDGET_MS,
+  });
+
+  // Mutually exclusive states, and the readiness wait above has settled which
+  // one is on screen. Only the recover screen needs the link back.
+  if (await usePassphrase.isVisible()) {
+    await usePassphrase.click();
+  }
+
   await expect(input).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
   await input.fill(passphrase);
 
-  // Click the button; Firefox does not reliably submit on Enter.
+  // Click the button; Firefox does not reliably submit on Enter. Enter
+  // submission is covered by the VaultGate Jest spec instead.
   await page.getByRole('button', { name: /^Unlock$/ }).click();
 
-  // The field disappearing is the unlock landing — not the click resolving.
+  // The field disappearing is the unlock landing — not the submit resolving.
   // PBKDF2 is slow by design, and slower again on WebKit.
   await expect(input).toHaveCount(0, { timeout: PBKDF2_BUDGET_MS });
 }

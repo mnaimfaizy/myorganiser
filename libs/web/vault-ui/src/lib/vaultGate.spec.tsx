@@ -127,7 +127,9 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
-      expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByText(/Test: Set encryption passphrase/),
       ).not.toBeInTheDocument();
@@ -152,7 +154,9 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/Test: Set encryption passphrase/),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/Test: Unlock/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByText(/A vault is already on this device/),
       ).not.toBeInTheDocument();
@@ -175,9 +179,7 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/Setting up your vault on this device/),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByText(/A vault is already on this device/),
       ).not.toBeInTheDocument();
@@ -200,7 +202,9 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
-      expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByText(/A vault is already on this device/),
       ).not.toBeInTheDocument();
@@ -233,9 +237,7 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/We could not reach the server/),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /Create encrypted vault/ }),
       ).not.toBeInTheDocument();
@@ -266,9 +268,7 @@ describe('VaultGate', () => {
         screen.getByRole('heading', { level: 1, name: 'Please sign in again' }),
       ).toBeInTheDocument();
       expect(screen.getByText(/Please sign in again/)).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /Create encrypted vault/ }),
       ).not.toBeInTheDocument();
@@ -340,7 +340,9 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/Test: Set encryption passphrase/),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/Test: Unlock/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByText(/A vault is already on this device/),
       ).not.toBeInTheDocument();
@@ -368,7 +370,9 @@ describe('VaultGate', () => {
       expect(
         screen.queryByText(/Test: Set encryption passphrase/),
       ).not.toBeInTheDocument();
-      expect(screen.queryByText(/Test: Unlock/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -393,7 +397,7 @@ describe('VaultGate', () => {
 
       // Fill passphrase and try to unlock
       const passphraseInput = screen.getByLabelText(
-        'Encryption passphrase',
+        'Passphrase',
       ) as HTMLInputElement;
       fireEvent.change(passphraseInput, { target: { value: 'gate-pass-1' } });
 
@@ -442,9 +446,9 @@ describe('VaultGate', () => {
         <VaultGate title="MyVault">{() => <div>children</div>}</VaultGate>,
       );
 
-      // Click "Forgot passphrase" to switch to recovery
+      // Click "Forgot it? Use your Recovery Key" to switch to recovery
       const forgotButton = screen.getByRole('button', {
-        name: /Forgot passphrase/i,
+        name: 'Forgot it? Use your Recovery Key',
       });
       fireEvent.click(forgotButton);
 
@@ -501,7 +505,7 @@ describe('VaultGate', () => {
       );
 
       const passphraseInput = screen.getByLabelText(
-        'Encryption passphrase',
+        'Passphrase',
       ) as HTMLInputElement;
       fireEvent.change(passphraseInput, { target: { value: 'gate-pass-1' } });
 
@@ -545,7 +549,7 @@ describe('VaultGate', () => {
       );
 
       const forgotButton = screen.getByRole('button', {
-        name: /Forgot passphrase/i,
+        name: 'Forgot it? Use your Recovery Key',
       });
       fireEvent.click(forgotButton);
 
@@ -619,7 +623,9 @@ describe('VaultGate', () => {
       );
 
       // Must show unlock panel after handle change
-      expect(screen.getByText(/MyVault: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
 
       // Must NOT show create panel — this is the whole point of the fix
       expect(
@@ -655,7 +661,9 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/MyVault: Set encryption passphrase/),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/MyVault: Unlock/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).not.toBeInTheDocument();
 
       // Simulate Local Vault Revision bump (from VaultReconcileRunner's saveVault call).
       // The handle object identity stays the same; only the revision changes.
@@ -670,7 +678,9 @@ describe('VaultGate', () => {
       // This proves the revision bump (without handle identity change) is sufficient
       // to trigger re-read of vaultStatus() and update the UI — the whole point of
       // Slice #647's render-phase reset.
-      expect(screen.getByText(/MyVault: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
 
       // Must NOT show create panel anymore
       expect(
@@ -756,8 +766,10 @@ describe('VaultGate', () => {
 
   describe('gate screen headings (VaultGateFrame contract)', () => {
     const claimOfferName = /I have a recovery key for a vault on this device/;
+    const unlockClaimOfferName =
+      /I have a Recovery Key for a different vault on this device/;
 
-    test('unlock screen has one level 1 heading named "<title>: Unlock" and renders the claim offer', async () => {
+    test('unlock screen has one level 1 heading "Unlock your vault" and renders the claim offer', async () => {
       const handle = createStubHandle({
         vaultStatus: jest.fn(() => 'owned'),
       });
@@ -774,10 +786,10 @@ describe('VaultGate', () => {
 
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
       expect(
-        screen.getByRole('heading', { level: 1, name: 'Tasks: Unlock' }),
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: claimOfferName }),
+        screen.getByRole('button', { name: unlockClaimOfferName }),
       ).toBeInTheDocument();
     });
 
@@ -833,7 +845,7 @@ describe('VaultGate', () => {
       ).toBeInTheDocument();
     });
 
-    test('recover screen is titled "<title>: Recover" after the User picks Forgot passphrase', async () => {
+    test('recover screen is titled "<title>: Recover" after the User picks Forgot it? Use your Recovery Key', async () => {
       const handle = createStubHandle({
         vaultStatus: jest.fn(() => 'owned'),
       });
@@ -849,7 +861,9 @@ describe('VaultGate', () => {
       await act(async () => {});
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Forgot passphrase' }),
+        screen.getByRole('button', {
+          name: 'Forgot it? Use your Recovery Key',
+        }),
       );
 
       expect(
@@ -857,7 +871,7 @@ describe('VaultGate', () => {
       ).toBeInTheDocument();
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
       expect(
-        screen.getByRole('button', { name: claimOfferName }),
+        screen.getByRole('button', { name: unlockClaimOfferName }),
       ).toBeInTheDocument();
     });
 
@@ -1031,10 +1045,12 @@ describe('VaultGate', () => {
 
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
-      expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole('button', {
-          name: /I have a recovery key for a vault on this device/,
+          name: /I have a Recovery Key for a different vault on this device/,
         }),
       ).toBeInTheDocument();
     });
@@ -1336,7 +1352,9 @@ describe('VaultGate', () => {
       render(<VaultGate title="Test">{() => <div>children</div>}</VaultGate>);
 
       // Should show the ordinary Unlock screen instead
-      expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByText(/This device holds two vaults that are both yours/),
       ).not.toBeInTheDocument();
@@ -1371,7 +1389,9 @@ describe('VaultGate', () => {
 
       // Should show Unlock screen
       await waitFor(() => {
-        expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+        expect(
+          screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+        ).toBeInTheDocument();
       });
 
       // Verify no vault write functions were called
@@ -1429,7 +1449,9 @@ describe('VaultGate', () => {
       );
 
       // Should show Unlock screen next
-      expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
     });
 
     test('should allow recovery key offer on decline, and show replace offer again if recovery key matches', async () => {
@@ -1460,19 +1482,21 @@ describe('VaultGate', () => {
 
       // Should show Unlock screen with recovery key offer
       await waitFor(() => {
-        expect(screen.getByText(/Test: Unlock/)).toBeInTheDocument();
+        expect(
+          screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+        ).toBeInTheDocument();
       });
 
       expect(
         screen.getByRole('button', {
-          name: /I have a recovery key for a vault on this device/,
+          name: /I have a Recovery Key for a different vault on this device/,
         }),
       ).toBeInTheDocument();
 
       // Expand and submit recovery key
       fireEvent.click(
         screen.getByRole('button', {
-          name: /I have a recovery key for a vault on this device/,
+          name: /I have a Recovery Key for a different vault on this device/,
         }),
       );
 
@@ -1540,7 +1564,7 @@ describe('VaultGate', () => {
       await waitFor(() => {
         fireEvent.click(
           screen.getByRole('button', {
-            name: /I have a recovery key for a vault on this device/,
+            name: /I have a Recovery Key for a different vault on this device/,
           }),
         );
       });
@@ -1692,9 +1716,7 @@ describe('VaultGate', () => {
           /Checking whether your vault is already on the server/,
         ),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.getByRole('button', {
           name: /I have a recovery key for a vault on this device/,
@@ -1733,9 +1755,7 @@ describe('VaultGate', () => {
       expect(
         screen.getByText(/The server already holds a vault for your account/),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /Create encrypted vault/ }),
       ).not.toBeInTheDocument();
@@ -1778,9 +1798,7 @@ describe('VaultGate', () => {
           /Checking for your vault needs the server, and we could not reach it/,
         ),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /Create encrypted vault/ }),
       ).not.toBeInTheDocument();
@@ -1818,9 +1836,7 @@ describe('VaultGate', () => {
           /Your session ended before we could check for your vault/,
         ),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Encryption passphrase/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/passphrase/i)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /Create encrypted vault/ }),
       ).not.toBeInTheDocument();
@@ -1891,6 +1907,344 @@ describe('VaultGate', () => {
           name: /I have a recovery key for a vault on this device/,
         }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('passphrase unlock form', () => {
+    const PASSPHRASE_MISMATCH =
+      "That passphrase didn't unlock your vault. Nothing was changed.";
+
+    // Unlock writes the key through setMasterKeyBytes. The gate reads the
+    // session again on the render that follows the unlock, so the mock session
+    // has to hold what was written.
+    function mockUnlockableSession(handle: VaultHandle): void {
+      let unlockedBytes: Uint8Array | null = null;
+      mockUseOptionalVaultSession.mockImplementation(() => ({
+        masterKeyBytes: unlockedBytes,
+        setMasterKeyBytes: (bytes: Uint8Array | null) => {
+          unlockedBytes = bytes;
+        },
+        lock: jest.fn(),
+        handle,
+      }));
+    }
+
+    function mockLockedSession(handle: VaultHandle): void {
+      mockUseOptionalVaultSession.mockReturnValue({
+        masterKeyBytes: null,
+        setMasterKeyBytes: jest.fn(),
+        lock: jest.fn(),
+        handle,
+      });
+    }
+
+    test('submitting the form (what Enter in the passphrase field produces) unlocks and opens the gate', async () => {
+      const masterKeyBytes = new Uint8Array([1, 2, 3, 4]);
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest.fn().mockResolvedValue({ masterKeyBytes }),
+      });
+      mockUnlockableSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      // jsdom does not turn a keydown into implicit form submission, so the
+      // submit event is dispatched directly on the form the field lives in.
+      const field = screen.getByLabelText('Passphrase') as HTMLInputElement;
+      fireEvent.change(field, { target: { value: 'pw' } });
+
+      // Enter triggers implicit submission only when the field's form has an
+      // enabled submit button and it is the first one in tree order.
+      const form = field.closest('form') as HTMLFormElement;
+      expect(field.form).toBe(form);
+      const firstSubmit = form.querySelector('button[type="submit"]');
+      expect(firstSubmit).toBe(screen.getByRole('button', { name: 'Unlock' }));
+      expect(firstSubmit).toBeEnabled();
+
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Unlocked tasks')).toBeInTheDocument();
+      });
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledWith({
+        passphrase: 'pw',
+      });
+    });
+
+    test('a wrong passphrase shows the inline error on the field and still fires the toast', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest
+          .fn()
+          .mockRejectedValue(new VaultSecretMismatchError('passphrase')),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.change(field, { target: { value: 'gate-pass-1' } });
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+      expect(await screen.findByText(PASSPHRASE_MISMATCH)).toBeInTheDocument();
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledWith({
+        passphrase: 'gate-pass-1',
+      });
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      expect(field).toHaveAccessibleDescription(PASSPHRASE_MISMATCH);
+      expect(toastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "That passphrase didn't unlock this vault",
+          variant: 'destructive',
+        }),
+      );
+    });
+
+    test('editing the passphrase after a wrong attempt clears the inline error and its invalid state', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest
+          .fn()
+          .mockRejectedValue(new VaultSecretMismatchError('passphrase')),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.change(field, { target: { value: 'gate-pass-1' } });
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+      await screen.findByText(PASSPHRASE_MISMATCH);
+
+      fireEvent.change(field, { target: { value: 'gate-pass-2' } });
+
+      expect(screen.queryByText(PASSPHRASE_MISMATCH)).not.toBeInTheDocument();
+      expect(field).not.toHaveAttribute('aria-invalid');
+      expect(field).not.toHaveAttribute('aria-describedby');
+    });
+
+    test('a failure that is not a mismatch shows the fixed toast and no inline error', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest.fn().mockRejectedValue(new Error('boom')),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.change(field, { target: { value: 'gate-pass-1' } });
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+      await waitFor(() => {
+        expect(toastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'Unlock failed' }),
+        );
+      });
+      expect(screen.queryByText(PASSPHRASE_MISMATCH)).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(field).not.toHaveAttribute('aria-invalid');
+    });
+
+    test('while the unlock is in flight the button reads Unlocking and a second submit is ignored', async () => {
+      const masterKeyBytes = new Uint8Array([1, 2, 3, 4]);
+      let resolveUnlock: (result: {
+        masterKeyBytes: Uint8Array;
+      }) => void = () => undefined;
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest.fn(
+          () =>
+            new Promise<{ masterKeyBytes: Uint8Array }>((resolve) => {
+              resolveUnlock = resolve;
+            }),
+        ),
+      });
+      mockUnlockableSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.change(field, { target: { value: 'gate-pass-1' } });
+      const form = field.closest('form') as HTMLFormElement;
+      fireEvent.submit(form);
+
+      const busyButton = await screen.findByRole('button', {
+        name: 'Unlocking…',
+      });
+      expect(busyButton).toBeDisabled();
+      expect(busyButton).toHaveAttribute('aria-busy', 'true');
+
+      fireEvent.submit(form);
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveUnlock({ masterKeyBytes });
+      });
+      await waitFor(() => {
+        expect(screen.getByText('Unlocked tasks')).toBeInTheDocument();
+      });
+    });
+
+    test('the reveal control toggles the passphrase between hidden and visible without submitting', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      const field = screen.getByLabelText('Passphrase') as HTMLInputElement;
+      const reveal = screen.getByRole('button', { name: 'Show passphrase' });
+      expect(field.type).toBe('password');
+      expect(reveal).toHaveAttribute('aria-pressed', 'false');
+
+      fireEvent.click(reveal);
+      expect(field.type).toBe('text');
+      expect(reveal).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Show passphrase' })).toBe(
+        reveal,
+      );
+
+      fireEvent.click(reveal);
+      expect(field.type).toBe('password');
+      expect(reveal).toHaveAttribute('aria-pressed', 'false');
+
+      expect(handle.unlockWithPassphrase).not.toHaveBeenCalled();
+    });
+
+    test('the explanatory line names the encrypted items when the gate is told what they are', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks" encryptedItems="tasks">
+          {() => <div>Unlocked tasks</div>}
+        </VaultGate>,
+      );
+
+      await act(async () => {});
+
+      expect(
+        screen.getByText(
+          'Your tasks are encrypted. Enter your passphrase to open them on this device.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    test('the explanatory line is generic when no encrypted items are named', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      expect(
+        screen.getByText(
+          'Your data is encrypted. Enter your passphrase to open it on this device.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    test('Forgot it? opens the recovery screen, and submitting the recovery key field unlocks with the trimmed key', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithRecoveryKey: jest.fn().mockResolvedValue({
+          masterKeyBytes: new Uint8Array([1, 2, 3, 4]),
+        }),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Forgot it? Use your Recovery Key',
+        }),
+      );
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Tasks: Recover' }),
+      ).toBeInTheDocument();
+
+      const recoveryField = screen.getByLabelText(
+        'Recovery key',
+      ) as HTMLInputElement;
+      fireEvent.change(recoveryField, {
+        target: { value: '  gate-recover-1  ' },
+      });
+
+      const recoverForm = recoveryField.closest('form') as HTMLFormElement;
+      expect(recoveryField.form).toBe(recoverForm);
+      const firstSubmit = recoverForm.querySelector('button[type="submit"]');
+      expect(firstSubmit).toBe(
+        screen.getByRole('button', { name: 'Unlock with recovery key' }),
+      );
+      expect(firstSubmit).toBeEnabled();
+
+      fireEvent.submit(recoverForm);
+
+      await waitFor(() => {
+        expect(handle.unlockWithRecoveryKey).toHaveBeenCalledWith({
+          recoveryKey: 'gate-recover-1',
+        });
+      });
+      await waitFor(() => {
+        expect(toastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'Recovered' }),
+        );
+      });
+    });
+
+    test('Use passphrase on the recovery screen returns to the unlock screen', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Forgot it? Use your Recovery Key',
+        }),
+      );
+      expect(screen.getByLabelText('Recovery key')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Use passphrase' }));
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Unlock your vault' }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Recovery key')).not.toBeInTheDocument();
     });
   });
 });
