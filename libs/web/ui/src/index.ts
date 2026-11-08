@@ -49,6 +49,7 @@ export * from './lib/components/Tooltip/Tooltip';
 
 export * from './lib/hooks/use-app-install';
 export * from './lib/hooks/use-feedback-dialog';
+export * from './lib/feedback-report-status-tone';
 export * from './lib/hooks/use-media-query';
 export * from './lib/hooks/use-mobile';
 export * from './lib/hooks/use-online-status';

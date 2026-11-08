@@ -2,7 +2,6 @@ import type {
   FeedbackReportKind,
   FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
-import type { StatusPillTone } from '@myorganiser/web-ui';
 
 export const REPORT_KIND_LABELS = {
   bug_report: 'Bug report',
@@ -15,20 +14,13 @@ export const DELIVERED_STATUS_BY_KIND = {
   suggestion: 'shipped',
 } as const satisfies Record<FeedbackReportKind, FeedbackReportStatus>;
 
-// The tones mirror FEEDBACK_REPORT_STATUS_RULES.tone in
-// libs/web/pages/admin/src/lib/formatFeedbackReport.ts; page libs cannot import each other.
+// The tone comes from the shared FEEDBACK_REPORT_STATUS_TONES in @myorganiser/web-ui.
 export const REPORT_STATUS_CONFIG = {
-  received: { label: 'Received', tone: 'neutral' },
-  under_review: { label: 'Under review', tone: 'info' },
-  planned: { label: 'Planned', tone: 'brand' },
-  fixed: { label: 'Fixed', tone: 'trust' },
-  shipped: { label: 'Shipped', tone: 'trust' },
-  wont_do: { label: "Won't do", tone: 'danger' },
-  cannot_reproduce: { label: "Can't reproduce", tone: 'outline' },
-} as const satisfies Record<
-  FeedbackReportStatus,
-  {
-    label: string;
-    tone: StatusPillTone;
-  }
->;
+  received: { label: 'Received' },
+  under_review: { label: 'Under review' },
+  planned: { label: 'Planned' },
+  fixed: { label: 'Fixed' },
+  shipped: { label: 'Shipped' },
+  wont_do: { label: "Won't do" },
+  cannot_reproduce: { label: "Can't reproduce" },
+} as const satisfies Record<FeedbackReportStatus, { label: string }>;

@@ -2,14 +2,15 @@ import type {
   FeedbackReportKind,
   FeedbackReportStatus,
 } from '@myorganiser/app-api-client';
-import type { StatusPillTone } from '@myorganiser/web-ui';
+import {
+  FEEDBACK_REPORT_STATUS_TONES,
+  type StatusPillTone,
+} from '@myorganiser/web-ui';
 
 const REPOSITORY_URL = 'https://github.com/mnaimfaizy/myorganiser';
 
 export interface FeedbackReportStatusRule {
   label: string;
-  /** The StatusPill tone. Under review is info blue; Can't reproduce is the warning outline. */
-  tone: StatusPillTone;
   adminSettable: boolean;
   /** A final status cannot be changed again; the backend refuses every admin action on it. */
   isFinal: boolean;
@@ -26,7 +27,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   received: {
     label: 'Received',
     isFinal: false,
-    tone: 'neutral',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
@@ -34,7 +34,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   under_review: {
     label: 'Under review',
     isFinal: false,
-    tone: 'info',
     adminSettable: true,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
@@ -42,7 +41,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   planned: {
     label: 'Planned',
     isFinal: false,
-    tone: 'brand',
     adminSettable: true,
     requiresStatusNote: false,
     kinds: ['bug_report', 'suggestion'],
@@ -50,7 +48,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   fixed: {
     label: 'Fixed',
     isFinal: true,
-    tone: 'trust',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['bug_report'],
@@ -58,7 +55,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   shipped: {
     label: 'Shipped',
     isFinal: true,
-    tone: 'trust',
     adminSettable: false,
     requiresStatusNote: false,
     kinds: ['suggestion'],
@@ -66,7 +62,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   wont_do: {
     label: "Won't do",
     isFinal: false,
-    tone: 'danger',
     adminSettable: true,
     requiresStatusNote: true,
     kinds: ['bug_report', 'suggestion'],
@@ -74,7 +69,6 @@ const FEEDBACK_REPORT_STATUS_RULES = {
   cannot_reproduce: {
     label: "Can't reproduce",
     isFinal: false,
-    tone: 'outline',
     adminSettable: true,
     requiresStatusNote: true,
     kinds: ['bug_report'],
@@ -129,7 +123,7 @@ export function trackingIssueUrl(issueNumber: number): string {
 export function getStatusPillTone(
   status: FeedbackReportStatus,
 ): StatusPillTone {
-  return FEEDBACK_REPORT_STATUS_RULES[status].tone;
+  return FEEDBACK_REPORT_STATUS_TONES[status];
 }
 
 /**
