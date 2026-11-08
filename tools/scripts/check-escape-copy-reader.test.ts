@@ -17,6 +17,7 @@ import {
   capabilityFindings,
   checksumFindings,
   customPropertyFindings,
+  freshEnvelopeFindings,
   publishedNameFindings,
   spacingLiteralFindings,
   schemaVersionFindings,
@@ -349,4 +350,43 @@ test('the checker passes on this tree, running the built artifact end to end', (
     result.stdout,
     /opens with both the passphrase and the Recovery Key/u,
   );
+});
+
+test('a harness output carrying every field the gate reads is no finding', () => {
+  assert.deepEqual(
+    freshEnvelopeFindings({
+      text: 't',
+      passphrase: 'p',
+      recoveryKey: 'k',
+      expected: {},
+      schemaVersion: 1,
+    }),
+    [],
+  );
+});
+
+test('a field renamed or removed in the harness output fails the gate, naming it', () => {
+  const findings = freshEnvelopeFindings({
+    text: 't',
+    passphrase: 'p',
+    recoveryKeyBase64: 'k', // `recoveryKey` renamed
+    expected: {},
+    schemaVersion: 1,
+  });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /`recoveryKey`/u);
+  assert.match(findings[0], /mintFreshEscapeCopy\.ts/u);
+});
+
+test('a field of the wrong type, or a non-object output, is a finding', () => {
+  const wrong = freshEnvelopeFindings({
+    text: 't',
+    passphrase: 'p',
+    recoveryKey: 'k',
+    expected: {},
+    schemaVersion: '1',
+  });
+  assert.match(wrong[0], /`schemaVersion`/u);
+  assert.equal(freshEnvelopeFindings(undefined).length, 1);
+  assert.equal(freshEnvelopeFindings(null).length, 1);
 });
