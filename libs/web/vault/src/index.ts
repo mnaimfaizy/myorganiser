@@ -35,9 +35,11 @@ export {
   disablePasskeyUnlock,
   enrolPasskeyUnlock,
   isPasskeyUnlockEnrolled,
+  PasskeyCredentialGoneError,
   recordPasskeyUnlockOffered,
   unlockWithPasskey,
 } from './lib/vault/passkeyUnlock';
+export { masterKeyOpensLocalVault } from './lib/vault/masterKeyOpensLocalVault';
 export type {
   PasskeyAssertionRequest,
   PasskeyAssertionResult,

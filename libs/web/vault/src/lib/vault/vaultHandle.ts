@@ -21,6 +21,7 @@ import {
   ownedLocalVaultSlot,
   type VaultRecordType,
 } from './localVaultStorage';
+import { disablePasskeyUnlock } from './passkeyUnlock';
 import { createSyncBookmarkAccess } from './syncBookmarkAccess';
 import { VAULT_BLOB_TYPE_BY_FIELD } from './vaultBlobFields';
 import { createRecoveryKeyAcknowledgmentAccess } from './recoveryKeyAcknowledgment';
@@ -307,6 +308,10 @@ export function createVaultHandle(options: {
       bookmarks.removeBookmarks();
       refusals.removeRefusals();
       acknowledgments.remove();
+      // Passkey Unlock (ADR 0136, decision 6): its wrapping holds the Master
+      // Key of the Vault being removed. Storage failure is tolerated the same
+      // way the neighbours tolerate it — removal of the Local Vault proceeds.
+      disablePasskeyUnlock(options.owner);
       reportVaultReplaced();
     },
     async hasUnsentChanges(type) {

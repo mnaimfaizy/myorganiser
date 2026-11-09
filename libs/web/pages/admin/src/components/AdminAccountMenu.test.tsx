@@ -24,11 +24,33 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { getCurrentUser, logout } from '@myorganiser/auth';
 import { useSidebar, useToast } from '@myorganiser/web-ui';
+import { isPasskeyUnlockEnrolled } from '@myorganiser/web-vault';
 
 import { AdminAccountMenu } from './AdminAccountMenu';
 
-const adminUser = { name: 'Test Admin', email: 'admin@example.com' };
+const adminUser = {
+  id: 'admin-a',
+  name: 'Test Admin',
+  email: 'admin@example.com',
+};
 const mockToast = jest.fn();
+
+// Storage key as the Passkey Unlock wrapping record writes it (ADR 0136).
+const PASSKEY_RECORD_PREFIX = 'myorganiser_passkey_unlock_v1';
+
+/** A fixture Passkey Unlock wrapping record in its stored shape; the values are placeholders. */
+function seedPasskeyRecord(owner: string): void {
+  localStorage.setItem(
+    `${PASSKEY_RECORD_PREFIX}:${owner}`,
+    JSON.stringify({
+      version: 1,
+      owner,
+      credentialId: 'Y3JlZA==',
+      prfSalt: 'c2FsdA==',
+      wrappedMasterKey: { iv: 'aXY=', ciphertext: 'Y3Q=' },
+    }),
+  );
+}
 
 function stubSidebar(isMobile: boolean) {
   const sidebar = {
@@ -52,6 +74,7 @@ function openMenu(trigger: HTMLElement) {
 describe('AdminAccountMenu', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     (getCurrentUser as jest.Mock).mockReturnValue(adminUser);
     (logout as jest.Mock).mockResolvedValue(undefined);
     (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
@@ -163,5 +186,65 @@ describe('AdminAccountMenu', () => {
       });
     });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('should remove only this admin’s passkey record once the sign-out succeeds', async () => {
+    seedPasskeyRecord('admin-a');
+    seedPasskeyRecord('user-b');
+
+    render(<AdminAccountMenu variant="header" />);
+
+    openMenu(screen.getByRole('button'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/login');
+    });
+    expect(isPasskeyUnlockEnrolled('admin-a')).toBe(false);
+    expect(isPasskeyUnlockEnrolled('user-b')).toBe(true);
+  });
+
+  it('should keep this admin’s passkey record when the sign-out is rejected', async () => {
+    seedPasskeyRecord('admin-a');
+    (logout as jest.Mock).mockRejectedValue(new Error('network down'));
+
+    render(<AdminAccountMenu variant="header" />);
+
+    openMenu(screen.getByRole('button'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Log out failed' }),
+      );
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled('admin-a')).toBe(true);
+  });
+
+  it('should still navigate to login when storage refuses to remove the passkey record', async () => {
+    seedPasskeyRecord('admin-a');
+    const removeItem = jest
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+
+    try {
+      render(<AdminAccountMenu variant="header" />);
+
+      openMenu(screen.getByRole('button'));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+      expect(removeItem).toHaveBeenCalledWith(
+        `${PASSKEY_RECORD_PREFIX}:admin-a`,
+      );
+      expect(mockToast).not.toHaveBeenCalled();
+    } finally {
+      removeItem.mockRestore();
+    }
   });
 });

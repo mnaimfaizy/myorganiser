@@ -1,6 +1,7 @@
 'use client';
 
 import { getCurrentUser, logout } from '@myorganiser/auth';
+import { disablePasskeyUnlock } from '@myorganiser/web-vault';
 import {
   Avatar,
   AvatarFallback,
@@ -45,6 +46,7 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
 
   // A rejected sign-out keeps the User here and says so; it must not redirect.
   const handleLogout = React.useCallback(async () => {
+    const owner = getCurrentUser()?.id;
     try {
       await logout();
     } catch {
@@ -55,6 +57,8 @@ export function AdminAccountMenu({ variant }: AdminAccountMenuProps) {
       });
       return;
     }
+    // Logging out removes this owner's Passkey Unlock record (ADR 0136).
+    if (owner) disablePasskeyUnlock(owner);
     router.push('/login');
   }, [router, toast]);
 

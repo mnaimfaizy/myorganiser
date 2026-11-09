@@ -11,12 +11,13 @@
  */
 
 import { bytesToBase64 } from './crypto';
-import type {
-  PasskeyAssertionRequest,
-  PasskeyAssertionResult,
-  PasskeyCreationRequest,
-  PasskeyCreationResult,
-  PasskeyPlatform,
+import {
+  PasskeyCredentialGoneError,
+  type PasskeyAssertionRequest,
+  type PasskeyAssertionResult,
+  type PasskeyCreationRequest,
+  type PasskeyCreationResult,
+  type PasskeyPlatform,
 } from './passkeyUnlock';
 
 const RELYING_PARTY_NAME = 'MyOrganiser';
@@ -151,7 +152,32 @@ async function createCredential(
   };
 }
 
+/**
+ * WebAuthn deliberately reports a cancel and an unknown credential alike
+ * (`NotAllowedError`), so only a browser that names the unknown credential —
+ * `NotFoundError` — ends Passkey Unlock here. Everything else stays a plain
+ * failure that deletes nothing.
+ */
+function isCredentialGone(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'NotFoundError'
+  );
+}
+
 async function getAssertion(
+  request: PasskeyAssertionRequest,
+): Promise<PasskeyAssertionResult> {
+  try {
+    return await getAssertionUnchecked(request);
+  } catch (error) {
+    if (isCredentialGone(error)) throw new PasskeyCredentialGoneError();
+    throw error;
+  }
+}
+
+async function getAssertionUnchecked(
   request: PasskeyAssertionRequest,
 ): Promise<PasskeyAssertionResult> {
   const credential = asPublicKeyCredential(

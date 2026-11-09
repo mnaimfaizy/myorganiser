@@ -104,13 +104,39 @@ export interface PasskeyPlatform {
   abandonCredential(credentialId: Uint8Array): Promise<void>;
 }
 
+/**
+ * Thrown by `PasskeyPlatform.getAssertion` when the browser reports that the
+ * enrolled credential no longer exists (the User deleted it from their
+ * passkey provider). Unlike a cancel or a failed ceremony — which the browser
+ * reports as one indistinguishable throw — this is the one assertion failure
+ * that ends Passkey Unlock for the device.
+ */
+export class PasskeyCredentialGoneError extends Error {
+  public readonly code = 'passkey-credential-gone';
+
+  constructor() {
+    super('The passkey enrolled for Passkey Unlock no longer exists');
+    this.name = 'PasskeyCredentialGoneError';
+    Object.setPrototypeOf(this, PasskeyCredentialGoneError.prototype);
+  }
+}
+
 /** How an enrolment ended. Only `enrolled` writes anything. */
 export type PasskeyEnrolmentOutcome = 'enrolled' | 'unsupported' | 'failed';
 
-/** How a passkey unlock ended. Only `unlocked` carries the Master Key. */
+/**
+ * How a passkey unlock ended. Only `unlocked` carries the Master Key.
+ *
+ * `stale` and `credential-gone` mean the wrapping record was deleted: the
+ * Master Key it held no longer opens the Vault's Ciphertext, or the browser
+ * reports the credential no longer exists. Either way the passphrase is asked
+ * for. `failed` deletes nothing.
+ */
 export type PasskeyUnlockOutcome =
   | { outcome: 'unlocked'; masterKeyBytes: Uint8Array }
   | { outcome: 'not-enrolled' }
+  | { outcome: 'stale' }
+  | { outcome: 'credential-gone' }
   | { outcome: 'failed' };
 
 function hasUsablePrfOutput(output: Uint8Array | null): output is Uint8Array {
@@ -269,12 +295,21 @@ export async function enrolPasskeyUnlock(options: {
  *
  * `failed` covers a cancel, a failed ceremony, a missing PRF output and a
  * wrapping that does not decrypt under it. None of them deletes the record:
- * the caller falls back to the passphrase. Whether the recovered key still
- * opens the server's Ciphertext is a separate check.
+ * the caller falls back to the passphrase.
+ *
+ * Two outcomes delete the record (ADR 0136, decision 6):
+ * - `credential-gone`: the platform reports the credential no longer exists.
+ * - `stale`: `verifyMasterKey` says the recovered Master Key no longer opens
+ *   the Vault's Ciphertext (a replaced Vault). A verifier that throws is a
+ *   check that could not run, which is `failed`, not `stale`.
+ *
+ * A passphrase change or Recovery Key rotation never lands here: the Master
+ * Key does not change, so the record keeps working.
  */
 export async function unlockWithPasskey(options: {
   owner: string;
   platform: PasskeyPlatform;
+  verifyMasterKey?: (masterKeyBytes: Uint8Array) => Promise<boolean>;
 }): Promise<PasskeyUnlockOutcome> {
   const record = readPasskeyUnlockRecord(options.owner);
   if (!record) return { outcome: 'not-enrolled' };
@@ -295,8 +330,24 @@ export async function unlockWithPasskey(options: {
       ciphertext: base64ToBytes(record.wrappedMasterKey.ciphertext),
       iv: base64ToBytes(record.wrappedMasterKey.iv),
     });
+    if (options.verifyMasterKey) {
+      let opensVault: boolean;
+      try {
+        opensVault = await options.verifyMasterKey(masterKeyBytes);
+      } catch {
+        return { outcome: 'failed' };
+      }
+      if (!opensVault) {
+        disablePasskeyUnlock(options.owner);
+        return { outcome: 'stale' };
+      }
+    }
     return { outcome: 'unlocked', masterKeyBytes };
-  } catch {
+  } catch (error) {
+    if (error instanceof PasskeyCredentialGoneError) {
+      disablePasskeyUnlock(options.owner);
+      return { outcome: 'credential-gone' };
+    }
     return { outcome: 'failed' };
   }
 }

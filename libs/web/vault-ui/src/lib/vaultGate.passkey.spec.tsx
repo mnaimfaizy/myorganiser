@@ -17,8 +17,10 @@ import {
   waitFor,
 } from '@testing-library/react';
 import {
+  createVaultHandle,
   enrolPasskeyUnlock,
   isPasskeyUnlockEnrolled,
+  PasskeyCredentialGoneError,
   type PasskeyAssertionRequest,
   type PasskeyCreationRequest,
   type PasskeyPlatform,
@@ -121,6 +123,29 @@ async function enrol(owner: string, platform: PasskeyPlatform) {
   expect(outcome).toBe('enrolled');
 }
 
+// 14 characters: within the fixture passphrase rule (docs/testing/README.md).
+const VAULT_PASSPHRASE = 'vault-secret-1';
+
+/**
+ * A real owned Local Vault with no Vault Blob yet. The passkey check reads this
+ * device's Local Vault to verify the recovered key, so an unlock needs one.
+ */
+async function createOwnedVault(owner: string) {
+  const handle = createVaultHandle({ owner });
+  await handle.initialize({ passphrase: VAULT_PASSPHRASE });
+}
+
+/**
+ * A real owned Local Vault with a saved Vault Blob, wrapped by a Master Key
+ * that is not ENROLLED_KEY: the Vault a passkey enrolled earlier no longer opens.
+ */
+async function createOwnedVaultWithDifferentKey(owner: string) {
+  const handle = createVaultHandle({ owner });
+  await handle.initialize({ passphrase: VAULT_PASSPHRASE });
+  await handle.unlockWithPassphrase({ passphrase: VAULT_PASSPHRASE });
+  await handle.saveEncryptedData({ type: 'tasks', value: [] });
+}
+
 describe('VaultGate passkey unlock option (ADR 0136)', () => {
   let platform: FakePlatform;
 
@@ -147,6 +172,7 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
 
   test('a passkey that unlocks sets the Master Key with the passkey secret', async () => {
     await enrol('owner-a', platform);
+    await createOwnedVault('owner-a');
     const setMasterKeyBytes = jest.fn();
 
     renderGate(lockedSession('owner-a', setMasterKeyBytes), platform);
@@ -167,7 +193,7 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
     expect(platform.getAssertion).toHaveBeenCalledWith(
       expect.objectContaining({ userVerification: 'required' }),
     );
-  });
+  }, 30_000);
 
   test('a cancelled passkey check stays locked, keeps the record, and leaves the passphrase and Recovery Key usable', async () => {
     await enrol('owner-a', platform);
@@ -224,5 +250,94 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
       screen.queryByRole('button', { name: 'Unlock with passkey' }),
     ).not.toBeInTheDocument();
     expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+  });
+
+  test('a Local Vault the passkey no longer opens is stale: the option goes, nothing unlocks, and the passphrase is asked for', async () => {
+    await enrol('owner-a', platform);
+    // A real Local Vault whose Master Key is not the one the passkey wraps.
+    await createOwnedVaultWithDifferentKey('owner-a');
+    const setMasterKeyBytes = jest.fn();
+
+    renderGate(lockedSession('owner-a', setMasterKeyBytes), platform);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Passkey Unlock was turned off',
+          description:
+            'This passkey no longer matches your vault. Enter your passphrase.',
+        }),
+      );
+    });
+    expect(setMasterKeyBytes).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+    expect(
+      screen.queryByRole('button', { name: 'Unlock with passkey' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
+  }, 30_000);
+
+  test('a passkey the browser reports as gone is removed from this device and the passphrase is asked for', async () => {
+    await enrol('owner-a', platform);
+    platform.getAssertion.mockRejectedValueOnce(
+      new PasskeyCredentialGoneError(),
+    );
+    const setMasterKeyBytes = jest.fn();
+
+    renderGate(lockedSession('owner-a', setMasterKeyBytes), platform);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Passkey Unlock was turned off',
+          description:
+            'This passkey is no longer available. Enter your passphrase.',
+        }),
+      );
+    });
+    expect(setMasterKeyBytes).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+    expect(
+      screen.queryByRole('button', { name: 'Unlock with passkey' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
+  });
+
+  test('a passkey check that cannot read a Local Vault to verify against fails and keeps the record', async () => {
+    await enrol('owner-a', platform);
+    const setMasterKeyBytes = jest.fn();
+
+    renderGate(lockedSession('owner-a', setMasterKeyBytes), platform);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Your passkey didn't unlock the vault",
+        }),
+      );
+    });
+    expect(setMasterKeyBytes).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Unlock with passkey' }),
+    ).toBeEnabled();
   });
 });

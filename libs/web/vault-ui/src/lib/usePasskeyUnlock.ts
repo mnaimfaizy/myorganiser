@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useToast } from '@myorganiser/web-ui';
 import {
   isPasskeyUnlockEnrolled,
+  masterKeyOpensLocalVault,
   unlockWithPasskey,
   type PasskeyUnlockOutcome,
 } from '@myorganiser/web-vault';
@@ -46,12 +47,31 @@ export function usePasskeyUnlock(): PasskeyUnlockState {
     inFlight.current = true;
     setUnlocking(true);
     try {
-      const result = await unlockWithPasskey({ owner, platform });
+      const result = await unlockWithPasskey({
+        owner,
+        platform,
+        verifyMasterKey: (masterKeyBytes) =>
+          masterKeyOpensLocalVault({ owner, masterKeyBytes }),
+      });
       if (result.outcome === 'unlocked') {
         setMasterKeyBytes(result.masterKeyBytes, 'passkey');
         toast({
           title: 'Unlocked',
           description: 'Vault unlocked with your passkey for this session.',
+        });
+      } else if (
+        result.outcome === 'stale' ||
+        result.outcome === 'credential-gone'
+      ) {
+        // The record is already deleted, so the passkey option disappears and
+        // the passphrase is what is offered. Informational, not an error the
+        // User must dismiss before they can type.
+        toast({
+          title: 'Passkey Unlock was turned off',
+          description:
+            result.outcome === 'stale'
+              ? 'This passkey no longer matches your vault. Enter your passphrase.'
+              : 'This passkey is no longer available. Enter your passphrase.',
         });
       } else {
         toast({

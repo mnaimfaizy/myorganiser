@@ -14,14 +14,25 @@ import {
   disablePasskeyUnlock,
   enrolPasskeyUnlock,
   isPasskeyUnlockEnrolled,
+  PasskeyCredentialGoneError,
   recordPasskeyUnlockOffered,
   unlockWithPasskey,
   type PasskeyAssertionRequest,
   type PasskeyCreationRequest,
   type PasskeyPlatform,
 } from './passkeyUnlock';
-import { bytesToBase64, randomBytes } from './crypto';
+import {
+  aesGcmDecrypt,
+  base64ToBytes,
+  bytesToBase64,
+  importAesGcmKey,
+  randomBytes,
+} from './crypto';
+import { masterKeyOpensLocalVault } from './masterKeyOpensLocalVault';
+import { mintRecoveryKey } from './recoveryKeyMint';
+import { localVaultStorageKey, type VaultStorageV1 } from './localVaultStorage';
 import { readPasskeyUnlockRecord } from './passkeyUnlockStorage';
+import { createVaultHandle } from './vaultHandle';
 
 type CreateMode =
   | 'prf-at-create'
@@ -30,7 +41,11 @@ type CreateMode =
   | 'prf-short'
   | 'cancel';
 
-type AssertMode = 'derive' | 'null' | 'wrong-key' | 'cancel';
+type AssertMode = 'derive' | 'null' | 'wrong-key' | 'cancel' | 'gone';
+
+// Fixture passphrases kept to 10-15 characters (docs/testing/README.md).
+const OLD_PASSPHRASE = 'old-passphrase';
+const NEW_PASSPHRASE = 'new-passphrase';
 
 const MASTER_KEY = Uint8Array.from(
   { length: 32 },
@@ -96,6 +111,7 @@ class FakeAuthenticator implements PasskeyPlatform {
   async getAssertion(request: PasskeyAssertionRequest) {
     this.assertions.push(request);
     if (this.assertMode === 'cancel') throw cancelledCeremony();
+    if (this.assertMode === 'gone') throw new PasskeyCredentialGoneError();
     if (this.assertMode === 'null') return { prfOutput: null };
     const secret =
       this.assertMode === 'wrong-key' ? 'a-different-authenticator' : undefined;
@@ -423,6 +439,217 @@ describe('passkeyUnlock — Passkey Unlock policy over a fake authenticator', ()
       ).resolves.toBe(true);
     });
   });
+});
+
+/** Recover the Master Key a real Local Vault was created with, through its recovery wrapping. */
+async function recoverMasterKeyWithRecoveryKey(
+  owner: string,
+  recoveryKey: string,
+): Promise<Uint8Array> {
+  const stored = JSON.parse(
+    localStorage.getItem(localVaultStorageKey(owner)) ?? 'null',
+  ) as { vault: VaultStorageV1 } | null;
+  if (!stored) throw new Error('No Local Vault was stored for this owner');
+  const wrapped = stored.vault.masterKeyWrappedWithRecoveryKey;
+  return aesGcmDecrypt({
+    key: await importAesGcmKey(base64ToBytes(recoveryKey)),
+    iv: base64ToBytes(wrapped.iv),
+    ciphertext: base64ToBytes(wrapped.ciphertext),
+  });
+}
+
+function enrolVaultKey(owner: string, masterKeyBytes: Uint8Array) {
+  return enrolPasskeyUnlock({
+    owner,
+    masterKeyBytes,
+    userName: `${owner}@example.test`,
+    platform: authenticator,
+  });
+}
+
+describe('unlockWithPasskey — a stale wrapping or lost credential deletes the record (ADR 0136, decision 6)', () => {
+  test('23: a verifier that accepts the recovered Master Key unlocks and is handed that key', async () => {
+    await enrol(OWNER_A, authenticator);
+    const verifyMasterKey = jest.fn<Promise<boolean>, [Uint8Array]>(
+      async () => true,
+    );
+
+    const outcome = await unlockWithPasskey({
+      owner: OWNER_A,
+      platform: authenticator,
+      verifyMasterKey,
+    });
+
+    expect(outcome.outcome).toBe('unlocked');
+    expect(verifyMasterKey).toHaveBeenCalledTimes(1);
+    const [verified] = verifyMasterKey.mock.calls[0];
+    expect(Array.from(verified)).toEqual(Array.from(MASTER_KEY));
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(true);
+  });
+
+  test('24: a verifier that rejects the recovered key is stale, deletes the record, and returns no key', async () => {
+    await enrol(OWNER_A, authenticator);
+    const verifyMasterKey = jest.fn<Promise<boolean>, [Uint8Array]>(
+      async () => false,
+    );
+
+    await expect(
+      unlockWithPasskey({
+        owner: OWNER_A,
+        platform: authenticator,
+        verifyMasterKey,
+      }),
+    ).resolves.toEqual({ outcome: 'stale' });
+
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(false);
+    const assertionsBefore = authenticator.assertions.length;
+    await expect(
+      unlockWithPasskey({ owner: OWNER_A, platform: authenticator }),
+    ).resolves.toEqual({ outcome: 'not-enrolled' });
+    expect(authenticator.assertions).toHaveLength(assertionsBefore);
+  });
+
+  test('25: a stale check for one owner leaves another owner’s record in place', async () => {
+    await enrol(OWNER_A, authenticator);
+    await enrol(OWNER_B, authenticator);
+    const verifyMasterKey = jest.fn<Promise<boolean>, [Uint8Array]>(
+      async () => false,
+    );
+
+    await unlockWithPasskey({
+      owner: OWNER_A,
+      platform: authenticator,
+      verifyMasterKey,
+    });
+
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(false);
+    expect(isPasskeyUnlockEnrolled(OWNER_B)).toBe(true);
+  });
+
+  test('26: a credential the browser reports as gone is credential-gone and the record is deleted', async () => {
+    await enrol(OWNER_A, authenticator);
+    authenticator.assertMode = 'gone';
+
+    await expect(
+      unlockWithPasskey({ owner: OWNER_A, platform: authenticator }),
+    ).resolves.toEqual({ outcome: 'credential-gone' });
+
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(false);
+  });
+
+  test('27: a verifier that cannot run is failed, not stale, and the record is kept', async () => {
+    await enrol(OWNER_A, authenticator);
+    const verifyMasterKey = jest.fn<Promise<boolean>, [Uint8Array]>(() => {
+      throw new Error('No Local Vault to check the Master Key against');
+    });
+
+    await expect(
+      unlockWithPasskey({
+        owner: OWNER_A,
+        platform: authenticator,
+        verifyMasterKey,
+      }),
+    ).resolves.toEqual({ outcome: 'failed' });
+
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(true);
+  });
+
+  test('28: a cancelled check never reaches the verifier and keeps the record', async () => {
+    await enrol(OWNER_A, authenticator);
+    authenticator.assertMode = 'cancel';
+    const verifyMasterKey = jest.fn<Promise<boolean>, [Uint8Array]>(
+      async () => false,
+    );
+
+    await expect(
+      unlockWithPasskey({
+        owner: OWNER_A,
+        platform: authenticator,
+        verifyMasterKey,
+      }),
+    ).resolves.toEqual({ outcome: 'failed' });
+
+    expect(verifyMasterKey).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(true);
+  });
+});
+
+describe('Passkey Unlock over a real Vault Handle (ADR 0136, decision 6)', () => {
+  test('29: a passphrase change and a Recovery Key rotation keep the enrolment unlocking the same Master Key', async () => {
+    const handle = createVaultHandle({ owner: OWNER_A });
+    const { recoveryKey } = await handle.initialize({
+      passphrase: OLD_PASSPHRASE,
+    });
+    await handle.unlockWithPassphrase({ passphrase: OLD_PASSPHRASE });
+    await handle.saveEncryptedData({ type: 'tasks', value: [] });
+    const masterKeyBytes = await recoverMasterKeyWithRecoveryKey(
+      OWNER_A,
+      recoveryKey,
+    );
+    await expect(enrolVaultKey(OWNER_A, masterKeyBytes)).resolves.toBe(
+      'enrolled',
+    );
+
+    await handle.changePassphrase({
+      currentPassphrase: OLD_PASSPHRASE,
+      newPassphrase: NEW_PASSPHRASE,
+    });
+    await handle.rotateRecoveryKey({
+      currentPassphrase: NEW_PASSPHRASE,
+      recoveryKey: mintRecoveryKey(),
+    });
+
+    const outcome = await unlockWithPasskey({
+      owner: OWNER_A,
+      platform: authenticator,
+      verifyMasterKey: (bytes) =>
+        masterKeyOpensLocalVault({ owner: OWNER_A, masterKeyBytes: bytes }),
+    });
+
+    expect(outcome.outcome).toBe('unlocked');
+    if (outcome.outcome !== 'unlocked') return;
+    expect(Array.from(outcome.masterKeyBytes)).toEqual(
+      Array.from(masterKeyBytes),
+    );
+    await expect(
+      masterKeyOpensLocalVault({
+        owner: OWNER_A,
+        masterKeyBytes: outcome.masterKeyBytes,
+      }),
+    ).resolves.toBe(true);
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(true);
+  }, 30_000);
+
+  test('30: a Local Vault replaced since enrolment is stale: the record is deleted', async () => {
+    const first = createVaultHandle({ owner: OWNER_A });
+    const { recoveryKey } = await first.initialize({
+      passphrase: OLD_PASSPHRASE,
+    });
+    await first.unlockWithPassphrase({ passphrase: OLD_PASSPHRASE });
+    await first.saveEncryptedData({ type: 'tasks', value: [] });
+    const enrolledKey = await recoverMasterKeyWithRecoveryKey(
+      OWNER_A,
+      recoveryKey,
+    );
+    await expect(enrolVaultKey(OWNER_A, enrolledKey)).resolves.toBe('enrolled');
+
+    // A different Vault now sits where this owner's Local Vault was.
+    localStorage.removeItem(localVaultStorageKey(OWNER_A));
+    const replacement = createVaultHandle({ owner: OWNER_A });
+    await replacement.initialize({ passphrase: NEW_PASSPHRASE });
+    await replacement.unlockWithPassphrase({ passphrase: NEW_PASSPHRASE });
+    await replacement.saveEncryptedData({ type: 'tasks', value: [] });
+
+    await expect(
+      unlockWithPasskey({
+        owner: OWNER_A,
+        platform: authenticator,
+        verifyMasterKey: (bytes) =>
+          masterKeyOpensLocalVault({ owner: OWNER_A, masterKeyBytes: bytes }),
+      }),
+    ).resolves.toEqual({ outcome: 'stale' });
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(false);
+  }, 30_000);
 });
 
 describe('disablePasskeyUnlock', () => {

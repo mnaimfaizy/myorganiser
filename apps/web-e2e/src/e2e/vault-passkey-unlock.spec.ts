@@ -238,4 +238,53 @@ test.describe('Passkey Unlock (E2E)', () => {
       page.getByRole('button', { name: PASSKEY_UNLOCK_BUTTON, exact: true }),
     ).toHaveCount(0);
   });
+
+  test('logging out turns Passkey Unlock off, so the next unlock offers only the passphrase', async ({
+    page,
+  }) => {
+    test.setTimeout(180000);
+
+    authenticator = await attachVirtualAuthenticator(page, {
+      prf: true,
+      userVerification: true,
+    });
+
+    setupBackend(page, IDENTITIES);
+    await login(page, OWNER_EMAIL, OWNER_PASSWORD);
+    await expect(page).toHaveURL(/.*dashboard/, { timeout: 60000 });
+
+    await gotoStable(page, '/dashboard/addresses');
+    await createAndUnlockVault(page, OWNER_ID, OWNER_PASSPHRASE);
+
+    await expect(
+      page.getByRole('heading', { name: OFFER_HEADING }),
+    ).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
+    await page
+      .getByRole('button', { name: SET_UP_PASSKEY, exact: true })
+      .click();
+    await expect(
+      page.getByText('Passkey Unlock is on', { exact: true }),
+    ).toBeVisible({ timeout: PBKDF2_BUDGET_MS });
+    expect(
+      await readStorageItem(page, passkeyRecordKey(OWNER_ID)),
+    ).not.toBeNull();
+
+    // Log out is what turns Passkey Unlock off: the record is gone once the
+    // sign-out has reached the sign-in page, before the next sign-in begins.
+    await signOut(page);
+    expect(await readStorageItem(page, passkeyRecordKey(OWNER_ID))).toBeNull();
+
+    await login(page, OWNER_EMAIL, OWNER_PASSWORD);
+    await expect(page).toHaveURL(/.*dashboard/, { timeout: 60000 });
+    await gotoStable(page, '/dashboard/addresses');
+
+    // The owner's Local Vault survives log out, so the gate still asks for the
+    // passphrase, and offers no passkey option.
+    await expect(page.locator('#unlock-passphrase')).toBeVisible({
+      timeout: PBKDF2_BUDGET_MS,
+    });
+    await expect(
+      page.getByRole('button', { name: PASSKEY_UNLOCK_BUTTON, exact: true }),
+    ).toHaveCount(0);
+  });
 });

@@ -102,6 +102,7 @@ import { VaultUnlockCard } from './VaultUnlockCard';
 import { useVaultUnlock, useVaultDisabledState } from '../hooks';
 import { useIsMobile, useToast } from '@myorganiser/web-ui';
 import {
+  createVaultHandle,
   enrolPasskeyUnlock,
   type PasskeyAssertionRequest,
   type PasskeyCreationRequest,
@@ -489,6 +490,11 @@ describe('VaultUnlockCard', () => {
         masterKeyBytes: MASTER_KEY,
         userName: 'owner-a@example.com',
         platform,
+      });
+      // The passkey's Master Key is checked against this owner's Local Vault
+      // before it unlocks, so the owner needs one on this device.
+      await createVaultHandle({ owner: 'owner-a' }).initialize({
+        passphrase: 'vault-secret-1',
       });
       const mockUnlock = jest.fn().mockResolvedValue('ok');
       (useVaultUnlock as jest.Mock).mockReturnValue({
