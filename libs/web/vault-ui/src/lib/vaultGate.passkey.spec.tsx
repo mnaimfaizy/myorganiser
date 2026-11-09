@@ -9,6 +9,11 @@ jest.mock('@myorganiser/web-ui', () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
+jest.mock('@myorganiser/web-vault', () => ({
+  ...jest.requireActual('@myorganiser/web-vault'),
+  createVaultApi: jest.fn(),
+}));
+
 import {
   act,
   fireEvent,
@@ -17,10 +22,16 @@ import {
   waitFor,
 } from '@testing-library/react';
 import {
+  aesGcmEncrypt,
+  bytesToBase64,
+  createVaultApi,
   createVaultHandle,
   enrolPasskeyUnlock,
+  importAesGcmKey,
   isPasskeyUnlockEnrolled,
   PasskeyCredentialGoneError,
+  randomBytes,
+  utf8ToBytes,
   type PasskeyAssertionRequest,
   type PasskeyCreationRequest,
   type PasskeyPlatform,
@@ -34,6 +45,9 @@ import { CLAIM_EVIDENCE_WITHOUT_OWNER } from './useVaultClaimEvidence';
 
 const CREDENTIAL_ID = new Uint8Array(16).fill(7);
 const ENROLLED_KEY = new Uint8Array(32).map((_, i) => i + 1);
+// A different 32-byte Master Key: the one a Vault replaced on another device is wrapped by.
+const REPLACED_KEY = new Uint8Array(32).map((_, i) => 255 - i);
+const UPDATED_AT = '2026-01-01T00:00:00.000Z';
 
 /**
  * A deterministic fake authenticator: the PRF output is SHA-256 over the
@@ -146,6 +160,31 @@ async function createOwnedVaultWithDifferentKey(owner: string) {
   await handle.saveEncryptedData({ type: 'tasks', value: [] });
 }
 
+/** A Vault Blob sealed under `masterKeyBytes` with the real AES-GCM helper. */
+async function serverBlobUnder(masterKeyBytes: Uint8Array) {
+  const iv = randomBytes(12);
+  const ciphertext = await aesGcmEncrypt({
+    key: await importAesGcmKey(masterKeyBytes),
+    plaintext: utf8ToBytes('[]'),
+    iv,
+  });
+  return {
+    version: 1,
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(ciphertext),
+  };
+}
+
+/** A server that holds no Vault Blob, so the passkey check falls back to the Local Vault. */
+function emptyServerApi() {
+  return {
+    getVaultBlobInventory: jest.fn(async () => ({
+      data: { etag: 'e', blobs: [] },
+    })),
+    getVaultBlob: jest.fn(),
+  };
+}
+
 describe('VaultGate passkey unlock option (ADR 0136)', () => {
   let platform: FakePlatform;
 
@@ -153,6 +192,7 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
     jest.clearAllMocks();
     window.localStorage.clear();
     platform = createFakePlatform();
+    (createVaultApi as jest.Mock).mockImplementation(() => emptyServerApi());
   });
 
   test('an enrolled owner sees the passkey option beside the passphrase form and the Recovery Key link', async () => {
@@ -275,6 +315,64 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
         }),
       );
     });
+    expect(setMasterKeyBytes).not.toHaveBeenCalled();
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+    expect(
+      screen.queryByRole('button', { name: 'Unlock with passkey' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
+  }, 30_000);
+
+  test("a Vault replaced on another device is stale: the server's Ciphertext refuses the key even though this device's Local Vault holds no Vault Blob to contradict it", async () => {
+    await enrol('owner-a', platform);
+    // This device's Local Vault holds no Vault Blob, so it has nothing to
+    // contradict the key.
+    await createOwnedVault('owner-a');
+    // The server's Vault Blob is wrapped by another Master Key, as after a
+    // re-initialised Vault on another device.
+    const replacedBlob = await serverBlobUnder(REPLACED_KEY);
+    const server = {
+      getVaultBlobInventory: jest.fn(async () => ({
+        data: {
+          etag: 'inventory-1',
+          blobs: [{ type: 'tasks', etag: 'blob-1', updatedAt: UPDATED_AT }],
+        },
+      })),
+      getVaultBlob: jest.fn(async () => ({
+        data: {
+          etag: 'blob-1',
+          updatedAt: UPDATED_AT,
+          type: 'tasks',
+          message: '',
+          blob: replacedBlob,
+        },
+      })),
+    };
+    (createVaultApi as jest.Mock).mockImplementation(() => server);
+    const setMasterKeyBytes = jest.fn();
+
+    renderGate(lockedSession('owner-a', setMasterKeyBytes), platform);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Passkey Unlock was turned off',
+          description:
+            'This passkey no longer matches your vault. Enter your passphrase.',
+        }),
+      );
+    });
+    // The server's Ciphertext was the one read, and it is what refused the key.
+    expect(server.getVaultBlob).toHaveBeenCalledWith(
+      { type: 'tasks' },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(setMasterKeyBytes).not.toHaveBeenCalled();
     expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
     expect(

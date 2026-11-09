@@ -161,9 +161,11 @@ export async function getServerVaultBlob(
   // the ability to rewrite Vault Meta.
   api: Pick<VaultApiLike, 'getVaultBlob'>,
   type: VaultBlobType,
+  /** Ends this read in flight — see {@link requestOptions}. */
+  signal?: AbortSignal,
 ): Promise<ServerVaultBlob | null> {
   try {
-    const response = await api.getVaultBlob({ type });
+    const response = await api.getVaultBlob({ type }, requestOptions(signal));
     return toServerVaultBlob(response.data as GetVaultBlobResponse);
   } catch (error) {
     if (getHttpStatus(error) === 404) return null;

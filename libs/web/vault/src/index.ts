@@ -40,6 +40,12 @@ export {
   unlockWithPasskey,
 } from './lib/vault/passkeyUnlock';
 export { masterKeyOpensLocalVault } from './lib/vault/masterKeyOpensLocalVault';
+export {
+  checkMasterKeyAgainstServerVault,
+  masterKeyOpensVault,
+  SERVER_CHECK_TIMEOUT_MS,
+  type ServerMasterKeyCheck,
+} from './lib/vault/masterKeyOpensVault';
 export type {
   PasskeyAssertionRequest,
   PasskeyAssertionResult,
