@@ -135,15 +135,43 @@ test('only a fix branch is told how to attribute its defect', () => {
   }
 });
 
-test('the fallback the agent is told to write satisfies the attribution check', () => {
-  // Regression: #1273's agent guessed `Introduced in #1318`. The fallback it is
-  // now given must itself pass `fix:attribution:check`, or the agent is told to
-  // write a line CI rejects.
+test('the fix-branch instruction orders the sources and forbids guessed numbers', () => {
+  // Regression: #1273's agent guessed `Introduced in #1318`. The instruction
+  // must take the brief's field first, then archaeology that reads the number
+  // from a merge commit, then the `unknown` form, and never a recalled number.
   const instruction = fixAttributionInstruction('fix/1273-x') ?? '';
-  const fallback = /`(Introduced in unknown: [^`]+)`/.exec(instruction)?.[1];
-  assert.ok(fallback, 'the instruction names a fallback line');
+  for (const phrase of [
+    'Introduced in #<n>',
+    'Introduced in unknown: <why>',
+    'merge commit',
+    'git log',
+    '**Introduced in:**',
+    'passes CI',
+  ]) {
+    assert.ok(instruction.includes(phrase), `names "${phrase}"`);
+  }
   assert.ok(
-    attributeFix({ commits: fallback }),
-    'the fallback reads as attribution',
+    !instruction.includes('not named in triage'),
+    'does not carry the removed fixed fallback',
+  );
+});
+
+test('the lines the agent is told to write satisfy the attribution check', () => {
+  // The unknown template is read from the instruction, so the prompt and the
+  // gate cannot drift apart: the sample substitutes a reason for `<why>`.
+  const instruction = fixAttributionInstruction('fix/1273-x') ?? '';
+  const template = /`(Introduced in unknown: <why>)`/.exec(instruction)?.[1];
+  assert.ok(template, 'the instruction names the unknown template');
+  const unknownLine = template.replace(
+    '<why>',
+    'searched git log -S and blame; no merge commit found',
+  );
+  assert.ok(
+    attributeFix({ commits: unknownLine }),
+    'the unknown line reads as attribution',
+  );
+  assert.ok(
+    attributeFix({ commits: 'Introduced in #1362' }),
+    'a number read from a merge commit reads as attribution',
   );
 });
