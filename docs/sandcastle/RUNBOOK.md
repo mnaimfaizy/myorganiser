@@ -299,8 +299,11 @@ comment back to each slice, then **close** each integrated slice whose run ended
 completed). A slice whose agent did not signal completion, or listed anything as `OUTSTANDING:`, is
 integrated and marked `status:done` but **held open** as `ready-for-human` with that list as a
 comment, and the slices that depend on it stay blocked until you resolve it and close it
-([ADR 0111](../adr/0111-a-prd-slice-closes-only-on-a-clean-outcome.md)). The PRD issue stays open
-until you merge the manual PRD PR.
+([ADR 0111](../adr/0111-a-prd-slice-closes-only-on-a-clean-outcome.md)). Closing it releases them
+at once — a closed issue counts as a satisfied dependency — and the next `--prd` run clears their
+stale `status:blocked` label at its start (see
+[If you integrate a slice by hand](#if-you-integrate-a-slice-by-hand-the-next-run-clears-its-dependents-label)).
+The PRD issue stays open until you merge the manual PRD PR.
 
 Standalone runs follow the same rule with the last step removed: agent → commit → gate → **stop**.
 There is no integration branch to fast-forward into, so the work branch is the deliverable and the
@@ -555,25 +558,30 @@ The driver no longer aborts on an incomplete wave ([ADR 0045](../adr/0045-a-prd-
 so this bites less often than it did — but the labels are still left mid-rewrite, so the rule
 stands: recover with the wave driver, not with a bare dispatch.
 
-### If you integrate a slice by hand, unblock its dependents
+### If you integrate a slice by hand, the next run clears its dependents' label
 
-`status:blocked` is cleared by `unblockDependents`, which runs **only** on the orchestrator's
-integration path. Integrating a slice yourself — fast-forwarding the feature branch, labelling
-`status:done`, closing the issue — skips it, and the next wave then finds nothing to dispatch:
+`unblockDependents` clears `status:blocked` only when a slice finishes a run **clean**. Integrating
+a slice yourself — fast-forwarding the feature branch, labelling `status:done`, closing the issue —
+skips it, and so does closing a slice held as `ready-for-human`
+([ADR 0111](../adr/0111-a-prd-slice-closes-only-on-a-clean-outcome.md)). The dependents are not
+stranded: `status:blocked` is not an entry filter, so selection admits them and `## Blocked by`
+ordering decides when they run. Only the label is stale.
 
-```
-Error: No open AFK slice issues found for PRD <n>.
-```
+Every `--prd` run sweeps it first. Before selecting slices it removes `status:blocked` from each
+open slice of the PRD whose `## Blocked by` names at least one slice of the PRD and whose every
+dependency is satisfied (closed, or `status:done` and not held), and posts the same
+`Unblocked: … Remaining blockers: none — ready for agent.` comment. `--dry-run` prints
+`Would remove stale status:blocked from #<n>` instead. The decision is `staleBlockedLabels` in
+`tools/scripts/lib/sandcastle-slice-selection.ts`.
 
-The slices are there; they are excluded because `main.mts` filters out `status:blocked`. Clear it
-on every dependent whose `## Blocked by` entries are now done or closed, and only those:
+A label with no in-PRD blocker is left alone, even when every listed dependency is closed: it means
+something the run cannot evaluate, and selection defers that slice. Clear one of those by hand once
+you have checked it:
 
 ```bash
 gh issue view <dependent> --json body --jq '.body' | grep -A 5 -i '^## Blocked by'
 gh issue edit <dependent> --remove-label status:blocked
 ```
-
-Leave the rest blocked — the orchestrator will clear them as their blockers integrate.
 
 ### Salvaging by hand
 

@@ -12,6 +12,8 @@ import {
   isSatisfiedAsDependency,
   selectPrdSlices,
   slicesOfPrd,
+  staleBlockedLabels,
+  unblockedComment,
   unfinishedDependencies,
   type Issue,
 } from './sandcastle-slice-selection.ts';
@@ -488,4 +490,123 @@ test('describeAssembly does not claim completion for a PRD with no slices', () =
   const assembly = describeAssembly([], PRD);
   assert.equal(assembly.complete, false);
   assert.equal(assembly.summary, 'no slices found');
+});
+
+test("closing a held slice by hand makes its dependents' status:blocked stale", () => {
+  // #1351 was held (ADR 0111), then closed by a person. Nothing ran
+  // unblockDependents, so #1352 kept a label that no longer describes it.
+  const held = slice(1351, {
+    state: 'CLOSED',
+    labels: ['status:done', 'ready-for-human'],
+  });
+  const dependent = slice(1352, {
+    labels: [...READY, 'status:blocked'],
+    body: blockedBySection(1351),
+  });
+  const issues = [held, dependent];
+  const lookup = (n: number) => issues.find((issue) => issue.number === n);
+  assert.deepEqual(
+    staleBlockedLabels(issues, { prd: PRD, lookup }).map(
+      ({ issue, dependencies }) => [issue.number, dependencies],
+    ),
+    [[1352, [1351]]],
+  );
+});
+
+test('a status:blocked label is not stale while any dependency still holds', () => {
+  const issues = [
+    slice(1, { state: 'CLOSED' }),
+    slice(2, { labels: ['status:done', 'ready-for-human'] }),
+    slice(3, { labels: [...READY] }),
+    slice(4, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(1, 2),
+    }),
+    slice(5, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(1, 3),
+    }),
+    slice(6, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(1, 999),
+    }),
+  ];
+  const lookup = (n: number) => issues.find((issue) => issue.number === n);
+  assert.deepEqual(staleBlockedLabels(issues, { prd: PRD, lookup }), []);
+});
+
+test('an unexplained status:blocked label is never treated as stale', () => {
+  // No in-PRD blocker means the label carries something this run cannot
+  // evaluate — selectPrdSlices defers these, so the sweep must not clear them.
+  const outside = { number: 771, state: 'CLOSED', labels: [], body: '' };
+  const issues = [
+    slice(10, { labels: [...READY, 'status:blocked'] }),
+    slice(11, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(),
+    }),
+    slice(12, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(771),
+    }),
+  ];
+  const lookup = (n: number) =>
+    n === 771 ? outside : issues.find((issue) => issue.number === n);
+  assert.deepEqual(staleBlockedLabels(issues, { prd: PRD, lookup }), []);
+});
+
+test('the sweep only touches open slices of this PRD that carry the label', () => {
+  const issues = [
+    slice(20, { state: 'CLOSED' }),
+    slice(21, { labels: [...READY], body: blockedBySection(20) }),
+    slice(22, {
+      state: 'CLOSED',
+      labels: ['status:blocked'],
+      body: blockedBySection(20),
+    }),
+    slice(23, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(20),
+      prd: 999,
+    }),
+    slice(25, {
+      labels: ['status:blocked'],
+      body: blockedBySection(20, 24),
+    }),
+    slice(24, { state: 'CLOSED' }),
+  ];
+  const lookup = (n: number) => issues.find((issue) => issue.number === n);
+  assert.deepEqual(
+    staleBlockedLabels(issues, { prd: PRD, lookup }).map(
+      ({ issue, dependencies }) => [issue.number, dependencies],
+    ),
+    [[25, [20, 24]]],
+  );
+});
+
+test('a dependency completed in this run counts as satisfied', () => {
+  const issues = [
+    slice(30, { labels: [...READY] }),
+    slice(31, {
+      labels: [...READY, 'status:blocked'],
+      body: blockedBySection(30),
+    }),
+  ];
+  assert.deepEqual(
+    staleBlockedLabels(issues, { prd: PRD, completed: new Set([30]) }).map(
+      ({ issue }) => issue.number,
+    ),
+    [31],
+  );
+});
+
+test('unblockedComment matches the text unblockDependents has always written', () => {
+  assert.equal(
+    unblockedComment([1351]),
+    'Unblocked: #1351 is done. Remaining blockers: none — ready for agent.',
+  );
+  assert.equal(
+    unblockedComment([1350, 1351]),
+    'Unblocked: #1350, #1351 are done. Remaining blockers: none — ready for agent.',
+  );
 });

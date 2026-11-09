@@ -2765,7 +2765,14 @@
             Dropped at selection; they never enter the pipeline. Sweep enforces
             this <b>strictly</b> &mdash; nobody named that work. Standalone does
             not: naming the issue <b>is</b> the authorization, so these labels
-            print a warning and the run proceeds anyway.
+            print a warning and the run proceeds anyway. PRD mode first
+            <b>sweeps</b> its slices: <code>staleBlockedLabels</code> finds
+            each open slice whose <code>status:blocked</code> is explained by an
+            in-PRD <code>## Blocked by</code> entry and whose every dependency is
+            already satisfied, and the run removes the stale label with an
+            <code>Unblocked:</code> comment. Selection then admits a
+            <code>status:blocked</code> slice with an in-PRD blocker and defers
+            one without.
           </dd>
 
           <dt>PLAN PREVIEW</dt>
@@ -2888,7 +2895,9 @@
             <code>ready-for-human</code>, a comment lists every outstanding
             item, and its dependents are <b>not</b> unblocked. The run reports
             it as <code>integrated, held for a person</code>. A person releases
-            the slices behind it by resolving the items and closing the issue.
+            the slices behind it by resolving the items and closing the issue;
+            the next PRD run's start-of-run sweep clears their stale
+            <code>status:blocked</code>.
             Standalone and sweep leave the issue open and never mark it
             <code>status:done</code> &mdash; that would count work on an unpushed
             local branch as a finished dependency. When the gate passes they swap
@@ -2953,7 +2962,7 @@
   <section class="panel" aria-labelledby="modes-h">
     <div class="phead">
       <h2 id="modes-h">Three modes</h2>
-      <span class="src">main.mts:839-959, :901-907, :3278-3350</span>
+      <span class="src">main.mts:841-1014, :954-960, :3333-3405</span>
     </div>
     <div class="pbody">
       <div class="scrollx">
@@ -3080,7 +3089,7 @@
   <section class="panel" aria-labelledby="gate-h">
     <div class="phead">
       <h2 id="gate-h">The gate &mdash; two project scopes</h2>
-      <span class="src">main.mts:257-318, :1890-2056</span>
+      <span class="src">main.mts:259-320, :1945-2111</span>
     </div>
     <div class="pbody">
       <p>
@@ -3435,7 +3444,7 @@
     <div class="phead">
       <h2 id="cont-h">What crosses the container boundary</h2>
       <span class="src"
-        >main.mts:1217-1239, :2803-2817 &middot; .sandcastle/Dockerfile</span
+        >main.mts:1272-1294, :2858-2872 &middot; .sandcastle/Dockerfile</span
       >
     </div>
     <div class="pbody">
@@ -3569,7 +3578,7 @@
   <section class="panel" aria-labelledby="routing-h">
     <div class="phead">
       <h2 id="routing-h">Routing: labels in, behaviour out</h2>
-      <span class="src">main.mts:1356-1362, :1430-1454, :2403-2407</span>
+      <span class="src">main.mts:1411-1417, :1485-1509, :2458-2462</span>
     </div>
     <div class="pbody">
       <p class="small">
@@ -3790,52 +3799,52 @@
   {
     "note": "Expected-content anchors for file:line citations on this page, verified 2026-09-30 against .sandcastle/main.mts, .sandcastle/dispatch-waves.mts, and tools/scripts/lib/sandcastle-resume.ts. See ADR 0085.",
     "anchors": {
-      "main.mts:839-959": {
+      "main.mts:841-1014": {
         "file": ".sandcastle/main.mts",
         "start": "`  [#${completed.number}] #${dependentNumber} still blocked by ${unfinished",
         "end": "// label is NOT explained that way stays out: it means something this code cannot"
       },
-      "main.mts:901-907": {
+      "main.mts:954-960": {
         "file": ".sandcastle/main.mts",
         "start": "'issue',",
         "end": "'title,body',"
       },
-      "main.mts:257-318": {
+      "main.mts:259-320": {
         "file": ".sandcastle/main.mts",
         "start": "}",
         "end": "/**"
       },
-      "main.mts:1890-2056": {
+      "main.mts:1945-2111": {
         "file": ".sandcastle/main.mts",
         "start": "`Refs #${issue.number}`,",
         "end": "): boolean {"
       },
-      "main.mts:1217-1239": {
+      "main.mts:1272-1294": {
         "file": ".sandcastle/main.mts",
         "start": "// run whose sub-agent behaviour you most want to read. A mount sidesteps the ordering",
         "end": "// Absent, no mount is added and CodeExplorer falls back to Glob/Grep as already"
       },
-      "main.mts:2803-2817": {
+      "main.mts:2858-2872": {
         "file": ".sandcastle/main.mts",
         "start": "* Sessions are selected by mtime against the moment this run started rather than by id.",
         "end": "'.sandcastle',"
       },
-      "main.mts:1356-1362": {
+      "main.mts:1411-1417": {
         "file": ".sandcastle/main.mts",
         "start": "function modelFor(issue: Issue): string {",
         "end": "return sandcastleModels.claudeByComplexity.low;"
       },
-      "main.mts:1430-1454": {
+      "main.mts:1485-1509": {
         "file": ".sandcastle/main.mts",
         "start": "// does, not merely which issue it came from — see AGENTS.md \"Branch naming\". First",
         "end": "return 'chore';"
       },
-      "main.mts:3278-3350": {
+      "main.mts:3333-3405": {
         "file": ".sandcastle/main.mts",
         "start": "const outcome = judgeRunOutcome(",
         "end": "unblockDependents(issue);"
       },
-      "main.mts:2403-2407": {
+      "main.mts:2458-2462": {
         "file": ".sandcastle/main.mts",
         "start": "function resolveGate(issue: Issue): 'mechanical' | 'standard' | 'full' {",
         "end": "return 'standard';"
