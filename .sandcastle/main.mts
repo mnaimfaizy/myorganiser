@@ -45,6 +45,8 @@ import {
   isCompleted,
   isSatisfiedAsDependency,
   selectPrdSlices,
+  staleBlockedLabels,
+  unblockedComment,
   unfinishedDependencies,
 } from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 import {
@@ -859,10 +861,61 @@ function unblockDependents(completed: Issue): void {
       '--repo',
       REPO,
       '--body',
-      `Unblocked: #${completed.number} is done. Remaining blockers: none — ready for agent.`,
+      unblockedComment([completed.number]),
     ]);
     console.log(
       `  [#${completed.number}] removed status:blocked from #${dependentNumber}`,
+    );
+  }
+}
+
+/**
+ * At the start of a PRD run, clear `status:blocked` from every open slice whose
+ * `## Blocked by` dependencies are all satisfied already.
+ *
+ * `unblockDependents` runs only when a slice finishes clean. A slice held for a
+ * person (ADR 0111) that the person later closes by hand never triggers it, so
+ * its dependents keep a stale label (#1352–#1354 after #1351). Selection admits
+ * them regardless; this keeps the label honest. Which labels are stale is decided
+ * by `staleBlockedLabels`; only the `gh` writes live here. Mutates `issues` so
+ * the rest of the run sees the labels as they now are on GitHub.
+ */
+function sweepStaleBlockedLabels(prd: number, issues: Issue[]): void {
+  const stale = staleBlockedLabels(issues, {
+    prd,
+    lookup: (number: number) =>
+      issues.find((issue) => issue.number === number) ?? fetchIssue(number),
+  });
+
+  for (const { issue, dependencies } of stale) {
+    const refs = dependencies.map((n) => `#${n}`).join(', ');
+    if (dryRun) {
+      console.log(
+        `Would remove stale status:blocked from #${issue.number} (${refs} done).`,
+      );
+      continue;
+    }
+    ghSilent([
+      'issue',
+      'edit',
+      String(issue.number),
+      '--repo',
+      REPO,
+      '--remove-label',
+      'status:blocked',
+    ]);
+    ghSilent([
+      'issue',
+      'comment',
+      String(issue.number),
+      '--repo',
+      REPO,
+      '--body',
+      unblockedComment(dependencies),
+    ]);
+    issue.labels = issue.labels.filter((l) => l.name !== 'status:blocked');
+    console.log(
+      `Removed stale status:blocked from #${issue.number} (${refs} done).`,
     );
   }
 }
@@ -949,6 +1002,8 @@ function planPrdRun(prd: number): RunPlan {
     '--limit',
     '100',
   ]);
+
+  sweepStaleBlockedLabels(prd, everyIssue);
 
   // `status:blocked` is NOT an entry filter. This run maintains that label itself:
   // it strips it from a dependent the moment its blocker completes. Filtering on it

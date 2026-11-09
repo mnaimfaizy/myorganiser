@@ -2765,7 +2765,14 @@
             Dropped at selection; they never enter the pipeline. Sweep enforces
             this <b>strictly</b> &mdash; nobody named that work. Standalone does
             not: naming the issue <b>is</b> the authorization, so these labels
-            print a warning and the run proceeds anyway.
+            print a warning and the run proceeds anyway. PRD mode first
+            <b>sweeps</b> its slices: <code>staleBlockedLabels</code> finds
+            each open slice whose <code>status:blocked</code> is explained by an
+            in-PRD <code>## Blocked by</code> entry and whose every dependency is
+            already satisfied, and the run removes the stale label with an
+            <code>Unblocked:</code> comment. Selection then admits a
+            <code>status:blocked</code> slice with an in-PRD blocker and defers
+            one without.
           </dd>
 
           <dt>PLAN PREVIEW</dt>
@@ -2888,7 +2895,9 @@
             <code>ready-for-human</code>, a comment lists every outstanding
             item, and its dependents are <b>not</b> unblocked. The run reports
             it as <code>integrated, held for a person</code>. A person releases
-            the slices behind it by resolving the items and closing the issue.
+            the slices behind it by resolving the items and closing the issue;
+            the next PRD run's start-of-run sweep clears their stale
+            <code>status:blocked</code>.
             Standalone and sweep leave the issue open and never mark it
             <code>status:done</code> &mdash; that would count work on an unpushed
             local branch as a finished dependency. When the gate passes they swap

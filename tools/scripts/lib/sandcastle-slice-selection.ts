@@ -344,6 +344,61 @@ export function selectPrdSlices(
   };
 }
 
+export interface StaleBlockedLabelOptions extends DependencySatisfactionOptions {
+  prd: number;
+}
+
+export interface StaleBlockedLabel<T extends Issue = Issue> {
+  issue: T;
+  /** Every `## Blocked by` dependency of `issue` — all of them satisfied. */
+  dependencies: number[];
+}
+
+/**
+ * Open slices of a PRD whose `status:blocked` label no longer describes them.
+ *
+ * `unblockDependents` clears the label only when a slice finishes a run clean.
+ * A slice held for a person (ADR 0111) releases nothing, so when the person
+ * closes it by hand its dependents keep a label their `## Blocked by` no longer
+ * supports — #1352–#1354 after #1351. Selection admits them anyway; this is
+ * the label catching up, which a PRD run does once at its start.
+ *
+ * Only a label this run owns is stale: one explained by a `## Blocked by` entry
+ * naming another slice of the PRD, the same rule `selectPrdSlices` uses to admit
+ * a slice. A label with no in-PRD blocker means something this code cannot
+ * evaluate, and stays — even when every listed dependency is closed.
+ */
+export function staleBlockedLabels<T extends Issue>(
+  issues: T[],
+  { prd, ...satisfaction }: StaleBlockedLabelOptions,
+): StaleBlockedLabel<T>[] {
+  const ofPrd = slicesOfPrd(issues, prd);
+  const prdNumbers = new Set(ofPrd.map((issue) => issue.number));
+
+  return ofPrd
+    .filter(
+      (issue) =>
+        issue.state === 'OPEN' &&
+        hasLabel(issue, 'status:blocked') &&
+        blockersWithin(issue, prdNumbers).length > 0 &&
+        unfinishedDependencies(issue, satisfaction).length === 0,
+    )
+    .sort((left, right) => left.number - right.number)
+    .map((issue) => ({
+      issue,
+      dependencies: blockedBy(issue).filter(
+        (dependency) => dependency !== issue.number,
+      ),
+    }));
+}
+
+/** The comment posted on a slice when its `status:blocked` label is removed. */
+export function unblockedComment(dependencies: number[]): string {
+  const refs = dependencies.map((dependency) => `#${dependency}`).join(', ');
+  const verb = dependencies.length === 1 ? 'is' : 'are';
+  return `Unblocked: ${refs} ${verb} done. Remaining blockers: none — ready for agent.`;
+}
+
 export interface AssemblyReport {
   total: number;
   done: number;
