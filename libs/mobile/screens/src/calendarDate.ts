@@ -7,6 +7,8 @@
 // anywhere west of Greenwich — the day a User picked would print as the day
 // before.
 
+import { localDateKey } from '@myorganiser/core/portable';
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTHS = [
   'Jan',
@@ -44,9 +46,7 @@ export function parseCalendarDate(iso: string): Date | null {
 
 /** The `YYYY-MM-DD` of a date's local calendar day. */
 export function toCalendarDate(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+  return localDateKey(date);
 }
 
 /** "Wed 14 Oct 2026". An unreadable value prints as it was stored. */
