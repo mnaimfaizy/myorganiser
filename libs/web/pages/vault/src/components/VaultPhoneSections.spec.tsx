@@ -1,6 +1,6 @@
 /* eslint-disable import/first -- jest.mock must precede application imports */
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 /**
  * Mock useVaultDisabledState at its module path so the real
@@ -43,6 +43,18 @@ jest.mock('./RemoveVaultDialog', () => ({
 import { VaultPhoneSections } from './VaultPhoneSections';
 import { useChangePassphrase } from '../hooks/useChangePassphrase';
 import { useVaultDisabledState } from '../hooks/useVaultDisabledState';
+import type { PasskeyPlatform } from '@myorganiser/web-vault';
+import { PasskeyPlatformProvider } from '@myorganiser/web-vault-ui';
+
+/** A platform whose only answer that matters here is whether passkeys can be created. */
+function platformWith(canCreate: boolean): PasskeyPlatform {
+  return {
+    canCreatePasskeys: async () => canCreate,
+    createCredential: jest.fn(),
+    getAssertion: jest.fn(),
+    abandonCredential: jest.fn(),
+  } as unknown as PasskeyPlatform;
+}
 
 describe('VaultPhoneSections', () => {
   beforeEach(() => {
@@ -180,5 +192,36 @@ describe('VaultPhoneSections', () => {
       'data-open',
       'false',
     );
+  });
+
+  describe('Passkey Unlock row', () => {
+    test('shows the Passkey Unlock row with its status when the browser can create passkeys', async () => {
+      render(
+        <PasskeyPlatformProvider platform={platformWith(true)}>
+          <VaultPhoneSections />
+        </PasskeyPlatformProvider>,
+      );
+
+      expect(await screen.findByTestId('passkey-unlock-row')).toHaveTextContent(
+        'Passkey Unlock',
+      );
+      expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
+        'Off on this device',
+      );
+    });
+
+    test('renders no Passkey Unlock row when the browser cannot create passkeys', async () => {
+      await act(async () => {
+        render(
+          <PasskeyPlatformProvider platform={platformWith(false)}>
+            <VaultPhoneSections />
+          </PasskeyPlatformProvider>,
+        );
+      });
+
+      expect(
+        screen.queryByTestId('passkey-unlock-row'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

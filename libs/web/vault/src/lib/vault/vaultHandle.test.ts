@@ -97,6 +97,11 @@ import { localVaultStorageKey } from './localVaultStorage';
 import { createLocalVaultRevision } from './localVaultRevision';
 import { mintRecoveryKey } from './recoveryKeyMint';
 import { recoveryKeyAcknowledgmentStorageKey } from './recoveryKeyAcknowledgmentStorage';
+import {
+  passkeyUnlockStorageKey,
+  readPasskeyUnlockRecord,
+  writePasskeyUnlockRecord,
+} from './passkeyUnlockStorage';
 import * as vaultHandleModule from './vaultHandle';
 import {
   createVaultHandle,
@@ -1829,6 +1834,66 @@ describe('createVaultHandle (owner-bound Vault Handle)', () => {
       const { readSyncBookmarks } = require('./syncBookmarkStorage');
       const bookmarks = readSyncBookmarks('user-a');
       expect(bookmarks.tasks?.etag).toBe('etag-2');
+    });
+  });
+
+  describe('removeVault — deletes this owner’s Passkey Unlock record (ADR 0136, decision 6)', () => {
+    // Fixture wrapping record: base64 placeholders, never a real Master Key.
+    function seedPasskeyRecord(owner: string): void {
+      writePasskeyUnlockRecord({
+        owner,
+        credentialId: 'Y3JlZGVudGlhbC1pZA==',
+        prfSalt: 'cHJmLXNhbHQ=',
+        wrappedMasterKey: { iv: 'aXY=', ciphertext: 'Y2lwaGVydGV4dA==' },
+      });
+    }
+
+    test('removeVault() deletes this owner’s passkey record along with the Local Vault', async () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      await handle.initialize({ passphrase: 'test-passphrase' });
+      seedPasskeyRecord('user-a');
+
+      handle.removeVault();
+
+      expect(handle.hasOwnedVault()).toBe(false);
+      expect(readPasskeyUnlockRecord('user-a')).toBeUndefined();
+    });
+
+    test('removeVault() leaves another owner’s passkey record in place', async () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      await handle.initialize({ passphrase: 'test-passphrase' });
+      seedPasskeyRecord('user-a');
+      seedPasskeyRecord('user-b');
+
+      handle.removeVault();
+
+      expect(readPasskeyUnlockRecord('user-a')).toBeUndefined();
+      expect(readPasskeyUnlockRecord('user-b')).toBeDefined();
+    });
+
+    test('removeVault() still completes when storage refuses to delete the passkey record', async () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      await handle.initialize({ passphrase: 'test-passphrase' });
+      seedPasskeyRecord('user-a');
+      const realRemoveItem = Storage.prototype.removeItem;
+      const removeItem = jest
+        .spyOn(Storage.prototype, 'removeItem')
+        .mockImplementation(function (this: Storage, key: string) {
+          if (key === passkeyUnlockStorageKey('user-a')) {
+            throw new Error('QuotaExceededError');
+          }
+          realRemoveItem.call(this, key);
+        });
+
+      try {
+        expect(() => handle.removeVault()).not.toThrow();
+        expect(removeItem).toHaveBeenCalledWith(
+          passkeyUnlockStorageKey('user-a'),
+        );
+        expect(handle.hasOwnedVault()).toBe(false);
+      } finally {
+        removeItem.mockRestore();
+      }
     });
   });
 

@@ -56,3 +56,8 @@ export {
   routeVaultBlobInventoryOverStore,
 } from './vaultBlobInventoryRoute';
 export { changePassphrase, unlockVaultOnSettingsPage } from './vaultSettings';
+export {
+  attachVirtualAuthenticator,
+  type VirtualAuthenticator,
+  type VirtualAuthenticatorOptions,
+} from './virtualAuthenticator';

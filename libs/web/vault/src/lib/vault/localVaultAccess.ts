@@ -30,20 +30,28 @@ import type {
 
 const PBKDF2_ITERATIONS = 310_000;
 
+/** The secret a `VaultSecretMismatchError` says did not unwrap the Master Key. */
+export type VaultMismatchedSecret = 'passphrase' | 'recovery-key' | 'passkey';
+
+const doesNotUnlock = (secretName: string): string =>
+  `The ${secretName} does not unlock this Vault`;
+
+const VAULT_SECRET_MISMATCH_MESSAGE = {
+  passphrase: doesNotUnlock('passphrase'),
+  'recovery-key': doesNotUnlock('recovery key'),
+  passkey: doesNotUnlock('passkey'),
+} as const satisfies Record<VaultMismatchedSecret, string>;
+
 /**
  * A wrapped Master Key would not unwrap. The secret is wrong — the Vault is
  * not corrupt and must never be offered as resettable.
  */
 export class VaultSecretMismatchError extends Error {
   public readonly code = 'vault-secret-mismatch';
-  public readonly secret: 'passphrase' | 'recovery-key';
+  public readonly secret: VaultMismatchedSecret;
 
-  constructor(secret: 'passphrase' | 'recovery-key') {
-    super(
-      secret === 'passphrase'
-        ? 'The passphrase does not unlock this Vault'
-        : 'The recovery key does not unlock this Vault',
-    );
+  constructor(secret: VaultMismatchedSecret) {
+    super(VAULT_SECRET_MISMATCH_MESSAGE[secret]);
     this.name = 'VaultSecretMismatchError';
     this.secret = secret;
     // Preserve prototype chain for instanceof checks across module boundaries.

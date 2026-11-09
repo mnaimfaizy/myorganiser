@@ -10,7 +10,7 @@
  *
  * `signed-out` and `no-local-vault` block everything, uniformly. That is
  * correctness rather than security: in those states there is no Local Vault for
- * any of the six operations to act on.
+ * any operation to act on.
  *
  * This table implements ADR 0068 §3 as written; whether uniform `no-local-vault`
  * blocking is right for import is deferred to PRD #658.
@@ -21,13 +21,14 @@
  */
 
 /**
- * The six operations the Vault page offers. Unlocking is not one of them: it is
+ * The operations the Vault page offers. Unlocking is not one of them: it is
  * the affordance that leaves the locked state rather than an operation gated by
  * it, and `VaultUnlockCard` renders only while locked.
  */
 export const VAULT_OPERATIONS = {
   PassphraseChange: 'change-passphrase',
   RecoveryKeyRotation: 'rotate-recovery-key',
+  PasskeyUnlock: 'passkey-unlock',
   CloudBackup: 'cloud-backup',
   Export: 'export',
   Removal: 'remove',
@@ -70,7 +71,7 @@ export type VaultOperationRule =
 
 /**
  * Being signed out reads the same for every operation, so it is one constant
- * rather than six copies of one sentence.
+ * rather than one copy per operation.
  */
 export const VAULT_SIGNED_OUT_COPY =
   'Your vault is not available on this device right now.';
@@ -88,6 +89,14 @@ export const VAULT_OPERATION_POLICY = {
     whenLocked: 'Unlock your vault to rotate its recovery key.',
     whenNoLocalVault:
       'Set up a local vault on this device to rotate its recovery key.',
+  },
+  [VAULT_OPERATIONS.PasskeyUnlock]: {
+    // Turning it on re-derives the Master Key from the passphrase; turning it off
+    // is held to the same answer because the policy states one answer per operation.
+    needsMasterKey: true,
+    whenLocked: 'Unlock your vault to change Passkey Unlock on this device.',
+    whenNoLocalVault:
+      'Set up a local vault on this device to use Passkey Unlock.',
   },
   [VAULT_OPERATIONS.CloudBackup]: {
     needsMasterKey: false,

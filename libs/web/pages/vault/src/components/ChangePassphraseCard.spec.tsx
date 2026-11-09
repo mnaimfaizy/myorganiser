@@ -690,6 +690,49 @@ describe('ChangePassphraseCard', () => {
     });
   });
 
+  describe('Passkey mode', () => {
+    test('21: unlockSecret passkey → Change passphrase dialog keeps the Current passphrase field', () => {
+      (useChangePassphrase as jest.Mock).mockReturnValue({
+        changing: false,
+        unlockSecret: 'passkey',
+        changePassphrase: jest.fn(),
+      });
+
+      renderCardOpen();
+
+      expect(
+        screen.getByRole('heading', { name: 'Change passphrase' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Current passphrase')).toBeInTheDocument();
+      expect(
+        screen.queryByText(/You unlocked with your recovery key/),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('change-passphrase-submit')).toHaveTextContent(
+        'Change passphrase',
+      );
+    });
+
+    test('22: unlockSecret passkey → card summary and opener read Change passphrase, not the recovery-key mode', () => {
+      (useChangePassphrase as jest.Mock).mockReturnValue({
+        changing: false,
+        unlockSecret: 'passkey',
+        changePassphrase: jest.fn(),
+      });
+
+      render(<ChangePassphraseCard />);
+
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Change passphrase' }),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('change-passphrase-open')).toHaveTextContent(
+        'Change passphrase…',
+      );
+      expect(
+        screen.queryByRole('heading', { name: 'Set new passphrase' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('Recovery-key mode summary', () => {
     test('20: unlockSecret recovery-key → card h3, description and opener follow the recovery-key mode while the dialog is closed', () => {
       (useChangePassphrase as jest.Mock).mockReturnValue({

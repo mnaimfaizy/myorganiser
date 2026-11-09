@@ -18,6 +18,7 @@ import {
 } from '@myorganiser/web-pages/dashboard';
 
 import {
+  PasskeyUnlockOfferRunner,
   PassphraseResetPrompt,
   VaultMetaConvergeRunner,
   VaultMountSettleProvider,
@@ -89,6 +90,11 @@ export default function DashboardLayout({
              * stays an unlock (ADR 0095).
              */}
             <PassphraseResetPrompt />
+            {/*
+             * The one-time Passkey Unlock offer, after a passphrase unlock
+             * from any surface — the gate or the Vault page (ADR 0136).
+             */}
+            <PasskeyUnlockOfferRunner />
             <DashboardSidebar />
             <SidebarInset>
               <BreadcrumbLabelProvider>
