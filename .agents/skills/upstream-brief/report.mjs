@@ -1,5 +1,5 @@
 /**
- * The structured Upstream Brief report contract (ADR 0084 item 3 and item 10).
+ * The structured Upstream Brief report contract (DESIGN.md §3 and item 10).
  *
  * A research worker writes a report matching `INPUT SHAPE` below. This module
  * turns it into a **normalized report**: the same envelope, with every entry
@@ -8,36 +8,36 @@
  * decision — a code review computes a verdict that one bad finding corrupts,
  * so it rejects the report whole; a brief has no verdict, and losing an
  * Ecosystem's good findings to one bad citation costs more than listing the
- * bad one (ADR 0084, Considered Options).
+ * bad one (DESIGN.md §3).
  *
  * `unverified` and `counts` are computed, never written. A report arriving
  * with either is rejected, for the same reason the code-review contract
  * rejects a hand-written verdict: a derived field the author can forge is not
  * derived.
  *
- * WHY THIS FILE IS HERE, AND NOT IN tools/scripts/
- *   The skill is portable (ADR 0018, retained by ADR 0084). A validator living
- *   in this repo's script tree would make a brief checkable only in this repo.
+ * WHY THIS FILE IS IN THE SKILL, AND NOT IN A HOST'S SCRIPT TREE
+ *   The skill is portable (DESIGN.md, Boundary). A validator living in one
+ *   host's script tree would make a brief checkable only in that host.
  *   So this module imports **nothing at all** — not a dependency, not even a
  *   Node built-in — and `validate-report.mjs` beside it is the only part that
- *   touches a filesystem or a git binary. `.agents/skills/upstream-brief/report.test.mjs`
+ *   touches a filesystem or a git binary. `report.test.mjs`
  *   asserts that import-freedom, because "dependency-free" is the kind of
  *   claim that rots the first time somebody reaches for a helper.
  *
  * WHY LOCAL EVIDENCE IS CHECKED AT ALL
- *   The three briefs written under ADR 0018 cited `file:line` with no commit,
+ *   The first three briefs cited `file:line` with no commit,
  *   inside a document frozen at its date, and carried two Correction blocks
  *   for three wrong claims. A quotation nothing compares to anything is a
- *   claim, not evidence (ADR 0078). Every local citation here carries the
+ *   claim, not evidence (DESIGN.md, Principles). Every local citation here carries the
  *   file, the line, and the literal text at that line, and every one of them
  *   is read back out of the tree at the commit the report records — which is
  *   also what lets a frozen brief stay valid after the tree moves on.
  *
- *   The four failure reasons mirror the review pipeline's
- *   (`tools/scripts/review/obligations.ts`) deliberately and **by copying the
- *   rule rather than the code**: a reader who knows one vocabulary knows both,
- *   and the skill stays portable. The duplication is the price of that, and it
- *   is written down here so the next person does not "fix" it with an import.
+ *   The four failure reasons are the vocabulary a code-review pipeline uses
+ *   for a quoted line that does not hold, and a host may already run one. If
+ *   it does, this copy shares the **rule, not the code**: an import would tie
+ *   the skill to that host and end its portability. The duplication is the
+ *   price, written down so the next person does not "fix" it with an import.
  *
  * INPUT SHAPE
  *   report              schemaVersion, date, commit, ecosystems[], scanned[],
@@ -55,19 +55,19 @@
  *   incidentalObservation summary, local[{file,line,text}], owner
  *
  *   An Opportunity spells its verbatim quote `benefitQuote` rather than
- *   `source.quote` because ADR 0084 item 8 makes that quote the benefit
+ *   `source.quote` because DESIGN.md §8 makes that quote the benefit
  *   itself — "its benefit is the upstream's quoted statement, never an
  *   estimate". It is checked exactly like any other source quote.
  *
  * WHAT THIS MODULE DOES NOT DO
- *   The ledger carry-forward (ADR 0084 item 11 — a checked-and-clear claim
+ *   The ledger carry-forward (DESIGN.md §11 — a checked-and-clear claim
  *   whose recorded range still covers a new Baseline is carried forward
  *   without new research) lives in `ledger.mjs`: it reads the *previous*
  *   committed report against a *new* Baseline, and this module validates
  *   exactly one report in isolation. The `delta` this contract validates is
  *   the ledger's output, not its own work.
  *
- *   Everything else ADR 0084 states about one report's own entries is
+ *   Everything else DESIGN.md states about one report's own entries is
  *   enforced here, in `validateEntry` and the per-Ecosystem pass in
  *   `normalizeUpstreamReport`: `absent` Evidence alone cannot support a
  *   `mismatch` (item 3), a `broken-now` claim without `executed` Evidence is
@@ -86,14 +86,14 @@
 
 export const UPSTREAM_REPORT_SCHEMA_VERSION = 1;
 
-/** ADR 0084 retains ADR 0018's three finding types unchanged. */
+/** The three finding types (BRIEF.md, Finding types). */
 export const UPSTREAM_FINDING_TYPES = /** @type {const} */ ([
   'future-risk',
   'mismatch',
   'missed-improvement',
 ]);
 
-/** ADR 0084 item 5. Ordered most urgent first: this list orders the plan. */
+/** DESIGN.md §5. Ordered most urgent first: this list orders the plan. */
 export const UPSTREAM_URGENCIES = /** @type {const} */ ([
   'broken-now',
   'removal-scheduled',
@@ -102,7 +102,7 @@ export const UPSTREAM_URGENCIES = /** @type {const} */ ([
 ]);
 
 /**
- * ADR 0084 item 3. `absent` is the kind this brief adds to the review
+ * DESIGN.md §3. `absent` is the kind this brief adds to the review
  * pipeline's three: the documents matching the Baseline were read and do not
  * say it, which on its own never proves the repo wrong.
  */
@@ -113,17 +113,17 @@ export const UPSTREAM_EVIDENCE_KINDS = /** @type {const} */ ([
   'absent',
 ]);
 
-/** ADR 0084 item 7 and item 9: the plan touches instructions; the rest is follow-on. */
+/** DESIGN.md §7 and item 9: the plan touches instructions; the rest is follow-on. */
 export const UPSTREAM_DISPOSITIONS = /** @type {const} */ ([
   'plan',
   'follow-on',
 ]);
 
-/** ADR 0084 item 8: "at most three Upstream Opportunities per Ecosystem." */
+/** DESIGN.md §8: "at most three Upstream Opportunities per Ecosystem." */
 export const MAX_OPPORTUNITIES_PER_ECOSYSTEM = 3;
 
 /**
- * ADR 0084 item 5: a `broken-now` claim without `executed` Evidence is
+ * DESIGN.md §5: a `broken-now` claim without `executed` Evidence is
  * downgraded rather than rejected — the claim itself may still be true, only
  * the strongest urgency is not something citation or reasoning alone can
  * support. `advisory` is the floor of `UPSTREAM_URGENCIES` on purpose: absent
@@ -132,15 +132,17 @@ export const MAX_OPPORTUNITIES_PER_ECOSYSTEM = 3;
  */
 export const BROKEN_NOW_DOWNGRADE_URGENCY = 'advisory';
 
-/** ADR 0084 item 7 names the three owners an Incidental Observation routes to. */
-export const INCIDENTAL_OWNERS = /** @type {const} */ ([
-  'DepAudit',
-  'Audit',
+/**
+ * Who an Incidental Observation may route to when the adapter names nobody
+ * (DESIGN.md §7). A host lists its own owners under `incidental_owners` and
+ * the validator takes that list; this default only says "file an issue".
+ */
+export const DEFAULT_INCIDENTAL_OWNERS = /** @type {const} */ ([
   'ad-hoc-issue',
 ]);
 
 /**
- * Why a local citation did not hold. Same four names the review pipeline
+ * Why a local citation did not hold. Same four names a review pipeline
  * uses, by the rule above — one vocabulary, two implementations.
  */
 export const CITATION_FAILURE_REASONS = /** @type {const} */ ([
@@ -151,7 +153,7 @@ export const CITATION_FAILURE_REASONS = /** @type {const} */ ([
 ]);
 
 /**
- * Why an entry is Unverified. The first three are ADR 0084 item 3's own list —
+ * Why an entry is Unverified. The first three are DESIGN.md §3's own list —
  * a URL, a verbatim quote, and the version the page states — `malformed`
  * covers everything the shape itself refuses (including the domain rules
  * that are shape-shaped: an Incidental Observation carrying a disposition),
@@ -350,14 +352,14 @@ const reject = (kind, ecosystem, where, reason, detail, label) => ({
 });
 
 /**
- * The three facts ADR 0084 item 3 requires of any upstream citation: a URL, a
+ * The three facts DESIGN.md §3 requires of any upstream citation: a URL, a
  * verbatim quote, and the version the page states. Each missing one has its
  * own reason, because "this finding is unverified" without saying which of
  * the three is absent is the kind of note a next run cannot act on.
  *
  * `quoteField` names where the verbatim text lives, which differs by entry
  * kind: an Opportunity's is `benefitQuote`, hoisted out of `source` because
- * it *is* the benefit (ADR 0084 item 8).
+ * it *is* the benefit (DESIGN.md §8).
  */
 function sourceProblems(
   entry,
@@ -458,7 +460,7 @@ const enumProblem = (value, members, field) =>
  * `entry` on a success is not always `raw` unchanged: a `broken-now` finding
  * that survives every other check but lacks `executed` Evidence is still
  * accepted, with its urgency downgraded and the downgrade recorded on the
- * returned copy (ADR 0084 item 5) — see the bottom of this function.
+ * returned copy (DESIGN.md §5) — see the bottom of this function.
  *
  * @param {{baseline?: string, horizon?: string}} context an Opportunity's
  *   Ecosystem, for the Baseline/Horizon check (item 8). Unused by every other
@@ -483,7 +485,7 @@ function validateEntry(kind, raw, readSource, context = {}) {
     if (!problem && !isText(raw.claim))
       problem = ['malformed', 'claim is absent or empty'];
     if (!problem && raw.executed !== undefined) {
-      // ADR 0084 item 5: the brief records each command and its exit code.
+      // DESIGN.md §5: the brief records each command and its exit code.
       // The rule that such a command must write no tracked file and install
       // nothing is stated, not mechanically enforced — recording the command
       // is what makes the reader able to judge it.
@@ -494,7 +496,7 @@ function validateEntry(kind, raw, readSource, context = {}) {
       )
         problem = ['malformed', 'executed must be {command, exitCode}'];
     }
-    // ADR 0084 item 3: `absent` means the matching documents were read and do
+    // DESIGN.md §3: `absent` means the matching documents were read and do
     // not say it, which on its own never proves the repo wrong — so it can
     // name a missed improvement or a future risk worth watching, but it
     // cannot itself be the evidence for "this contradicts upstream".
@@ -503,13 +505,13 @@ function validateEntry(kind, raw, readSource, context = {}) {
         'absent-evidence-mismatch',
         'evidence is `absent` — the matching documents were read and say ' +
           'nothing, which on its own never proves the repo wrong, so this ' +
-          'cannot be a mismatch (ADR 0084 item 3)',
+          'cannot be a mismatch (DESIGN.md §3)',
       ];
     if (!problem) problem = sourceProblems(raw)[0] ?? null;
     if (!problem) problem = localProblem(raw, readSource, { required: false });
   } else if (kind === 'checkedAndClear') {
     if (!isText(raw.claim)) problem = ['malformed', 'claim is absent or empty'];
-    // ADR 0084 item 11 reads this range back on the next run to decide whether
+    // DESIGN.md §11 reads this range back on the next run to decide whether
     // the claim can be carried forward without new research. A claim that does
     // not say what it holds for cannot be carried forward by anything.
     if (!problem && !isText(raw.holdsFor))
@@ -527,11 +529,11 @@ function validateEntry(kind, raw, readSource, context = {}) {
           quoteField: 'benefitQuote',
           quoteIn: 'entry',
         })[0] ?? null;
-    // ADR 0084 item 8: an Opportunity "must name at least one local site,
+    // DESIGN.md §8: an Opportunity "must name at least one local site,
     // checked like any local evidence". Unlike a finding, zero sites is not a
     // legal Opportunity — it would be a suggestion about nowhere.
     if (!problem) problem = localProblem(raw, readSource, { required: true });
-    // ADR 0084 item 8: "adoptable at the Baseline, or by the Horizon with its
+    // DESIGN.md §8: "adoptable at the Baseline, or by the Horizon with its
     // minimum version stated". A minVersion the Baseline already satisfies
     // needs nothing further; one above it is only legal when a Horizon was
     // named and reaches at least that far.
@@ -548,15 +550,19 @@ function validateEntry(kind, raw, readSource, context = {}) {
               (context.horizon
                 ? ` and above the Horizon ${context.horizon}`
                 : ', and this Ecosystem names no Horizon') +
-              ' (ADR 0084 item 8)',
+              ' (DESIGN.md §8)',
           ];
       }
     }
   } else {
-    problem = enumProblem(raw.owner, INCIDENTAL_OWNERS, 'owner');
+    problem = enumProblem(
+      raw.owner,
+      context.incidentalOwners ?? DEFAULT_INCIDENTAL_OWNERS,
+      'owner',
+    );
     if (!problem && !isText(raw.summary))
       problem = ['malformed', 'summary is absent or empty'];
-    // ADR 0084 item 7: an Incidental Observation is "not a finding ... and
+    // DESIGN.md §7: an Incidental Observation is "not a finding ... and
     // never enters the brief's proposed plan". `disposition` is an Upstream
     // Finding field; carrying one here would let an incidental slip into the
     // plan the same way a Finding does.
@@ -564,14 +570,14 @@ function validateEntry(kind, raw, readSource, context = {}) {
       problem = [
         'malformed',
         'an Incidental Observation cannot carry a disposition — it is not ' +
-          "an Upstream Finding and never enters the brief's plan (ADR 0084 item 7)",
+          "an Upstream Finding and never enters the brief's plan (DESIGN.md §7)",
       ];
     if (!problem) problem = localProblem(raw, readSource, { required: false });
   }
 
   if (problem) return fail(problem[0], problem[1]);
 
-  // ADR 0084 item 5, applied only once everything else about the finding
+  // DESIGN.md §5, applied only once everything else about the finding
   // already holds: `broken-now` without `executed` Evidence is downgraded,
   // not rejected — the claim may still be right, only the strongest urgency
   // needs proof citation or reasoning alone cannot supply.
@@ -591,7 +597,7 @@ function validateEntry(kind, raw, readSource, context = {}) {
           downgradeReason:
             'broken-now requires executed Evidence (a command and its exit ' +
             'code); without it the finding is downgraded rather than trusted ' +
-            'at face value (ADR 0084 item 5)',
+            'at face value (DESIGN.md §5)',
         },
       };
   }
@@ -635,13 +641,13 @@ function envelopeProblems(raw) {
     problems.push(
       `commit: expected a git SHA, found ${JSON.stringify(raw.commit)}. ` +
         'Local evidence is checked at this commit, so a report without one is ' +
-        'a set of claims nothing can compare to anything (ADR 0084 item 3).',
+        'a set of claims nothing can compare to anything (DESIGN.md §3).',
     );
   if (!isTextArray(raw.scanned))
     problems.push(
       'scanned: expected an array of the paths or globs this run read. ' +
         '"none in scanned files" named no scanned files in every brief written ' +
-        'before ADR 0084, which is what made coverage unauditable.',
+        'in the early briefs, which is what made coverage unauditable.',
     );
   if (!Array.isArray(raw.failedHops))
     problems.push('failedHops: expected an array');
@@ -687,7 +693,7 @@ function envelopeProblems(raw) {
         problems.push(
           `${at}.members: expected a non-empty array of package names`,
         );
-      // ADR 0084 item 1. The Baseline is the version actually installed; a
+      // DESIGN.md §1. The Baseline is the version actually installed; a
       // report that cannot say what it was anchored to is anchored to nothing.
       if (!isText(eco.baseline))
         problems.push(`${at}.baseline: absent or empty`);
@@ -711,16 +717,20 @@ function envelopeProblems(raw) {
  * Validate a report as a worker wrote it and return the normalized report.
  *
  * @param {unknown} raw the input report
- * @param {{readSource: (file: string) => string|null|undefined}} options
+ * @param {{readSource: (file: string) => string|null|undefined, incidentalOwners?: readonly string[]}} options
  *   `readSource` returns a file's contents at the report's recorded commit.
- *   It is required rather than defaulted: a default that returned `null`
+ *   `incidentalOwners` is the adapter's `incidental_owners`; absent, the
+ *   default applies. `readSource` is required rather than defaulted: a default that returned `null`
  *   would report every citation as `file-not-found`, which reads as the
  *   worker inventing files when in fact nobody supplied a reader.
  * @throws {UpstreamReportRejected} when the envelope is not a report
  * @returns the normalized report: envelope, surviving entries, `unverified`,
  *   and `counts`
  */
-export function normalizeUpstreamReport(raw, { readSource } = {}) {
+export function normalizeUpstreamReport(
+  raw,
+  { readSource, incidentalOwners } = {},
+) {
   if (typeof readSource !== 'function')
     throw new TypeError(
       'normalizeUpstreamReport needs a readSource(file) reader for the recorded commit',
@@ -732,19 +742,23 @@ export function normalizeUpstreamReport(raw, { readSource } = {}) {
   const unverified = [];
   // Keyed off the one pinned table rather than a second hand-written list of
   // the same four kinds. A count is a fan-out over ENTRY_KINDS like any other,
-  // and the duplicate map was the shape AGENTS.md names: it would have gone on
-  // compiling while silently counting three of four (ADR 0053).
+  // and a duplicate map is the shape that table exists to prevent: it would have gone on
+  // compiling while silently counting three of four (DESIGN.md, Principles).
   const counts = Object.fromEntries(
     ENTRY_KINDS.map((kind) => [ENTRY_LIST_FIELDS[kind], 0]),
   );
 
   const ecosystems = raw.ecosystems.map((eco, ecoIndex) => {
     const kept = {};
-    const context = { baseline: eco.baseline, horizon: eco.horizon };
+    const context = {
+      baseline: eco.baseline,
+      horizon: eco.horizon,
+      incidentalOwners,
+    };
     for (const kind of ENTRY_KINDS) {
       const field = ENTRY_LIST_FIELDS[kind];
       kept[field] = [];
-      // ADR 0084 item 8: "at most three Upstream Opportunities per
+      // DESIGN.md §8: "at most three Upstream Opportunities per
       // Ecosystem." Counted against what actually survives, in the order the
       // worker wrote them — an Opportunity a citation already refused does
       // not spend one of the three slots, and a report naming five where two
@@ -764,7 +778,7 @@ export function normalizeUpstreamReport(raw, { readSource } = {}) {
                   at,
                   'too-many-opportunities',
                   `an Ecosystem carries at most ${MAX_OPPORTUNITIES_PER_ECOSYSTEM} ` +
-                    `Upstream Opportunities (ADR 0084 item 8); this is the ` +
+                    `Upstream Opportunities (DESIGN.md §8); this is the ` +
                     `${acceptedOpportunities}th that otherwise holds`,
                   entryLabel(kind, verdict.entry),
                 ),
@@ -815,7 +829,7 @@ export function normalizeUpstreamReport(raw, { readSource } = {}) {
 }
 
 /**
- * Re-check a **normalized** report that is already committed (ADR 0084 item 10).
+ * Re-check a **normalized** report that is already committed (DESIGN.md §10).
  *
  * The committed artifact is the validator's output, not the worker's input:
  * it carries the write-time `unverified` list, which is a record of what was
@@ -829,10 +843,14 @@ export function normalizeUpstreamReport(raw, { readSource } = {}) {
  * exactly the drift a Wired Gate exists to catch.
  *
  * @param {unknown} normalized a report read back off disk
- * @param {{readSource: (file: string) => string|null|undefined}} options
+ * @param {{readSource: (file: string) => string|null|undefined, incidentalOwners?: readonly string[]}} options
+ *   the same options `normalizeUpstreamReport` takes
  * @returns {{ok: boolean, problems: string[], report?: object}}
  */
-export function recheckUpstreamReport(normalized, { readSource } = {}) {
+export function recheckUpstreamReport(
+  normalized,
+  { readSource, incidentalOwners } = {},
+) {
   if (!isObject(normalized))
     return { ok: false, problems: ['the report is not an object'] };
   if (!Array.isArray(normalized.unverified) || !isObject(normalized.counts))
@@ -849,7 +867,7 @@ export function recheckUpstreamReport(normalized, { readSource } = {}) {
 
   let fresh;
   try {
-    fresh = normalizeUpstreamReport(input, { readSource });
+    fresh = normalizeUpstreamReport(input, { readSource, incidentalOwners });
   } catch (error) {
     if (!(error instanceof UpstreamReportRejected)) throw error;
     return { ok: false, problems: error.problems };

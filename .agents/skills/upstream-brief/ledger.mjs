@@ -1,6 +1,6 @@
 /**
  * The ledger: what one Upstream Brief run remembers from the last one
- * (ADR 0084 items 11 and 12).
+ * (DESIGN.md §11 and §12).
  *
  * Two kinds of memory live here, and they are the same kind of decision twice:
  *
@@ -31,14 +31,14 @@
  *   version (`16.2.6`), a wildcard tail (`22.x`, `0.80.x`), and a conjunction
  *   of comparators (`>=15.0.0 <17.0.0`). Caret and tilde are deliberately NOT
  *   accepted: `^0.2.3` means `>=0.2.3 <0.3.0` and `^1.2.3` means
- *   `>=1.2.3 <2.0.0`, and this repo's React Native Ecosystem sits on the 0.x
- *   line where that subtlety decides the answer. A range misread in that
+ *   `>=1.2.3 <2.0.0`, and an Ecosystem on a 0.x line (React Native, for
+ *   one) is exactly where that subtlety decides the answer. A range misread in that
  *   direction carries a claim forward that should have been re-researched,
  *   which is the one outcome the ledger exists to prevent — so an unrecognised
  *   spelling is refused by name rather than approximated.
  *
  * WHY THIS FILE IMPORTS ONLY ITS SIBLINGS
- *   The skill is portable (ADR 0018, retained by ADR 0084). Every reader is
+ *   The skill is portable (DESIGN.md, Boundary). Every reader is
  *   injected, exactly as in `report.mjs` and `baseline.mjs`, so this module
  *   touches no filesystem and a caller may drive it from a worktree, a git
  *   object, or a fixture map. `report.test.mjs` asserts that import-freedom
@@ -52,6 +52,7 @@
  *   forward on a quote the validator would refuse.
  */
 
+import { parseAdapterYaml } from './adapter.mjs';
 import {
   collapseWhitespace,
   compareVersions,
@@ -233,7 +234,7 @@ function carryForwardOne(previousEcosystem, current, readCurrent) {
       continue;
     }
 
-    // ADR 0084 item 11 carries a claim forward on its *quoted instruction
+    // DESIGN.md §11 carries a claim forward on its *quoted instruction
     // text* being unchanged. A claim quoting no instruction text has nothing
     // that could be shown unchanged, so it is researched again rather than
     // carried on the range alone — the range says which versions the upstream
@@ -353,7 +354,7 @@ const deltaLine = (lead, finding) =>
  * contract validates and the renderer's Delta section prints, each an array of
  * strings, or `null` when no named Ecosystem had a ledger — a first run has no
  * delta to open with, which is exactly what an absent `delta` key means
- * (ADR 0084 item 11).
+ * (DESIGN.md §11).
  *
  * An Ecosystem with no ledger is left out of all three lists rather than
  * having its findings called new: "new" is a claim about what changed since
@@ -453,7 +454,7 @@ export function selectLatestLedgerReport(reports, lead) {
 // ── Declined Upstream Opportunities ─────────────────────────────────────────
 
 /**
- * The adapter keys one declined entry carries (ADR 0084 item 12), and the
+ * The adapter keys one declined entry carries (DESIGN.md §12), and the
  * field each becomes. Identity is the first three: the Ecosystem, the upstream
  * page, and the local site. `reason` is the one-line why, `baseline_range` is
  * what it was declined at, and `quote` is the upstream statement at the time.
@@ -514,60 +515,29 @@ export function normalizeDeclinedEntry(raw) {
 }
 
 /**
- * `declined_opportunities:` out of a YAML adapter.
- *
- * This repo ships no YAML parser and the schema ADAPTER.md documents is
- * exactly this narrow, so it is matched line-by-line — the same constraint and
- * the same shape as `parseEcosystemsFromConfig` in `resolve-baseline.mjs`:
+ * `declined_opportunities:` out of a YAML adapter, read by the one adapter
+ * reader (`adapter.mjs`). Inside this key a value runs to the end of its line:
+ * a URL carries colons and a reason carries prose, so a `#` is part of the
+ * value (a URL fragment is not a comment). Surrounding quotes are stripped.
  *
  *   declined_opportunities:
  *     - ecosystem: nx
  *       url: https://nx.dev/concepts/inferred-tasks
- *       site: tools/scripts/check-component-hygiene.ts
+ *       site: tools/check-hygiene.ts
  *       reason: tracked for next quarter, not this one
  *       baseline_range: '>=22.0.0 <23.0.0'
  *       quote: 'Inferred tasks keep project configuration in step ...'
- *
- * A value runs to the end of its line: a URL carries colons and a reason
- * carries prose, so nothing is split on a second `:` and a trailing `#` is
- * part of the value (a URL fragment is not a comment). Surrounding quotes are
- * stripped.
  */
 export function parseDeclinedOpportunitiesFromConfig(configText) {
-  const lines = String(configText).split(/\r?\n/);
-  const startIndex = lines.findIndex((line) =>
-    /^declined_opportunities:\s*$/.test(line),
-  );
-  if (startIndex === -1) return [];
-
-  const entries = [];
-  let current = null;
-
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (line.trim() === '' || /^\s*#/.test(line)) continue;
-    if (/^\S/.test(line)) break; // dedent back to a top-level key
-
-    const item = line.match(/^\s*-\s*([A-Za-z_]+):\s*(.*)$/);
-    if (item) {
-      current = {};
-      entries.push(current);
-      current[item[1]] = unquote(item[2]);
-      continue;
-    }
-    if (!current) continue;
-    const field = line.match(/^\s+([A-Za-z_]+):\s*(.*)$/);
-    if (field) current[field[1]] = unquote(field[2]);
-  }
-
-  return entries.map(normalizeDeclinedEntry);
+  const { config } = parseAdapterYaml(String(configText));
+  return Array.isArray(config.declined_opportunities)
+    ? config.declined_opportunities.map(normalizeDeclinedEntry)
+    : [];
 }
-
-const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, '$2');
 
 /**
  * Check every declined entry against the repository it is recorded in
- * (ADR 0084 item 12: "The validator fails an entry whose Ecosystem or path no
+ * (DESIGN.md §12: "The validator fails an entry whose Ecosystem or path no
  * longer exists").
  *
  * A decline is a standing instruction to stay quiet about one place. When that
@@ -607,7 +577,7 @@ export function validateDeclinedOpportunities(
         `absent or empty: ${missing.join(', ')}. An entry records identity ` +
           '(ecosystem, url, site), a one-line reason, the Baseline range it ' +
           'was declined at, and the upstream quote at the time — without the ' +
-          'quote nothing can ever lift the suppression on the axis ADR 0084 ' +
+          'quote nothing can ever lift the suppression on the axis DESIGN.md ' +
           'item 12 names second',
       );
       return;
@@ -652,7 +622,7 @@ const declines = (entry, opportunity, lead) =>
 
 /**
  * Apply the adapter's declined entries to the Opportunities one Ecosystem's
- * run produced (ADR 0084 item 12).
+ * run produced (DESIGN.md §12).
  *
  * Suppressed while **both** hold: the Baseline is still inside the range the
  * decline was made at, and the upstream quote still says what it said. Either

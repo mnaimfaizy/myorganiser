@@ -1,5 +1,5 @@
 /**
- * Contract suite for the ledger (ADR 0084 items 11 and 12).
+ * Contract suite for the ledger (DESIGN.md §11 and §12).
  *
  * What it proves, one acceptance criterion at a time:
  *   - a checked-and-clear claim whose range covers the new Baseline and whose
@@ -327,7 +327,7 @@ test('the delta the ledger computes is the delta the report contract accepts', (
   const normalized = normalizeUpstreamReport(raw, { readSource: currentTree });
   assert.deepEqual(normalized.delta, result.delta);
 
-  // ...and the renderer prints it under the section ADR 0084 item 11 opens with.
+  // ...and the renderer prints it under the section DESIGN.md §11 opens with.
   const brief = renderUpstreamBrief(normalized);
   assert.equal(BRIEF_SECTIONS[0], 'Delta');
   const section = brief.slice(

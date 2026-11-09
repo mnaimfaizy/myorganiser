@@ -1,32 +1,27 @@
 #!/usr/bin/env node
-// Prints the Baseline resolution for this repo's declared Ecosystems (ADR
-// 0084 items 1 and 2), so a developer can see what an Upstream Brief would
-// anchor to before any research hop runs.
+// Prints the Baseline resolution for the declared Ecosystems (DESIGN.md §1
+// and §2), so a developer can see what an Upstream Brief would anchor to
+// before any research hop runs.
 //
-//   node .agents/skills/upstream-brief/resolve-baseline.mjs [--repo <dir>]
+//   node <skill>/resolve-baseline.mjs [--repo <dir>]
 //
-// Reads `ecosystems` and `version_record.path` from `upstream-brief.config.yml`
-// (also `.yaml`/`.json`; see ADAPTER.md). Installed versions come from each
-// installed package's own manifest under node_modules — this repo uses a
-// node-modules linker, so no lockfile parser is introduced. The version
-// record is read only to name a drift note; ADR 0084 item 1 forbids reading
-// it as a source.
+// Reads `ecosystems` and `version_record.path` through the adapter reader
+// (`adapter.mjs`, ADAPTER.md). Installed versions come from the package
+// resolver (`npm-resolver.mjs`). The version record is read only to name a
+// drift note; DESIGN.md §1 forbids reading it as a source.
 //
-// This is not a gate: it asserts nothing and always exits 0. It is a small
-// command, not a Wired Gate, so it stays out of `gates:coverage:check`'s
-// non-recursive scan of `tools/scripts/` and needs no optout entry there.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+// It asserts nothing about the Ecosystems and exits 0. The one exception is
+// an adapter it cannot read: those problems print first, and the command
+// exits 1, because a resolution from a misread adapter is not a resolution.
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { ADAPTER_FILES, parseAdapterYaml, readAdapter } from './adapter.mjs';
 import { findVersionInText, resolveEcosystemBaselines } from './baseline.mjs';
 import { isEntryPoint } from './entry-point.mjs';
+import { resolverFor } from './npm-resolver.mjs';
 
 const LABEL = 'upstream-baseline';
-const CONFIG_PATHS = [
-  'upstream-brief.config.yml',
-  'upstream-brief.config.yaml',
-  'upstream-brief.config.json',
-];
 /** ADAPTER.md's default: compare against package.json when nothing is configured. */
 export const DEFAULT_VERSION_RECORD_PATH = 'package.json';
 
@@ -35,169 +30,74 @@ function readRepoFile(repo, path) {
   return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
 }
 
-function splitFlowList(inner) {
-  return inner
-    .split(',')
-    .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
-    .filter(Boolean);
-}
+/** The adapter's `ecosystems`, in the shape `baseline.mjs` takes. */
+const toEcosystems = (config) =>
+  (Array.isArray(config.ecosystems) ? config.ecosystems : [])
+    .filter((eco) => typeof eco?.lead === 'string' && eco.lead.trim())
+    .map((eco) => {
+      const ecosystem = { lead: eco.lead.trim() };
+      if (Array.isArray(eco.members?.add))
+        ecosystem.addMembers = eco.members.add;
+      if (Array.isArray(eco.members?.remove))
+        ecosystem.removeMembers = eco.members.remove;
+      return ecosystem;
+    });
+
+const toVersionRecordPath = (config) =>
+  typeof config.version_record?.path === 'string' &&
+  config.version_record.path.trim()
+    ? config.version_record.path.trim()
+    : DEFAULT_VERSION_RECORD_PATH;
 
 /**
- * `ecosystems:` — a list of `{lead, members: {add, remove}}` mappings. This
- * repo has no YAML parser (`resolveBriefDir` in `check-upstream-briefs.ts`
- * faces the same constraint for `brief_dir`), and the schema ADAPTER.md
- * documents is exactly this narrow, so it is matched line-by-line rather
- * than parsed generally:
- *
- *   ecosystems:
- *     - lead: nx
- *     - lead: next
- *       members:
- *         add: [eslint-config-next]
- *         remove: []
+ * `ecosystems:` out of a YAML adapter: a list of `{lead, members: {add,
+ * remove}}` mappings, read by the one adapter reader.
  */
-export function parseEcosystemsFromConfig(text) {
-  const lines = text.split(/\r?\n/);
-  const startIndex = lines.findIndex((line) => /^ecosystems:\s*$/.test(line));
-  if (startIndex === -1) return [];
+export const parseEcosystemsFromConfig = (text) =>
+  toEcosystems(parseAdapterYaml(text).config);
 
-  const ecosystems = [];
-  let current = null;
-  let inMembers = false;
-
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (line.trim() === '' || /^\s*#/.test(line)) continue;
-    if (/^\S/.test(line)) break; // dedent back to a top-level key
-
-    const itemMatch = line.match(/^\s*-\s*lead:\s*(\S+)\s*$/);
-    if (itemMatch) {
-      current = { lead: itemMatch[1] };
-      ecosystems.push(current);
-      inMembers = false;
-      continue;
-    }
-    if (!current) continue;
-    if (/^\s*members:\s*$/.test(line)) {
-      inMembers = true;
-      continue;
-    }
-    if (!inMembers) continue;
-    const addMatch = line.match(/^\s*add:\s*\[([^\]]*)\]\s*$/);
-    if (addMatch) {
-      current.addMembers = splitFlowList(addMatch[1]);
-      continue;
-    }
-    const removeMatch = line.match(/^\s*remove:\s*\[([^\]]*)\]\s*$/);
-    if (removeMatch) current.removeMembers = splitFlowList(removeMatch[1]);
-  }
-  return ecosystems;
-}
-
-/** `version_record.path`, defaulting to `package.json` (ADAPTER.md). */
-export function resolveVersionRecordPath(text) {
-  const lines = text.split(/\r?\n/);
-  const startIndex = lines.findIndex((line) =>
-    /^version_record:\s*$/.test(line),
-  );
-  if (startIndex === -1) return DEFAULT_VERSION_RECORD_PATH;
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    if (/^\S/.test(lines[i])) break;
-    const match = lines[i].match(
-      /^\s+path:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/,
-    );
-    if (match) return match[1];
-  }
-  return DEFAULT_VERSION_RECORD_PATH;
-}
-
-function readAdapterConfig(repo) {
-  for (const path of CONFIG_PATHS) {
-    const text = readRepoFile(repo, path);
-    if (text === null) continue;
-    if (path.endsWith('.json')) {
-      const parsed = JSON.parse(text);
-      const ecosystems = Array.isArray(parsed.ecosystems)
-        ? parsed.ecosystems.map((eco) => ({
-            lead: eco.lead,
-            addMembers: eco.members?.add ?? [],
-            removeMembers: eco.members?.remove ?? [],
-          }))
-        : [];
-      return {
-        ecosystems,
-        versionRecordPath:
-          parsed.version_record?.path ?? DEFAULT_VERSION_RECORD_PATH,
-      };
-    }
-    return {
-      ecosystems: parseEcosystemsFromConfig(text),
-      versionRecordPath: resolveVersionRecordPath(text),
-    };
-  }
-  return { ecosystems: [], versionRecordPath: DEFAULT_VERSION_RECORD_PATH };
-}
-
-function installedVersionIn(repo) {
-  return (name) => {
-    const text = readRepoFile(
-      repo,
-      join('node_modules', ...name.split('/'), 'package.json'),
-    );
-    if (text === null) return null;
-    try {
-      const parsed = JSON.parse(text);
-      return typeof parsed.version === 'string' ? parsed.version : null;
-    } catch {
-      return null;
-    }
-  };
-}
-
-function discoverScopeMembersIn(repo) {
-  return (prefix) => {
-    // scopePrefixFor always returns `@scope/`; the scope directory is
-    // node_modules/@scope.
-    const scope = prefix.replace(/\/$/, '');
-    const dir = join(repo, 'node_modules', scope);
-    if (!existsSync(dir)) return [];
-    return readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => `${scope}/${entry.name}`);
-  };
-}
+/** `version_record.path` out of a YAML adapter, defaulting to `package.json`. */
+export const resolveVersionRecordPath = (text) =>
+  toVersionRecordPath(parseAdapterYaml(text).config);
 
 /**
  * Every declared Ecosystem, resolved against what this repo has installed.
  *
  * Separated from `run` below because the ledger command
- * (`resolve-ledger.mjs`) needs the resolution itself, not a printed line: a
- * carry-forward decision is made against a **new Baseline**, so a second copy
- * of "how this repo finds installed versions" is a second place for the two
- * commands to disagree about what the Baseline is.
+ * (`resolve-ledger.mjs`) and the run suggestion (`suggest-run.mjs`) need the
+ * resolution itself, not a printed line: a carry-forward decision is made
+ * against a **new Baseline**, so a second copy of "how this repo finds
+ * installed versions" is a second place to disagree about what the Baseline is.
  *
  * @param {{repo?: string}} [options]
- * @returns {{results: object[], ecosystems: object[], versionRecordPath: string}}
+ * @returns {{results: object[], ecosystems: object[], versionRecordPath: string, adapterPath: string | null, problems: string[]}}
  */
 export function resolveDeclaredEcosystems({ repo = process.cwd() } = {}) {
-  const { ecosystems, versionRecordPath } = readAdapterConfig(repo);
-  if (ecosystems.length === 0)
-    return { results: [], ecosystems, versionRecordPath };
+  const adapter = readAdapter((path) => readRepoFile(repo, path));
+  const ecosystems = toEcosystems(adapter.config);
+  const versionRecordPath = toVersionRecordPath(adapter.config);
+  const base = {
+    ecosystems,
+    versionRecordPath,
+    adapterPath: adapter.path,
+    problems: adapter.problems,
+  };
+  if (ecosystems.length === 0) return { ...base, results: [] };
 
   const recordText = readRepoFile(repo, versionRecordPath);
   const recordedVersion =
     recordText === null
       ? () => null
       : (name) => findVersionInText(recordText, name);
+  const resolver = resolverFor(repo);
 
   return {
-    ecosystems,
-    versionRecordPath,
+    ...base,
     results: resolveEcosystemBaselines(
       ecosystems,
       {
-        installedVersion: installedVersionIn(repo),
-        discoverScopeMembers: discoverScopeMembersIn(repo),
+        installedVersion: resolver.installedVersion,
+        discoverScopeMembers: resolver.discoverScopeMembers,
         recordedVersion,
       },
       { recordSourceLabel: versionRecordPath },
@@ -205,14 +105,23 @@ export function resolveDeclaredEcosystems({ repo = process.cwd() } = {}) {
   };
 }
 
-export function run({ repo = process.cwd() } = {}) {
-  const { results, ecosystems } = resolveDeclaredEcosystems({ repo });
-  if (ecosystems.length === 0)
-    return [
-      `${LABEL}: no ecosystems declared in ${CONFIG_PATHS[0]} (or .yaml/.json) — nothing to resolve`,
-    ];
+/** The adapter's problems as printable lines; empty when it read cleanly. */
+export const adapterProblemLines = (label, adapterPath, problems) =>
+  problems.map((problem) => `${label}: ${adapterPath}: ${problem}`);
 
-  const lines = [];
+/** The printed lines, and the exit code `main` sets: 1 only for adapter problems. */
+export function runWithStatus({ repo = process.cwd() } = {}) {
+  const { results, ecosystems, adapterPath, problems } =
+    resolveDeclaredEcosystems({ repo });
+  const lines = adapterProblemLines(LABEL, adapterPath, problems);
+  const exitCode = problems.length ? 1 : 0;
+  if (ecosystems.length === 0) {
+    lines.push(
+      `${LABEL}: no ecosystems declared in ${adapterPath ?? `${ADAPTER_FILES[0]} (or .yaml/.json)`} — nothing to resolve`,
+    );
+    return { lines, exitCode };
+  }
+
   for (const result of results) {
     if (!result.ok) {
       lines.push(`${LABEL}: ${result.lead} — FAILED: ${result.reason}`);
@@ -224,14 +133,18 @@ export function run({ repo = process.cwd() } = {}) {
     );
     for (const note of result.driftNotes) lines.push(`  drift: ${note}`);
   }
-  return lines;
+  return { lines, exitCode };
 }
+
+export const run = (options) => runWithStatus(options).lines;
 
 function main(argv) {
   const flagIndex = argv.indexOf('--repo');
   const repo =
     flagIndex === -1 ? process.cwd() : argv[flagIndex + 1] || process.cwd();
-  for (const line of run({ repo })) console.log(line);
+  const { lines, exitCode } = runWithStatus({ repo });
+  for (const line of lines) (exitCode ? console.error : console.log)(line);
+  process.exitCode = exitCode;
 }
 
 if (isEntryPoint(import.meta.url)) main(process.argv.slice(2));

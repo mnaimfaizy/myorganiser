@@ -1,5 +1,5 @@
 /**
- * Contract suite for the ledger command (ADR 0084 items 11 and 12).
+ * Contract suite for the ledger command (DESIGN.md §11 and §12).
  *
  * The judgment is `ledger.mjs`'s and is proved in `ledger.test.mjs`. What is
  * proved here is the wiring: which committed report is read as an Ecosystem's
@@ -240,7 +240,7 @@ test('a declined entry pointing at a file that is gone is reported, and names th
   });
   const output = status(files, { dirs, resolved: [NX] }).lines.join('\n');
   assert.match(output, /declined_opportunities\[0\] .* site-not-found/);
-  assert.match(output, /yarn upstream:briefs:check/);
+  assert.match(output, /check-reports\.mjs/);
 });
 
 test('an adapter with no declined entry says so', () => {

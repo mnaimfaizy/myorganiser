@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Validates a structured Upstream Brief report and renders the Markdown brief.
 //
-//   node .agents/skills/upstream-brief/validate-report.mjs <report.json> \
+//   node <skill>/validate-report.mjs <report.json> \
 //     [--out <normalized.json>] [--render <brief.md>] [--repo <dir>]
 //
-// The skill is portable (ADR 0018, retained by ADR 0084), so this file and the
-// two modules beside it import only Node built-ins and each other. A consuming
-// repo wires it through a thin checker of its own; in this one that is
-// `tools/scripts/check-upstream-briefs.ts`, which exists so the Meta-Gate can
-// see the gate (ADR 0084 item 10).
+// The skill is portable (DESIGN.md, Boundary), so this file imports only Node
+// built-ins and the modules beside it. It validates one report as it is
+// written; `check-reports.mjs` re-validates every committed one (DESIGN.md
+// §10). `--repo` names the repository whose adapter supplies
+// `incidental_owners` and whose history holds the recorded commit.
 //
 // WHAT COMES OUT
 //   `--out` writes the normalized report. That artifact — not the worker's
@@ -19,7 +19,7 @@
 // EXIT CODES
 //   0  the report is a report. It may carry Unverified entries: a finding the
 //      validator refused moves to that list with its reason and the rest of
-//      the report stands (ADR 0084 item 3). That is the whole difference from
+//      the report stands (DESIGN.md §3). That is the whole difference from
 //      the code-review contract, which rejects a report whole because it
 //      computes a verdict one bad finding would corrupt.
 //   1  the report is invalid or unparseable — a bad envelope, a hand-written
@@ -31,11 +31,13 @@
 //      resolve, so without resolving the commit first, a shallow clone would
 //      report every citation in the brief as `file-not-found` — the loudest
 //      possible accusation against a worker that did nothing wrong (the same
-//      separation ADR 0078 forced on the review pipeline).
+//      separation DESIGN.md, Principles, names).
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { readIncidentalOwners } from './adapter.mjs';
 import { isEntryPoint } from './entry-point.mjs';
+import { repoIo } from './repo-io.mjs';
 import { UpstreamReportRejected, normalizeUpstreamReport } from './report.mjs';
 import { renderUpstreamBrief } from './render.mjs';
 
@@ -153,7 +155,10 @@ export function main(
 
   let report;
   try {
-    report = normalizeUpstreamReport(raw, { readSource: source(commit, cwd) });
+    report = normalizeUpstreamReport(raw, {
+      readSource: source(commit, cwd),
+      incidentalOwners: readIncidentalOwners(repoIo(cwd).read),
+    });
   } catch (error) {
     if (!(error instanceof UpstreamReportRejected)) throw error;
     console.error(`${LABEL}: ${reportPath} is not a valid report`);

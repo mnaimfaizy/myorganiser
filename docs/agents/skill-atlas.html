@@ -725,7 +725,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
       "file": ".agents/skills/unit-test-delegation-workflow/SKILL.md",
       "start": "Use `.agents/skills/playwright-e2e-workflow/SKILL.md` for Playwright specs in `apps/web-e2e`."
     },
-    "upstream-brief/SKILL.md:67": {
+    "upstream-brief/SKILL.md:69": {
       "file": ".agents/skills/upstream-brief/SKILL.md",
       "start": "Launch one **research worker per Ecosystem** — not per package. These are Independent Hops and may run in parallel. If the host has a Research specialist, use it as the worker. Otherwise the same agent fetches the pages. A failed hop is recorded; the run continues."
     },
@@ -911,9 +911,9 @@ const AGENTS = {
 };
 const AGENT_NOTE = {
   "Commit": "Two of the three parents match by wording, not delegation: address-pr-review/SKILL.md:49 says \u201cCommit through `corepack yarn ai:commit`\u201d (the verb) and finish-standalone-runs/SKILL.md:125 has a \u201cCommit:\u201d report label. Only commit-change-workflow drafts through the sub-agent. check-skill-map.ts counts them because its AGENT_FALSE_POSITIVES has no entry for either.",
-  "Research": "Conditional \u2014 upstream-brief/SKILL.md:67: \u201cIf the host has a Research specialist, use it as the worker. Otherwise the same agent fetches the pages.\u201d",
-  "Audit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names Audit as the owner a human routes an Incidental Observation to (INCIDENTAL_OWNERS, upstream-brief/report.mjs). Nothing invokes this agent automatically.",
-  "DepAudit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names DepAudit as the owner a human routes an Incidental Observation to (INCIDENTAL_OWNERS, upstream-brief/report.mjs). Nothing invokes this agent automatically.",
+  "Research": "Conditional \u2014 upstream-brief/SKILL.md:69: \u201cIf the host has a Research specialist, use it as the worker. Otherwise the same agent fetches the pages.\u201d",
+  "Audit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names Audit as the owner a human routes an Incidental Observation to (incidental_owners, upstream-brief.config.yml). Nothing invokes this agent automatically.",
+  "DepAudit": "Standing Specialist \u2014 user-invocable, in no pipeline; entered directly, not run as a hop (CONTEXT.md). The dotted edge from upstream-brief is not a delegation: that skill writes a brief and stops, then names DepAudit as the owner a human routes an Incidental Observation to (incidental_owners, upstream-brief.config.yml). Nothing invokes this agent automatically.",
   "Docs": "Standing Specialist \u2014 user-invocable, in no pipeline. Belonging to no chain is its shape, not a defect (CONTEXT.md)."
 };
 

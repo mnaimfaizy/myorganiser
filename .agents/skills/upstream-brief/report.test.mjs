@@ -1,5 +1,5 @@
 /**
- * Contract suite for the structured Upstream Brief report (ADR 0084 item 3).
+ * Contract suite for the structured Upstream Brief report (DESIGN.md §3).
  *
  * What it proves, in the order the ADR states the rules:
  *   - a well-formed report validates and yields a normalized report;
@@ -134,7 +134,7 @@ test("an Opportunity's verbatim quote is benefitQuote, and it is required", () =
   assert.match(report.unverified[0].detail, /benefitQuote/);
 });
 
-test('an Opportunity naming no local site is refused (ADR 0084 item 8)', () => {
+test('an Opportunity naming no local site is refused (DESIGN.md §8)', () => {
   const raw = fixtureReport();
   raw.ecosystems[0].opportunities[0].local = [];
   const report = normalize(raw);
@@ -143,7 +143,7 @@ test('an Opportunity naming no local site is refused (ADR 0084 item 8)', () => {
 });
 
 test('a finding naming no local site is fine — absence is a legal Evidence kind', () => {
-  // `missed-improvement` with `absent` Evidence is the shape ADR 0084 item 3
+  // `missed-improvement` with `absent` Evidence is the shape DESIGN.md §3
   // names: the matching documents were read and do not say it. Requiring a
   // local citation there would make the kind unusable.
   const report = normalize();
@@ -171,7 +171,7 @@ test('an unknown value in a closed vocabulary demotes rather than passing throug
   }
 });
 
-test('an Incidental Observation routes to one of the three declared owners', () => {
+test('an Incidental Observation routes to an owner the adapter declares', () => {
   const raw = fixtureReport();
   raw.ecosystems[1].incidental[0].owner = 'somebody';
   const report = normalize(raw);
@@ -195,9 +195,9 @@ test('a checked-and-clear claim with no holdsFor cannot be carried forward, so i
   assert.match(report.unverified[0].detail, /holdsFor/);
 });
 
-// ── Domain rules (ADR 0084 items 3, 5, 7, 8) ────────────────────────────────
+// ── Domain rules (DESIGN.md §3, §5, §7, §8) ────────────────────────────────
 
-test('a mismatch whose only Evidence is absent is refused, not accepted (ADR 0084 item 3)', () => {
+test('a mismatch whose only Evidence is absent is refused, not accepted (DESIGN.md §3)', () => {
   const raw = fixtureReport();
   raw.ecosystems[0].findings[0].type = 'mismatch';
   raw.ecosystems[0].findings[0].evidence = 'absent';
@@ -245,7 +245,7 @@ for (const [name, mutate] of [
     },
   ],
 ]) {
-  test(`broken-now without executed Evidence is downgraded, not rejected — ${name} (ADR 0084 item 5)`, () => {
+  test(`broken-now without executed Evidence is downgraded, not rejected — ${name} (DESIGN.md §5)`, () => {
     const raw = fixtureReport();
     mutate(raw.ecosystems[0].findings[0]);
     const report = normalize(raw);
@@ -259,7 +259,7 @@ for (const [name, mutate] of [
   });
 }
 
-test('an Ecosystem carries at most three Upstream Opportunities (ADR 0084 item 8)', () => {
+test('an Ecosystem carries at most three Upstream Opportunities (DESIGN.md §8)', () => {
   const raw = fixtureReport();
   const template = raw.ecosystems[0].opportunities[0];
   raw.ecosystems[0].opportunities = Array.from({ length: 5 }, (_, i) => ({
@@ -320,7 +320,7 @@ test('an Opportunity above the Baseline is valid when the Horizon covers it', ()
   assert.equal(report.ecosystems[0].opportunities[0].minVersion, '16.3.0');
 });
 
-test('an Opportunity above the Baseline with no Horizon is refused (ADR 0084 item 8)', () => {
+test('an Opportunity above the Baseline with no Horizon is refused (DESIGN.md §8)', () => {
   const raw = fixtureReport();
   delete raw.ecosystems[0].horizon;
   const report = normalize(raw);
@@ -346,7 +346,7 @@ test('an Opportunity at or below the Baseline needs no Horizon', () => {
   assert.deepEqual(report.unverified, []);
 });
 
-test('an Incidental Observation cannot carry a disposition (ADR 0084 item 7)', () => {
+test('an Incidental Observation cannot carry a disposition (DESIGN.md §7)', () => {
   const raw = fixtureReport();
   raw.ecosystems[1].incidental[0].disposition = 'plan';
   const report = normalize(raw);
@@ -641,7 +641,7 @@ test('a re-check of something that is not a report at all is refused, not thrown
 // ── Portability ─────────────────────────────────────────────────────────────
 
 test('the validator imports nothing beyond Node built-ins and its own siblings', () => {
-  // ADR 0018, retained by ADR 0084: the skill is portable. A dependency here
+  // DESIGN.md, Boundary: the skill is portable. A dependency here
   // would make an Upstream Brief checkable only in a repo that installs it,
   // and "dependency-free" is exactly the kind of claim that rots quietly.
   const files = readdirSync(HERE).filter(
@@ -675,4 +675,16 @@ test('the validator imports nothing beyond Node built-ins and its own siblings',
 test('every urgency has a display title, so no heading can render as undefined', () => {
   for (const urgency of UPSTREAM_URGENCIES)
     assert.equal(typeof URGENCY_TITLES[urgency], 'string');
+});
+
+test('incidentalOwners replaces the default owner list', () => {
+  const raw = fixtureReport();
+  raw.ecosystems[1].incidental[0].owner = 'DepAudit';
+  assert.equal(normalize(raw).unverified[0]?.reason, 'malformed');
+  const report = normalizeUpstreamReport(raw, {
+    readSource: fixtureReader,
+    incidentalOwners: ['DepAudit'],
+  });
+  assert.equal(report.unverified.length, 0);
+  assert.equal(report.ecosystems[1].incidental[0].owner, 'DepAudit');
 });

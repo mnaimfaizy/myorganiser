@@ -9,13 +9,15 @@ argument-hint: 'ecosystem[@horizon] [ecosystem[@horizon] ...]'
 
 A user-invoked audit. The human names Ecosystems and, optionally, a Horizon for each. The run writes one **Upstream Brief**, commits the structured report the brief is rendered from, and proposes a HITL issue when there is something to decide. It bumps no package, applies no instruction edit, and starts no grill.
 
-Load [ADAPTER.md](ADAPTER.md) when resolving the host adapter. Load [REPORT.md](REPORT.md) when writing or validating the structured report. Load [BRIEF.md](BRIEF.md) when naming and committing what the run leaves behind. Load [LEDGER.md](LEDGER.md) when reading the previous run — what carries forward, what the delta says, and which Upstream Opportunities were declined.
+Load [ADAPTER.md](ADAPTER.md) when resolving the host adapter. Load [REPORT.md](REPORT.md) when writing or validating the structured report. Load [BRIEF.md](BRIEF.md) when naming and committing what the run leaves behind. Load [LEDGER.md](LEDGER.md) when reading the previous run — what carries forward, what the delta says, and which Upstream Opportunities were declined. Load [DESIGN.md](DESIGN.md) when a rule needs its reason, or before changing this skill.
+
+`<skill>` in a command below is the folder this file is in, relative to the repository root — `.agents/skills/upstream-brief`, `.claude/skills/upstream-brief`, or wherever the host installed it. Every command runs from the repository root.
 
 ## Guardrails
 
 - Write the report and the brief. Leave instruction files, Skills, hygiene scripts, adapter config, and application code unchanged. The brief proposes; a human applies.
 - **Every finding needs an upstream statement.** Primary sources only: official documentation, vendor release notes, or a spec. Documentation a package ships for its own version outranks the same vendor's website. The training corpus, blogs, and installed third-party skills are not sources.
-- A local defect no upstream statement grounds is an **Incidental Observation**: recorded with an owner, never counted as a finding, never in the plan.
+- A local defect no upstream statement grounds is an **Incidental Observation**: recorded with an owner from the adapter's `incidental_owners`, never counted as a finding, never in the plan.
 - **The proposed plan may touch exactly five things:** Instruction Files, Skills, hygiene and test scripts, the definition behind a command an instruction teaches, and the adapter config. An upstream-grounded finding about anything else — application code, an installed third-party skill — is **follow-on**. Never edit an installed third-party skill; propose a pin or a refresh instead.
 - No package bumps. A version record disagreeing with a Baseline is a preflight note for the host's dependency-sync owner, never a plan item.
 - File an issue only after the human confirms. Omit `ready-for-agent` and any dependencies role.
@@ -30,13 +32,13 @@ Require one or more Ecosystem names, each optionally followed by a Horizon (exam
 
 ### 2. Resolve the adapter
 
-Read `upstream-brief.config.yml` (also `.yaml` / `.json`) from the repo root. Missing keys take the defaults in [ADAPTER.md](ADAPTER.md). A missing file is not an error.
+Read `upstream-brief.config.yml` (also `.yaml` / `.json`) from the repo root. Missing keys take the defaults in [ADAPTER.md](ADAPTER.md). A missing file is not an error. An adapter the reader reports **problems** in is: `resolve-baseline.mjs` prints each one with its line and exits 1. Show them to the human and stop — a run over a misread adapter audits the wrong files or forgets what was declined.
 
-**Done when:** the Ecosystem declarations, the version-record path, declined Upstream Opportunities, instruction globs, brief directory, optional source/script globs, and optional issue map are known.
+**Done when:** the adapter reads with no problems, and the Ecosystem declarations, the version-record path, declined Upstream Opportunities, instruction globs, brief directory, incidental owners, optional source/script globs, and optional issue map are known.
 
 ### 3. Resolve the Baselines and confirm membership
 
-Run the Baseline resolver (`.agents/skills/upstream-brief/resolve-baseline.mjs`, built on the dependency-free `baseline.mjs`) for each named Ecosystem: its lead's installed version is the Baseline, and its members are what the lead's scope prefix discovers, extended or trimmed by the adapter's declaration. An Ecosystem whose lead is not installed is a **failed hop** — record it with its reason and continue with the rest. Never invent a Baseline, and never read one from the version record or a declared range.
+Run the Baseline resolver (`<skill>/resolve-baseline.mjs`, built on the dependency-free `baseline.mjs`) for each named Ecosystem: its lead's installed version is the Baseline, and its members are what the lead's scope prefix discovers, extended or trimmed by the adapter's declaration. An Ecosystem whose lead is not installed is a **failed hop** — record it with its reason and continue with the rest. Never invent a Baseline, and never read one from the version record or a declared range.
 
 Then **ask once**, in a single question covering every Ecosystem: print each lead, its Baseline, its Horizon, its member list, and any drift notes, and have the human confirm or trim the membership before research starts. Research the membership the human confirms.
 
@@ -46,7 +48,7 @@ A correction belongs in the adapter's `members.add` / `members.remove` so the ne
 
 ### 4. Read the ledger
 
-For each resolved Ecosystem, the latest structured report committed in the brief directory that carries it is its ledger. Run `node .agents/skills/upstream-brief/resolve-ledger.mjs` to see, per Ecosystem: which checked-and-clear claims carry forward to the new Baseline, which go back on the research list and why, and which declined Upstream Opportunities are still suppressed. [LEDGER.md](LEDGER.md) is the rule for all three.
+For each resolved Ecosystem, the latest structured report committed in the brief directory that carries it is its ledger. Run `node <skill>/resolve-ledger.mjs` to see, per Ecosystem: which checked-and-clear claims carry forward to the new Baseline, which go back on the research list and why, and which declined Upstream Opportunities are still suppressed. [LEDGER.md](LEDGER.md) is the rule for all three.
 
 A carried-forward claim is **not researched again** — it is written into this run's report as checked and clear, with the citations it already carried. An Ecosystem with no ledger researches everything and its report carries no `delta`. Frozen briefs are read, never edited.
 
@@ -92,7 +94,7 @@ Hand each worker its Ecosystem's lead, members, Baseline, Horizon, the loaded in
 
 **Upstream Opportunities.** At most three per Ecosystem, strongest first. Each is a technique the upstream documents or an alternative the upstream itself names, at a place where nothing is wrong today. Each must be adoptable at the Baseline — or by the Horizon, with its `minVersion` stated — must name at least one local site as a checked citation, and must state its benefit as the upstream's own quoted sentence, never an estimate. Do not propose one the ledger reports as suppressed; do propose a resurfaced one, with the reason it came back.
 
-**Zero is a legal answer, and the run says what it considered.** The report has no field for a candidate that was weighed and dropped, so it goes in `scanned` — the list of what the run read — as one entry per candidate, naming the Ecosystem, the page, and in one clause why nothing was proposed from it: `nx — https://nx.dev/… — already adopted at tools/scripts/check-component-hygiene.ts`. An empty Opportunities section beside a `scanned` list that names no candidate reads as a run that never looked.
+**Zero is a legal answer, and the run says what it considered.** The report has no field for a candidate that was weighed and dropped, so it goes in `scanned` — the list of what the run read — as one entry per candidate, naming the Ecosystem, the page, and in one clause why nothing was proposed from it: `nx — https://nx.dev/… — already adopted at scripts/check-hygiene.ts`. An empty Opportunities section beside a `scanned` list that names no candidate reads as a run that never looked.
 
 **Done when:** every resolved Ecosystem has a report entry or a failure note.
 
@@ -115,7 +117,7 @@ Write the report as JSON. For every Ecosystem that had a ledger, set the report'
 ```bash
 node --input-type=module -e "
 import { readFileSync } from 'node:fs';
-import { classifyFindings } from './.agents/skills/upstream-brief/ledger.mjs';
+import { classifyFindings } from './<skill>/ledger.mjs';
 const [draft, ledger] = process.argv.slice(1).map((p) => JSON.parse(readFileSync(p, 'utf8')));
 console.log(JSON.stringify(classifyFindings({ previous: ledger, ecosystems: draft.ecosystems }), null, 2));
 " <draft-report.json> <the ledger report step 4 named>
@@ -124,7 +126,7 @@ console.log(JSON.stringify(classifyFindings({ previous: ledger, ecosystems: draf
 It returns `{newFindings, resolved, stillPresent}` to assign to `delta`, or `null` when no named Ecosystem had a ledger — `null` means **omit the key**, which is what a first run's absent delta means. Then run the validator, which validates before it renders:
 
 ```bash
-node .agents/skills/upstream-brief/validate-report.mjs <report.json> \
+node <skill>/validate-report.mjs <report.json> \
   --out <normalized.json> --render <brief.md>
 ```
 

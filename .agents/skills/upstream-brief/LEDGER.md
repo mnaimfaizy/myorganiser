@@ -3,21 +3,21 @@
 The latest committed structured report for an Ecosystem is its **ledger**. A new run reads it
 before any research hop spends a token: a checked-and-clear Instruction Claim that still holds is
 carried forward, everything else is researched again, and the brief opens with a delta
-([ADR 0084](../../../docs/adr/0084-an-upstream-brief-is-anchored-to-what-is-installed-and-accepted-on-checked-evidence.md)
+([DESIGN.md](DESIGN.md)
 item 11). The same file also owns declined Upstream Opportunities (item 12), because both are the
 same thing — one run's decision, read by the next.
 
-| File                 | What it is                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `ledger.mjs`         | The decisions. Carry-forward, finding classification, declined Opportunities.          |
-| `resolve-ledger.mjs` | The command: what this repo's Ecosystems would carry forward, and what they would not. |
+| File                 | What it is                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `ledger.mjs`         | The decisions. Carry-forward, finding classification, declined Opportunities.         |
+| `resolve-ledger.mjs` | The command: what the host's Ecosystems would carry forward, and what they would not. |
 
 ```bash
-node .agents/skills/upstream-brief/resolve-ledger.mjs
+node <skill>/resolve-ledger.mjs
 ```
 
-It asserts nothing and always exits 0. The gate is `tools/scripts/check-upstream-briefs.ts`,
-which fails on a declined entry whose Ecosystem or path is gone.
+It asserts nothing about the ledger and exits 0, or 1 when the adapter cannot be read. The gate
+is `check-reports.mjs`, which fails on a declined entry whose Ecosystem or path is gone.
 
 ## Carry-forward
 

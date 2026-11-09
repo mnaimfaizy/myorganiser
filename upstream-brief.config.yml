@@ -22,9 +22,14 @@ ecosystems:
 # or the upstream quote changes. Nothing has been declined yet; the shape is
 # `{ecosystem, url, site, reason, baseline_range, quote}` (see ADAPTER.md), and
 # `yarn upstream:briefs:check` fails an entry whose Ecosystem or site is gone.
-# Written as a bare key rather than `[]`: the adapter reader matches the header
-# line exactly, so an entry added under a `[]` spelling would be read by nobody.
+# The adapter reader accepts `[]` too, and names any entry written under it as
+# a problem rather than reading past it.
 declined_opportunities:
+
+# Who an Incidental Observation may be routed to (ADR 0084 item 7). The skill's
+# default is only `ad-hoc-issue`; this repository also has the Audit and
+# DepAudit sub-agents.
+incidental_owners: [DepAudit, Audit, ad-hoc-issue]
 
 instruction_globs:
   - '**/AGENTS.md'
