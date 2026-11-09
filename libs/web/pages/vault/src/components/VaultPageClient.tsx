@@ -11,6 +11,7 @@ import type { CloudBackupSummary } from './CloudBackupLiveCard';
 import { EscapeCopyReaderCard } from './EscapeCopyReaderCard';
 import { ExportVaultCard } from './ExportVaultCard';
 import { ImportVaultCard } from './ImportVaultCard';
+import { PasskeyUnlockCard } from './PasskeyUnlockCard';
 import { RecoveryKeyRotationCard } from './RecoveryKeyRotationCard';
 import { RemoveVaultCard } from './RemoveVaultCard';
 import { VaultEscapeCopySection } from './VaultEscapeCopySection';
@@ -85,12 +86,14 @@ export function VaultPageClient() {
               Access
             </h2>
             <p className="text-body text-foreground-supporting">
-              What opens your vault. Both open a dialog with the full steps.
+              What opens your vault. Each opens a dialog with the full steps.
+              Passkey Unlock is set up separately on each device.
             </p>
           </div>
           <div className={SECTION_GRID_CLASS}>
             <ChangePassphraseCard />
             <RecoveryKeyRotationCard />
+            <PasskeyUnlockCard />
           </div>
         </section>
 

@@ -24,6 +24,7 @@ import {
 } from './crypto';
 import {
   readPasskeyUnlockOffered,
+  removePasskeyUnlockRecord,
   readPasskeyUnlockRecord,
   writePasskeyUnlockOffered,
   writePasskeyUnlockRecord,
@@ -119,6 +120,20 @@ function hasUsablePrfOutput(output: Uint8Array | null): output is Uint8Array {
 /** Whether `owner` holds a valid passkey wrapping record on this device. */
 export function isPasskeyUnlockEnrolled(owner: string): boolean {
   return readPasskeyUnlockRecord(owner) !== undefined;
+}
+
+/**
+ * Turn Passkey Unlock off for `owner` on this device: delete the wrapping
+ * record. The offer record stays, so turning it off never re-triggers the
+ * one-time offer. Returns false when storage refused the removal.
+ */
+export function disablePasskeyUnlock(owner: string): boolean {
+  try {
+    removePasskeyUnlockRecord(owner);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

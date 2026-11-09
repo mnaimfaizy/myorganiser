@@ -23,6 +23,7 @@ import { VAULT_OPERATIONS } from '../policy';
 import { ROTATION_DESCRIPTION } from './RecoveryKeyRotationCard';
 import { REMOVE_VAULT_DESCRIPTION } from './RemoveVaultCard';
 import { RemoveVaultDialog } from './RemoveVaultDialog';
+import { VaultPhonePasskeyRow } from './VaultPhonePasskeyRow';
 
 const ACCESS_HEADING_ID = 'vault-phone-access-heading';
 const BACKUPS_HEADING_ID = 'vault-phone-backups-heading';
@@ -133,6 +134,7 @@ export function VaultPhoneSections() {
               reason={rotation.unavailableReason}
             />
           )}
+          <VaultPhonePasskeyRow />
         </ListGroup>
       </section>
 

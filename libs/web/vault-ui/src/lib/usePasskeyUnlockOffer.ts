@@ -25,13 +25,14 @@ const PASSKEY_UNLOCK_OFFERED_AFTER = {
   passkey: false,
 } as const satisfies Record<VaultUnlockSecret, boolean>;
 
-type EnrolmentToast = {
+export type EnrolmentToast = {
   title: string;
   description: string;
   variant?: 'destructive';
 };
 
-const ENROLMENT_TOAST = {
+/** The toast each enrolment outcome ends in; shared by the offer and the Vault page card. */
+export const ENROLMENT_TOAST = {
   enrolled: {
     title: 'Passkey Unlock is on',
     description:

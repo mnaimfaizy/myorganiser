@@ -32,6 +32,7 @@ export {
   PASSKEY_PRF_OUTPUT_LENGTH,
   PASSKEY_USER_VERIFICATION,
   canOfferPasskeyUnlock,
+  disablePasskeyUnlock,
   enrolPasskeyUnlock,
   isPasskeyUnlockEnrolled,
   recordPasskeyUnlockOffered,

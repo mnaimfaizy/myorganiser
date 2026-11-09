@@ -135,9 +135,23 @@ jest.mock('./CloudBackupLiveCard', () => ({
 
 import { VaultPageClient } from './VaultPageClient';
 import { useIsMobile } from '@myorganiser/web-ui';
-import { useVaultLockState } from '@myorganiser/web-vault-ui';
+import {
+  PasskeyPlatformProvider,
+  useVaultLockState,
+} from '@myorganiser/web-vault-ui';
+import type { PasskeyPlatform } from '@myorganiser/web-vault';
 import { useGoogleIdentityScript } from '../hooks';
 import { useVaultDisabledState } from '../hooks/useVaultDisabledState';
+
+/** A platform that says whether this browser can create passkeys. */
+function platformWith(canCreate: boolean): PasskeyPlatform {
+  return {
+    canCreatePasskeys: async () => canCreate,
+    createCredential: jest.fn(),
+    getAssertion: jest.fn(),
+    abandonCredential: jest.fn(),
+  } as unknown as PasskeyPlatform;
+}
 
 /** The lock state each disabled state implies: a session that is null is 'no-session'. */
 const LOCK_STATE_FOR: Record<string, string> = {
@@ -547,6 +561,40 @@ describe('VaultPageClient', () => {
       expect(
         screen.getByTestId('escape-copy-reader-just-made'),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('Passkey Unlock by layout', () => {
+    test('the desktop layout shows the Passkey Unlock card, not the phone row', async () => {
+      render(
+        <PasskeyPlatformProvider platform={platformWith(true)}>
+          <VaultPageClient />
+        </PasskeyPlatformProvider>,
+      );
+
+      expect(
+        await screen.findByTestId('passkey-unlock-card'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('passkey-unlock-row'),
+      ).not.toBeInTheDocument();
+    });
+
+    test('the phone layout shows the Passkey Unlock row, not the desktop card', async () => {
+      (useIsMobile as jest.Mock).mockReturnValue(true);
+      setDisabledState('enabled');
+      render(
+        <PasskeyPlatformProvider platform={platformWith(true)}>
+          <VaultPageClient />
+        </PasskeyPlatformProvider>,
+      );
+
+      expect(
+        await screen.findByTestId('passkey-unlock-row'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('passkey-unlock-card'),
+      ).not.toBeInTheDocument();
     });
   });
 });

@@ -19,6 +19,10 @@ import {
   useIsMobile,
 } from '@myorganiser/web-ui';
 import { currentPassphraseSchema } from '@myorganiser/web-vault';
+import {
+  PasskeyUnlockOption,
+  usePasskeyUnlock,
+} from '@myorganiser/web-vault-ui';
 
 import { useVaultUnlock, useVaultDisabledState } from '../hooks';
 
@@ -31,8 +35,17 @@ type VaultUnlockInput = z.infer<typeof vaultUnlockSchema>;
 /** The locked hero: the one place the vault is unlocked, shown above the Access cards. */
 export function VaultUnlockCard() {
   const { unlocking, unlock } = useVaultUnlock();
+  const {
+    available: passkeyAvailable,
+    unlocking: passkeyUnlocking,
+    unlock: unlockWithPasskey,
+  } = usePasskeyUnlock();
   const disabledState = useVaultDisabledState();
   const isMobile = useIsMobile();
+
+  const handlePasskeyUnlock = useCallback(() => {
+    void unlockWithPasskey();
+  }, [unlockWithPasskey]);
 
   const form = useForm<VaultUnlockInput>({
     resolver: zodResolver(vaultUnlockSchema),
@@ -76,6 +89,15 @@ export function VaultUnlockCard() {
           Enter your passphrase to unlock your vault on this device for this
           session.
         </p>
+        {passkeyAvailable ? (
+          <div className="col-span-2">
+            <PasskeyUnlockOption
+              unlocking={passkeyUnlocking}
+              onUnlock={handlePasskeyUnlock}
+              dividerClassName="text-navy-muted-foreground"
+            />
+          </div>
+        ) : null}
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}

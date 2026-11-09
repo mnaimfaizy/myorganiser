@@ -11,6 +11,7 @@
 
 import {
   canOfferPasskeyUnlock,
+  disablePasskeyUnlock,
   enrolPasskeyUnlock,
   isPasskeyUnlockEnrolled,
   recordPasskeyUnlockOffered,
@@ -421,5 +422,21 @@ describe('passkeyUnlock — Passkey Unlock policy over a fake authenticator', ()
         canOfferPasskeyUnlock({ owner: OWNER_A, platform: authenticator }),
       ).resolves.toBe(true);
     });
+  });
+});
+
+describe('disablePasskeyUnlock', () => {
+  test('deletes only this owner’s record and keeps the answered offer', async () => {
+    await enrol(OWNER_A, authenticator);
+    await enrol(OWNER_B, authenticator);
+    recordPasskeyUnlockOffered(OWNER_A);
+
+    expect(disablePasskeyUnlock(OWNER_A)).toBe(true);
+
+    expect(isPasskeyUnlockEnrolled(OWNER_A)).toBe(false);
+    expect(isPasskeyUnlockEnrolled(OWNER_B)).toBe(true);
+    await expect(
+      canOfferPasskeyUnlock({ owner: OWNER_A, platform: authenticator }),
+    ).resolves.toBe(false);
   });
 });

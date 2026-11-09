@@ -72,6 +72,14 @@ jest.mock('@myorganiser/web-ui', () => {
     return <input type={type} disabled={disabled} id={id} {...props} />;
   }
 
+  function Separator(props: any) {
+    return <hr {...props} />;
+  }
+
+  function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ');
+  }
+
   return {
     Button,
     Form,
@@ -83,6 +91,8 @@ jest.mock('@myorganiser/web-ui', () => {
     FormMessage,
     Illustration,
     Input,
+    Separator,
+    cn,
     useIsMobile: jest.fn(),
     useToast: jest.fn(),
   };
@@ -90,7 +100,19 @@ jest.mock('@myorganiser/web-ui', () => {
 
 import { VaultUnlockCard } from './VaultUnlockCard';
 import { useVaultUnlock, useVaultDisabledState } from '../hooks';
-import { useIsMobile } from '@myorganiser/web-ui';
+import { useIsMobile, useToast } from '@myorganiser/web-ui';
+import {
+  enrolPasskeyUnlock,
+  type PasskeyAssertionRequest,
+  type PasskeyCreationRequest,
+  type PasskeyPlatform,
+  type VaultHandle,
+} from '@myorganiser/web-vault';
+import {
+  PasskeyPlatformProvider,
+  VaultSessionContext,
+  type VaultSessionContextValue,
+} from '@myorganiser/web-vault-ui';
 
 // === Mock helpers ===
 
@@ -104,6 +126,7 @@ describe('VaultUnlockCard', () => {
 
     // Default mocks
     (useIsMobile as jest.Mock).mockReturnValue(false);
+    (useToast as jest.Mock).mockReturnValue({ toast: jest.fn() });
     (useVaultDisabledState as jest.Mock).mockReturnValue('locked');
     (useVaultUnlock as jest.Mock).mockReturnValue({
       unlocking: false,
@@ -373,6 +396,117 @@ describe('VaultUnlockCard', () => {
       await waitFor(() => {
         expect(passphraseInput!.value).toBe('');
       });
+    });
+  });
+
+  describe('Passkey option (ADR 0136)', () => {
+    const CREDENTIAL_ID = new Uint8Array(16).fill(7);
+    const MASTER_KEY = new Uint8Array(32).fill(9);
+
+    /** A deterministic PRF: SHA-256 over the credential id and the salt. */
+    async function fakePrf(
+      credentialId: Uint8Array,
+      salt: Uint8Array,
+    ): Promise<Uint8Array> {
+      const input = new Uint8Array(credentialId.length + salt.length);
+      input.set(credentialId, 0);
+      input.set(salt, credentialId.length);
+      return new Uint8Array(await crypto.subtle.digest('SHA-256', input));
+    }
+
+    function createFakePlatform(): PasskeyPlatform {
+      return {
+        canCreatePasskeys: async () => true,
+        createCredential: async (request: PasskeyCreationRequest) => ({
+          credentialId: CREDENTIAL_ID,
+          prfEnabled: true,
+          prfOutput: await fakePrf(CREDENTIAL_ID, request.prfSalt),
+        }),
+        getAssertion: async (request: PasskeyAssertionRequest) => ({
+          prfOutput: await fakePrf(request.credentialId, request.prfSalt),
+        }),
+        abandonCredential: async () => undefined,
+      };
+    }
+
+    function renderForOwner(
+      owner: string,
+      setMasterKeyBytes: jest.Mock,
+      platform: PasskeyPlatform,
+    ) {
+      const session = {
+        masterKeyBytes: null,
+        setMasterKeyBytes,
+        lock: jest.fn(),
+        handle: { owner, loadVault: () => ({}) } as unknown as VaultHandle,
+      } as unknown as VaultSessionContextValue;
+
+      return render(
+        <VaultSessionContext.Provider value={session}>
+          <PasskeyPlatformProvider platform={platform}>
+            <VaultUnlockCard />
+          </PasskeyPlatformProvider>
+        </VaultSessionContext.Provider>,
+      );
+    }
+
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    test('an owner with no passkey on this device sees no passkey option, and the passphrase form stays', () => {
+      renderForOwner('owner-a', jest.fn(), createFakePlatform());
+
+      expect(
+        screen.queryByRole('button', { name: 'Unlock with passkey' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('vault-unlock-submit')).toBeInTheDocument();
+    });
+
+    test('an owner enrolled on this device sees the passkey option, and the passphrase form stays', async () => {
+      const platform = createFakePlatform();
+      const outcome = await enrolPasskeyUnlock({
+        owner: 'owner-a',
+        masterKeyBytes: MASTER_KEY,
+        userName: 'owner-a@example.com',
+        platform,
+      });
+      expect(outcome).toBe('enrolled');
+
+      renderForOwner('owner-a', jest.fn(), platform);
+
+      expect(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Passphrase')).toBeInTheDocument();
+      expect(screen.getByTestId('vault-unlock-submit')).toBeInTheDocument();
+    });
+
+    test('choosing the passkey option unlocks with the passkey secret and does not run the passphrase unlock', async () => {
+      const platform = createFakePlatform();
+      await enrolPasskeyUnlock({
+        owner: 'owner-a',
+        masterKeyBytes: MASTER_KEY,
+        userName: 'owner-a@example.com',
+        platform,
+      });
+      const mockUnlock = jest.fn().mockResolvedValue('ok');
+      (useVaultUnlock as jest.Mock).mockReturnValue({
+        unlocking: false,
+        unlock: mockUnlock,
+      });
+      const setMasterKeyBytes = jest.fn();
+
+      renderForOwner('owner-a', setMasterKeyBytes, platform);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Unlock with passkey' }),
+      );
+
+      await waitFor(() => {
+        expect(setMasterKeyBytes).toHaveBeenCalledWith(MASTER_KEY, 'passkey');
+      });
+      expect(mockUnlock).not.toHaveBeenCalled();
     });
   });
 });
