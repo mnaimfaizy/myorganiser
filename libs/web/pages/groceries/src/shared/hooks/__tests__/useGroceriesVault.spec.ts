@@ -38,13 +38,21 @@ import type {
   ListLine,
 } from '@myorganiser/vault-core';
 import { randomId } from '@myorganiser/core';
-import { normalizeGroceries, type VaultHandle } from '@myorganiser/web-vault';
+import {
+  normalizeGroceries,
+  VaultWriteContendedError,
+  type VaultHandle,
+} from '@myorganiser/web-vault';
 import { useLocalVaultRevision } from '@myorganiser/web-vault-ui';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useGroceriesVault } from '../useGroceriesVault';
 
 const mockNormalizeGroceries = normalizeGroceries as jest.Mock;
 const mockLoadDecryptedData = jest.fn();
+// The read a save makes before it writes (ADR 0143). Kept apart from
+// mockLoadDecryptedData so the call counts the hook's own reads are asserted by
+// do not include the save's read.
+const mockLoadDecryptedDataWithCiphertext = jest.fn();
 const mockSaveEncryptedData = jest.fn();
 
 /** Shape written by saveGroceriesPayload for assertions. */
@@ -58,12 +66,15 @@ function groceriesEncryptedSave(
       records,
       deletions,
     },
+    // The fake handle holds no ciphertext, so the save is unconditional.
+    expectedCiphertext: null,
   };
 }
 
 describe('useGroceriesVault', () => {
   const handle = {
     loadDecryptedData: mockLoadDecryptedData,
+    loadDecryptedDataWithCiphertext: mockLoadDecryptedDataWithCiphertext,
     saveEncryptedData: mockSaveEncryptedData,
   } as unknown as VaultHandle;
 
@@ -103,6 +114,10 @@ describe('useGroceriesVault', () => {
   /** Wires the vault mocks to resolve with the given payload and renders the hook. */
   async function setup(initialPayload: GroceriesVaultPayload) {
     mockLoadDecryptedData.mockResolvedValue(initialPayload);
+    mockLoadDecryptedDataWithCiphertext.mockResolvedValue({
+      value: initialPayload,
+      ciphertext: null,
+    });
     mockNormalizeGroceries.mockImplementation((raw: unknown) => ({
       value: raw as GroceriesVaultPayload,
       changed: false,
@@ -119,6 +134,10 @@ describe('useGroceriesVault', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     jest.mocked(useLocalVaultRevision).mockReturnValue(0);
+    mockLoadDecryptedDataWithCiphertext.mockResolvedValue({
+      value: null,
+      ciphertext: null,
+    });
   });
 
   it('reports a load failure and stops loading without claiming success', async () => {
@@ -173,8 +192,8 @@ describe('useGroceriesVault', () => {
   describe('convergence reloads', () => {
     /**
      * Holds the first two loads open so the test controls their order. Any later
-     * load (e.g. the read saveGroceriesPayload makes before writing) resolves
-     * straight away with `newerRaw`, so a stale write-back can reach the Vault.
+     * load resolves straight away with `newerRaw`, so a stale write-back can
+     * reach the Vault.
      */
     function holdFirstTwoReads(newerRaw: unknown) {
       const reads: Array<{
@@ -322,22 +341,53 @@ describe('useGroceriesVault', () => {
       );
     });
 
+    it('shows the payload the write-back resolved with, when a contended write-back merged in another writer’s list', async () => {
+      const repairedList = makeList({ id: 'listA', name: 'A' });
+      const otherWritersList = makeList({ id: 'listOther', name: 'Other' });
+      mockLoadDecryptedData.mockResolvedValue(null);
+      mockNormalizeGroceries.mockImplementation(() => ({
+        value: { catalog: [], lists: [repairedList] },
+        changed: true,
+      }));
+      // The write-back's first write finds the Ciphertext moved; the retry lands.
+      let saveCalls = 0;
+      mockSaveEncryptedData.mockImplementation(async () => {
+        saveCalls += 1;
+        if (saveCalls === 1) throw new VaultWriteContendedError('groceries');
+      });
+      mockLoadDecryptedDataWithCiphertext.mockResolvedValue({
+        value: {
+          records: { catalog: [], lists: [otherWritersList] },
+          deletions: {},
+        },
+        ciphertext: { iv: 'iv-stored', ciphertext: 'ct-stored' },
+      });
+
+      const { result } = renderHook(() => useGroceriesVault({ handle }));
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+        expect(result.current.lists.map((list) => list.id).sort()).toEqual([
+          'listA',
+          'listOther',
+        ]);
+      });
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(2);
+    });
+
     /**
-     * Holds every load the effect makes, and answers the read that
-     * saveGroceriesPayload makes before its save (the second load) straight
-     * away. holdFirstTwoReads cannot serve here: it would hold that save read
-     * too, so the save would never start.
+     * Holds every load the effect makes, so the test settles each read itself.
+     * The read a save makes before writing goes through
+     * loadDecryptedDataWithCiphertext, not this one, so it is not held here.
      */
     function holdEffectReads() {
       const effectReads: Array<(value: unknown) => void> = [];
-      mockLoadDecryptedData.mockImplementation(() => {
-        if (mockLoadDecryptedData.mock.calls.length === 2) {
-          return Promise.resolve(null);
-        }
-        return new Promise((resolve) => {
-          effectReads.push(resolve);
-        });
-      });
+      mockLoadDecryptedData.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            effectReads.push(resolve);
+          }),
+      );
       return effectReads;
     }
 
@@ -436,6 +486,91 @@ describe('useGroceriesVault', () => {
       });
       expect(result.current.error).toBeNull();
       expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not apply the write-back of a superseded read once a newer read has applied', async () => {
+      const staleRaw = { stale: true };
+      const staleList = makeList({ id: 'stale', name: 'Stale' });
+      const newerList = makeList({ id: 'newer', name: 'Newer' });
+      const newerRaw = { catalog: [], lists: [newerList] };
+      const effectReads = holdEffectReads();
+      const releaseSave = holdSave();
+      mockNormalizeGroceries.mockImplementation((raw: unknown) =>
+        raw === staleRaw
+          ? { value: { catalog: [], lists: [staleList] }, changed: true }
+          : { value: raw as GroceriesVaultPayload, changed: false },
+      );
+
+      const { result, rerender } = renderHook(() =>
+        useGroceriesVault({ handle }),
+      );
+      await waitFor(() => expect(effectReads).toHaveLength(1));
+      await act(async () => {
+        effectReads[0](staleRaw);
+      });
+      await waitFor(() =>
+        expect(mockSaveEncryptedData).toHaveBeenCalledTimes(1),
+      );
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(effectReads).toHaveLength(2));
+      await act(async () => {
+        effectReads[1](newerRaw);
+      });
+      await waitFor(() => expect(result.current.lists).toEqual([newerList]));
+
+      // The stale write-back finishes last; it must not put its list back.
+      await act(async () => {
+        releaseSave();
+        await new Promise((settle) => setTimeout(settle, 0));
+      });
+      expect(result.current.lists).toEqual([newerList]);
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('contended save', () => {
+    it('shows the merged lists the save resolved with, not the lists it sent', async () => {
+      const listA = makeList({ id: 'listA', name: 'A' });
+      const listB = makeList({ id: 'listB', name: 'B' });
+      const otherWritersList = makeList({ id: 'listOther', name: 'Other' });
+      const storedBlob = { iv: 'iv-stored', ciphertext: 'ct-stored' };
+      const result = await setup({ catalog: [], lists: [listA] });
+
+      // The first write finds the Ciphertext moved; the retry lands on it.
+      let saveCalls = 0;
+      mockSaveEncryptedData.mockImplementation(async () => {
+        saveCalls += 1;
+        if (saveCalls === 1) throw new VaultWriteContendedError('groceries');
+      });
+      mockLoadDecryptedDataWithCiphertext.mockResolvedValue({
+        value: {
+          records: { catalog: [], lists: [otherWritersList] },
+          deletions: {},
+        },
+        ciphertext: storedBlob,
+      });
+
+      await act(async () => {
+        await result.current.persistPayload({
+          catalog: [],
+          lists: [listA, listB],
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.lists.map((list) => list.id).sort()).toEqual([
+          'listA',
+          'listB',
+          'listOther',
+        ]);
+      });
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(2);
+      expect(mockSaveEncryptedData).toHaveBeenLastCalledWith(
+        expect.objectContaining({ expectedCiphertext: storedBlob }),
+      );
+      expect(result.current.error).toBeNull();
     });
   });
 

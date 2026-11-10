@@ -16,6 +16,7 @@ export * from './lib/vault/taskNormalization';
 export {
   VaultLockedError,
   VaultSecretMismatchError,
+  VaultWriteContendedError,
   createVaultHandle,
 } from './lib/vault/vaultHandle';
 export type {

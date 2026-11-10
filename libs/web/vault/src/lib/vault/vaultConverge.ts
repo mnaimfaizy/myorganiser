@@ -46,6 +46,10 @@ import {
 
 import { getHttpStatus } from '../http/getHttpStatus';
 
+import {
+  sameStoredCiphertext,
+  VaultWriteContendedError,
+} from './localVaultAccess';
 import type {
   EncryptedBlob,
   VaultRecordType,
@@ -171,7 +175,7 @@ export type VaultBlobConvergeRefusalReason =
   'different-vault';
 
 /**
- * What convergence did. One of the six things it can do.
+ * What convergence did. One of the seven things it can do.
  *
  * `merged` without an `etag` means the merge is saved locally but the server
  * moved again before the retry landed, so it is still unsent — the next
@@ -181,6 +185,15 @@ export type VaultBlobConvergeRefusalReason =
 export type VaultBlobConvergeOutcome =
   | { kind: 'nothing'; reason: VaultBlobConvergeIdleReason }
   | { kind: 'refused'; reason: VaultBlobConvergeRefusalReason }
+  /**
+   * Convergence was about to take the server's copy, but a local edit
+   * replaced this type's Ciphertext first. Nothing was written and no Sync
+   * Bookmark was recorded. The edit already told the Vault Sync Sink, so the
+   * queue converges the type again, this time on the dirty path
+   * ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md),
+   * decision 6).
+   */
+  | { kind: 'superseded' }
   | { kind: 'sent'; etag: string }
   | { kind: 'took'; etag: string }
   | { kind: 'merged'; etag?: string }
@@ -205,16 +218,13 @@ type ConvergeContext = {
   type: VaultBlobType;
   field: VaultRecordType;
   prompt: VaultBlobConvergePrompt;
-  /** The Local Vault as loaded at entry. Every write below goes back to it. */
-  vault: VaultStorageV1;
+  /**
+   * This type's Ciphertext as loaded at entry — the one every decision below
+   * is made about — or `undefined` when none was stored. A take writes only
+   * while the stored Ciphertext is still this one.
+   */
+  decidedLocal: EncryptedBlob | undefined;
 };
-
-function sameCiphertext(
-  local: EncryptedBlob,
-  remote: EncryptedBlobV1,
-): boolean {
-  return local.iv === remote.iv && local.ciphertext === remote.ciphertext;
-}
 
 function isConflict(error: unknown): boolean {
   return getHttpStatus(error) === 409;
@@ -307,8 +317,15 @@ export async function convergeVaultBlob(options: {
     return { kind: 'refused', reason: 'different-vault' };
   }
 
-  const context: ConvergeContext = { api, handle, type, field, prompt, vault };
   const local = vault.data[field];
+  const context: ConvergeContext = {
+    api,
+    handle,
+    type,
+    field,
+    prompt,
+    decidedLocal: local,
+  };
 
   // Dirtiness is derived by hashing Ciphertext, so it is answerable while the
   // Vault is locked — moving bytes that are already encrypted needs no Master
@@ -316,13 +333,16 @@ export async function convergeVaultBlob(options: {
   if (!(await handle.hasUnsentChanges(field))) {
     const remote = options.remote;
     if (!remote) return { kind: 'nothing', reason: 'in-sync' };
-    if (local && sameCiphertext(local, remote.blob)) {
+    if (local && sameStoredCiphertext(local, remote.blob)) {
       return { kind: 'nothing', reason: 'in-sync' };
     }
     // Nothing local is unsent, so the server's copy supersedes this one
     // without anything being lost. This is the whole of a Vault Pull that
     // does not conflict.
-    return { kind: 'took', etag: await takeRemote(context, remote) };
+    const took = await takeRemote(context, remote);
+    return took === SUPERSEDED
+      ? { kind: 'superseded' }
+      : { kind: 'took', etag: took };
   }
 
   // `hasUnsentChanges` is false when there is no Ciphertext for this type, so
@@ -388,8 +408,23 @@ async function send(
   return etag;
 }
 
+/** What `takeRemote` returns when a local edit got there first. */
+const SUPERSEDED = Symbol('superseded');
+
 /**
- * Adopt the server's Ciphertext for this type. Returns the ETag it holds.
+ * Adopt the server's Ciphertext for this type. Returns the ETag it holds, or
+ * `SUPERSEDED` when it stood down.
+ *
+ * It stands down when this type's local Ciphertext is no longer the one
+ * convergence decided on: a local edit landed during the network awaits, and
+ * taking now would discard it. Then nothing is written and no Sync Bookmark
+ * is recorded. It does not retry; the edit has already told the Vault Sync
+ * Sink, so the queue re-converges the type (ADR 0143, decision 6).
+ *
+ * Otherwise only this type is replaced, on a Local Vault read synchronously
+ * just before the write, so no other type written meanwhile is reverted. It
+ * goes through `saveVault`, which bumps the Local Vault Revision: readers hold
+ * Ciphertext that is no longer stored.
  *
  * The Sync Bookmark advances with it. A bookmark records the Ciphertext this
  * device and the server last agreed on, and after a take they agree on the
@@ -401,9 +436,16 @@ async function send(
 async function takeRemote(
   context: ConvergeContext,
   remote: ServerVaultBlob,
-): Promise<string> {
-  context.vault.data[context.field] = serverEncryptedBlobToLocal(remote.blob);
-  context.handle.saveVault(context.vault);
+): Promise<string | typeof SUPERSEDED> {
+  const vault = context.handle.loadVault();
+  if (
+    !vault ||
+    !sameStoredCiphertext(vault.data[context.field], context.decidedLocal)
+  ) {
+    return SUPERSEDED;
+  }
+  vault.data[context.field] = serverEncryptedBlobToLocal(remote.blob);
+  context.handle.saveVault(vault);
   await context.handle.recordPushSuccess({
     type: context.field,
     etag: remote.etag,
@@ -469,7 +511,23 @@ async function decideConflict(
 
   // Save before sending. The merge is the converged truth whether or not the
   // push lands, and a merge kept only in memory is a merge lost to a refresh.
-  await handle.saveEncryptedData({ type: context.field, value: merged });
+  //
+  // Conditional on the Ciphertext the merge was made from. A local edit that
+  // landed while the server's copy was fetched and decrypted is not in
+  // `merged`, so writing would discard it; stand down instead, exactly as a
+  // take does. The edit re-marked the type, so it is merged again next pass.
+  try {
+    await handle.saveEncryptedData({
+      type: context.field,
+      value: merged,
+      expectedCiphertext: localBlob,
+    });
+  } catch (error) {
+    if (error instanceof VaultWriteContendedError) {
+      return { kind: 'superseded' };
+    }
+    throw error;
+  }
   const mergedBlob = handle.loadVault()?.data[context.field];
   if (!mergedBlob) {
     throw new Error(`Merged Ciphertext for "${context.field}" was not saved`);
@@ -506,12 +564,10 @@ async function askUser(
   if (decision === 'defer') return { kind: 'asked', reason, decision };
 
   if (decision === 'keep-remote') {
-    return {
-      kind: 'asked',
-      reason,
-      decision,
-      etag: await takeRemote(context, remote),
-    };
+    const took = await takeRemote(context, remote);
+    return took === SUPERSEDED
+      ? { kind: 'superseded' }
+      : { kind: 'asked', reason, decision, etag: took };
   }
 
   try {

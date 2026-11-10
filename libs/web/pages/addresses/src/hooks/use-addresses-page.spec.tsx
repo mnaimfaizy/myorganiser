@@ -169,7 +169,13 @@ describe('useAddressesPage', () => {
 
     mockToast.mockReset();
     jest.mocked(saveVaultRecords).mockReset();
-    jest.mocked(saveVaultRecords).mockResolvedValue(undefined);
+    // Resolves what was written: the records given, less any deletion. A
+    // test that needs a contended save overrides this.
+    jest
+      .mocked(saveVaultRecords)
+      .mockImplementation(async (_store, _type, records, deletion) =>
+        records.filter((record) => record.id !== deletion?.deletedId),
+      );
     jest.mocked(normalizeAddresses).mockReset();
     jest.mocked(normalizeAddresses).mockImplementation((raw) => ({
       value: raw as AddressRecord[],
@@ -230,6 +236,26 @@ describe('useAddressesPage', () => {
         );
       });
       expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the records the write-back resolved with, when a contended write-back merged in another writer’s record', async () => {
+      const normalized = [{ ...OTHER }];
+      jest
+        .mocked(normalizeAddresses)
+        .mockReturnValue({ value: normalized, changed: true });
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          HOME,
+        ]);
+
+      const { result } = await renderLoaded([{ legacy: true }]);
+
+      await waitFor(() => {
+        expect(result.current.items).toEqual([OTHER, HOME]);
+      });
+      expect(result.current.loading).toBe(false);
     });
 
     it('reports a decrypt failure with the destructive toast and stops loading', async () => {
@@ -423,6 +449,28 @@ describe('useAddressesPage', () => {
         title: 'Saved',
         description: 'Address saved (encrypted).',
       });
+    });
+
+    it('shows the records the save resolved with, when a contended save merged in another writer’s record', async () => {
+      // The Vault merged a record another device stored meanwhile into the write.
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          OTHER,
+        ]);
+
+      const { result } = await renderLoaded([HOME]);
+
+      await act(async () => {
+        await result.current.addAddress(addressValues({ label: 'Work' }));
+      });
+
+      expect(result.current.items).toEqual([
+        expect.objectContaining({ label: 'Work' }),
+        HOME,
+        OTHER,
+      ]);
     });
 
     it('rejects to the caller, toasts the message, and keeps the items when a save fails', async () => {

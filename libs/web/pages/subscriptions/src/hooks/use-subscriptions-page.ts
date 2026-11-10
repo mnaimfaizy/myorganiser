@@ -127,13 +127,20 @@ export function useSubscriptionsPage(
         // screen nor the Vault. Normalization repairs what *this* read saw, so
         // saving it after a newer read has landed writes the stale records
         // over the newer ones, silently (#1280). What this decides is whether
-        // the save starts: a save already in flight fixes its records half
-        // when it is entered, and nothing here aborts it.
+        // the save starts. A save already in flight is not aborted, but it
+        // writes only over the Ciphertext it read, merging with whatever
+        // moved in instead (ADR 0143).
         if (!isActive) return;
         setItems(normalized.value);
         setLoading(false);
         if (normalized.changed) {
-          await saveVaultRecords(handle, 'subscriptions', normalized.value);
+          const written = await saveVaultRecords(
+            handle,
+            'subscriptions',
+            normalized.value,
+          );
+          // A contended write-back merged in what another writer stored.
+          if (isActive) setItems(written);
         }
       })
       .catch(() => {
@@ -154,13 +161,15 @@ export function useSubscriptionsPage(
   const persist = useCallback(
     async (next: SubscriptionRecord[], deletedId?: string) => {
       try {
-        await saveVaultRecords(
+        const written = await saveVaultRecords(
           handle,
           'subscriptions',
           next,
           deletedId === undefined ? undefined : { deletedId },
         );
-        setItems(next);
+        // What was written, not `next`: a contended save merges in what
+        // another writer stored meanwhile (ADR 0143).
+        setItems(written);
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
         toast({

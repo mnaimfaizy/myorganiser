@@ -50,8 +50,29 @@ class ThrowOnLoadVaultAdapter extends InMemoryTasksVaultAdapter {
 }
 
 class ThrowOnSaveVaultAdapter extends InMemoryTasksVaultAdapter {
-  async saveTasks(_tasks: Task[]): Promise<void> {
+  async saveTasks(_tasks: Task[]): Promise<Task[]> {
     throw new Error('disk full');
+  }
+}
+
+/**
+ * A save that, as a contended production save does, resolves with what was
+ * actually written: this save's tasks plus one another writer stored meanwhile.
+ */
+class MergingOnSaveVaultAdapter extends InMemoryTasksVaultAdapter {
+  private readonly otherWriterTask: Task;
+
+  constructor(
+    otherWriterTask: Task,
+    initial?: ConstructorParameters<typeof InMemoryTasksVaultAdapter>[0],
+  ) {
+    super(initial);
+    this.otherWriterTask = otherWriterTask;
+  }
+
+  async saveTasks(tasks: Task[]): Promise<Task[]> {
+    await super.saveTasks(tasks);
+    return [...tasks, this.otherWriterTask];
   }
 }
 
@@ -245,6 +266,20 @@ describe('task-workflow', () => {
       expect(saveSpy).not.toHaveBeenCalled();
     });
 
+    it('returns the tasks the write-back wrote, when a contended save merged in another writer’s task', async () => {
+      const theirs = makeTask({ id: 'their-1', title: 'Added elsewhere' });
+      const adapter = new MergingOnSaveVaultAdapter(theirs, {
+        tasks: [makeTask({ id: 'urgent', priority: 'urgent' as TaskPriority })],
+      });
+
+      const result = appliedOutcome(await loadTasksFromVault(adapter));
+
+      expect(result.tasks.map((task) => task.id).sort()).toEqual([
+        'their-1',
+        'urgent',
+      ]);
+    });
+
     it('normalises and writes back the stored tasks when isCurrent is true', async () => {
       const adapter = new InMemoryTasksVaultAdapter({
         tasks: [makeTask({ id: 'urgent', priority: 'urgent' as TaskPriority })],
@@ -348,6 +383,35 @@ describe('task-workflow', () => {
         createdAt: FIXED_NOW,
       });
       expect(adapter.getSavedTasks()).toEqual(tasks);
+    });
+
+    it('returns the tasks the save wrote, sorted, when a contended save merged in another writer’s task', async () => {
+      const existing = makeTask({
+        id: 'existing-1',
+        priority: 'low',
+        createdAt: '2024-01-01T00:00:00.000Z',
+      });
+      const theirs = makeTask({
+        id: 'their-1',
+        priority: 'low',
+        createdAt: '2024-02-01T00:00:00.000Z',
+      });
+      const adapter = new MergingOnSaveVaultAdapter(theirs, {
+        tasks: [existing],
+      });
+
+      const { tasks, result } = await addTaskToWorkflow(adapter, [existing], {
+        title: 'New task',
+        priority: 'high',
+        status: 'pending',
+      });
+
+      expect(result).toEqual({ ok: true, kind: 'created' });
+      expect(tasks.map((task) => task.id)).toEqual([
+        'generated-id-1',
+        'existing-1',
+        'their-1',
+      ]);
     });
 
     it('returns save_failed but still returns updated tasks optimistically', async () => {

@@ -31,7 +31,11 @@ import {
   type VaultMetaRefusalLifetime,
 } from './vaultMetaRefusal';
 
-export { VaultLockedError, VaultSecretMismatchError } from './localVaultAccess';
+export {
+  VaultLockedError,
+  VaultSecretMismatchError,
+  VaultWriteContendedError,
+} from './localVaultAccess';
 // `NoUnclaimedLocalVaultError` and `LocalVaultAlreadyOwnedError` stay
 // internal: `claimUnclaimedLocalVaultOnEvidence` reads `vaultStatus` before it
 // claims and reports `skipped-nothing-to-claim` / `skipped-already-owned`
@@ -430,11 +434,16 @@ export function createVaultHandle(options: {
       return result;
     },
     loadDecryptedData: access.loadDecryptedData,
+    loadDecryptedDataWithCiphertext: access.loadDecryptedDataWithCiphertext,
     decryptCiphertext: access.decryptCiphertext,
     // The one write that names a Vault Blob Type, so the one the sink hears
     // about. Local first, then the report: the Local Vault is written and this
     // promise is settled by everything the caller can observe before the sink
-    // has done anything at all.
+    // has done anything at all. A contended write throws before the report,
+    // so the sink hears only of Ciphertext that was actually written.
+    //
+    // It does not bump the Local Vault Revision, and a merged save is no
+    // exception: it is an edit, not a replacement (ADR 0143, decision 5).
     async saveEncryptedData(saveOptions) {
       await access.saveEncryptedData(saveOptions);
       reportChange(saveOptions.type);

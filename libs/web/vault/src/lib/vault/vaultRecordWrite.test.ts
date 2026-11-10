@@ -4,6 +4,11 @@ import type {
 } from '@myorganiser/vault-core';
 
 import {
+  sameStoredCiphertext,
+  VaultWriteContendedError,
+} from './localVaultAccess';
+import type { EncryptedBlob, VaultRecordType } from './localVaultStorage';
+import {
   type EditableVaultRecordType,
   type VaultRecordStore,
   deleteVaultRecordAndSave,
@@ -11,16 +16,27 @@ import {
   saveVaultRecords,
 } from './vaultRecordWrite';
 
+/** The Ciphertext a store holds for a type when a save starts reading it. */
+const STORED: EncryptedBlob = { iv: 'iv-stored', ciphertext: 'ct-stored' };
+
+/** The Ciphertext another writer leaves behind between a read and a write. */
+const OTHER: EncryptedBlob = { iv: 'iv-other', ciphertext: 'ct-other' };
+
+/** What `loadDecryptedDataWithCiphertext` answers for a stored value. */
+function holding(value: unknown) {
+  return { value, ciphertext: value === null ? null : STORED };
+}
+
 describe('vaultRecordWrite', () => {
   let store: VaultRecordStore;
-  let loadDecryptedDataMock: jest.Mock;
+  let loadWithCiphertextMock: jest.Mock;
   let saveEncryptedDataMock: jest.Mock;
 
   beforeEach(() => {
-    loadDecryptedDataMock = jest.fn();
+    loadWithCiphertextMock = jest.fn();
     saveEncryptedDataMock = jest.fn().mockResolvedValue(undefined);
     store = {
-      loadDecryptedData: loadDecryptedDataMock,
+      loadDecryptedDataWithCiphertext: loadWithCiphertextMock,
       saveEncryptedData: saveEncryptedDataMock,
     };
   });
@@ -37,11 +53,11 @@ describe('vaultRecordWrite', () => {
         records: [{ id: 'old-task', title: 'Old' }],
         deletions: { 'deleted-task': '2026-01-01T10:00:00.000Z' },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await saveVaultRecords(store, type, records);
 
-      expect(loadDecryptedDataMock).toHaveBeenCalledWith({
+      expect(loadWithCiphertextMock).toHaveBeenCalledWith({
         type,
         defaultValue: null,
       });
@@ -51,6 +67,7 @@ describe('vaultRecordWrite', () => {
           records,
           deletions: { 'deleted-task': '2026-01-01T10:00:00.000Z' },
         },
+        expectedCiphertext: STORED,
       });
     });
 
@@ -61,7 +78,7 @@ describe('vaultRecordWrite', () => {
       ];
 
       const legacyPayload = [{ id: 'old-task', title: 'Old' }];
-      loadDecryptedDataMock.mockResolvedValue(legacyPayload);
+      loadWithCiphertextMock.mockResolvedValue(holding(legacyPayload));
 
       await saveVaultRecords(store, type, records);
 
@@ -71,12 +88,13 @@ describe('vaultRecordWrite', () => {
           records,
           deletions: {},
         },
+        expectedCiphertext: STORED,
       });
     });
 
     test('should save envelope with empty deletions when nothing stored', async () => {
       const records = [{ id: 'task-1', title: 'Task 1' }];
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       await saveVaultRecords(store, type, records);
 
@@ -86,6 +104,7 @@ describe('vaultRecordWrite', () => {
           records,
           deletions: {},
         },
+        expectedCiphertext: null,
       });
     });
 
@@ -101,7 +120,7 @@ describe('vaultRecordWrite', () => {
           d: '', // empty id
         },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await saveVaultRecords(store, type, records);
 
@@ -113,10 +132,10 @@ describe('vaultRecordWrite', () => {
       });
     });
 
-    test('should reject when loadDecryptedData rejects', async () => {
+    test('should reject when loadDecryptedDataWithCiphertext rejects', async () => {
       const records = [{ id: 'task-1', title: 'Task 1' }];
       const error = new Error('Decryption failed');
-      loadDecryptedDataMock.mockRejectedValue(error);
+      loadWithCiphertextMock.mockRejectedValue(error);
 
       await expect(saveVaultRecords(store, type, records)).rejects.toThrow(
         'Decryption failed',
@@ -130,7 +149,7 @@ describe('vaultRecordWrite', () => {
       const records = [record1, record2];
       const deletedAt = '2026-01-15T14:30:00.000Z';
 
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       await saveVaultRecords(store, type, records, {
         deletedId: 'task-1',
@@ -149,7 +168,7 @@ describe('vaultRecordWrite', () => {
       const records = [{ id: 'task-1', title: 'Task 1' }];
       const deletedAt = '2026-01-15T14:30:00.000Z';
 
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       await saveVaultRecords(store, type, records, {
         deletedId: 'task-999',
@@ -173,7 +192,7 @@ describe('vaultRecordWrite', () => {
       const now = new Date('2026-01-15T10:00:00.000Z');
       jest.setSystemTime(now);
 
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       await saveVaultRecords(store, type, records, {
         deletedId: 'task-1',
@@ -197,11 +216,13 @@ describe('vaultRecordWrite', () => {
         { id: 'task-2', title: 'Task 2' },
       ];
       const deletedAt = '2026-01-15T14:30:00.000Z';
-      loadDecryptedDataMock.mockResolvedValue({
-        records: [],
-        deletions: {},
-        futureEnvelopeKey: { schema: 2 },
-      });
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({
+          records: [],
+          deletions: {},
+          futureEnvelopeKey: { schema: 2 },
+        }),
+      );
 
       await saveVaultRecords(store, 'tasks', records, {
         deletedId: 'task-1',
@@ -215,6 +236,7 @@ describe('vaultRecordWrite', () => {
           records: [{ id: 'task-2', title: 'Task 2' }],
           deletions: { 'task-1': deletedAt },
         },
+        expectedCiphertext: STORED,
       });
     });
   });
@@ -228,7 +250,7 @@ describe('vaultRecordWrite', () => {
       const record2 = { id: 'task-2', title: 'Task 2' };
       const records = [record1, record2];
 
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       const remaining = await deleteVaultRecordAndSave(
         store,
@@ -245,6 +267,7 @@ describe('vaultRecordWrite', () => {
           records: [record2],
           deletions: { 'task-1': deletedAt },
         },
+        expectedCiphertext: null,
       });
     });
 
@@ -261,7 +284,7 @@ describe('vaultRecordWrite', () => {
           'task-4': '2026-01-01T11:00:00.000Z',
         },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await deleteVaultRecordAndSave(store, type, records, 'task-1', deletedAt);
 
@@ -284,7 +307,7 @@ describe('vaultRecordWrite', () => {
         records: [],
         deletions: { 'task-1': olderDeletionTime },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await deleteVaultRecordAndSave(
         store,
@@ -309,7 +332,7 @@ describe('vaultRecordWrite', () => {
         records: [],
         deletions: { 'task-1': newerStoredTime },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await deleteVaultRecordAndSave(
         store,
@@ -327,7 +350,7 @@ describe('vaultRecordWrite', () => {
 
     test('should record deletion even when record not in list', async () => {
       const records = [{ id: 'task-1', title: 'Task 1' }];
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       const remaining = await deleteVaultRecordAndSave(
         store,
@@ -344,6 +367,7 @@ describe('vaultRecordWrite', () => {
           records,
           deletions: { 'task-999': deletedAt },
         },
+        expectedCiphertext: null,
       });
     });
 
@@ -353,7 +377,7 @@ describe('vaultRecordWrite', () => {
       const record3 = { id: 'task-3', title: 'Task 3' };
       const records = [record1, record2, record3];
 
-      loadDecryptedDataMock.mockResolvedValue(null);
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
 
       const remaining = await deleteVaultRecordAndSave(
         store,
@@ -368,10 +392,10 @@ describe('vaultRecordWrite', () => {
       expect(remaining[1]).toBe(record3);
     });
 
-    test('should reject when loadDecryptedData rejects', async () => {
+    test('should reject when loadDecryptedDataWithCiphertext rejects', async () => {
       const records = [{ id: 'task-1', title: 'Task 1' }];
       const error = new Error('Decryption failed');
-      loadDecryptedDataMock.mockRejectedValue(error);
+      loadWithCiphertextMock.mockRejectedValue(error);
 
       await expect(
         deleteVaultRecordAndSave(store, type, records, 'task-1', deletedAt),
@@ -396,11 +420,11 @@ describe('vaultRecordWrite', () => {
 
     test('should save envelope with empty deletions when store holds bare legacy payload', async () => {
       const payload = samplePayload;
-      loadDecryptedDataMock.mockResolvedValue([{ id: 'legacy' }]);
+      loadWithCiphertextMock.mockResolvedValue(holding([{ id: 'legacy' }]));
 
       await saveGroceriesPayload(store, payload);
 
-      expect(loadDecryptedDataMock).toHaveBeenCalledWith({
+      expect(loadWithCiphertextMock).toHaveBeenCalledWith({
         type: 'groceries',
         defaultValue: null,
       });
@@ -410,6 +434,7 @@ describe('vaultRecordWrite', () => {
           records: payload,
           deletions: {},
         },
+        expectedCiphertext: STORED,
       });
     });
 
@@ -421,7 +446,7 @@ describe('vaultRecordWrite', () => {
         records: { catalog: [], lists: [] },
         deletions: { 'old-delete': '2026-01-01T10:00:00.000Z' },
       };
-      loadDecryptedDataMock.mockResolvedValue(storedEnvelope);
+      loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
 
       await saveGroceriesPayload(store, payload, {
         deletedIds: ['line-1', 'line-2'],
@@ -438,7 +463,366 @@ describe('vaultRecordWrite', () => {
             'line-2': deletedAt,
           },
         },
+        expectedCiphertext: STORED,
       });
+    });
+  });
+
+  describe('contended saves (ADR 0143)', () => {
+    type SaveCall = {
+      type: VaultRecordType;
+      value: unknown;
+      expectedCiphertext?: EncryptedBlob | null;
+    };
+    type StoredState = { value: unknown; ciphertext: EncryptedBlob | null };
+
+    /**
+     * A store another writer keeps changing. Each state in `otherWriterWrites`
+     * lands just before the save that follows it is checked, so every save
+     * meets Ciphertext it did not read, the way a pull or another tab would.
+     * The write rule is the real one: a save goes ahead only while the
+     * Ciphertext it was conditioned on is still the stored one.
+     */
+    function contendedStore(
+      read: unknown,
+      otherWriterWrites: StoredState[] = [],
+    ) {
+      let stored: StoredState = { value: read, ciphertext: STORED };
+      const pending = [...otherWriterWrites];
+      const attempts: SaveCall[] = [];
+      const written: SaveCall[] = [];
+
+      const loadMock = jest.fn();
+      loadMock.mockImplementation(async () => stored);
+      const saveMock = jest.fn(async (call: SaveCall) => {
+        attempts.push(call);
+        const landed = pending.shift();
+        if (landed) stored = landed;
+        if (
+          !sameStoredCiphertext(
+            stored.ciphertext,
+            call.expectedCiphertext ?? null,
+          )
+        ) {
+          throw new VaultWriteContendedError(call.type);
+        }
+        written.push(call);
+        stored = {
+          value: call.value,
+          ciphertext: {
+            iv: `iv-written-${written.length}`,
+            ciphertext: `ct-written-${written.length}`,
+          },
+        };
+      });
+
+      const contendedStoreMock: VaultRecordStore = {
+        loadDecryptedDataWithCiphertext: loadMock,
+        saveEncryptedData: saveMock,
+      };
+      return {
+        store: contendedStoreMock,
+        attempts,
+        written,
+        current: () => stored,
+      };
+    }
+
+    test('a pull and a User edit made during a save: the stored newer record survives, a pulled record is kept, and the newer User edit wins', async () => {
+      const pulledRecord = {
+        id: 'R',
+        title: 'Pulled',
+        updatedAt: '2026-01-01T11:00:00.000Z',
+      };
+      const pulledNew = {
+        id: 'P',
+        title: 'Added by pull',
+        updatedAt: '2026-01-01T11:30:00.000Z',
+      };
+      const userEdit = {
+        id: 'E',
+        title: 'User edit',
+        updatedAt: '2026-01-01T12:00:00.000Z',
+      };
+      const userRecords = [
+        {
+          id: 'R',
+          title: 'Before pull',
+          updatedAt: '2026-01-01T10:00:00.000Z',
+        },
+        userEdit,
+      ];
+      const { store, written } = contendedStore(
+        { records: [], deletions: {} },
+        [
+          {
+            value: {
+              records: [
+                pulledRecord,
+                pulledNew,
+                {
+                  id: 'E',
+                  title: 'Old',
+                  updatedAt: '2026-01-01T09:00:00.000Z',
+                },
+              ],
+              deletions: {},
+            },
+            ciphertext: OTHER,
+          },
+        ],
+      );
+
+      const result = await saveVaultRecords(store, 'tasks', userRecords);
+
+      expect(result).toHaveLength(3);
+      expect(result).toEqual(
+        expect.arrayContaining([pulledRecord, pulledNew, userEdit]),
+      );
+      expect(written).toHaveLength(1);
+      expect(written[0].value).toEqual({ records: result, deletions: {} });
+    });
+
+    test('an envelope key a newer client wrote meanwhile is kept, not restored to the stale copy this save read', async () => {
+      const { store, written } = contendedStore(
+        { records: [], deletions: {}, futureKey: { schema: 1 } },
+        [
+          {
+            value: { records: [], deletions: {}, futureKey: { schema: 2 } },
+            ciphertext: OTHER,
+          },
+        ],
+      );
+
+      await saveVaultRecords(store, 'tasks', [
+        { id: 'T', title: 'Mine', updatedAt: '2026-01-01T10:00:00.000Z' },
+      ]);
+
+      expect(written).toHaveLength(1);
+      expect(written[0].value).toEqual({
+        futureKey: { schema: 2 },
+        records: [
+          { id: 'T', title: 'Mine', updatedAt: '2026-01-01T10:00:00.000Z' },
+        ],
+        deletions: {},
+      });
+    });
+
+    test('one contended write: the first write is conditioned on what was read, the retry on the other writer Ciphertext, and the save resolves with the merged records', async () => {
+      const otherRecord = {
+        id: 'X',
+        title: 'Other tab',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+      };
+      const mine = {
+        id: 'M',
+        title: 'Mine',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+      };
+      const { store, attempts, written } = contendedStore(
+        { records: [], deletions: {} },
+        [
+          {
+            value: { records: [otherRecord], deletions: {} },
+            ciphertext: OTHER,
+          },
+        ],
+      );
+
+      const result = await saveVaultRecords(store, 'tasks', [mine]);
+
+      expect(attempts.map((call) => call.expectedCiphertext)).toEqual([
+        STORED,
+        OTHER,
+      ]);
+      expect(written).toHaveLength(1);
+      expect(result).toEqual([otherRecord, mine]);
+    });
+
+    test('three contended attempts reject with VaultWriteContendedError and write nothing, leaving the other writer Ciphertext stored', async () => {
+      const moves: StoredState[] = [1, 2, 3].map((n) => ({
+        value: { records: [], deletions: {} },
+        ciphertext: { iv: `iv-move-${n}`, ciphertext: `ct-move-${n}` },
+      }));
+      const { store, attempts, written, current } = contendedStore(
+        { records: [], deletions: {} },
+        moves,
+      );
+
+      await expect(
+        saveVaultRecords(store, 'tasks', [
+          { id: 'M', title: 'Mine', updatedAt: '2026-01-01T10:00:00.000Z' },
+        ]),
+      ).rejects.toMatchObject({
+        name: 'VaultWriteContendedError',
+        type: 'tasks',
+      });
+      expect(attempts).toHaveLength(3);
+      expect(written).toEqual([]);
+      expect(current().ciphertext).toEqual(moves[2].ciphertext);
+    });
+
+    test('two contended attempts and a third that succeeds: three attempts, one write, and the result is the merge made on the third attempt', async () => {
+      const otherRecord = {
+        id: 'X',
+        title: 'Other writer',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+      };
+      const mine = {
+        id: 'M',
+        title: 'Mine',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+      };
+      const { store, attempts, written } = contendedStore(
+        { records: [], deletions: {} },
+        [
+          {
+            value: { records: [], deletions: {} },
+            ciphertext: { iv: 'iv-move-1', ciphertext: 'ct-move-1' },
+          },
+          {
+            value: { records: [otherRecord], deletions: {} },
+            ciphertext: { iv: 'iv-move-2', ciphertext: 'ct-move-2' },
+          },
+        ],
+      );
+
+      const result = await saveVaultRecords(store, 'tasks', [mine]);
+
+      expect(attempts).toHaveLength(3);
+      expect(attempts[2].expectedCiphertext).toEqual({
+        iv: 'iv-move-2',
+        ciphertext: 'ct-move-2',
+      });
+      expect(written).toHaveLength(1);
+      expect(result).toEqual([otherRecord, mine]);
+      expect(written[0].value).toEqual({ records: result, deletions: {} });
+    });
+
+    test('saveVaultRecords resolves with the caller records when nothing moved', async () => {
+      const records = [
+        { id: 'task-1', title: 'Task 1' },
+        { id: 'task-2', title: 'Task 2' },
+      ];
+      const { store, written } = contendedStore({
+        records: [],
+        deletions: {},
+      });
+
+      await expect(saveVaultRecords(store, 'tasks', records)).resolves.toEqual(
+        records,
+      );
+      expect(written).toHaveLength(1);
+    });
+
+    test('deleteVaultRecordAndSave contended: resolves the merged records, records the deletion, and the deleted record stays absent even where the other writer still holds it', async () => {
+      const deletedAt = '2026-01-01T12:00:00.000Z';
+      const stillHeldElsewhere = {
+        id: 't1',
+        title: 'Held by other writer',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+      };
+      const kept = {
+        id: 't2',
+        title: 'Kept',
+        updatedAt: '2026-01-01T09:30:00.000Z',
+      };
+      const addedByPull = {
+        id: 't3',
+        title: 'Added by pull',
+        updatedAt: '2026-01-01T11:00:00.000Z',
+      };
+      const { store, written } = contendedStore(
+        { records: [], deletions: {} },
+        [
+          {
+            value: {
+              records: [stillHeldElsewhere, addedByPull],
+              deletions: {},
+            },
+            ciphertext: OTHER,
+          },
+        ],
+      );
+
+      const result = await deleteVaultRecordAndSave(
+        store,
+        'tasks',
+        [stillHeldElsewhere, kept],
+        't1',
+        deletedAt,
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(expect.arrayContaining([kept, addedByPull]));
+      expect(result.map((record) => record.id)).not.toContain('t1');
+      expect(written).toHaveLength(1);
+      expect(written[0].value).toMatchObject({
+        deletions: { t1: deletedAt },
+      });
+    });
+
+    test('saveGroceriesPayload contended: resolves the nested merge, keeping a list the other writer added alongside this save list', async () => {
+      const catalogItem = {
+        id: 'cat-1',
+        name: 'Produce',
+        category: 'produce' as const,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+      const listAddedElsewhere = {
+        id: 'list-other',
+        name: 'Added in another tab',
+        lines: [],
+        createdAt: '2026-01-01T08:00:00.000Z',
+        updatedAt: '2026-01-01T08:00:00.000Z',
+      };
+      const listMine = {
+        id: 'list-mine',
+        name: 'Mine',
+        lines: [],
+        createdAt: '2026-01-01T09:00:00.000Z',
+        updatedAt: '2026-01-01T09:00:00.000Z',
+      };
+      const { store, written } = contendedStore(
+        { records: { catalog: [], lists: [] }, deletions: {} },
+        [
+          {
+            value: {
+              records: { catalog: [catalogItem], lists: [listAddedElsewhere] },
+              deletions: {},
+            },
+            ciphertext: OTHER,
+          },
+        ],
+      );
+
+      const result = await saveGroceriesPayload(store, {
+        catalog: [catalogItem],
+        lists: [listMine],
+      });
+
+      expect(result.lists.map((list) => list.id)).toEqual(
+        expect.arrayContaining(['list-other', 'list-mine']),
+      );
+      expect(result.catalog.map((item) => item.id)).toEqual(['cat-1']);
+      expect(written[0].value).toEqual({ records: result, deletions: {} });
+    });
+
+    test('a store failure that is not a contention is rethrown without a retry', async () => {
+      const failure = new Error('disk full');
+      const failingStore: VaultRecordStore = {
+        loadDecryptedDataWithCiphertext: jest.fn(async () => ({
+          value: null,
+          ciphertext: null,
+        })) as unknown as VaultRecordStore['loadDecryptedDataWithCiphertext'],
+        saveEncryptedData: jest.fn().mockRejectedValue(failure),
+      };
+
+      await expect(
+        saveVaultRecords(failingStore, 'tasks', [{ id: 'T', title: 'Mine' }]),
+      ).rejects.toBe(failure);
+      expect(failingStore.saveEncryptedData).toHaveBeenCalledTimes(1);
     });
   });
 });

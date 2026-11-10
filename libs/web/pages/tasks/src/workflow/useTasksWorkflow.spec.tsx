@@ -187,6 +187,40 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
       expect(preserved?.title).toBe('Task from server');
     });
 
+    it('shows the tasks the save resolved with, when a contended save merged in another writer’s task', async () => {
+      const initialTask = makeTask({ id: 'task-1', title: 'Initial task' });
+      const theirs = makeTask({ id: 'task-2', title: 'Added elsewhere' });
+      class MergingAdapter extends InMemoryTasksVaultAdapter {
+        async saveTasks(tasks: Task[]): Promise<Task[]> {
+          await super.saveTasks(tasks);
+          return [...tasks, theirs];
+        }
+      }
+      const adapter = new MergingAdapter({ tasks: [initialTask] });
+
+      const { result } = renderHook(() =>
+        useTasksWorkflow({ handle: null as any, adapter }),
+      );
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.updateTask('task-1', {
+          title: 'Updated initial task',
+          priority: 'medium',
+          status: 'pending',
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.tasks.map((task) => task.id).sort()).toEqual([
+          'task-1',
+          'task-2',
+        ]);
+      });
+    });
+
     it('multiple revisions trigger multiple re-reads', async () => {
       const task1 = makeTask({ id: 'task-1', title: 'Task 1' });
       const adapter = new InMemoryTasksVaultAdapter({ tasks: [task1] });
@@ -284,7 +318,7 @@ describe('useTasksWorkflow — Local Vault Revision integration', () => {
         });
       }
 
-      saveTasks(tasks: Task[]): Promise<void> {
+      saveTasks(tasks: Task[]): Promise<Task[]> {
         return this.hold().then(() => super.saveTasks(tasks));
       }
 
