@@ -120,6 +120,11 @@ What changed:
 - **The HTML merge is `E2E HTML Report`**, which is not required and runs only when a shard failed. A green run still uploads each shard's blob report.
 - **The Chromium install in both lane jobs drops `--with-deps`.** The nightly keeps it, because Firefox and WebKit need packages the runner image does not carry, and nobody waits on the nightly. Browser binaries are still not cached.
 
+What stays, from the 2026-10-29 resolution of #1381:
+
+- **Each shard still builds the frontend itself.** `nx build web` takes ~37s per shard. A shared build job would put a build, an upload and a download in front of every shard, which costs about what it saves, and adds one more job before anything starts.
+- **A pull request still runs the whole suite whenever `web-e2e` is affected.** There is no affected-spec selection. The suite is hermetic and its specs exercise shared app code, so nothing maps a changed file to the specs it can break. Balancing gets the time back without risking a spec being skipped.
+
 Predicted: lane span ~4m 05s and lane finish ~5m 10s into the run, at the median. That clears the lane's 5-minute signal but not the Single-Library target. `workers: 2` per shard was left out: it would reverse this ADR's stability reason for one worker, and its gain is unmeasured. It is a measured follow-up.
 
 The weights are a measurement, and they drift as specs are added. Refresh them from a run's blob reports when one shard's spec time pulls away from the others. A stale weights file costs balance, never coverage.
