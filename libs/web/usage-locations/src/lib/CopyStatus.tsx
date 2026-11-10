@@ -13,8 +13,14 @@ export interface CopyStatusProps {
 const COPY_STATUS_CLASSES = {
   floating:
     'fixed bottom-6 left-1/2 z-20 flex min-h-12 -translate-x-1/2 items-center rounded-control bg-navy px-4 text-body-sm font-semibold text-navy-foreground shadow-toast',
+  /**
+   * Clears the toast stack via `--toast-offset`, and also the phone FAB via
+   * `--toast-fab-reserve` (the FAB's top edge, set by the dashboard layout
+   * while a `[data-phone-fab]` is mounted), keeping a 1rem gap above it.
+   * Whichever clearance is taller wins.
+   */
   phone:
-    'fixed inset-x-4 bottom-[calc(var(--toast-offset,0px)+1.5rem)] z-20 flex min-h-13 items-center rounded-control bg-navy px-4 text-body font-semibold text-navy-foreground shadow-toast',
+    'fixed inset-x-4 bottom-[max(calc(var(--toast-offset,0px)+1.5rem),calc(var(--toast-fab-reserve,0px)+1rem))] z-20 flex min-h-13 items-center rounded-control bg-navy px-4 text-body font-semibold text-navy-foreground shadow-toast',
 } as const satisfies Record<CopyStatusVariant, string>;
 
 /**
