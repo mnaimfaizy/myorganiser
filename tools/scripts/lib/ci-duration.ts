@@ -76,7 +76,7 @@ export const CI_WORKFLOW = 'ci.yml';
 export const TEST_JOB_NAME = 'Test';
 
 /**
- * The blocking E2E lane's jobs, by name: `E2E Chromium (shard 1/3)`,
+ * The blocking E2E lane's jobs, by name: `E2E Chromium (shard 1/4)`,
  * `E2E Report`, `E2E live logout`. Anchored and word-bounded so a future
  * `E2E`-prefixed job joins the lane and a job merely mentioning E2E does
  * not.

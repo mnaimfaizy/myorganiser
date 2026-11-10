@@ -1123,7 +1123,8 @@ describe('ci.yml facts the constants depend on', () => {
       .map((entry) => entry.name)
       .sort();
     assert.deepEqual(lane, [
-      'E2E Chromium (shard ${{ matrix.shard }}/3)',
+      'E2E Chromium (shard ${{ matrix.shard }}/4)',
+      'E2E HTML Report',
       'E2E Report',
       'E2E live logout',
     ]);
