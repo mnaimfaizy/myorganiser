@@ -35,7 +35,8 @@ The repository is public, so Actions minutes are free. Wall-clock is the only bu
 - **Blocking lane** — Chromium only, on `pull_request`, gated on `nx affected` containing
   `web-e2e` (matching the existing `build-frontend` pattern). Split across **3 shards** plus a
   `merge-reports` job, keeping the CI critical path near its current ~7 minutes. Keeps `retries: 2`
-  and **passes on retry**.
+  and **passes on retry**. (Now 4 shards balanced by duration behind a thin `E2E Report` gate; see
+  the [2026-11-10 amendment](#amendment-2026-11-10).)
 - **Nightly lane** — all three browsers as a **matrix over browsers** (not shards), on cron
   `17 3 * * *` plus `workflow_dispatch`, against `main`. Runs with **`--fail-on-flaky-tests`**. On
   a **scheduled** failure it reuses the issue pattern already proven in `monthly-agent-model-audit.yml`:
