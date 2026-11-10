@@ -460,7 +460,7 @@ The backend exposes three JWT-protected endpoints under `/api/v1/vault/backups`:
 | GET    | `/vault/backups/latest?status=…&source=…&event=…` | Fetch latest matching audit row (200 JSON `null` if none) |
 | GET    | `/vault/backups?cursor=…&limit=…&source=…`        | Cursor-paginated list of audit rows                       |
 
-When no row matches, `GET /vault/backups/latest` answers `200` with `Content-Type: application/json` and the literal body `null` (not 404, not an empty body); the generated `getLatestBackup` data type is `… | null`.
+When no row matches, `GET /vault/backups/latest` answers `200` with `Content-Type: application/json` and the literal body `null` (not 404, not an empty body); the web hooks narrow on `data === null`. The spec marks the 200 schema `nullable`, but the OpenAPI generator does not carry that into the generated return type, so `getLatestBackup` is still typed without `null`.
 
 Schema highlights (Prisma model `VaultBackupRecord`):
 
