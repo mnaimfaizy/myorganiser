@@ -15,7 +15,7 @@ import {
 } from '../schemas/youtubeDigest';
 
 export interface YouTubeDigestSettings {
-  /** The digest card is shown only when this is true. */
+  /** The digest card needs this and `settingsLoaded` to both be true. */
   connected: boolean;
   /**
    * True only after a successful settings load. False before the first load,
