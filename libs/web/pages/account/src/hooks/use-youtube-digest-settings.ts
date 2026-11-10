@@ -15,8 +15,14 @@ import {
 } from '../schemas/youtubeDigest';
 
 export interface YouTubeDigestSettings {
-  /** The digest card is shown only when this is true. */
+  /** The digest card needs this and `settingsLoaded` to both be true. */
   connected: boolean;
+  /**
+   * True only after a successful settings load. False before the first load,
+   * after a failed load, and while a Retry is in flight. The form must not be
+   * shown, and `save` sends nothing, until it is true.
+   */
+  settingsLoaded: boolean;
   enabled: boolean;
   setEnabled: (enabled: boolean) => void;
   weekday: number;
@@ -58,11 +64,13 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
   const [saving, setSaving] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   // Fetch YouTube notification settings
   useEffect(() => {
     let cancelled = false;
+    setSettingsLoaded(false);
     (async () => {
       try {
         const api = createYouTubeApi();
@@ -77,6 +85,7 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
         const { data } = await api.getNotificationSettings();
         if (cancelled) return;
         reset({ enabled: data.enabled, weekday: data.preferredWeekday });
+        setSettingsLoaded(true);
         setLoadError(null);
       } catch (error) {
         if (cancelled) return;
@@ -109,43 +118,44 @@ export function useYouTubeDigestSettings(): YouTubeDigestSettings {
     [setValue],
   );
 
-  const save = useCallback(
-    () =>
-      handleSubmit(
-        async (values) => {
-          setSaving(true);
-          try {
-            await createYouTubeApi().updateNotificationSettings({
-              notificationSettingsBody: {
-                enabled: values.enabled,
-                preferredWeekday: values.weekday,
-                timeZone: detectTimeZone() || 'UTC',
-              },
-            });
-            toast({
-              title: 'Saved',
-              description: 'Weekly digest settings updated.',
-            });
-          } catch (error) {
-            toast({
-              title: 'Error',
-              description: errorMessage(
-                error,
-                'Failed to update digest settings.',
-              ),
-              variant: 'destructive',
-            });
-          } finally {
-            setSaving(false);
-          }
-        },
-        (errors) => toast(invalidSaveToast(errors)),
-      )(),
-    [handleSubmit, toast],
-  );
+  const save = useCallback(async () => {
+    // Second guard behind the hidden form: never write unloaded defaults.
+    if (!settingsLoaded) return;
+    await handleSubmit(
+      async (values) => {
+        setSaving(true);
+        try {
+          await createYouTubeApi().updateNotificationSettings({
+            notificationSettingsBody: {
+              enabled: values.enabled,
+              preferredWeekday: values.weekday,
+              timeZone: detectTimeZone() || 'UTC',
+            },
+          });
+          toast({
+            title: 'Saved',
+            description: 'Weekly digest settings updated.',
+          });
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: errorMessage(
+              error,
+              'Failed to update digest settings.',
+            ),
+            variant: 'destructive',
+          });
+        } finally {
+          setSaving(false);
+        }
+      },
+      (errors) => toast(invalidSaveToast(errors)),
+    )();
+  }, [handleSubmit, settingsLoaded, toast]);
 
   return {
     connected,
+    settingsLoaded,
     enabled,
     setEnabled,
     weekday,
