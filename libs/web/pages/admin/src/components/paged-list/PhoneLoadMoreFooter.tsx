@@ -39,6 +39,22 @@ export function PhoneLoadMoreFooter({
   onRetry,
 }: PhoneLoadMoreFooterProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // The sticky admin tab bar covers the tail where the sentinel triggers the
+  // fetch, so a failure lands behind it. Bring the error block clear of the bar
+  // once per failure; 'nearest' is a no-op when it is already fully visible.
+  useEffect(() => {
+    const node = errorRef.current;
+    if (!loadMoreError || node === null) return;
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView?.({
+      block: 'nearest',
+      behavior: reduceMotion ? 'instant' : 'smooth',
+    });
+  }, [loadMoreError]);
 
   useEffect(() => {
     let observer: IntersectionObserver | undefined;
@@ -75,20 +91,20 @@ export function PhoneLoadMoreFooter({
     <>
       <div ref={sentinelRef} aria-hidden="true" className="h-px" />
       {loadMoreError ? (
-        onRetry !== undefined ? (
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-center text-caption text-destructive">
-              {errorMessage}
-            </p>
-            <Button variant="outline" size="sm" onClick={onRetry}>
-              Try again
-            </Button>
-          </div>
-        ) : (
+        <div
+          ref={errorRef}
+          className="flex flex-col items-center gap-2"
+          style={{ scrollMarginBottom: 'var(--toast-offset, 0px)' }}
+        >
           <p className="text-center text-caption text-destructive">
             {errorMessage}
           </p>
-        )
+          {onRetry !== undefined ? (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
       ) : loadingMore && loadingMoreMessage !== undefined ? (
         <p className="text-center text-caption text-muted-foreground">
           {loadingMoreMessage}
