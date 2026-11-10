@@ -48,8 +48,8 @@ import { VaultReplaceOffer } from './VaultReplaceOffer';
 const PASSPHRASE_MISMATCH_MESSAGE =
   "That passphrase didn't unlock your vault. Nothing was changed.";
 
-// The schema and the Unlock button's disabled check are the same rule: a key
-// that is empty once trimmed is neither submitted nor enabled.
+// The one rule for submit and the Unlock button's disabled state: a key that
+// is empty once trimmed is neither submitted nor enabled.
 const recoveryKeyUnlockSchema = z.object({
   recoveryKey: z.string().trim().min(1),
 });
@@ -694,8 +694,10 @@ export function VaultGate(props: VaultGateProps) {
   }
 
   if (useRecovery) {
-    // Same rule as recoveryKeyUnlockSchema: an all-whitespace key is not enabled.
-    const canRecover = recoveryKeyValue.trim().length > 0;
+    // The schema is the one rule: an all-whitespace key is not enabled.
+    const canRecover = recoveryKeyUnlockSchema.safeParse({
+      recoveryKey: recoveryKeyValue,
+    }).success;
 
     return (
       <VaultGateFrame
