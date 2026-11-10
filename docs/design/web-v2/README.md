@@ -5,8 +5,8 @@ The approved v2.0 UI/UX design for the web app — user portal, admin portal, an
 |                  |                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ |
 | Source           | [Claude Design canvas](https://claude.ai/artifact/59o7kdnAyxfpsNTrPstwBt) (private; needs the owner's login) |
-| Exported version | `1792474123-308c`                                                                                            |
-| Exported         | 2026-10-20                                                                                                   |
+| Exported version | `1794289728-69b4`                                                                                            |
+| Exported         | 2026-11-10                                                                                                   |
 | Approved for     | [PRD #1241](https://github.com/mnaimfaizy/myorganiser/issues/1241)                                           |
 
 **These files are the design of record.** When the canvas changes after approval, the change is exported here in its own commit; the canvas link is for collaborating on the next version, and the files here are what an issue or pull request builds to.
@@ -103,6 +103,9 @@ The approved v2.0 UI/UX design for the web app — user portal, admin portal, an
 > • Status shows as a pill only when it is not the default (In progress, Blocked).
 > • Filters: context segmented + status chips; archived behind a chip.
 > • Same sort inside a group as today: priority, then due, then created.
+> • Filters that hide every Task: the list says "No tasks match these filters." with Clear filters, which resets status to Open and context to All.
+> • "All clear" shows only while the status filter is Open and no Task is open in any context. Its open count and its done-this-week count both read every context.
+> • The summary line stays scoped to the selected context, because it describes the current view.
 
 ### 4 · Addresses
 
