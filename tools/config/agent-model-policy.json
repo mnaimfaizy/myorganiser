@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-10",
+  "reviewedAt": "2026-11-10",
   "decision": {
     "defaultRule": "Pin models by agent role and harness; after repeated failures, escalate the decision to the main agent or a human instead of allowing an automatic model change.",
     "tiers": {
@@ -67,7 +67,7 @@
     "dep-audit": {
       "tier": "T1",
       "models": {
-        "copilot": ["Gemini 3.8 Flash (copilot)", "Claude Haiku 4.5 (copilot)"],
+        "copilot": ["Gemini 3.8 Flash (copilot)", "Claude Haiku 5.5 (copilot)"],
         "claude": "haiku",
         "cursor": "composer-2.5",
         "gemini": "gemini-3.6-flash"
@@ -86,7 +86,7 @@
       "tier": "T2",
       "rationale": "Writes a whole self-contained artifact from a brief, and the failure modes are judgment ones: an accessible-name pattern that is textbook-correct and wrong here, a claimed visual review that could not have happened, a doc-vs-source contradiction silently copied. The mechanical half is check-design-hygiene.ts; what is left needs reasoning quality.",
       "models": {
-        "copilot": ["Claude Sonnet 5 (copilot)", "GPT-5.6 Terra (copilot)"],
+        "copilot": ["Claude Sonnet 5.5 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",
         "cursor": "grok-4.6",
         "gemini": "gemini-3.6-flash"
@@ -105,7 +105,7 @@
       "tier": "T2",
       "models": {
         "copilot": [
-          "Claude Sonnet 5 (copilot)",
+          "Claude Sonnet 5.5 (copilot)",
           "GPT-5.6 Terra (copilot)",
           "Grok 4.6 (copilot)"
         ],
@@ -232,7 +232,7 @@
         "high": "claude-opus-5-5"
       },
       "cursorDefault": "composer-2.5",
-      "copilotDefault": "claude-sonnet-5"
+      "copilotDefault": "claude-sonnet-5.5"
     }
   },
   "catalogSources": [
@@ -242,19 +242,19 @@
       "requiredTerms": [
         "GPT-5.6 Luna",
         "Gemini 3.8 Flash",
-        "Claude Sonnet 5",
+        "Claude Sonnet 5.5",
         "Grok 4.6",
         "MAI-Code-1.1-Flash"
       ],
       "linePrefixes": ["GPT-", "Claude ", "Gemini ", "Grok ", "Kimi ", "MAI-"],
-      "snapshotSha256": "ec9093cf6ce8a610a0f91092a4e5d60b6e8cb2209bccd1eae136ffad31540b44"
+      "snapshotSha256": "87ebab73870d42f8beb49c80c98c572b01214b15403ef7fde4360e2bc12835f4"
     },
     {
       "harness": "claude",
       "url": "https://docs.anthropic.com/en/docs/claude-code/sub-agents",
       "requiredTerms": ["haiku", "sonnet", "inherit"],
       "linePrefixes": ["haiku", "sonnet", "opus", "fable", "inherit"],
-      "snapshotSha256": "3b702f91c1da0ea1845bcbef704478a06038fec7c269200c89c15b3916129e60"
+      "snapshotSha256": "c007353f42f3f4f100643d78d2e2e7e09b2a614167a59aef016e570be9552e52"
     },
     {
       "harness": "cursor",
@@ -268,7 +268,7 @@
       "url": "https://ai.google.dev/gemini-api/docs/pricing?hl=en",
       "requiredTerms": ["gemini-3.6-flash", "gemini-3.5-flash-lite"],
       "linePrefixes": ["Gemini "],
-      "snapshotSha256": "d768f9ba6c0873f94851b5f28a97b4aa8278e2b1ff36805df09e512aff13cae4"
+      "snapshotSha256": "492f15447cd0061602d04e0436b5605fd6b2372e284252050c69666676fa0752"
     }
   ],
   "costSources": {
@@ -280,7 +280,7 @@
         "Claude Sonnet 5",
         "Gemini 3.8"
       ],
-      "snapshotSha256": "39ffdfe0f29d16158ea7a7d78f2a008d273922f979d8ca6c881a27b927184365"
+      "snapshotSha256": "719937ddfb682b7da8ce8ceeb56b565c14218e3ad6078f62f90738989f9551b6"
     },
     "claude": {
       "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
@@ -290,7 +290,7 @@
         "Claude Opus 5",
         "cache"
       ],
-      "snapshotSha256": "d0fec4c4f115cf0c9179bab562cb453a8816fcb7f69aaa9e4a331adfbaff3167"
+      "snapshotSha256": "7d5d433ab281dd6cc88f9528a1c9d0ff7fe3df9f8b270ba305c6e0a164f2cfa9"
     },
     "cursor": {
       "url": "https://cursor.com/docs/models-and-pricing",
@@ -300,7 +300,7 @@
         "Cursor Models",
         "Other Models"
       ],
-      "snapshotSha256": "12b620f27b5c893825726fd2e4664d7e3daa6689fbeaab263ff41addd5805ff5"
+      "snapshotSha256": "22dd776a583233b3242ff5bffbc79926c1d4265d057e2465a49bddbc6b6f632c"
     },
     "gemini": {
       "url": "https://ai.google.dev/gemini-api/docs/pricing?hl=en",
@@ -310,7 +310,7 @@
         "Input price",
         "Output price"
       ],
-      "snapshotSha256": "864529e9603b609ac2d4d6916e4af9d21b44198c5c262bce38c8f232c5fd5fae"
+      "snapshotSha256": "2b17deaf3be3b1daefd4f4d3e76b8dbfe50cf22f96e6834335c21fb4a1185780"
     }
   }
 }

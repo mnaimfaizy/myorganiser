@@ -2,7 +2,7 @@
 description: 'Use when the user asks to audit dependencies, check for outdated packages, scan for vulnerabilities, or review dependency upgrade risk in MyOrganiser.'
 name: 'DepAudit'
 tools: [read, search, execute]
-model: ['Gemini 3.8 Flash (copilot)', 'Claude Haiku 4.5 (copilot)']
+model: ['Gemini 3.8 Flash (copilot)', 'Claude Haiku 5.5 (copilot)']
 user-invocable: true
 argument-hint: "Optional: 'security' | 'outdated' | 'all' (default)"
 ---
