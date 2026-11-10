@@ -14,6 +14,7 @@ import { ShortsBudgetMeter } from './ShortsBudgetMeter';
 import { ShortsHardStop } from './ShortsHardStop';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
 import { YouTubeSectionNav } from './YouTubeSectionNav';
+import { YouTubeStatusError } from './YouTubeStatusError';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 import { ShortsList } from './ShortsList';
@@ -64,7 +65,7 @@ export function ShortsPageClient() {
 function ShortsWatchExperience() {
   const isPhone = useIsMobileState() === true;
   const variant: YouTubeLayoutVariant = isPhone ? 'phone' : 'desktop';
-  const { connected, status } = useYouTubeStatus();
+  const { connected, status, refresh: refreshStatus } = useYouTubeStatus();
   const {
     shorts,
     loading,
@@ -235,6 +236,10 @@ function ShortsWatchExperience() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
+  }
+
+  if (status === 'error') {
+    return <YouTubeStatusError onRetry={refreshStatus} />;
   }
 
   if (!connected) {
