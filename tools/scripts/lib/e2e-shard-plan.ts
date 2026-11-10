@@ -166,11 +166,30 @@ export function planShards(
 }
 
 /**
+ * The characters a spec path may use: letters, digits, `.`, `_`, `-` and `/`.
+ *
+ * The filters reach Playwright through `nx run`, which composes one shell
+ * command and wraps each forwarded argument in double quotes. Inside double
+ * quotes the shell still expands `$`, a backtick, `"` and `\`. With this set
+ * the only `\` a filter carries is the one `escapeRegExp` puts before a `.`,
+ * and the only `$` is the final anchor right before the closing quote, so
+ * both stay literal. A path outside the set fails the plan rather than
+ * reaching the shell.
+ */
+export const SAFE_SPEC_PATH = /^[A-Za-z0-9._/-]+$/;
+
+/**
  * The Playwright CLI filter that selects exactly one spec file. Playwright
  * reads a positional argument as a regular expression over the absolute
  * path, so a bare `vault.spec.ts` would also select `multi-user-vault.spec.ts`;
  * anchoring at a path separator and the end of the string selects only it.
+ * Throws for a path outside `SAFE_SPEC_PATH`.
  */
 export function fileFilter(file: string): string {
+  if (!SAFE_SPEC_PATH.test(file)) {
+    throw new Error(
+      `spec path "${file}" has a character outside [A-Za-z0-9._/-]; rename it, because its filter is passed through a shell`,
+    );
+  }
   return `(^|/)${escapeRegExp(file)}$`;
 }

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_WEIGHT_SECONDS,
   E2E_TEST_DIR,
+  SAFE_SPEC_PATH,
   SHARD_WEIGHTS_FILE,
   fileFilter,
   listSpecFiles,
@@ -117,6 +118,37 @@ test('a file filter selects that file and not one whose name ends the same', () 
   assert.ok(!matches('/repo/apps/web-e2e/src/e2e/vault.spec.ts.snap'));
   assert.ok(new RegExp(fileFilter('a.b.spec.ts')).test('/x/a.b.spec.ts'));
   assert.ok(!new RegExp(fileFilter('a.b.spec.ts')).test('/x/aXb.spec.ts'));
+});
+
+test('a spec path with a character the shell expands inside double quotes is refused', () => {
+  for (const unsafe of [
+    'a$b.spec.ts',
+    'a`b`.spec.ts',
+    'a"b.spec.ts',
+    'a\\b.spec.ts',
+    'a b.spec.ts',
+    'a(b).spec.ts',
+    'a[b].spec.ts',
+  ]) {
+    assert.throws(
+      () => fileFilter(unsafe),
+      /outside \[A-Za-z0-9._\/-\]/,
+      unsafe,
+    );
+  }
+});
+
+test('every real spec path is safe to forward through the shell nx composes', () => {
+  const unsafe = REAL_FILES.filter((file) => !SAFE_SPEC_PATH.test(file));
+  assert.deepEqual(unsafe, []);
+  for (const file of REAL_FILES) {
+    const filter = fileFilter(file);
+    // Inside double quotes these are the only characters the shell treats
+    // specially; a filter may carry `\` only before `.` and `$` only last.
+    assert.doesNotMatch(filter, /[`"]/, file);
+    assert.doesNotMatch(filter.replace(/\\\./g, ''), /\\/, file);
+    assert.equal(filter.indexOf('$'), filter.length - 1, file);
+  }
 });
 
 test('the spec listing walks helper directories and skips non-spec files', () => {
