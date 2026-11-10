@@ -1,21 +1,28 @@
 'use client';
 
-import { type FormEvent, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import type { UseFormReturn } from 'react-hook-form';
+import { z } from 'zod';
 
 import { Button, IconButton, Input, Label } from '@myorganiser/web-ui';
 
 const PASSPHRASE_FIELD_ID = 'unlock-passphrase';
 const PASSPHRASE_ERROR_ID = 'unlock-passphrase-error';
 
+// An empty passphrase is deliberately valid (#1460): it is not rejected
+// client-side, and submitting it calls unlockWithPassphrase as any other does.
+export const passphraseUnlockSchema = z.object({ passphrase: z.string() });
+export type PassphraseUnlockValues = z.infer<typeof passphraseUnlockSchema>;
+
 export interface PassphraseUnlockFormProps {
-  /** The passphrase as typed. The gate owns it so the unlock handler can read it. */
-  value: string;
-  onChange: (value: string) => void;
-  /** Runs on Enter in the field and on the Unlock button. The handler must call `preventDefault` itself. */
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  /** The inline error under the field, or `null` when there is none. */
-  error: string | null;
+  /**
+   * The gate's form: the gate owns it so the typed passphrase survives the
+   * recover-screen toggle and the gate can set the mismatch error.
+   */
+  form: UseFormReturn<PassphraseUnlockValues>;
+  /** Called with the validated values on Enter / Unlock. */
+  onSubmit: (values: PassphraseUnlockValues) => void | Promise<void>;
   /** True while the unlock is in flight: the button shows its busy state and cannot be pressed. */
   unlocking: boolean;
 }
@@ -24,16 +31,16 @@ export interface PassphraseUnlockFormProps {
  * The passphrase field, its show/hide control, the inline error, and the
  * Unlock submit, wrapped in one form so Enter submits. The footer links sit
  * outside this form (the claim offer owns its own form, and forms do not nest).
- * The reveal state is local: it is UI state, not something the gate needs.
+ * The value and its error live in the gate's React Hook Form instance; the
+ * reveal state is local: it is UI state, not a field value.
  */
 export function PassphraseUnlockForm({
-  value,
-  onChange,
+  form,
   onSubmit,
-  error,
   unlocking,
 }: PassphraseUnlockFormProps) {
   const [revealPassphrase, setRevealPassphrase] = useState(false);
+  const error = form.formState.errors.passphrase?.message;
 
   const toggleRevealPassphrase = useCallback((): void => {
     setRevealPassphrase((previous) => !previous);
@@ -42,7 +49,7 @@ export function PassphraseUnlockForm({
   return (
     <form
       aria-label="Unlock your vault"
-      onSubmit={onSubmit}
+      onSubmit={form.handleSubmit(onSubmit)}
       className="flex flex-col gap-4.5"
     >
       <div className="flex flex-col gap-1.5">
@@ -52,8 +59,9 @@ export function PassphraseUnlockForm({
             id={PASSPHRASE_FIELD_ID}
             type={revealPassphrase ? 'text' : 'password'}
             autoComplete="current-password"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
+            {...form.register('passphrase', {
+              onChange: () => form.clearErrors('passphrase'),
+            })}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? PASSPHRASE_ERROR_ID : undefined}
             className="h-12 pr-12 text-body md:h-12 md:text-body"

@@ -634,11 +634,10 @@ describe('VaultGate', () => {
     });
 
     test('should show unlock panel when local vault revision changes without handle identity change (reconcile scenario)', () => {
+      // The status is driven by the scenario, not by how many renders read it.
+      let vaultStatusValue: 'absent' | 'owned' = 'absent';
       const handle = createStubHandle({
-        vaultStatus: jest
-          .fn()
-          .mockReturnValueOnce('absent')
-          .mockReturnValue('owned'),
+        vaultStatus: jest.fn(() => vaultStatusValue),
       });
       mockUseOptionalVaultSession.mockReturnValue({
         masterKeyBytes: null,
@@ -668,6 +667,7 @@ describe('VaultGate', () => {
       // Simulate Local Vault Revision bump (from VaultReconcileRunner's saveVault call).
       // The handle object identity stays the same; only the revision changes.
       // This triggers the render-phase reset that re-reads vaultStatus().
+      vaultStatusValue = 'owned';
       mockUseLocalVaultRevision.mockReturnValue(1);
 
       rerender(
@@ -2086,6 +2086,8 @@ describe('VaultGate', () => {
       expect(busyButton).toHaveAttribute('aria-busy', 'true');
 
       fireEvent.submit(form);
+      // RHF validates asynchronously: flush the pending submit before counting.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
       expect(handle.unlockWithPassphrase).toHaveBeenCalledTimes(1);
 
       await act(async () => {
@@ -2245,6 +2247,213 @@ describe('VaultGate', () => {
       ).toBeInTheDocument();
       expect(screen.getByLabelText('Passphrase')).toBeInTheDocument();
       expect(screen.queryByLabelText('Recovery key')).not.toBeInTheDocument();
+    });
+
+    test('an empty passphrase is not rejected client-side: Unlock is enabled and submit calls unlockWithPassphrase with ""', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest.fn().mockResolvedValue({
+          masterKeyBytes: new Uint8Array([1, 2, 3, 4]),
+        }),
+      });
+      mockUnlockableSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      const field = screen.getByLabelText('Passphrase') as HTMLInputElement;
+      expect(field.value).toBe('');
+      expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled();
+
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+      await waitFor(() => {
+        expect(screen.getByText('Unlocked tasks')).toBeInTheDocument();
+      });
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledTimes(1);
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledWith({
+        passphrase: '',
+      });
+    });
+
+    test('an empty passphrase that does not open the vault shows the inline error and the toast', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest
+          .fn()
+          .mockRejectedValue(new VaultSecretMismatchError('passphrase')),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        PASSPHRASE_MISMATCH,
+      );
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledWith({
+        passphrase: '',
+      });
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      expect(field).toHaveAttribute(
+        'aria-describedby',
+        'unlock-passphrase-error',
+      );
+      expect(field).toHaveAccessibleDescription(PASSPHRASE_MISMATCH);
+      expect(toastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "That passphrase didn't unlock this vault",
+          variant: 'destructive',
+        }),
+      );
+    });
+
+    test.each([
+      ['empty', ''],
+      ['whitespace-only', '   '],
+    ])(
+      'the recovery screen keeps Unlock disabled and does not submit a %s key',
+      async (_label, value) => {
+        const handle = createStubHandle({
+          vaultStatus: jest.fn(() => 'owned'),
+          unlockWithRecoveryKey: jest.fn(),
+        });
+        mockLockedSession(handle);
+
+        render(
+          <VaultGate title="Tasks">
+            {() => <div>Unlocked tasks</div>}
+          </VaultGate>,
+        );
+
+        await act(async () => {});
+
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'Forgot it? Use your Recovery Key',
+          }),
+        );
+        const recoveryField = screen.getByLabelText(
+          'Recovery key',
+        ) as HTMLInputElement;
+        fireEvent.change(recoveryField, { target: { value } });
+
+        expect(
+          screen.getByRole('button', { name: 'Unlock with recovery key' }),
+        ).toBeDisabled();
+
+        // The disabled button cannot be pressed, but a form submit still
+        // reaches the handler: the schema must stop it.
+        fireEvent.submit(recoveryField.closest('form') as HTMLFormElement);
+        await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+        expect(handle.unlockWithRecoveryKey).not.toHaveBeenCalled();
+      },
+    );
+
+    test('a failed unlock releases the in-flight guard so the next submit runs again', async () => {
+      const masterKeyBytes = new Uint8Array([1, 2, 3, 4]);
+      let rejectFirstAttempt: (reason: unknown) => void = () => undefined;
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+        unlockWithPassphrase: jest
+          .fn()
+          .mockImplementationOnce(
+            () =>
+              new Promise<never>((_resolve, reject) => {
+                rejectFirstAttempt = reject;
+              }),
+          )
+          .mockResolvedValueOnce({ masterKeyBytes }),
+      });
+      mockUnlockableSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      const field = screen.getByLabelText('Passphrase');
+      fireEvent.change(field, { target: { value: 'gate-pass-1' } });
+      const form = field.closest('form') as HTMLFormElement;
+      fireEvent.submit(form);
+
+      expect(
+        await screen.findByRole('button', { name: 'Unlocking…' }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        rejectFirstAttempt(new Error('boom'));
+      });
+
+      await waitFor(() => {
+        expect(toastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'Unlock failed' }),
+        );
+      });
+      const unlockButton = await screen.findByRole('button', {
+        name: 'Unlock',
+      });
+      expect(unlockButton).toBeEnabled();
+
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Unlocked tasks')).toBeInTheDocument();
+      });
+      expect(handle.unlockWithPassphrase).toHaveBeenCalledTimes(2);
+    });
+
+    test('a passphrase and a recovery key typed before the screen toggle are kept when the user returns', async () => {
+      const handle = createStubHandle({
+        vaultStatus: jest.fn(() => 'owned'),
+      });
+      mockLockedSession(handle);
+
+      render(
+        <VaultGate title="Tasks">{() => <div>Unlocked tasks</div>}</VaultGate>,
+      );
+
+      await act(async () => {});
+
+      fireEvent.change(screen.getByLabelText('Passphrase'), {
+        target: { value: 'kept-pass' },
+      });
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Forgot it? Use your Recovery Key',
+        }),
+      );
+      fireEvent.change(screen.getByLabelText('Recovery key'), {
+        target: { value: ' key ' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Use passphrase' }));
+      expect(screen.getByLabelText('Passphrase')).toHaveValue('kept-pass');
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Forgot it? Use your Recovery Key',
+        }),
+      );
+      expect(screen.getByLabelText('Recovery key')).toHaveValue(' key ');
+      expect(
+        screen.getByRole('button', { name: 'Unlock with recovery key' }),
+      ).toBeEnabled();
+
+      expect(handle.unlockWithPassphrase).not.toHaveBeenCalled();
+      expect(handle.unlockWithRecoveryKey).not.toHaveBeenCalled();
     });
   });
 });
