@@ -127,7 +127,9 @@ class Component extends DCLogic {
       { tone: 'Trust', style: pill('#CCFBF1', '#115E59'), words: ['Current', 'Active', 'Encrypted'] },
       { tone: 'Success', style: pill('#DCFCE7', '#166534'), words: ['Done', 'Changed'] },
       { tone: 'Warning', style: pill('#FEF3C7', '#92400E'), words: ['Due today', 'Renews in 3 d'] },
-      { tone: 'Danger', style: pill('#FEE2E2', '#B91C1C'), words: ['Overdue', 'Blocked', 'Disabled'] }
+      { tone: 'Info', style: pill('#E0F2FE', '#075985'), words: ['Under review'] },
+      { tone: 'Danger', style: pill('#FEE2E2', '#B91C1C'), words: ['Overdue', 'Blocked', 'Disabled'] },
+      { tone: 'Outline', style: pill('#FFFFFF', '#92400E') + ';box-sizing:border-box;border:1px solid #B45309', words: ["Can't reproduce"] }
     ];
     const box = (bg, edge) => 'display:flex;align-items:flex-start;gap:12px;padding:14px 14px 14px 16px;border-radius:16px;background:' + bg + ';border:1px solid ' + edge;
     const banners = [

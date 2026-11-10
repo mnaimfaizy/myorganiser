@@ -1290,7 +1290,7 @@
     "taskNotes": {
       "maxH": 520,
       "page": "tasks",
-      "text": "Decisions in this page:\n• Tick to complete: the checkbox moves a Task to done (closedAt set), Undo in the toast.\n• Groups: Overdue, Today, Upcoming, No date — then Done collapsed.\n• Description and estimated minutes finally get UI.\n• Status shows as a pill only when it is not the default (In progress, Blocked).\n• Filters: context segmented + status chips; archived behind a chip.\n• Same sort inside a group as today: priority, then due, then created.",
+      "text": "Decisions in this page:\n• Tick to complete: the checkbox moves a Task to done (closedAt set), Undo in the toast.\n• Groups: Overdue, Today, Upcoming, No date — then Done collapsed.\n• Description and estimated minutes finally get UI.\n• Status shows as a pill only when it is not the default (In progress, Blocked).\n• Filters: context segmented + status chips; archived behind a chip.\n• Same sort inside a group as today: priority, then due, then created.\n• Filters that hide every Task: the list says \"No tasks match these filters.\" with Clear filters, which resets status to Open and context to All.\n• \"All clear\" shows only while the status filter is Open and no Task is open in any context. Its open count and its done-this-week count both read every context.\n• The summary line stays scoped to the selected context, because it describes the current view.",
       "w": 380,
       "x": 4560,
       "y": 0
