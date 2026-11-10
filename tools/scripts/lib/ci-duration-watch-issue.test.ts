@@ -34,6 +34,7 @@ import {
 } from './nightly-e2e-rot-issue.ts';
 import {
   fastRun,
+  hotMerge,
   hotRun,
   job,
   measure,
@@ -49,7 +50,8 @@ const DATE = '2026-10-27';
 // ---------------------------------------------------------------- fixtures
 
 /** Ten breaching runs: every signal trips. The breach report's input. */
-const breachingSummary = () => measure(repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun));
+const breachingSummary = () =>
+  measure(repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun), undefined, [hotMerge()]);
 
 /** Ten fast, fresh runs: within target. The recovery's input. */
 const quietSummary = () => measure(repeat(MIN_SINGLE_LIBRARY_RUNS, fastRun));

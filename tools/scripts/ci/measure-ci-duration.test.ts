@@ -618,6 +618,7 @@ test('the evidence keys that name an API name the one that answers them: the job
       '`main` commits (Repos API)',
       'branch compare (Repos API)',
       'job and step timestamps (Actions API)',
+      'merges into `main` (`gh pr list`, Repos API)',
     ],
   );
 });

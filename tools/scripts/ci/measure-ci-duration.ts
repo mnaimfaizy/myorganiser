@@ -52,6 +52,7 @@ import {
   summarizeCiDuration,
   type CiDurationGather,
   type GatheredJob,
+  type GatheredMerge,
   type GatheredRun,
 } from '../lib/ci-duration.ts';
 import {
@@ -395,6 +396,76 @@ const compareBranch = (
   };
 };
 
+/** One merged Pull Request, as `gh pr list` returns it. */
+interface MergedPullRequest {
+  number: number;
+  headRefName: string;
+  headRefOid: string;
+  mergedAt: string;
+  mergeCommit?: { oid?: string } | null;
+}
+
+/** Pull Requests merged into `main` over the window, or null if unreadable. */
+const listMerges = ({
+  repository,
+  since,
+  until,
+  limit,
+}: {
+  repository: string;
+  since: string;
+  until: string;
+  limit: number;
+}): MergedPullRequest[] | null =>
+  ghJsonOrNull([
+    'pr',
+    'list',
+    '--repo',
+    repository,
+    '--base',
+    'main',
+    '--state',
+    'merged',
+    '--search',
+    `merged:${since}..${until}`,
+    '--json',
+    'number,headRefName,headRefOid,mergedAt,mergeCommit',
+    '--limit',
+    String(limit),
+  ]) as MergedPullRequest[] | null;
+
+/**
+ * How far `main` had moved past a Pull Request's head when it merged, or
+ * null when that cannot be read.
+ *
+ * `main` at the moment of the merge is the merge commit's first parent. That
+ * holds for a merge commit and for a squash; for a rebase merge of several
+ * commits the first parent is the previous rebased commit, which this repo's
+ * merges do not use (every merge into `main` is a merge commit).
+ */
+const behindAtMerge = (
+  repository: string,
+  merge: MergedPullRequest,
+): number | null => {
+  const oid = merge.mergeCommit?.oid;
+  if (!oid || !merge.headRefOid) return null;
+  const commit = ghJsonOrNull([
+    'api',
+    `repos/${repository}/commits/${oid}`,
+  ]) as {
+    parents?: { sha?: string }[];
+  } | null;
+  const base = commit?.parents?.[0]?.sha;
+  if (!base) return null;
+  const compare = ghJsonOrNull([
+    'api',
+    `repos/${repository}/compare/${base}...${merge.headRefOid}?per_page=1`,
+  ]) as { behind_by?: number } | null;
+  return Number.isFinite(compare?.behind_by)
+    ? Number(compare?.behind_by)
+    : null;
+};
+
 export interface GatherOptions {
   workflow: string;
   since: string;
@@ -464,6 +535,18 @@ export function gather({
     };
   });
 
+  const listedMerges =
+    useGithub && slug
+      ? listMerges({ repository: slug, since, until, limit })
+      : null;
+  const merges: GatheredMerge[] = (listedMerges ?? []).map((merge) => ({
+    number: merge.number,
+    headBranch: merge.headRefName,
+    mergedAt: merge.mergedAt,
+    behindBy: slug ? behindAtMerge(slug, merge) : null,
+  }));
+  const mergesUnread = merges.filter((merge) => merge.behindBy === null).length;
+
   const capped = useGithub && listed.length >= limit;
   const evidence: Record<string, string> = {
     'CI runs (`gh run list`)': !useGithub
@@ -503,6 +586,19 @@ export function gather({
             ? ''
             : ` — ${read.incomplete}, so a run older than the oldest commit read` +
               ' resolves no tip and stays unclassified'),
+    'merges into `main` (`gh pr list`, Repos API)': !useGithub
+      ? 'not read — no `gh`'
+      : !slug
+        ? 'not read — the repository could not be resolved'
+        : listedMerges === null
+          ? 'unreadable, so no merge is counted behind `main` or clean'
+          : `${merges.length} merged in the window` +
+            (mergesUnread === 0
+              ? ''
+              : `, ${mergesUnread} of them not comparable with \`main\` at the merge`) +
+            (merges.length >= limit
+              ? ` — the listing hit its --limit of ${limit}`
+              : ''),
     'Nx project roots': `${projectRoots.length} read from ${PROJECT_ROOT_FILES.map((file) => `\`${file}\``).join(' and ')} files at this checkout`,
   };
   if (withTruncatedJobs > 0) {
@@ -516,6 +612,7 @@ export function gather({
     projectRoots: [...projectRoots],
     evidence,
     runs,
+    merges,
   };
 }
 
