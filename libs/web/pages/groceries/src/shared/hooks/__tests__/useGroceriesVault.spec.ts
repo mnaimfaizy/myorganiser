@@ -572,6 +572,66 @@ describe('useGroceriesVault', () => {
       );
       expect(result.current.error).toBeNull();
     });
+
+    it('rethrows and keeps the pre-save lists when every attempt is contended', async () => {
+      const listA = makeList({ id: 'listA', name: 'A' });
+      const listB = makeList({ id: 'listB', name: 'B' });
+      const storedBlob = { iv: 'iv-stored', ciphertext: 'ct-stored' };
+      const result = await setup({ catalog: [], lists: [listA] });
+
+      // Every write finds the Ciphertext moved, so all three attempts are contended.
+      mockSaveEncryptedData.mockRejectedValue(
+        new VaultWriteContendedError('groceries'),
+      );
+      mockLoadDecryptedDataWithCiphertext.mockResolvedValue({
+        value: {
+          records: { catalog: [], lists: [listA] },
+          deletions: {},
+        },
+        ciphertext: storedBlob,
+      });
+
+      let thrownError: unknown;
+      await act(async () => {
+        try {
+          await result.current.persistPayload({
+            catalog: [],
+            lists: [listA, listB],
+          });
+        } catch (error) {
+          thrownError = error;
+        }
+      });
+
+      expect(thrownError).toBeInstanceOf(VaultWriteContendedError);
+      await waitFor(() => {
+        expect(result.current.error).toBe(
+          'Failed to save your changes. Please try again.',
+        );
+      });
+      expect(result.current.lists).toEqual([listA]);
+      expect(mockSaveEncryptedData).toHaveBeenCalledTimes(3);
+      expect(mockSaveEncryptedData).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ expectedCiphertext: storedBlob }),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ expectedCiphertext: storedBlob }),
+      );
+      expect(mockSaveEncryptedData).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ expectedCiphertext: storedBlob }),
+      );
+      // The retry merges this save's own lists into what is stored, so the
+      // last attempt carries listB even though the save never applied it.
+      const thirdWrite = mockSaveEncryptedData.mock.calls[2][0];
+      expect(
+        thirdWrite.value.records.lists
+          .map((list: GroceryList) => list.id)
+          .sort(),
+      ).toEqual(['listA', 'listB']);
+    });
   });
 
   describe('addItemToLists', () => {
