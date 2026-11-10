@@ -291,9 +291,10 @@ describe('VaultBackupController (HTTP integration)', () => {
       .set('Authorization', 'Bearer user-1');
 
     expect(res.status).toBe(200);
-    // tsoa writes a null return as an empty body under the status the
-    // controller set; there is no JSON document on the wire.
-    expect(res.text).toBe('');
+    // The controller writes the JSON literal `null` itself: tsoa would
+    // otherwise send an empty body.
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toBeNull();
   });
 
   test('returns latest record filtered by status=success', async () => {

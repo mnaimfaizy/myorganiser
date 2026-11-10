@@ -393,11 +393,12 @@ export function setupBackend(
     if (request.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, headers });
     } else if (request.method() === 'GET') {
+      // No backup: 200 with a literal JSON null body.
       await route.fulfill({
-        status: 404,
+        status: 200,
         headers,
         contentType: 'application/json',
-        body: JSON.stringify({}),
+        body: 'null',
       });
     } else {
       await route.fulfill({ status: 405, headers });

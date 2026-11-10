@@ -36,7 +36,7 @@ export interface RecordVaultBackupRequest {
 
 type RecordVaultBackupResponse = VaultBackupRecordDto | ErrorResponse;
 
-type GetLatestVaultBackupResponse = VaultBackupRecordDto | null | ErrorResponse;
+export type GetLatestVaultBackupResponse = VaultBackupRecordDto | null;
 
 interface VaultBackupHistoryPage {
   items: VaultBackupRecordDto[];
@@ -68,7 +68,7 @@ export class VaultBackupController extends Controller {
     @Query() status?: VaultBackupStatus,
     @Query() source?: VaultBackupSource,
     @Query() event?: VaultBackupEvent,
-  ): Promise<GetLatestVaultBackupResponse | null> {
+  ): Promise<GetLatestVaultBackupResponse> {
     const userId = requireUserId(req);
 
     const result = await vaultBackupService.getLatest(
@@ -77,6 +77,12 @@ export class VaultBackupController extends Controller {
       source,
       event,
     );
+    if (result.body === null) {
+      // tsoa writes a null return as an empty body. The contract is the JSON
+      // literal `null`, so write it here; returnHandler skips once headers are sent.
+      req.res?.status(result.status).json(null);
+      return null;
+    }
     this.setStatus(result.status);
     return result.body as GetLatestVaultBackupResponse;
   }
