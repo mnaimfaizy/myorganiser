@@ -106,7 +106,7 @@ export const prdBranchSlug = (title: string): string => {
  * but did not introduce the defect — and that passed. Triage writes the
  * attribution into the brief (the `my-triage` Skill), so the agent copies it;
  * with none it does the archaeology in local git history and names only a
- * number read from a merge commit subject, else `unknown: <why>`, which the
+ * number read from a merge or squash-merge subject on main, else `unknown: <why>`, which the
  * escaped-defect measurement counts honestly rather than as a guessed fact.
  *
  * Whether the branch is a fix is the measurement's own `pullRequestType`, so
@@ -120,8 +120,9 @@ export const fixAttributionInstruction = (branch: string): string | null => {
     '1. If the triage brief has an **Introduced in:** field, copy it exactly and do no archaeology. ' +
     '2. Otherwise do the archaeology in local git history (`git log -S`, `git blame`, ' +
     '`git log --merges --ancestry-path`): trace the defect to the commit that introduced it, ' +
-    'then find the merge commit that landed it. Write `Introduced in #<n>` only when `<n>` ' +
-    'is read from the subject of that merge commit (`Merge pull request #<n> from …`). ' +
+    'then find the commit on main that landed it. Write `Introduced in #<n>` only when `<n>` ' +
+    'is read from the subject of that commit: a merge commit (`Merge pull request #<n> from …`), ' +
+    "or a squash merge on main's first-parent history whose subject ends in `(#<n>)`. " +
     '3. If no pull request can be read that way, write `Introduced in unknown: <why>`, ' +
     'where `<why>` says what you searched and why it found no pull request. ' +
     'Never write a number you recalled, inferred from a title, or matched by topic: ' +

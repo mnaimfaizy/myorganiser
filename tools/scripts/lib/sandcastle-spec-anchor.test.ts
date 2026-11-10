@@ -138,14 +138,20 @@ test('only a fix branch is told how to attribute its defect', () => {
 test('the fix-branch instruction orders the sources and forbids guessed numbers', () => {
   // Regression: #1273's agent guessed `Introduced in #1318`. The instruction
   // must take the brief's field first, then archaeology that reads the number
-  // from a merge commit, then the `unknown` form, and never a recalled number.
+  // from a merge commit or a squash-merge subject on main's first-parent
+  // history, then the `unknown` form, and never a recalled number.
   const instruction = fixAttributionInstruction('fix/1273-x') ?? '';
   for (const phrase of [
     'Introduced in #<n>',
     'Introduced in unknown: <why>',
     'merge commit',
+    'Merge pull request #<n> from',
+    '(#<n>)',
+    'first-parent',
     'git log',
     '**Introduced in:**',
+    'Never write a number',
+    'recalled',
     'passes CI',
   ]) {
     assert.ok(instruction.includes(phrase), `names "${phrase}"`);
