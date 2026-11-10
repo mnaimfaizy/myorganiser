@@ -14,7 +14,7 @@
       "id": "tools:test",
       "ciStep": "Run tools/scripts contract suites",
       "job": "tool-suites",
-      "why": "Every Contract Suite under tools/scripts in one `node --test` run (ADR 0135) — the checker contracts, the review pipeline, the release and staging deploy contracts, and the sandcastle decisions. The triggers are every tree those suites compile or read from the real repository, not just tools/ itself: the Husky hooks and workflow files whose wiring several suites assert, the composite action tools/scripts/lib/review-tier-workflow.test.ts and tools/scripts/review/run-facts-wiring.test.ts read, the skills and agent bodies they import, the sandcastle inputs tools/scripts/lib/sandcastle-cli-version.test.ts reads, the deployment pages tools/scripts/check-deploy-pipeline.test.ts copies, and the brand sources tools/scripts/generate-brand-logos.test.ts, check-web-app-icons.test.ts and check-mobile-app-icon.test.ts read — the brand-logo suite is the only thing in the tree that asserts those token names, since its generator is reached by no gate. A suite proves its checker works, and the checker itself still runs over the whole tree on every pull request through `yarn gates:run`; what this list must not omit is a tree a suite reads with no checker standing behind it.",
+      "why": "Every Contract Suite under tools/scripts in one `node --test` run (ADR 0135) — the checker contracts, the review pipeline, the release and staging deploy contracts, and the sandcastle decisions. The triggers are every tree those suites compile or read from the real repository, not just tools/ itself: the Husky hooks and workflow files whose wiring several suites assert, the composite action tools/scripts/lib/review-tier-workflow.test.ts and tools/scripts/review/run-facts-wiring.test.ts read, the skills and agent bodies they import, the sandcastle inputs tools/scripts/lib/sandcastle-cli-version.test.ts reads, the deployment pages tools/scripts/check-deploy-pipeline.test.ts copies, and the brand sources tools/scripts/generate-brand-logos.test.ts, check-web-app-icons.test.ts and check-mobile-app-icon.test.ts read — the brand-logo suite is the only thing in the tree that asserts those token names, since its generator is reached by no gate. The E2E shard plan's suite (tools/scripts/lib/e2e-shard-plan.test.ts) reads the Playwright config and the shard weights file, and asserts the plan's spec listing against `playwright test --list`; those two files are triggers because a change to either can make the plan and Playwright disagree about which files exist. A suite proves its checker works, and the checker itself still runs over the whole tree on every pull request through `yarn gates:run`; what this list must not omit is a tree a suite reads with no checker standing behind it.",
       "triggers": [
         "tools/**",
         ".husky/**",
@@ -24,7 +24,9 @@
         "docs/deployment/**",
         "libs/design-tokens/src/generated/**",
         "libs/web/ui/src/lib/components/AppLogo/**",
-        "libs/mobile/ui/src/components/BrandMark.tsx"
+        "libs/mobile/ui/src/components/BrandMark.tsx",
+        "apps/web-e2e/playwright.config.ts",
+        "apps/web-e2e/shard-weights.json"
       ]
     },
     {
