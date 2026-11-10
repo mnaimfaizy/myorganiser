@@ -462,6 +462,11 @@ describe('VaultUnlockCard', () => {
         screen.queryByRole('button', { name: 'Unlock with passkey' }),
       ).not.toBeInTheDocument();
       expect(screen.getByTestId('vault-unlock-submit')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Enter your passphrase to unlock your vault on this device for this session.',
+        ),
+      ).toBeInTheDocument();
     });
 
     test('an owner enrolled on this device sees the passkey option, and the passphrase form stays', async () => {
@@ -481,6 +486,14 @@ describe('VaultUnlockCard', () => {
       ).toBeInTheDocument();
       expect(screen.getByText('Passphrase')).toBeInTheDocument();
       expect(screen.getByTestId('vault-unlock-submit')).toBeInTheDocument();
+      expect(
+        screen.getByText('Unlock your vault on this device for this session.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'Enter your passphrase to unlock your vault on this device for this session.',
+        ),
+      ).not.toBeInTheDocument();
     });
 
     test('choosing the passkey option unlocks with the passkey secret and does not run the passphrase unlock', async () => {
