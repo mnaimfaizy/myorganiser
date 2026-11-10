@@ -2,7 +2,7 @@
 description: 'Use when a design brief needs turning into a House Explainer Page — a self-contained HTML artifact under docs/. Produces and verifies the page. What the page is for, and every fact in it, stay with the design-brief skill.'
 name: 'Designer'
 tools: [read, search, edit, execute]
-model: ['Claude Sonnet 5 (copilot)', 'GPT-5.6 Terra (copilot)']
+model: ['Claude Sonnet 5.5 (copilot)', 'GPT-5.6 Terra (copilot)']
 user-invocable: true
 argument-hint: 'A design brief (design-brief skill output, or a path to one) + the target page path'
 ---

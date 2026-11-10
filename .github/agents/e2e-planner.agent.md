@@ -2,7 +2,7 @@
 description: 'Use when the user asks to plan, outline, or design Playwright end-to-end tests for a user flow in MyOrganiser. Returns a behavior-first flow matrix and structured test plan; does not write the test file.'
 name: 'E2EPlanner'
 tools: [read, search]
-model: ['Claude Sonnet 5 (copilot)', 'GPT-5.6 Terra (copilot)', 'Grok 4.6 (copilot)']
+model: ['Claude Sonnet 5.5 (copilot)', 'GPT-5.6 Terra (copilot)', 'Grok 4.6 (copilot)']
 user-invocable: true
 argument-hint: "User flow to test (e.g. 'login + create todo')"
 ---
