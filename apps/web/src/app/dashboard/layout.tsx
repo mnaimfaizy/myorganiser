@@ -87,6 +87,9 @@ export default function DashboardLayout({
              * /vault/blobs twice (reconcile, then the pull's first pass). That
              * is on purpose, measured in #1358; coalescing those in-flight
              * reads without merging the runners is tracked in #1489.
+             * GET /vault/backups/latest is not one of these: Home asks it once
+             * per load, and only after unlock (the extra calls in #1358 were
+             * dev StrictMode and lock/unlock), so it has no duplicate.
              */}
             <VaultMetaConvergeRunner />
             <VaultPullRunner />
