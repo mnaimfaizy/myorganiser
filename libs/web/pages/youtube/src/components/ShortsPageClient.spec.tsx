@@ -734,6 +734,23 @@ describe('ShortsPageClient — locked and unlocked branches', () => {
       expect(screen.queryByTestId('entry-continue')).not.toBeInTheDocument();
     });
 
+    it('shows the connection error with Retry, which re-runs the status check', () => {
+      const refreshStatus = jest.fn();
+      (useYouTubeStatus as jest.Mock).mockReturnValue({
+        connected: false,
+        status: 'error',
+        refresh: refreshStatus,
+      });
+      renderShorts({ acknowledge: false });
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not check your YouTube connection.',
+      );
+      expect(screen.queryByTestId('entry-continue')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(refreshStatus).toHaveBeenCalledTimes(1);
+    });
+
     it('shows skeletons while the first Shorts load is in flight', () => {
       renderShorts({ shortsState: { shorts: [], loading: true } });
 

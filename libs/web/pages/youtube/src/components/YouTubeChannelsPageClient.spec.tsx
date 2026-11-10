@@ -850,4 +850,90 @@ describe('YouTubeChannelsPageClient', () => {
       });
     });
   });
+
+  describe('status error and connect failure', () => {
+    it('shows the status alert with Retry, which re-runs the status check', () => {
+      const refresh = jest.fn();
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: false,
+        status: 'error',
+        refresh,
+      });
+
+      render(<YouTubeChannelsPageClient />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not check your YouTube connection.',
+      );
+      expect(screen.queryByText('Connect YouTube')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the connect error on the prompt when connect rejects, and keeps Connect usable', async () => {
+      let attempts = 0;
+      const connect = jest.fn(async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('auth-url request failed');
+      });
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: false,
+        status: 'disconnected',
+        refresh: jest.fn(),
+      });
+      mockUseYouTubeConnect.mockReturnValue({
+        connect,
+        disconnect: jest.fn(),
+      });
+
+      render(<YouTubeChannelsPageClient />);
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Connect YouTube' }),
+        );
+      });
+
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not start the YouTube connection. Please try again.',
+      );
+      expect(
+        screen.getByRole('button', { name: 'Connect YouTube' }),
+      ).toBeEnabled();
+    });
+
+    it('clears the connect error when Connect is pressed again', async () => {
+      let attempts = 0;
+      const connect = jest.fn(async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('auth-url request failed');
+      });
+      mockUseYouTubeStatus.mockReturnValue({
+        connected: false,
+        status: 'disconnected',
+        refresh: jest.fn(),
+      });
+      mockUseYouTubeConnect.mockReturnValue({
+        connect,
+        disconnect: jest.fn(),
+      });
+
+      render(<YouTubeChannelsPageClient />);
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Connect YouTube' }),
+        );
+      });
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Connect YouTube' }),
+        );
+      });
+
+      expect(connect).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
 });

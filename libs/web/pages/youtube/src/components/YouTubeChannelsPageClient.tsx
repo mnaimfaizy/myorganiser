@@ -10,12 +10,14 @@ import {
   useYouTubeSyncStatus,
   YouTubeRequestError,
 } from '../hooks';
+import { useGuardedYouTubeConnect } from '../hooks/useGuardedYouTubeConnect';
 import { useYouTubeSyncPoll } from '../hooks/useYouTubeSyncPoll';
 import { isRunLive } from '../lib/syncProgress';
 import { DisconnectYouTubeDialog } from './DisconnectYouTubeDialog';
 import { SubscriptionManager } from './SubscriptionManager';
 import { YouTubeConnectPrompt } from './YouTubeConnectPrompt';
 import { YouTubeSectionNav } from './YouTubeSectionNav';
+import { YouTubeStatusError } from './YouTubeStatusError';
 import { YouTubeUnavailableNotice } from './YouTubeUnavailableNotice';
 import { toUnavailableNoticeProps } from '../lib/unavailableNotice';
 
@@ -36,7 +38,7 @@ export function YouTubeChannelsPageClient() {
 
 function YouTubeChannelsConnectionState() {
   const { connected, status, refresh: refreshStatus } = useYouTubeStatus();
-  const { connect } = useYouTubeConnect();
+  const { handleConnect, connectError } = useGuardedYouTubeConnect();
   const [disconnectNotice, setDisconnectNotice] = useState<{
     message: string;
     googlePermissionsUrl: string;
@@ -68,12 +70,17 @@ function YouTubeChannelsConnectionState() {
     );
   }
 
+  if (status === 'error') {
+    return <YouTubeStatusError onRetry={refreshStatus} />;
+  }
+
   if (!connected) {
     return (
       <>
         {disconnectNoticeBanner}
         <YouTubeConnectPrompt
-          onConnect={connect}
+          onConnect={handleConnect}
+          errorMessage={connectError ?? undefined}
           statusMessage={
             status === 'revoked'
               ? 'Your previous connection was revoked. Please reconnect.'
