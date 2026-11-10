@@ -20,7 +20,7 @@ export function useLatestBackupSummary(enabled: boolean): BackupState {
       .getLatestBackup({ status: 'success', event: 'export' })
       .then((response) => {
         if (!isActive) return;
-        if (!response.data) {
+        if (response.data === null) {
           setState({ status: 'empty' });
           return;
         }

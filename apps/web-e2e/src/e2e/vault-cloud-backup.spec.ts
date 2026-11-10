@@ -157,7 +157,7 @@ function setupBackend(page: Page) {
         status: 200,
         headers,
         contentType: 'application/json',
-        body: '',
+        body: 'null',
       });
       return;
     }

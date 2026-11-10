@@ -1218,12 +1218,9 @@
 				"additionalProperties": false
 			},
 			"GetLatestVaultBackupResponse": {
-				"anyOf": [
+				"allOf": [
 					{
 						"$ref": "#/components/schemas/VaultBackupRecordDto"
-					},
-					{
-						"$ref": "#/components/schemas/ErrorResponse"
 					}
 				],
 				"nullable": true
@@ -4043,12 +4040,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"allOf": [
-										{
-											"$ref": "#/components/schemas/GetLatestVaultBackupResponse"
-										}
-									],
-									"nullable": true
+									"$ref": "#/components/schemas/GetLatestVaultBackupResponse"
 								}
 							}
 						}

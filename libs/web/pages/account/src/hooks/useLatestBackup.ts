@@ -57,7 +57,7 @@ export function useLatestBackup(
         event: 'export',
       });
       // 200 with a null body means no backup exists yet.
-      if (!response.data) {
+      if (response.data === null) {
         setState({ status: 'empty', record: null });
         return;
       }

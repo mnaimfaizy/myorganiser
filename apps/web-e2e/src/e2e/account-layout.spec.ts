@@ -27,7 +27,7 @@ import { PHONE_VIEWPORT, signInToShell, tabBar } from './helpers/shellLayout';
  * Hermetic: the backend is stubbed by signInToShell. The connected tests stub
  * the YouTube status, notification settings, feedback reports and
  * /vault/backups/latest reads. Otherwise the shared sign-in backend (setupBackend)
- * answers the backups read with 200 and an empty body (no backups), which the not-connected test
+ * answers the backups read with 200 and a JSON null body (no backups), which the not-connected test
  * relies on. The account is not vault-gated, so no vault is created.
  */
 

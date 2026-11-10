@@ -630,8 +630,6 @@ export interface GetLatestVaultBackupResponse {
     'blobTypes': Array<VaultBackupBlobType>;
     'sizeBytes': number;
     'createdAt': string;
-    'message': string;
-    'details'?: any;
 }
 
 

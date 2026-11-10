@@ -871,9 +871,8 @@ components:
       type: object
       additionalProperties: false
     GetLatestVaultBackupResponse:
-      anyOf:
+      allOf:
         - $ref: "#/components/schemas/VaultBackupRecordDto"
-        - $ref: "#/components/schemas/ErrorResponse"
       nullable: true
     VaultBackupHistoryPage:
       properties:
@@ -2797,9 +2796,7 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/GetLatestVaultBackupResponse"
-                nullable: true
+                $ref: "#/components/schemas/GetLatestVaultBackupResponse"
         "426":
           description: Below the Version Floor
           content:

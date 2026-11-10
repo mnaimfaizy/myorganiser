@@ -454,11 +454,13 @@ Two old routes redirect here permanently:
 
 The backend exposes three JWT-protected endpoints under `/api/v1/vault/backups`:
 
-| Method | Path                                              | Purpose                                            |
-| ------ | ------------------------------------------------- | -------------------------------------------------- |
-| POST   | `/vault/backups`                                  | Append an audit row (called by `AuditReporter`)    |
-| GET    | `/vault/backups/latest?status=…&source=…&event=…` | Fetch latest matching audit row (200 null if none) |
-| GET    | `/vault/backups?cursor=…&limit=…&source=…`        | Cursor-paginated list of audit rows                |
+| Method | Path                                              | Purpose                                                   |
+| ------ | ------------------------------------------------- | --------------------------------------------------------- |
+| POST   | `/vault/backups`                                  | Append an audit row (called by `AuditReporter`)           |
+| GET    | `/vault/backups/latest?status=…&source=…&event=…` | Fetch latest matching audit row (200 JSON `null` if none) |
+| GET    | `/vault/backups?cursor=…&limit=…&source=…`        | Cursor-paginated list of audit rows                       |
+
+When no row matches, `GET /vault/backups/latest` answers `200` with `Content-Type: application/json` and the literal body `null` (not 404, not an empty body); the generated `getLatestBackup` data type is `… | null`.
 
 Schema highlights (Prisma model `VaultBackupRecord`):
 
