@@ -86,8 +86,9 @@ export function VaultUnlockCard() {
           Unlock your vault
         </h1>
         <p className="col-span-2 text-body text-navy-muted-foreground">
-          Enter your passphrase to unlock your vault on this device for this
-          session.
+          {passkeyAvailable
+            ? 'Unlock your vault on this device for this session.'
+            : 'Enter your passphrase to unlock your vault on this device for this session.'}
         </p>
         {passkeyAvailable ? (
           <div className="col-span-2">

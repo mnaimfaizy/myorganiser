@@ -459,9 +459,18 @@ export function VaultGate(props: VaultGateProps) {
 
   const title = useMemo(() => props.title, [props.title]);
 
-  const unlockDescription = props.encryptedItems
-    ? `Your ${props.encryptedItems} are encrypted. Enter your passphrase to open them on this device.`
-    : 'Your data is encrypted. Enter your passphrase to open it on this device.';
+  // With the passkey option shown, the copy stays neutral: the UI itself offers
+  // "Unlock with passkey" and "or use your passphrase".
+  let unlockDescription: string;
+  if (passkeyAvailable) {
+    unlockDescription = props.encryptedItems
+      ? `Your ${props.encryptedItems} are encrypted. Unlock to open them on this device.`
+      : 'Your data is encrypted. Unlock to open it on this device.';
+  } else {
+    unlockDescription = props.encryptedItems
+      ? `Your ${props.encryptedItems} are encrypted. Enter your passphrase to open them on this device.`
+      : 'Your data is encrypted. Enter your passphrase to open it on this device.';
+  }
 
   // Recovery Key Acknowledgment: the User just created a Vault and needs to
   // record their key. This branch sits above the children branch so it is shown

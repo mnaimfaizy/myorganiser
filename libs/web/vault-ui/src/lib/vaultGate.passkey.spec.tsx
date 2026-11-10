@@ -117,11 +117,14 @@ function lockedSession(
 function renderGate(
   session: VaultSessionContextValue,
   platform: PasskeyPlatform,
+  encryptedItems?: string,
 ) {
   return render(
     <VaultSessionContext.Provider value={session}>
       <PasskeyPlatformProvider platform={platform}>
-        <VaultGate title="Test">{() => <div>children</div>}</VaultGate>
+        <VaultGate title="Test" encryptedItems={encryptedItems}>
+          {() => <div>children</div>}
+        </VaultGate>
       </PasskeyPlatformProvider>
     </VaultSessionContext.Provider>,
   );
@@ -269,6 +272,40 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
     );
     expect(
       screen.getByRole('button', { name: 'Unlock with recovery key' }),
+    ).toBeInTheDocument();
+  });
+
+  test('with the passkey option shown, the explanatory line does not point only at the passphrase', async () => {
+    await enrol('owner-a', platform);
+
+    renderGate(lockedSession('owner-a', jest.fn()), platform, 'tasks');
+
+    expect(
+      screen.getByText(
+        'Your tasks are encrypted. Unlock to open them on this device.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test('with the passkey option shown and no items named, the explanatory line is the neutral generic one', async () => {
+    await enrol('owner-a', platform);
+
+    renderGate(lockedSession('owner-a', jest.fn()), platform);
+
+    expect(
+      screen.getByText(
+        'Your data is encrypted. Unlock to open it on this device.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test('without the passkey option, the explanatory line still asks for the passphrase', () => {
+    renderGate(lockedSession('owner-a', jest.fn()), platform, 'tasks');
+
+    expect(
+      screen.getByText(
+        'Your tasks are encrypted. Enter your passphrase to open them on this device.',
+      ),
     ).toBeInTheDocument();
   });
 
