@@ -5,7 +5,7 @@ The approved v2.0 UI/UX design for the web app — user portal, admin portal, an
 |                  |                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ |
 | Source           | [Claude Design canvas](https://claude.ai/artifact/59o7kdnAyxfpsNTrPstwBt) (private; needs the owner's login) |
-| Exported version | `1794289728-69b4`                                                                                            |
+| Exported version | `1794289870-d992`                                                                                            |
 | Exported         | 2026-11-10                                                                                                   |
 | Approved for     | [PRD #1241](https://github.com/mnaimfaizy/myorganiser/issues/1241)                                           |
 
