@@ -45,14 +45,6 @@ describe('localDateKey parity for calendar helpers', () => {
     'keys %s to the local calendar day',
     (_label, date, expected) => {
       expect(localDateKey(date)).toBe(expected);
-      expect(toCalendarDate(date)).toBe(localDateKey(date));
-      expect(localDateOnlyString(date)).toBe(localDateKey(date));
-    },
-  );
-
-  it.each(cases)(
-    'agrees with the expected literal for %s',
-    (_label, date, expected) => {
       expect(toCalendarDate(date)).toBe(expected);
       expect(localDateOnlyString(date)).toBe(expected);
     },
