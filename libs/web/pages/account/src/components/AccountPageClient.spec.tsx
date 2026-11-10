@@ -52,9 +52,10 @@ const PREFERENCES = {
   save: jest.fn(),
 };
 
-function digestSettings(connected: boolean) {
+function digestSettings(connected: boolean, settingsLoaded = connected) {
   return {
     connected,
+    settingsLoaded,
     enabled: true,
     setEnabled: jest.fn(),
     weekday: 1,
@@ -127,13 +128,17 @@ describe('AccountPageClient', () => {
     expect(headings[0]).toHaveTextContent('Ada Lovelace');
   });
 
-  it('omits the YouTube digest card when the YouTube account is not connected', () => {
+  it('renders neither the digest card nor a banner when the YouTube account is not connected', () => {
     setDigestConnected(false);
 
     render(<AccountPageClient />);
 
     expect(
       screen.queryByRole('heading', { name: 'Weekly YouTube digest' }),
+    ).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Save digest settings' }),
     ).toBeNull();
   });
 
@@ -150,6 +155,43 @@ describe('AccountPageClient', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Boom');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(retryLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the retryable error without the digest form when the connected settings request fails', () => {
+    const retryLoad = jest.fn();
+    (useYouTubeDigestSettings as jest.Mock).mockReturnValue({
+      ...digestSettings(true, false),
+      loadError: 'Boom',
+      retryLoad,
+    });
+    setBreakpoint(false);
+    render(<AccountPageClient />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Boom');
+    expect(
+      screen.queryByRole('heading', { name: 'Weekly YouTube digest' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Save digest settings' }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retryLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the digest form while the connected settings request is pending', () => {
+    (useYouTubeDigestSettings as jest.Mock).mockReturnValue(
+      digestSettings(true, false),
+    );
+    setBreakpoint(false);
+    render(<AccountPageClient />);
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: 'Weekly YouTube digest' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Save digest settings' }),
+    ).toBeNull();
   });
 
   it('shows the YouTube digest card when the YouTube account is connected', () => {

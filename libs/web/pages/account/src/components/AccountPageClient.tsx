@@ -55,7 +55,7 @@ export function AccountPageClient() {
           onRetry={digest.retryLoad}
         />
       )}
-      {digest.connected && (
+      {digest.connected && digest.settingsLoaded && (
         <YouTubeDigestSection
           variant={variant}
           enabled={digest.enabled}
