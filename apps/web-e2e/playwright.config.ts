@@ -87,6 +87,22 @@ function liveBackendWebServers(
 }
 
 /**
+ * EXPERIMENT ONLY — DO NOT MERGE (issue #1493).
+ *
+ * `E2E_WORKERS` overrides the preset's `workers` (1 under CI, ADR 0050), so a
+ * workflow can run one lane with 2 workers and leave the default alone. An
+ * unset or invalid value keeps the preset.
+ */
+function workersOverride(): number | undefined {
+  const raw = process.env['E2E_WORKERS'];
+  if (!raw) return undefined;
+  const workers = Number(raw);
+  return Number.isInteger(workers) && workers > 0 ? workers : undefined;
+}
+
+const preset = nxE2EPreset(__filename, { testDir: './src/e2e' });
+
+/**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
@@ -96,7 +112,8 @@ function liveBackendWebServers(
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  ...nxE2EPreset(__filename, { testDir: './src/e2e' }),
+  ...preset,
+  workers: workersOverride() ?? preset.workers,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,

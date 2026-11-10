@@ -45,6 +45,9 @@ jobs:
       # Playwright's webServer starts Nx as a nested child process, and the Nx
       # daemon does not survive that cleanly on hosted runners.
       NX_DAEMON: 'false'
+      # EXPERIMENT ONLY — DO NOT MERGE (issue #1493): two Playwright workers,
+      # policed by --fail-on-flaky-tests. Read by apps/web-e2e/playwright.config.ts.
+      E2E_WORKERS: '2'
 
     steps:
       - name: Checkout repository
@@ -87,12 +90,26 @@ jobs:
       - name: Build frontend for E2E
         run: corepack yarn nx build web
 
+      # EXPERIMENT ONLY — DO NOT MERGE (issue #1493). Samples CPU while the
+      # suite runs: vmstat every 2s, and the top processes (next-server,
+      # Chromium, Playwright workers) every ~5s. Read by
+      # tools/scripts/ci/e2e-workers-experiment.ts.
+      - name: Start CPU sampler
+        shell: bash
+        run: |
+          mkdir -p cpu-samples
+          nproc > cpu-samples/nproc
+          nohup stdbuf -oL vmstat -n -t 2 > cpu-samples/vmstat.log 2>&1 &
+          echo $! > cpu-samples/vmstat.pid
+          nohup bash -c 'while :; do echo "@@ $(date +%s)"; top -b -n 2 -d 1 -w 220 | awk "/^top -/{f++} f==2" | head -24; sleep 4; done' > cpu-samples/top.log 2>&1 &
+          echo $! > cpu-samples/top.pid
+
       # --fail-on-flaky-tests lives here and not on the blocking lane. A test
       # that passes on retry is not evidence that a pull request broke
       # something, but it is evidence about suite health — and nobody is
       # blocked here. See ADR 0050.
       - name: Run E2E (${{ matrix.browser }})
-        run: corepack yarn nx run web-e2e:${{ matrix.target }} --fail-on-flaky-tests --reporter=list
+        run: corepack yarn nx run web-e2e:${{ matrix.target }} --fail-on-flaky-tests --reporter=list,blob
 
       - name: Upload report
         if: ${{ !cancelled() }}
@@ -100,6 +117,30 @@ jobs:
         with:
           name: nightly-e2e-report-${{ matrix.browser }}
           path: dist/.playwright/apps/web-e2e/
+          retention-days: 14
+
+      # EXPERIMENT ONLY (issue #1493): per-attempt results for the flake list.
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nightly-blob-report-${{ matrix.browser }}
+          path: blob-report/
+          retention-days: 14
+
+      - name: Stop CPU sampler
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          for f in cpu-samples/*.pid; do kill "$(cat "$f")" 2>/dev/null || true; done
+          rm -f cpu-samples/*.pid
+
+      - name: Upload CPU samples
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: cpu-samples-nightly-${{ matrix.browser }}
+          path: cpu-samples/
           retention-days: 14
 
   # Schedule only, same as Report Success. A workflow_dispatch failure is a

@@ -1105,6 +1105,9 @@ jobs:
       # Playwright's webServer starts Nx as a nested child process, and the Nx
       # daemon does not survive that cleanly on hosted runners.
       NX_DAEMON: 'false'
+      # EXPERIMENT ONLY — DO NOT MERGE (issue #1493): two Playwright workers
+      # per shard. Read by apps/web-e2e/playwright.config.ts.
+      E2E_WORKERS: '2'
 
     steps:
       - name: Checkout repository
@@ -1162,6 +1165,20 @@ jobs:
       # apps/web-e2e/shard-weights.json. A file with no weight still runs, at
       # a default weight. The plan fails on an empty shard, because
       # Playwright given no file filter would run the whole suite.
+      # EXPERIMENT ONLY — DO NOT MERGE (issue #1493). Samples CPU while the
+      # shard runs: vmstat every 2s, and the top processes (next-server,
+      # Chromium, Playwright workers) every ~5s. Read by
+      # tools/scripts/ci/e2e-workers-experiment.ts.
+      - name: Start CPU sampler
+        shell: bash
+        run: |
+          mkdir -p cpu-samples
+          nproc > cpu-samples/nproc
+          nohup stdbuf -oL vmstat -n -t 2 > cpu-samples/vmstat.log 2>&1 &
+          echo $! > cpu-samples/vmstat.pid
+          nohup bash -c 'while :; do echo "@@ $(date +%s)"; top -b -n 2 -d 1 -w 220 | awk "/^top -/{f++} f==2" | head -24; sleep 4; done' > cpu-samples/top.log 2>&1 &
+          echo $! > cpu-samples/top.pid
+
       - name: Run E2E shard
         env:
           SHARD: ${{ matrix.shard }}/4
@@ -1180,7 +1197,163 @@ jobs:
         with:
           name: e2e-blob-report-${{ matrix.shard }}
           path: blob-report/
-          retention-days: 7
+          retention-days: 14
+
+      - name: Stop CPU sampler
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          for f in cpu-samples/*.pid; do kill "$(cat "$f")" 2>/dev/null || true; done
+          rm -f cpu-samples/*.pid
+
+      - name: Upload CPU samples
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: cpu-samples-e2e-${{ matrix.shard }}
+          path: cpu-samples/
+          retention-days: 14
+
+  e2e-control:
+    name: Control E2E Chromium (shard ${{ matrix.shard }}/4)
+    # EXPERIMENT ONLY — DO NOT MERGE (issue #1493). A copy of `e2e` at the
+    # preset's one worker. Its name does not start with "E2E", so
+    # `ci:duration:measure` reads the lane as the 2-worker shards only, and
+    # `E2E Report` does not wait on it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Pull requests only: the same commits ran this seconds earlier on the PR,
+    # and the nightly workflow covers `main`. See ADR 0050.
+    if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}
+    # Needs only `setup`, not `lint` or `test` (issue #1396). Waiting for
+    # either of them queued E2E behind the unit tests and put the critical
+    # path at 11 minutes; starting alongside them brings it back down. The
+    # cost is that E2E still burns a runner when Lint or Test are already
+    # failing, which is free on a public repository. See ADR 0050.
+    needs:
+      - setup
+
+    # Four shards balanced by measured duration rather than Playwright's own
+    # count-based `--shard`, which cut the suite alphabetically and left one
+    # shard at 76s of specs and another at 248s (issue #1381). The shard count
+    # here and the `/4` in the job name and `Run E2E shard` move together;
+    # tools/scripts/ci/e2e-lane-workflow.test.ts holds them to each other.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    env:
+      # Playwright's webServer starts Nx as a nested child process, and the Nx
+      # daemon does not survive that cleanly on hosted runners.
+      NX_DAEMON: 'false'
+      # EXPERIMENT ONLY (issue #1493): the paired control keeps the preset's
+      # one worker, on the same commit and in the same run as the 2-worker lane.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Verify frozen lockfile
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- yarn.lock
+
+      - name: Restore Nx computation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-22-e2e-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-22-e2e-
+            ${{ runner.os }}-nx-22-
+
+      # Only the browser this lane needs. Playwright advises against caching
+      # browser binaries: restoring the cache costs about what downloading does.
+      # No `--with-deps`: the ubuntu-24.04 image already carries Chromium's
+      # system libraries, and the apt step only added fonts — which, fetched
+      # from the Ubuntu mirror at ~30 kB/s, stalled this step for 3–9 minutes
+      # in 5 of 65 runs (issue #1381). The nightly keeps `--with-deps`.
+      - name: Install Playwright Chromium
+        run: corepack yarn playwright install chromium
+
+      # Built here rather than inside Playwright's webServer timeout, so a build
+      # failure is attributable and starting the server is only that.
+      - name: Build frontend for E2E
+        run: corepack yarn nx build web
+
+      # The shard's spec files come from tools/scripts/ci/e2e-shard-plan.ts,
+      # which assigns every spec file on disk to a shard by its weight in
+      # apps/web-e2e/shard-weights.json. A file with no weight still runs, at
+      # a default weight. The plan fails on an empty shard, because
+      # Playwright given no file filter would run the whole suite.
+      # EXPERIMENT ONLY — DO NOT MERGE (issue #1493). Samples CPU while the
+      # shard runs: vmstat every 2s, and the top processes (next-server,
+      # Chromium, Playwright workers) every ~5s. Read by
+      # tools/scripts/ci/e2e-workers-experiment.ts.
+      - name: Start CPU sampler
+        shell: bash
+        run: |
+          mkdir -p cpu-samples
+          nproc > cpu-samples/nproc
+          nohup stdbuf -oL vmstat -n -t 2 > cpu-samples/vmstat.log 2>&1 &
+          echo $! > cpu-samples/vmstat.pid
+          nohup bash -c 'while :; do echo "@@ $(date +%s)"; top -b -n 2 -d 1 -w 220 | awk "/^top -/{f++} f==2" | head -24; sleep 4; done' > cpu-samples/top.log 2>&1 &
+          echo $! > cpu-samples/top.pid
+
+      - name: Run E2E shard
+        env:
+          SHARD: ${{ matrix.shard }}/4
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan="$(node tools/scripts/ci/e2e-shard-plan.ts --shard "$SHARD")"
+          mapfile -t files <<< "$plan"
+          echo "Shard $SHARD runs ${#files[@]} spec file(s):"
+          printf '  %s\n' "${files[@]}"
+          corepack yarn nx run web-e2e:e2e --reporter=blob "${files[@]}"
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: control-e2e-blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 14
+
+      - name: Stop CPU sampler
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          for f in cpu-samples/*.pid; do kill "$(cat "$f")" 2>/dev/null || true; done
+          rm -f cpu-samples/*.pid
+
+      - name: Upload CPU samples
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: cpu-samples-control-${{ matrix.shard }}
+          path: cpu-samples/
+          retention-days: 14
 
   # The required check for the blocking lane (ADR 0050, #1397). It reads the
   # shards' result and nothing else: no checkout, no dependencies, so it adds
