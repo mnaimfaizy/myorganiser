@@ -230,7 +230,7 @@ describe('VaultPhonePasskeyRow', () => {
     expect(platform.createCredential).not.toHaveBeenCalled();
   });
 
-  test('turn off: pressing the On row disables this device directly, with no dialog', async () => {
+  test('turn off: pressing the On row opens the confirmation and does not disable anything', async () => {
     const platform = createFakePlatform();
     await enrolOwner(platform);
     renderRow(platform);
@@ -242,19 +242,87 @@ describe('VaultPhonePasskeyRow', () => {
 
     fireEvent.click(row);
 
+    expect(
+      await screen.findByRole('alertdialog', {
+        name: 'Turn off Passkey Unlock?',
+      }),
+    ).toBeInTheDocument();
+    expect(disablePasskeyUnlock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
+      PASSKEY_UNLOCK_STATUS_ON,
+    );
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(true);
+  });
+
+  test('turn off: confirming disables this device once, shows Off, toasts, and closes the dialog', async () => {
+    const platform = createFakePlatform();
+    await enrolOwner(platform);
+    renderRow(platform);
+
+    fireEvent.click(await screen.findByTestId('passkey-unlock-row'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn off' }));
+
     await waitFor(() => {
       expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
         PASSKEY_UNLOCK_STATUS_OFF,
       );
     });
+    expect(disablePasskeyUnlock).toHaveBeenCalledTimes(1);
     expect(disablePasskeyUnlock).toHaveBeenCalledWith('owner-a');
     expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
-    expect(
-      screen.queryByLabelText('Current passphrase'),
-    ).not.toBeInTheDocument();
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Passkey Unlock is off' }),
     );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('alertdialog', { name: 'Turn off Passkey Unlock?' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  test('turn off: Cancel closes the confirmation and leaves the row On', async () => {
+    const platform = createFakePlatform();
+    await enrolOwner(platform);
+    renderRow(platform);
+
+    fireEvent.click(await screen.findByTestId('passkey-unlock-row'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('alertdialog', { name: 'Turn off Passkey Unlock?' }),
+      ).not.toBeInTheDocument();
+    });
+    expect(disablePasskeyUnlock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
+      PASSKEY_UNLOCK_STATUS_ON,
+    );
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(true);
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  test('turn off: Escape closes the confirmation and leaves the row On', async () => {
+    const platform = createFakePlatform();
+    await enrolOwner(platform);
+    renderRow(platform);
+
+    fireEvent.click(await screen.findByTestId('passkey-unlock-row'));
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Turn off Passkey Unlock?',
+    });
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('alertdialog', { name: 'Turn off Passkey Unlock?' }),
+      ).not.toBeInTheDocument();
+    });
+    expect(disablePasskeyUnlock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
+      PASSKEY_UNLOCK_STATUS_ON,
+    );
+    expect(isPasskeyUnlockEnrolled('owner-a')).toBe(true);
   });
 
   test('turn off: a refused removal toasts the failure and the row stays On', async () => {
@@ -264,6 +332,7 @@ describe('VaultPhonePasskeyRow', () => {
 
     (disablePasskeyUnlock as jest.Mock).mockReturnValueOnce(false);
     fireEvent.click(await screen.findByTestId('passkey-unlock-row'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn off' }));
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(
@@ -273,6 +342,7 @@ describe('VaultPhonePasskeyRow', () => {
         }),
       );
     });
+    expect(disablePasskeyUnlock).toHaveBeenCalledTimes(1);
     expect(disablePasskeyUnlock).toHaveBeenCalledWith('owner-a');
     expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
       PASSKEY_UNLOCK_STATUS_ON,
@@ -283,7 +353,31 @@ describe('VaultPhonePasskeyRow', () => {
     );
   });
 
-  test('when the Vault is locked the row is disabled, shows the reason, and pressing it does nothing', async () => {
+  test('the chevron shows on the Off row, hidden from assistive technology', async () => {
+    const platform = createFakePlatform();
+    renderRow(platform);
+
+    const row = await screen.findByTestId('passkey-unlock-row');
+    const chevron = row.querySelector('svg');
+    expect(chevron).toBeInTheDocument();
+    expect(chevron).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('the chevron shows on the On row, hidden from assistive technology', async () => {
+    const platform = createFakePlatform();
+    await enrolOwner(platform);
+    renderRow(platform);
+
+    const row = await screen.findByTestId('passkey-unlock-row');
+    expect(screen.getByTestId('passkey-unlock-status')).toHaveTextContent(
+      PASSKEY_UNLOCK_STATUS_ON,
+    );
+    const chevron = row.querySelector('svg');
+    expect(chevron).toBeInTheDocument();
+    expect(chevron).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('when the Vault is locked the row is disabled, shows the reason, and pressing it opens no confirmation', async () => {
     const platform = createFakePlatform();
     await enrolOwner(platform);
     renderRow(platform, { unlocked: false });
@@ -299,6 +393,9 @@ describe('VaultPhonePasskeyRow', () => {
     fireEvent.click(row);
 
     expect(disablePasskeyUnlock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Turn off Passkey Unlock?' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText('Current passphrase'),
     ).not.toBeInTheDocument();
