@@ -13,6 +13,7 @@ import {
   DEFAULT_POLL_SECONDS,
   DEFAULT_TIMEOUT_MINUTES,
   MAX_BLOCKED_GREEN_READS,
+  MAX_MERGE_REFUSALS,
   MAX_UPDATES_PER_PULL_REQUEST,
   decideNext,
   parseTrainArgs,
@@ -192,7 +193,11 @@ describe('decideNext', () => {
 
   test('BLOCKED with every check green waits briefly, then stops', () => {
     const blocked = snapshot({ mergeStateStatus: 'BLOCKED' });
-    assert.equal(decideNext(blocked, REQUIRED).kind, 'wait');
+    assert.deepEqual(decideNext(blocked, REQUIRED), {
+      kind: 'wait',
+      reason: 'GitHub has not yet unblocked the merge',
+      blockedGreen: true,
+    });
     const step = decideNext(blocked, REQUIRED, {
       blockedGreenReads: MAX_BLOCKED_GREEN_READS - 1,
     });
@@ -441,6 +446,54 @@ describe('runTrain', () => {
     const { io } = fakeIo({});
     const result = await runTrain(args([4]), io);
     assert.match(result.stoppedAt?.reason ?? '', /#4 could not be read/);
+  });
+
+  test('a merge GitHub keeps refusing on a green head stops after MAX_MERGE_REFUSALS', async () => {
+    const { io, writes } = fakeIo(
+      { 1: [snapshot({ number: 1 })] },
+      { mergeRefusals: new Set() },
+    );
+    io.merge = (pr, sha) => {
+      writes.push(`merge #${pr} @${sha.slice(0, 1)}`);
+      return false;
+    };
+    const result = await runTrain(args([1, 2]), io);
+    assert.match(
+      result.stoppedAt?.reason ?? '',
+      new RegExp(`refused to merge #1 ${MAX_MERGE_REFUSALS} times`),
+    );
+    assert.deepEqual(result.notReached, [2]);
+    assert.equal(writes.length, MAX_MERGE_REFUSALS);
+  });
+
+  test('a refused merge past the deadline stops even below the refusal cap', async () => {
+    const { io } = fakeIo(
+      { 1: [snapshot({ number: 1 })] },
+      { clockStep: 60 * 60_000 },
+    );
+    io.merge = () => false;
+    let reads = 0;
+    const read = io.read;
+    io.read = (pr) => {
+      reads += 1;
+      // The clock only moves on sleep, so jump it past the deadline up front.
+      if (reads === 1) void io.sleep(0);
+      return read(pr);
+    };
+    const result = await runTrain(args([1], { timeoutMinutes: 45 }), io);
+    assert.match(
+      result.stoppedAt?.reason ?? '',
+      /could not be merged within 45 min/,
+    );
+  });
+
+  test('BLOCKED-while-green reads are counted by the step, not by its wording', async () => {
+    const { io, writes } = fakeIo({
+      1: [snapshot({ number: 1, mergeStateStatus: 'BLOCKED' })],
+    });
+    const result = await runTrain(args([1]), io);
+    assert.match(result.stoppedAt?.reason ?? '', /stays BLOCKED/);
+    assert.deepEqual(writes, []);
   });
 
   test('a dry run reads every Pull Request and writes nothing', async () => {

@@ -40,4 +40,4 @@ The watch then measured 37% (34 of 92 runs, 2026-10-30 → 11-09). The breakdown
 - Each Pull Request that would have merged behind `main` costs one more PR run on its updated head: about 39 runs over 11 days at the post-PRD rate. Standard runners are free for this public repository.
 - A batch of N takes about (N − 1) × 7.4 minutes of unattended wait instead of about a minute of clicking.
 - The train needs no ruleset change. The bypass stays, so the watch is what shows when a merge goes around the train.
-- If `main` moves under a Pull Request between its checks finishing and its merge, GitHub refuses the merge. The train then reads the PR again and updates it, up to three times, before stopping.
+- If `main` moves under a Pull Request between its checks finishing and its merge, GitHub refuses the merge. The train then reads the PR again and updates it, up to three times, before stopping. A merge GitHub refuses on a green, up-to-date head stops the train after three refusals or at the timeout, whichever comes first.

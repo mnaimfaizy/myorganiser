@@ -51,6 +51,15 @@ export const MAX_UPDATES_PER_PULL_REQUEST = 3;
  */
 export const MAX_BLOCKED_GREEN_READS = 4;
 
+/**
+ * How many times GitHub may refuse to merge one Pull Request whose every
+ * required check is green. A refusal because `main` moved reads back as
+ * `BEHIND` and is updated instead; a refusal that keeps happening on a green,
+ * up-to-date head is a rule the train does not know, and retrying it is a
+ * loop, not a wait.
+ */
+export const MAX_MERGE_REFUSALS = 3;
+
 /** The merge methods `main`'s ruleset allows. */
 export const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;
 export type MergeMethod = (typeof MERGE_METHODS)[number];
@@ -98,7 +107,11 @@ export interface RequiredCheckState {
 export type TrainStep =
   | { kind: 'merged' }
   | { kind: 'update' }
-  | { kind: 'wait'; reason: string }
+  /**
+   * `blockedGreen` marks the one wait that counts toward
+   * `MAX_BLOCKED_GREEN_READS`: `BLOCKED` with every required check green.
+   */
+  | { kind: 'wait'; reason: string; blockedGreen?: true }
   | { kind: 'merge'; headRefOid: string }
   | { kind: 'stop'; reason: string };
 
@@ -232,7 +245,11 @@ export function decideNext(
             `#${pr.number} stays BLOCKED with every required check green; ` +
             'something other than the checks is holding it',
         }
-      : { kind: 'wait', reason: 'GitHub has not yet unblocked the merge' };
+      : {
+          kind: 'wait',
+          reason: 'GitHub has not yet unblocked the merge',
+          blockedGreen: true,
+        };
   }
   // UNKNOWN: GitHub is still computing mergeability.
   return { kind: 'wait', reason: `merge state is ${pr.mergeStateStatus}` };
@@ -361,6 +378,7 @@ export async function runTrain(
     const pr = args.pullRequests[index];
     const deadline = io.now() + args.timeoutMinutes * 60_000;
     let updates = 0;
+    let refusals = 0;
     let blockedGreenReads = 0;
     let lastWait = '';
 
@@ -408,17 +426,29 @@ export async function runTrain(
           merged.push(pr);
           break;
         }
-        // Refused: most often `main` moved between the read and the merge.
-        // Read again — a BEHIND branch is updated, anything else stops.
+        // Refused: most often `main` moved between the read and the merge,
+        // and the next read is BEHIND and updates. A refusal that repeats on
+        // a green head is bounded twice over: by count and by the deadline.
+        refusals += 1;
+        if (refusals >= MAX_MERGE_REFUSALS) {
+          return stop(
+            index,
+            `GitHub refused to merge #${pr} ${refusals} times with every required check green`,
+          );
+        }
+        if (io.now() >= deadline) {
+          return stop(
+            index,
+            `#${pr} could not be merged within ${args.timeoutMinutes} min`,
+          );
+        }
         io.log(`#${pr}: GitHub refused the merge; reading it again`);
         await io.sleep(args.pollSeconds);
         continue;
       }
 
       // wait
-      blockedGreenReads = step.reason.startsWith('GitHub has not yet')
-        ? blockedGreenReads + 1
-        : 0;
+      blockedGreenReads = step.blockedGreen ? blockedGreenReads + 1 : 0;
       if (io.now() >= deadline) {
         return stop(
           index,
