@@ -347,6 +347,12 @@ person (none is a failed run; ADR 0142 decision 3, ADR 0147 decision 6), a FAIL:
 `tmp/qa/`, and nothing is uploaded unless the Maintainer chooses it. A failed scenario's recording
 is kept locally for inspection either way.
 
+`tmp/qa/<subject>/` means the **primary checkout's**. A QA run in its own worktree writes its
+`--out` folders under that worktree, which the Maintainer does not look in, and they go when the
+worktree is removed. Before you sign off, copy each `--out` folder to the primary checkout's
+`tmp/qa/<subject>/`, and put that path in the Execution record. If a permission check blocks
+the copy, give the worktree path instead, and do not remove the worktree.
+
 Which QA Artifact a scenario keeps is fixed when the plan is composed, by its `Capture:` line (see
 [The `Capture:` line](#the-capture-line)), not chosen mid-run. Uploading stays the Maintainer's
 choice.

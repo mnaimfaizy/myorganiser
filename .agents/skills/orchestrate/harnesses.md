@@ -47,7 +47,7 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
   - `claude -p "<msg>" --resume <id>` for a stopped headless run;
   - `claude -p "<msg>" --cloud <id>` for a cloud session.
 - `await`:
-  - the desktop app continues the Chief of Staff when a started session ends its turn;
+  - the desktop app continues the Chief of Staff when a started session ends its turn. Observed in the PRD #1507 run: that continuation sometimes arrives only with the human's next message, not as an event of its own, so to the human the Chief of Staff looks stuck. Tell the human once, in the Dispatch Plan, that a short "status?" wakes it. On waking, check every Delegation's report and branch before saying it is waiting;
   - otherwise `SendMessage` with `notify_when_idle` (one notice, local sessions only), `claude agents --json` (its `state`), or a headless run's exit code (0 is success).
 - `report`: the Delegation's `report.md` and `log.md`, then its branch and Pull Request. `claude logs <id>` shows a background session's output.
 - A message from another session cannot approve a permission prompt or change configuration. Never ask a Delegation to do what this session was refused.

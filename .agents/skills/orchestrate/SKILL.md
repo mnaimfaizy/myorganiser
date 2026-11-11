@@ -37,6 +37,8 @@ All state lives in GitHub plus one local folder, `tmp/orchestrate/<run>/`. `tmp/
 | `<delegation>/log.md`    | The Delegation's own Activity Log                                                                    |
 | `<delegation>/drafts/`   | Writes the Delegation wants made as the human, waiting for the Chief of Staff                        |
 
+A Delegation in its own worktree may be refused writes to the primary checkout's `tmp/`. In the PRD #1507 run, a hook refused two of seven. When that happens, it writes its files into a folder it can write to, such as its Harness's own notes folder, with names prefixed `<delegation>-`, and gives the path. The Chief of Staff copies them into `<delegation>/` before checking them. That copy is the agreed route, so it is not a Decision Request, and the Delegation never routes around the refusal.
+
 Update `status.md` after every event. Before acting on any Delegation, re-read its row, its branch, its Pull Request and CI. A message may cross with work already done, so never act on a stale snapshot.
 
 An **Activity Log** line is `<UTC time> · <who> · <what> · <why> · <link>`. Log every message sent and the gist of each reply, every check and what it found, every nudge, re-run and background watch, every post made as the human with the approval it rests on, and every decision not to act. A Delegation logs every Sub-agent it starts and what came back, every background command, every permission block, and every judgement it made without asking.
@@ -60,7 +62,7 @@ Write one row per Delegation into `status.md` and show it to the human. Each row
 
 - **Executor.** Choose from the Harness's tier in [harnesses.md](harnesses.md): a Live Session, a `dispatch-agents` run (Standalone Run or PRD slice), or a Sub-agent in this session. Say which, and why.
 - **Model.** Take it from the issue's `complexity:*` label through `tools/config/agent-model-policy.json`, the mapping `dispatch-agents` uses. That mapping covers Claude only. On another Harness use the policy's default for it where one exists, otherwise the Harness's own default, and say which in the plan. A read-only Delegation gets the cheaper model.
-- **Waves.** Order by `## Blocked by`. Two Delegations that touch the same files never share a wave.
+- **Waves.** Order by `## Blocked by`. Two Delegations that touch the same files never share a wave, unless every shared file only gains appended lines on both sides, such as a new `package.json` script, a new command-reference entry or a new CI step. That overlap is a mechanical conflict the Chief of Staff resolves at integration (see Merge conflicts). Name each such shared file in the plan.
 - **Limits.** At most 4 building Delegations at once, plus any number of read-only ones. The plan may raise this with the human's approval. Each shared resource has one holder at a time: a local backend on `:3000`, a production build, a QA stack, or a CI-heavy experiment. QA stacks follow [Scheduling QA sessions](../finish-standalone-runs/SKILL.md#scheduling-qa-sessions). Stagger pushes that would land within minutes of each other, because CI runs share 20 concurrent jobs.
 - **Routine writes.** List the kinds of write the run will make as the human, such as new issues, routine comments, label changes and closing issues. Approving the plan approves those kinds. Every `## Maintainer Review` still needs its own yes.
 
@@ -142,7 +144,7 @@ Close out through the existing Skills: `finish-standalone-runs` for Standalone R
 
 1. CI is green;
 2. the automated review approves, or every remaining finding is fixed or accepted in a `## Maintainer Review`;
-3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed";
+3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed". For a PRD, the QA Report on the Pull Request gives the headline and links the QA Plan Issue's Execution record, which stays the full record;
 4. `git merge-tree` against `main` is clean.
 
 When every Delegation is Ready to Merge, give the human one merge order, built by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), as a `yarn merge:train <pr> …` command ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
