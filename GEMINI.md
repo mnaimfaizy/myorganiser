@@ -10,7 +10,7 @@ This file is a Harness Adapter. Shared always-on policy lives in `AGENTS.md`. Do
 
 ## Commands
 
-Thin files under `.gemini/commands/` point at Skills. Put procedures in `.agents/skills/`, not in the command file.
+Thin `.toml` files under `.gemini/commands/` point at Skills: a `description` and a `prompt` that `@{...}`-includes the Skill's `SKILL.md`. Gemini CLI loads only `.toml` command files ([Custom commands](https://geminicli.com/docs/cli/custom-commands/)), so a `.md` adapter there is never a command. Put procedures in `.agents/skills/`, not in the command file.
 
 ## Sub-agents
 

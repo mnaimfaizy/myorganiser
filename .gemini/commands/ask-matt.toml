@@ -1,0 +1,6 @@
+description = "Recommend which MyOrganiser Skill or workflow to run next."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/ask-matt/SKILL.md}
+"""

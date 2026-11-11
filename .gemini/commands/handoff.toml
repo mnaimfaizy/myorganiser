@@ -1,0 +1,6 @@
+description = "Compact this conversation into a handoff document for another agent."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/handoff/SKILL.md}
+"""

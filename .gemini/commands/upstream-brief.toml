@@ -1,0 +1,8 @@
+description = "Write an Upstream Brief comparing repo instructions to official docs."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/upstream-brief/SKILL.md}
+
+Host adapter: `upstream-brief.config.yml`.
+"""
