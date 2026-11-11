@@ -25,7 +25,7 @@ Every cloud Executor works from a clone of the remote, so it sees only pushed br
 
 ## Finding the Skill
 
-Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code reaches it through the committed `.claude/skills` symlink. Gemini CLI also gets the thin command adapter every human-invoked Skill has, `.gemini/commands/orchestrate.md`.
+Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code reaches it through the committed `.claude/skills` symlink. Gemini CLI also gets the thin command adapter every human-invoked Skill has, `.gemini/commands/orchestrate.toml`.
 
 | Harness     | Invoke         | Notes                                                                               |
 | ----------- | -------------- | ----------------------------------------------------------------------------------- |
@@ -34,7 +34,7 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
 | Codex       | `$orchestrate` | A slash form does not work. Invoke it explicitly; it has no `agents/openai.yaml`.   |
 | Copilot     | `/orchestrate` | VS Code agent mode; **check before use** for Copilot CLI.                           |
 | OpenCode    | `@orchestrate` | No slash form for Skills. A thin `.opencode/commands/orchestrate.md` could add one. |
-| Gemini CLI  | `/orchestrate` | Through `.gemini/commands/orchestrate.md`; **check before use**, see below.         |
+| Gemini CLI  | `/orchestrate` | Through `.gemini/commands/orchestrate.toml`.                                        |
 
 ## Claude Code
 
@@ -99,7 +99,6 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
 - `await`: the process exiting: 0 success, 1 error, 42 bad input, 53 turn limit.
 - `report`: the report files.
 - Gemini CLI reads `AGENTS.md` only when `context.fileName` lists it, as this repository's `.gemini/settings.json` does.
-- Gemini CLI documents custom commands as `.toml` files under `.gemini/commands/`. This repository's adapters are `.md`, so **check before use** that `/orchestrate` loads.
 
 ## Sources
 
