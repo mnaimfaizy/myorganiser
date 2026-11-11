@@ -121,6 +121,7 @@ Named workflows live in `.agents/skills/`. Load the Skill; do not copy its steps
 - Implement agreed work: `.agents/skills/implement/SKILL.md`
 - Code review: `.agents/skills/code-review/SKILL.md`
 - Finished Standalone Runs, to checked Pull Requests and QA: `.agents/skills/finish-standalone-runs/SKILL.md`
+- Human asks this session to run a set of issues or a PRD through other sessions (`/orchestrate`, Chief of Staff): `.agents/skills/orchestrate/SKILL.md`. Not for building the work in this session; that is `implement`.
 - Review comments on an open Pull Request: `.agents/skills/address-pr-review/SKILL.md`
 - QA plan for finished work before its PR merges (PRD Issue, or a single issue) — compose or execute: `.agents/skills/qa-plan/SKILL.md`
 - TDD: `.agents/skills/tdd/SKILL.md`
