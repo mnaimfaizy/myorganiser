@@ -1,0 +1,6 @@
+description = "Review changes since a fixed point on the Standards and Spec axes."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/code-review/SKILL.md}
+"""
