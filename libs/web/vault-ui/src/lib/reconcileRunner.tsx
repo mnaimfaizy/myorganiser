@@ -157,6 +157,10 @@ function reconcileChangedSomething(result: VaultReconcileResult): boolean {
       // here, which is the known gap rather than the finished behaviour.
       case 'refused':
         return false;
+      // Convergence stood down for a local edit and wrote nothing (ADR 0143).
+      // The edit was made on this device, so it is not news either.
+      case 'superseded':
+        return false;
       case 'asked':
         return outcome.decision !== 'defer';
       case 'sent':

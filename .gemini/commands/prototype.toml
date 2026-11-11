@@ -1,0 +1,6 @@
+description = "Build a throwaway prototype to answer a design question."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/prototype/SKILL.md}
+"""

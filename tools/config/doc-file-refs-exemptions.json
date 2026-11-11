@@ -56,6 +56,11 @@
       "file": "docs/adr/0135-tooling-scripts-are-typescript-run-by-node-and-tested-by-node-test.md",
       "claim": "tools/jest.config.ts",
       "reason": "The Decision states that tools/jest.config.ts is deleted; issue #1336 deleted it when the copilot-hooks Jest specs moved to node --test. The path names the file the decision retires, not a pointer for a reader to follow today."
+    },
+    {
+      "file": "docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md",
+      "claim": "tools/qa",
+      "reason": "Decided home for the shared QA tooling, which the follow-up PRD builds. The ADR lands first; the slice that creates tools/qa/ removes this entry when it goes stale."
     }
   ]
 }

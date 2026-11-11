@@ -636,6 +636,34 @@ _Avoid_: Solo run, single dispatch, non-PRD run
 What a finished agent run reports about itself: whether it ended clean, and each item it left outstanding. It is the run's own claim, so whoever reviews the branch checks it rather than trusting it.
 _Avoid_: Run result, slice outcome, agent report
 
+**Chief of Staff**:
+The session in charge of a body of work — a set of issues or a PRD Issue — on the human's behalf. It owns the plan, the channel to the human, the status of every Delegation, and the merge order, and it never builds the work itself.
+_Avoid_: orchestrator (that is the main agent within one Skill chain), lead agent, manager agent, supervisor
+
+**Delegation**:
+One piece of work a Chief of Staff hands out: its brief, its Executor, and the report that comes back. The unit the Chief of Staff tracks.
+_Avoid_: task, job, assignment, ticket (an issue is what a Delegation works on, not the Delegation)
+
+**Executor**:
+What carries out a Delegation: a Live Session, a `dispatch-agents` run (Standalone Run or PRD slice), or a Sub-agent inside the Chief of Staff's own session.
+_Avoid_: worker, runner, child agent
+
+**Live Session**:
+A separate harness session that a Chief of Staff starts for a Delegation, which the human can open, talk to, and stop. It keeps its own permissions; the Chief of Staff cannot grant it more.
+_Avoid_: sub-session, child session, background agent, Sub-agent (that runs inside a session, not beside it)
+
+**Decision Request**:
+A question a Delegation raises that only the human may answer, sent with its options and a recommendation. The Chief of Staff relays it, and records the answer where the work's spec is read from.
+_Avoid_: blocker, escalation, clarification
+
+**Activity Log**:
+The append-only, local record of what a Chief of Staff or a Delegation did out of the human's sight, kept so the human can audit the work without the chat. It is a working file, never committed or posted.
+_Avoid_: transcript, chat history, audit trail (as a committed artifact)
+
+**Run Summary**:
+The short close-out a Chief of Staff posts on the PRD Issue or umbrella issue when its run ends: the Delegations, their Pull Requests, the human's decisions, and what is left open. It points to the local Activity Log rather than copying it.
+_Avoid_: final report, retro, run log
+
 **QA Plan**:
 The manual verification a person or an agent performs for completed work before its Pull Request merges, carrying only what the automated suites do not already prove. Every claim it makes about existing coverage is marked as observed or reconstructed, because a reader trusts it to say what may be skipped. It is composed as an uncommitted working file in `tmp/`, whatever becomes of it afterwards.
 _Avoid_: Test plan, test matrix, QA cycle, verification checklist, regression plan
@@ -649,8 +677,12 @@ A QA Plan for a PRD Issue, published as a GitHub issue labelled `qa`. Scenarios 
 _Avoid_: QA ticket, test ticket, validation issue
 
 **QA Artifact**:
-A screenshot or video captured while running a QA Plan, only where it shows something the written result cannot. It stays private to the person it was captured for unless they choose to publish it.
+A screenshot, video or Request Transcript captured while running a QA Plan, only where it shows something the written result cannot. For a fix it pairs what the code did before the change with what it does after, side by side. A screenshot or video stays private to the person it was captured for unless they choose to publish it.
 _Avoid_: Evidence (a Finding's term), QA proof, attachment
+
+**Request Transcript**:
+The QA Artifact for a change with no screen to show: the API calls a QA Plan scenario made and what came back, before and after the change, with every credential and token withheld and Ciphertext shortened. It holds only QA Account data, so it is shown inside the QA Report rather than published separately.
+_Avoid_: API evidence, HAR, request log, trace
 
 **QA Report**:
 The Pull Request comment recording which QA Plan scenarios were run, against which commit, and with what result. A later commit makes it stale.
@@ -947,7 +979,7 @@ _Avoid_: research doc, investigation, internal note, planning doc
 ## Harness & Instructions
 
 **Harness**:
-A coding-agent product that loads this repo's instructions (Cursor, Claude Code, Gemini CLI, GitHub Copilot).
+A coding-agent product that loads this repo's instructions (Claude Code, Cursor, OpenAI Codex, GitHub Copilot, OpenCode, Gemini CLI).
 _Avoid_: IDE, vendor, tool (when you mean the product)
 
 **Instruction File**:

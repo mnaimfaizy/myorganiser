@@ -55,6 +55,20 @@ function createFakeVault(initialTasks: Task[]): FakeVault {
     async ({ type, defaultValue }: { type: string; defaultValue: unknown }) =>
       records.has(type) ? records.get(type) : defaultValue,
   );
+  // The read a save makes before it writes. The fake keeps no ciphertext, so
+  // it reports none; the save's gate is taken by saveEncryptedData alone.
+  const loadDecryptedDataWithCiphertext = jest.fn(
+    async ({
+      type,
+      defaultValue,
+    }: {
+      type: string;
+      defaultValue: unknown;
+    }) => ({
+      value: records.has(type) ? records.get(type) : defaultValue,
+      ciphertext: null,
+    }),
+  );
   const saveEncryptedData = jest.fn(
     async ({ type, value }: { type: string; value: unknown }) => {
       const wait = gate;
@@ -65,7 +79,11 @@ function createFakeVault(initialTasks: Task[]): FakeVault {
   );
 
   return {
-    handle: { loadDecryptedData, saveEncryptedData } as unknown as VaultHandle,
+    handle: {
+      loadDecryptedData,
+      loadDecryptedDataWithCiphertext,
+      saveEncryptedData,
+    } as unknown as VaultHandle,
     saves: saveEncryptedData,
     storedTasks: () => (records.get('tasks') as { records: Task[] }).records,
     holdNextSave() {

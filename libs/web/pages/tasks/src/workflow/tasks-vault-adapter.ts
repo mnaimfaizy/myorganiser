@@ -11,8 +11,12 @@ import {
 
 export interface TasksVaultAdapter {
   loadTasks(): Promise<Task[] | null>;
-  /** Saves `tasks` as the whole list, keeping the stored Deletion Log. */
-  saveTasks(tasks: Task[]): Promise<void>;
+  /**
+   * Saves `tasks` as the whole list, keeping the stored Deletion Log. Returns
+   * the tasks written, which after a contended save include what another
+   * writer stored meanwhile (ADR 0143).
+   */
+  saveTasks(tasks: Task[]): Promise<Task[]>;
   /**
    * Saves `tasks` without `taskId` and records its deletion at `deletedAt`,
    * so a merge with a copy that still holds it does not bring it back
@@ -32,7 +36,7 @@ export function createProductionTasksVaultAdapter(
       });
     },
     async saveTasks(tasks) {
-      await saveVaultRecords(handle, 'tasks', tasks);
+      return saveVaultRecords(handle, 'tasks', tasks);
     },
     async deleteTask(tasks, taskId, deletedAt) {
       return deleteVaultRecordAndSave(
@@ -63,8 +67,9 @@ export class InMemoryTasksVaultAdapter implements TasksVaultAdapter {
     return this.tasks;
   }
 
-  async saveTasks(tasks: Task[]): Promise<void> {
+  async saveTasks(tasks: Task[]): Promise<Task[]> {
     this.tasks = tasks;
+    return tasks;
   }
 
   async deleteTask(

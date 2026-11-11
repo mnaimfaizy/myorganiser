@@ -137,7 +137,13 @@ describe('useSubscriptionsPage', () => {
 
     mockToast.mockReset();
     jest.mocked(saveVaultRecords).mockReset();
-    jest.mocked(saveVaultRecords).mockResolvedValue(undefined);
+    // Resolves what was written: the records given, less any deletion. A
+    // test that needs a contended save overrides this.
+    jest
+      .mocked(saveVaultRecords)
+      .mockImplementation(async (_store, _type, records, deletion) =>
+        records.filter((record) => record.id !== deletion?.deletedId),
+      );
     jest.mocked(normalizeSubscriptions).mockReset();
     jest.mocked(normalizeSubscriptions).mockImplementation((raw) => ({
       value: raw as SubscriptionRecord[],
@@ -206,6 +212,26 @@ describe('useSubscriptionsPage', () => {
         );
       });
       expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the records the write-back resolved with, when a contended write-back merged in another writer’s record', async () => {
+      const normalized = [{ ...GYM }];
+      jest
+        .mocked(normalizeSubscriptions)
+        .mockReturnValue({ value: normalized, changed: true });
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          NETFLIX,
+        ]);
+
+      const { result } = await renderLoaded([{ legacy: true }]);
+
+      await waitFor(() => {
+        expect(result.current.items).toEqual([GYM, NETFLIX]);
+      });
+      expect(result.current.loading).toBe(false);
     });
 
     it('reports a decrypt failure with the destructive toast and stops loading', async () => {
@@ -398,6 +424,38 @@ describe('useSubscriptionsPage', () => {
         title: SAVE_TOAST_TITLE,
         description: 'Subscription saved (encrypted).',
       });
+    });
+
+    it('shows the records the save resolved with, when a contended save merged in another writer’s record', async () => {
+      // The Vault merged a record another device stored meanwhile into the write.
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          GYM,
+        ]);
+
+      const { result } = await renderLoaded([NETFLIX]);
+
+      await act(async () => {
+        await result.current.addSubscription({
+          ...emptySubscriptionFormValues('AUD'),
+          name: 'Spotify',
+          startDate: '2026-10-01',
+        });
+      });
+
+      expect(saveVaultRecords).toHaveBeenCalledWith(
+        handle,
+        'subscriptions',
+        [expect.objectContaining({ name: 'Spotify' }), NETFLIX],
+        undefined,
+      );
+      expect(result.current.items).toEqual([
+        expect.objectContaining({ name: 'Spotify' }),
+        NETFLIX,
+        GYM,
+      ]);
     });
 
     it('rejects an unparseable start date with the invalid-date toast and saves nothing', async () => {

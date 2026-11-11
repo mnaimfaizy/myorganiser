@@ -1,8 +1,13 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
-import { useState, type FormEvent } from 'react';
+import { useForm } from 'react-hook-form';
 
-import { PassphraseUnlockForm } from './PassphraseUnlockForm';
+import {
+  PassphraseUnlockForm,
+  passphraseUnlockSchema,
+  type PassphraseUnlockValues,
+} from './PassphraseUnlockForm';
 import { PasskeyUnlockOption } from './PasskeyUnlockOption';
 import { VaultGateFrame } from './VaultGateFrame';
 
@@ -56,7 +61,10 @@ export const Unlocking: Story = {
 };
 
 function PasskeyUnlockGate() {
-  const [value, setValue] = useState('');
+  const form = useForm<PassphraseUnlockValues>({
+    resolver: zodResolver(passphraseUnlockSchema),
+    defaultValues: { passphrase: '' },
+  });
   return (
     <VaultGateFrame
       title="Unlock your vault"
@@ -65,12 +73,8 @@ function PasskeyUnlockGate() {
       <div className="flex flex-col gap-4.5">
         <PasskeyUnlockOption unlocking={false} onUnlock={() => undefined} />
         <PassphraseUnlockForm
-          value={value}
-          onChange={setValue}
-          onSubmit={(event: FormEvent<HTMLFormElement>) =>
-            event.preventDefault()
-          }
-          error={null}
+          form={form}
+          onSubmit={() => undefined}
           unlocking={false}
         />
       </div>

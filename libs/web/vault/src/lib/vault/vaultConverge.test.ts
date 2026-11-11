@@ -20,6 +20,8 @@ import {
   readVaultBlobRecords,
 } from '@myorganiser/vault-core';
 
+import { createLocalVaultRevision } from './localVaultRevision';
+import type { EncryptedBlob } from './localVaultStorage';
 import { mintRecoveryKey } from './recoveryKeyMint';
 import { createVaultHandle, VaultSecretMismatchError } from './vaultHandle';
 import {
@@ -2590,6 +2592,256 @@ describe('convergeVaultBlob', () => {
       // Assert: observed vault identity was NOT overwritten
       // (it remains at the previously recorded value since no new observation was made)
       expect(handle.observedVaultIdentity()).toBe('previous-identity');
+    });
+  });
+
+  describe('a local edit that lands during convergence (ADR 0143)', () => {
+    const localTask = {
+      id: 'task-local',
+      title: 'Local task',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T10:00:00.000Z',
+    };
+    const remoteTask = {
+      id: 'task-1',
+      title: 'Remote task',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T09:00:00.000Z',
+    };
+
+    /** A tasks payload holding one record, titled `title`, as a User edit. */
+    function editedTasks(title: string): VaultBlobEnvelope<unknown> {
+      return {
+        records: [
+          {
+            id: 'task-local',
+            title,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T11:00:00.000Z',
+          },
+        ],
+        deletions: {},
+      };
+    }
+
+    /**
+     * A handle whose named methods are replaced by `overrides`. Everything
+     * else is the real handle, reached through the prototype, so a test can
+     * land a local edit inside one specific await of the pass.
+     */
+    function interposed(
+      handle: ConvergingVaultHandle,
+      overrides: Partial<ConvergingVaultHandle>,
+    ): ConvergingVaultHandle {
+      return Object.assign(
+        Object.create(handle) as ConvergingVaultHandle,
+        overrides,
+      );
+    }
+
+    test('clean path: a local edit landing after the pass read the Local Vault supersedes the take, which writes nothing and records no Sync Bookmark', async () => {
+      const handle = await setupHandle('user-1', [localTask]);
+      await handle.recordPushSuccess({ type: 'tasks', etag: 'etag-1' });
+      const remote = await captureRemoteBlob(handle, [remoteTask]);
+
+      const api = createApiDouble();
+      const converging = interposed(handle, {
+        hasUnsentChanges: async (type) => {
+          const unsent = await handle.hasUnsentChanges(type);
+          await handle.saveEncryptedData({
+            type: 'tasks',
+            value: editedTasks('edited during the pass'),
+          });
+          return unsent;
+        },
+      });
+
+      const outcome = await convergeVaultBlob({
+        api,
+        handle: converging,
+        type: VaultBlobType.Tasks,
+        prompt: jest.fn() as VaultBlobConvergePrompt,
+        serverMeta: serverMetaFor(handle),
+        remote,
+      });
+
+      expect(outcome).toEqual({ kind: 'superseded' });
+      expect(api.putVaultBlob).not.toHaveBeenCalled();
+      expect(handle.lastPushedEtag('tasks')).toBe('etag-1');
+
+      const decrypted = await handle.loadDecryptedData<unknown>({
+        type: 'tasks',
+        defaultValue: null,
+      });
+      expect(readVaultBlobRecords(decrypted)).toEqual([
+        expect.objectContaining({ title: 'edited during the pass' }),
+      ]);
+    });
+
+    test('clean path: the take writes only its own type, so another type written during the pass survives, and the Local Vault Revision moves', async () => {
+      const revision = createLocalVaultRevision();
+      const handle = createVaultHandle({ owner: 'user-1', revision });
+      await handle.initialize({ passphrase });
+      await handle.unlockWithPassphrase({ passphrase });
+      await handle.saveEncryptedData({
+        type: 'tasks',
+        value: { records: [localTask], deletions: {} },
+      });
+      await handle.recordPushSuccess({ type: 'tasks', etag: 'etag-1' });
+      const remote = await captureRemoteBlob(handle, [remoteTask]);
+      const revisionBefore = revision.current();
+
+      const addressWrittenDuringPass = {
+        records: [{ id: 'address-1', label: 'Written during the pass' }],
+        deletions: {},
+      };
+      const converging = interposed(handle, {
+        hasUnsentChanges: async (type) => {
+          const unsent = await handle.hasUnsentChanges(type);
+          await handle.saveEncryptedData({
+            type: 'addresses',
+            value: addressWrittenDuringPass,
+          });
+          return unsent;
+        },
+      });
+
+      const outcome = await convergeVaultBlob({
+        api: createApiDouble(),
+        handle: converging,
+        type: VaultBlobType.Tasks,
+        prompt: jest.fn() as VaultBlobConvergePrompt,
+        serverMeta: serverMetaFor(handle),
+        remote,
+      });
+
+      expect(outcome).toEqual({ kind: 'took', etag: 'etag-remote' });
+      expect(revision.current()).toBeGreaterThan(revisionBefore);
+      expect(
+        await handle.loadDecryptedData({
+          type: 'addresses',
+          defaultValue: null,
+        }),
+      ).toEqual(addressWrittenDuringPass);
+
+      const decrypted = await handle.loadDecryptedData<unknown>({
+        type: 'tasks',
+        defaultValue: null,
+      });
+      expect(readVaultBlobRecords(decrypted)).toEqual([
+        expect.objectContaining({ id: 'task-1', title: 'Remote task' }),
+      ]);
+    });
+
+    test('keep-remote answered after a local edit landed during the prompt is superseded: nothing is taken and the edit is kept', async () => {
+      // No Sync Bookmark, so the local copy is unsent and the remote copy is
+      // undecryptable: convergence asks, and the answer arrives after an edit.
+      const handle = await setupHandle('user-1', [localTask]);
+      const undecryptable = await makeUndecryptableRemote([remoteTask]);
+
+      const api = createApiDouble();
+      const prompt = jest.fn(async () => {
+        await handle.saveEncryptedData({
+          type: 'tasks',
+          value: editedTasks('edited while asked'),
+        });
+        return 'keep-remote' as const;
+      }) as VaultBlobConvergePrompt;
+
+      const outcome = await convergeVaultBlob({
+        api,
+        handle,
+        type: VaultBlobType.Tasks,
+        prompt,
+        serverMeta: serverMetaFor(handle),
+        remote: undecryptable,
+      });
+
+      expect(prompt).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'undecryptable-remote' }),
+      );
+      expect(outcome).toEqual({ kind: 'superseded' });
+      expect(api.putVaultBlob).not.toHaveBeenCalled();
+      expect(handle.lastPushedEtag('tasks')).toBeUndefined();
+
+      const decrypted = await handle.loadDecryptedData<unknown>({
+        type: 'tasks',
+        defaultValue: null,
+      });
+      expect(readVaultBlobRecords(decrypted)).toEqual([
+        expect.objectContaining({ title: 'edited while asked' }),
+      ]);
+    });
+
+    test('merge path: a local edit landing while the remote copy is decrypted supersedes the merge, which is neither saved nor sent', async () => {
+      // No Sync Bookmark and a readable remote copy: convergence merges. The
+      // edit lands between the two decryptions that feed the merge.
+      const handle = await setupHandle('user-1', [localTask]);
+      const remote = await captureRemoteBlob(handle, [remoteTask]);
+
+      let editLanded = false;
+      const converging = interposed(handle, {
+        decryptCiphertext: async <T>(options: { blob: EncryptedBlob }) => {
+          const decrypted = await handle.decryptCiphertext<T>(options);
+          if (!editLanded) {
+            editLanded = true;
+            await handle.saveEncryptedData({
+              type: 'tasks',
+              value: editedTasks('edited during the merge'),
+            });
+          }
+          return decrypted;
+        },
+      });
+
+      const api = createApiDouble();
+      const outcome = await convergeVaultBlob({
+        api,
+        handle: converging,
+        type: VaultBlobType.Tasks,
+        prompt: jest.fn() as VaultBlobConvergePrompt,
+        serverMeta: serverMetaFor(handle),
+        remote,
+      });
+
+      expect(editLanded).toBe(true);
+      expect(outcome).toEqual({ kind: 'superseded' });
+      expect(api.putVaultBlob).not.toHaveBeenCalled();
+
+      // Only the edit is stored: a written merge would also hold 'Remote task'.
+      const decrypted = await handle.loadDecryptedData<unknown>({
+        type: 'tasks',
+        defaultValue: null,
+      });
+      expect(readVaultBlobRecords(decrypted)).toEqual([
+        expect.objectContaining({ title: 'edited during the merge' }),
+      ]);
+    });
+
+    test('merge path: a failure of the merge write that is not a contention is rethrown, and nothing is sent', async () => {
+      const handle = await setupHandle('user-1', [localTask]);
+      const remote = await captureRemoteBlob(handle, [remoteTask]);
+
+      const failure = new Error('disk full');
+      const converging = interposed(handle, {
+        saveEncryptedData: async () => {
+          throw failure;
+        },
+      });
+
+      const api = createApiDouble();
+      await expect(
+        convergeVaultBlob({
+          api,
+          handle: converging,
+          type: VaultBlobType.Tasks,
+          prompt: jest.fn() as VaultBlobConvergePrompt,
+          serverMeta: serverMetaFor(handle),
+          remote,
+        }),
+      ).rejects.toBe(failure);
+      expect(api.putVaultBlob).not.toHaveBeenCalled();
+      expect(handle.lastPushedEtag('tasks')).toBeUndefined();
     });
   });
 });

@@ -109,6 +109,46 @@ export class NoOwnedLocalVaultToReplaceError extends Error {
   }
 }
 
+/**
+ * A Local Vault write found that its Vault Blob Type's Ciphertext had moved
+ * since the write read it, and wrote nothing.
+ *
+ * Every encryption carries a fresh IV, so any write to the type, by any
+ * writer in this tab or another, moves its Ciphertext. A write that went ahead
+ * anyway would revert that writer's data
+ * ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
+ *
+ * `saveEncryptedData` throws it after one attempt. The record write funnel
+ * (`vaultRecordWrite.ts`) merges and retries, and throws it only once three
+ * attempts in total have all been contended. Either way the stored state is
+ * whatever the other writer left there.
+ */
+export class VaultWriteContendedError extends Error {
+  public readonly code = 'vault-write-contended';
+  public readonly type: VaultRecordType;
+
+  constructor(type: VaultRecordType) {
+    super(
+      `The saved "${type}" data changed while this save was in progress. Nothing was saved.`,
+    );
+    this.name = 'VaultWriteContendedError';
+    this.type = type;
+    Object.setPrototypeOf(this, VaultWriteContendedError.prototype);
+  }
+}
+
+/**
+ * Whether two reads of one Vault Blob Type's Ciphertext are the same bytes.
+ * Absent on both sides is the same; absent on one side is not.
+ */
+export function sameStoredCiphertext(
+  a: EncryptedBlob | null | undefined,
+  b: EncryptedBlob | null | undefined,
+): boolean {
+  if (!a || !b) return !a && !b;
+  return a.iv === b.iv && a.ciphertext === b.ciphertext;
+}
+
 /** An operation needing the Master Key was called before one was bound. */
 export class VaultLockedError extends Error {
   public readonly code = 'vault-locked';
@@ -326,6 +366,19 @@ export type LocalVaultAccess = {
     defaultValue: T;
   }): Promise<T>;
   /**
+   * `loadDecryptedData`, plus the Ciphertext that was decrypted — `null` when
+   * none is stored, in which case `value` is `defaultValue`.
+   *
+   * The Ciphertext is read once, synchronously, and the value is decrypted from
+   * exactly those bytes, so the pair always agrees. A writer passes it back to
+   * `saveEncryptedData` as `expectedCiphertext` to write only if nobody else
+   * has written the type since (ADR 0143).
+   */
+  loadDecryptedDataWithCiphertext<T>(options: {
+    type: VaultRecordType;
+    defaultValue: T;
+  }): Promise<{ value: T; ciphertext: EncryptedBlob | null }>;
+  /**
    * Decrypt Ciphertext this Local Vault does not hold — the server's copy of a
    * Vault Blob — under the Master Key currently bound.
    *
@@ -339,9 +392,23 @@ export type LocalVaultAccess = {
    * local copy".
    */
   decryptCiphertext<T>(options: { blob: EncryptedBlob }): Promise<T>;
+  /**
+   * Encrypt `value` and write it as `type`'s Ciphertext, replacing that type
+   * and nothing else (ADR 0143).
+   *
+   * Conditional. The write goes ahead only if `type`'s stored Ciphertext is
+   * still `expectedCiphertext` (`null`: still absent) at the moment of writing.
+   * Omit it and the Ciphertext stored when this call starts is expected. The
+   * check and the write run on a Local Vault read synchronously after the last
+   * await, so no other type written meanwhile is reverted.
+   *
+   * Throws `VaultWriteContendedError`, having written nothing, when the type's
+   * Ciphertext moved.
+   */
   saveEncryptedData(options: {
     type: VaultRecordType;
     value: unknown;
+    expectedCiphertext?: EncryptedBlob | null;
   }): Promise<void>;
 };
 
@@ -809,19 +876,50 @@ export function createLocalVaultAccess(options: {
       return decryptJsonWithMasterKey<T>({ masterKey, blob });
     },
 
+    async loadDecryptedDataWithCiphertext<T>({
+      type,
+      defaultValue,
+    }: {
+      type: VaultRecordType;
+      defaultValue: T;
+    }): Promise<{ value: T; ciphertext: EncryptedBlob | null }> {
+      const masterKeyBytes = requireMasterKey();
+
+      const blob = vaultOf(slot.read())?.data[type] ?? null;
+      if (!blob) return { value: defaultValue, ciphertext: null };
+
+      const masterKey = await importAesGcmKey(masterKeyBytes);
+      return {
+        value: await decryptJsonWithMasterKey<T>({ masterKey, blob }),
+        ciphertext: blob,
+      };
+    },
+
     async decryptCiphertext<T>({ blob }: { blob: EncryptedBlob }): Promise<T> {
       const masterKeyBytes = requireMasterKey();
       const masterKey = await importAesGcmKey(masterKeyBytes);
       return decryptJsonWithMasterKey<T>({ masterKey, blob });
     },
 
-    async saveEncryptedData({ type, value }) {
+    async saveEncryptedData({ type, value, expectedCiphertext }) {
       const masterKeyBytes = requireMasterKey();
-      const vault = requireVault();
+      // What this write expects to replace, fixed before the first await.
+      const expected =
+        expectedCiphertext !== undefined
+          ? expectedCiphertext
+          : (requireVault().data[type] ?? null);
 
       const masterKey = await importAesGcmKey(masterKeyBytes);
-      vault.data[type] = await encryptJsonWithMasterKey({ masterKey, value });
+      const blob = await encryptJsonWithMasterKey({ masterKey, value });
 
+      // Read, check and write with no await between them. The Local Vault
+      // read before the awaits is never written back: any type another writer
+      // saved meanwhile would be reverted with it (ADR 0143, decision 1).
+      const vault = requireVault();
+      if (!sameStoredCiphertext(vault.data[type], expected)) {
+        throw new VaultWriteContendedError(type);
+      }
+      vault.data[type] = blob;
       slot.write(vault);
     },
   };

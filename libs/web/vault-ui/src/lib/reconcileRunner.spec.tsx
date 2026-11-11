@@ -461,6 +461,15 @@ describe('VaultReconcileRunner', () => {
           saysSomething: false,
         },
       ],
+      superseded: [
+        {
+          name: 'superseded by a local edit',
+          outcome: { kind: 'superseded' },
+          // The pass stood down for an edit the User just made and wrote
+          // nothing, so there is no Vault change to announce (ADR 0143).
+          saysSomething: false,
+        },
+      ],
     } as const satisfies Record<
       VaultBlobConvergeOutcome['kind'],
       readonly ConvergedOutcomeCase[]

@@ -1,14 +1,10 @@
 'use client';
 
 import { Button, Input, Label, useToast } from '@myorganiser/web-ui';
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
 
 import {
   type VaultHandle,
@@ -27,7 +23,11 @@ import {
   RecoveryKeyClaimOffer,
   type RecoveryKeyClaimAnswer,
 } from './RecoveryKeyClaimOffer';
-import { PassphraseUnlockForm } from './PassphraseUnlockForm';
+import {
+  PassphraseUnlockForm,
+  type PassphraseUnlockValues,
+  passphraseUnlockSchema,
+} from './PassphraseUnlockForm';
 import { PasskeyUnlockOption } from './PasskeyUnlockOption';
 import { usePasskeyUnlock } from './usePasskeyUnlock';
 import { RecoveryKeyAcknowledgment } from './RecoveryKeyAcknowledgment';
@@ -47,6 +47,13 @@ import { VaultReplaceOffer } from './VaultReplaceOffer';
  */
 const PASSPHRASE_MISMATCH_MESSAGE =
   "That passphrase didn't unlock your vault. Nothing was changed.";
+
+// The one rule for submit and the Unlock button's disabled state: a key that
+// is empty once trimmed is neither submitted nor enabled.
+const recoveryKeyUnlockSchema = z.object({
+  recoveryKey: z.string().trim().min(1),
+});
+type RecoveryKeyUnlockValues = z.infer<typeof recoveryKeyUnlockSchema>;
 
 type VaultGateProps = {
   title: string;
@@ -123,10 +130,23 @@ export function VaultGate(props: VaultGateProps) {
   const [recoveryKeyUnacknowledged, setRecoveryKeyUnacknowledged] =
     useState(false);
 
-  const [passphrase, setPassphrase] = useState('');
+  // Both forms are owned here, not by their child screens, so a typed value
+  // survives the toggle between the unlock and recover screens (the gate stays
+  // mounted and RHF keeps values across child unmounts by default).
+  const passphraseForm = useForm<PassphraseUnlockValues>({
+    resolver: zodResolver(passphraseUnlockSchema),
+    defaultValues: { passphrase: '' },
+  });
+  const recoveryForm = useForm<RecoveryKeyUnlockValues>({
+    resolver: zodResolver(recoveryKeyUnlockSchema),
+    defaultValues: { recoveryKey: '' },
+  });
+  const recoveryKeyValue = useWatch({
+    control: recoveryForm.control,
+    name: 'recoveryKey',
+  });
+
   const [useRecovery, setUseRecovery] = useState(false);
-  const [recoveryInput, setRecoveryInput] = useState('');
-  const [passphraseError, setPassphraseError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   // The state drives the busy render; the ref stops a second submit that lands
   // before the render that disables the button has happened.
@@ -350,111 +370,116 @@ export function VaultGate(props: VaultGateProps) {
     }
   }, [handle, setupPassphrase, toast]);
 
-  const handleUnlockWithRecoveryKey = useCallback(async () => {
-    if (!handle) {
-      toast({
-        title: 'Recovery failed',
-        description: 'Sign in to recover a vault.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    try {
-      const result = await handle.unlockWithRecoveryKey({
-        recoveryKey: recoveryInput.trim(),
-      });
-
-      setMasterKeyBytes(result.masterKeyBytes, 'recovery-key');
-      toast({
-        title: 'Recovered',
-        description: 'Vault unlocked with your recovery key.',
-      });
-    } catch (e: unknown) {
-      if (e instanceof VaultSecretMismatchError) {
-        toast({
-          title: "That recovery key didn't unlock this vault",
-          description:
-            'The recovery key does not match this vault. Nothing was changed.',
-          variant: 'destructive',
-        });
-      } else {
+  // The key arrives already trimmed: the recovery schema's output is trimmed.
+  const handleUnlockWithRecoveryKey = useCallback(
+    async (recoveryKey: string) => {
+      if (!handle) {
         toast({
           title: 'Recovery failed',
-          description:
-            'Something went wrong. Nothing on this device was changed.',
+          description: 'Sign in to recover a vault.',
           variant: 'destructive',
         });
+        return;
       }
-    }
-  }, [handle, recoveryInput, setMasterKeyBytes, toast]);
-
-  const handleUnlockWithPassphrase = useCallback(async () => {
-    if (!handle) {
-      toast({
-        title: 'Unlock failed',
-        description: 'Sign in to unlock a vault.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    try {
-      const result = await handle.unlockWithPassphrase({
-        passphrase,
-      });
-      setMasterKeyBytes(result.masterKeyBytes, 'passphrase');
-      toast({
-        title: 'Unlocked',
-        description: 'Vault unlocked for this session.',
-      });
-    } catch (e: unknown) {
-      if (e instanceof VaultSecretMismatchError) {
-        setPassphraseError(PASSPHRASE_MISMATCH_MESSAGE);
-        toast({
-          title: "That passphrase didn't unlock this vault",
-          description:
-            'The passphrase does not match this vault. Nothing was changed.',
-          variant: 'destructive',
+      try {
+        const result = await handle.unlockWithRecoveryKey({
+          recoveryKey,
         });
-      } else {
+
+        setMasterKeyBytes(result.masterKeyBytes, 'recovery-key');
+        toast({
+          title: 'Recovered',
+          description: 'Vault unlocked with your recovery key.',
+        });
+      } catch (e: unknown) {
+        if (e instanceof VaultSecretMismatchError) {
+          toast({
+            title: "That recovery key didn't unlock this vault",
+            description:
+              'The recovery key does not match this vault. Nothing was changed.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Recovery failed',
+            description:
+              'Something went wrong. Nothing on this device was changed.',
+            variant: 'destructive',
+          });
+        }
+      }
+    },
+    [handle, setMasterKeyBytes, toast],
+  );
+
+  const handleUnlockWithPassphrase = useCallback(
+    async (passphrase: string) => {
+      if (!handle) {
         toast({
           title: 'Unlock failed',
-          description:
-            'Something went wrong. Nothing on this device was changed.',
+          description: 'Sign in to unlock a vault.',
           variant: 'destructive',
         });
+        return;
       }
-    }
-  }, [handle, passphrase, setMasterKeyBytes, toast]);
+      try {
+        const result = await handle.unlockWithPassphrase({
+          passphrase,
+        });
+        setMasterKeyBytes(result.masterKeyBytes, 'passphrase');
+        toast({
+          title: 'Unlocked',
+          description: 'Vault unlocked for this session.',
+        });
+      } catch (e: unknown) {
+        if (e instanceof VaultSecretMismatchError) {
+          passphraseForm.setError('passphrase', {
+            type: 'mismatch',
+            message: PASSPHRASE_MISMATCH_MESSAGE,
+          });
+          toast({
+            title: "That passphrase didn't unlock this vault",
+            description:
+              'The passphrase does not match this vault. Nothing was changed.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Unlock failed',
+            description:
+              'Something went wrong. Nothing on this device was changed.',
+            variant: 'destructive',
+          });
+        }
+      }
+    },
+    [handle, passphraseForm, setMasterKeyBytes, toast],
+  );
 
-  const handlePassphraseChange = useCallback((value: string): void => {
-    setPassphrase(value);
-    setPassphraseError(null);
-  }, []);
-
+  // preventDefault and validation are RHF's handleSubmit; the in-flight ref
+  // still guards a second submit that lands before the busy render.
   const handleUnlockSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-      event.preventDefault();
+    async ({ passphrase }: PassphraseUnlockValues): Promise<void> => {
       if (unlockInFlight.current) return;
       unlockInFlight.current = true;
-      setPassphraseError(null);
+      passphraseForm.clearErrors('passphrase');
       setUnlocking(true);
       try {
-        await handleUnlockWithPassphrase();
+        await handleUnlockWithPassphrase(passphrase);
       } finally {
         unlockInFlight.current = false;
         setUnlocking(false);
       }
     },
-    [handleUnlockWithPassphrase],
+    [handleUnlockWithPassphrase, passphraseForm],
   );
 
+  // No in-flight guard here, as before: the recover button is not busy-gated.
   const handleRecoverSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>): void => {
-      event.preventDefault();
-      if (recoveryInput.trim().length === 0) return;
-      void handleUnlockWithRecoveryKey();
+    ({ recoveryKey }: RecoveryKeyUnlockValues): void => {
+      void handleUnlockWithRecoveryKey(recoveryKey);
     },
-    [recoveryInput, handleUnlockWithRecoveryKey],
+    [handleUnlockWithRecoveryKey],
   );
 
   const title = useMemo(() => props.title, [props.title]);
@@ -669,7 +694,10 @@ export function VaultGate(props: VaultGateProps) {
   }
 
   if (useRecovery) {
-    const canRecover = recoveryInput.trim().length > 0;
+    // The schema is the one rule: an all-whitespace key is not enabled.
+    const canRecover = recoveryKeyUnlockSchema.safeParse({
+      recoveryKey: recoveryKeyValue,
+    }).success;
 
     return (
       <VaultGateFrame
@@ -697,13 +725,15 @@ export function VaultGate(props: VaultGateProps) {
         {showRemountRecoveryKeyBanner && (
           <UnacknowledgedRecoveryKeyBanner surface="locked" />
         )}
-        <form onSubmit={handleRecoverSubmit} className="flex flex-col gap-4.5">
+        <form
+          onSubmit={recoveryForm.handleSubmit(handleRecoverSubmit)}
+          className="flex flex-col gap-4.5"
+        >
           <div className="space-y-2">
             <Label htmlFor="recovery-key">Recovery key</Label>
             <Input
               id="recovery-key"
-              value={recoveryInput}
-              onChange={(e) => setRecoveryInput(e.target.value)}
+              {...recoveryForm.register('recoveryKey')}
               placeholder="Paste your recovery key"
             />
           </div>
@@ -755,10 +785,8 @@ export function VaultGate(props: VaultGateProps) {
         />
       )}
       <PassphraseUnlockForm
-        value={passphrase}
-        onChange={handlePassphraseChange}
+        form={passphraseForm}
         onSubmit={handleUnlockSubmit}
-        error={passphraseError}
         unlocking={unlocking}
       />
     </VaultGateFrame>
