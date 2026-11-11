@@ -58,7 +58,7 @@ const USAGE = `Usage:
 Runs the mechanical (non-judgment) TestReviewer checklist items against Jest
 test files. E2E specs under apps/web-e2e are skipped — they have their
 own rules in .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
-A tools/scripts Contract Suite (ADR 0135) is not a Jest spec — it is a
+A tools/scripts or tools/qa Contract Suite (ADR 0135) is not a Jest spec — it is a
 node --test suite that asserts with node:assert, not expect() — so the Jest
 rules above do not run against it. It is still required to assert something:
 a Contract Suite with no node:assert or t.assert… call fails. An assert call
@@ -491,7 +491,7 @@ const contractSuitePattern: AssertionPattern = (raw) => {
   return new RegExp([...calls, TEST_CONTEXT_ASSERTION].join('|'));
 };
 
-/** A tools/scripts Contract Suite's only mechanical rule (ADR 0135): it must
+/** A Contract Suite (tools/scripts or tools/qa)'s only mechanical rule (ADR 0135): it must
  *  call an assertion somewhere, directly or through a local helper (such as
  *  copilot-hooks/hook-harness.ts's expectContext()) whose exported body
  *  asserts. Every other check in CHECKS is Jest-specific and does not apply
