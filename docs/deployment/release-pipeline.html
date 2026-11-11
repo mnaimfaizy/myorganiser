@@ -2271,38 +2271,38 @@
           <code>upstream:briefs:test</code>) or a gate run-all flag is
           selected <span class="cite">:919</span>; a skipped job reads as
           passing;
-          Prisma Migration Gate <span class="cite">:1013</span>, only when a
+          Prisma Migration Gate <span class="cite">:1022</span>, only when a
           gate run-all or migration-drift flag is set
-          <span class="cite">:1017</span>, <span class="cite">:1018</span>;
-          Build Backend <span class="cite">:1225</span>, only when
-          <code>backend</code> is affected <span class="cite">:1229</span>,
-          <span class="cite">:1233-1234</span>;
-          Build Storybook <span class="cite">:1457</span>,
-          <span class="cite">:1463</span>
+          <span class="cite">:1026</span>, <span class="cite">:1027</span>;
+          Build Backend <span class="cite">:1234</span>, only when
+          <code>backend</code> is affected <span class="cite">:1238</span>,
+          <span class="cite">:1242-1243</span>;
+          Build Storybook <span class="cite">:1466</span>,
+          <span class="cite">:1472</span>
         </li>
         <li>
           <b>Pull requests only, wait on Setup alone:</b>
-          E2E Chromium (4 shards, balanced by duration) <span class="cite">:1094</span>, when
-          <code>web-e2e</code> is affected <span class="cite">:1100</span>,
-          <span class="cite">:1106-1107</span>,
-          then E2E Report <span class="cite">:1206</span>, which needs E2E
-          <span class="cite">:1211-1212</span>; and E2E live logout
-          <span class="cite">:1321</span>, <span class="cite">:1325</span>,
-          <span class="cite">:1327-1328</span>. The pull request&#8217;s
+          E2E Chromium (4 shards, balanced by duration) <span class="cite">:1103</span>, when
+          <code>web-e2e</code> is affected <span class="cite">:1109</span>,
+          <span class="cite">:1115-1116</span>,
+          then E2E Report <span class="cite">:1215</span>, which needs E2E
+          <span class="cite">:1220-1221</span>; and E2E live logout
+          <span class="cite">:1330</span>, <span class="cite">:1334</span>,
+          <span class="cite">:1336-1337</span>. The pull request&#8217;s
           frontend build check is each E2E shard&#8217;s own
           <code>nx build web</code> step
-          <span class="cite">:1172</span>, because <code>web-e2e</code>
-          depends on <code>web</code> <span class="cite">:1276</span>.
+          <span class="cite">:1181</span>, because <code>web-e2e</code>
+          depends on <code>web</code> <span class="cite">:1285</span>.
         </li>
         <li>
           <b>Also wait on Lint, Test and Typecheck, not Setup alone:</b>
-          Build Frontend <span class="cite">:1272</span>, which runs only
+          Build Frontend <span class="cite">:1281</span>, which runs only
           off a pull request (a push to <code>main</code>), when
-          <code>web</code> is affected <span class="cite">:1280</span>,
-          <span class="cite">:1281-1285</span>; and Build Mobile (web)
-          <span class="cite">:1411</span>, when <code>mobile</code> is
-          affected <span class="cite">:1415</span>,
-          <span class="cite">:1416-1420</span>
+          <code>web</code> is affected <span class="cite">:1289</span>,
+          <span class="cite">:1290-1294</span>; and Build Mobile (web)
+          <span class="cite">:1420</span>, when <code>mobile</code> is
+          affected <span class="cite">:1424</span>,
+          <span class="cite">:1425-1429</span>
         </li>
       </ol>
       <p class="small muted">
@@ -2843,30 +2843,30 @@
       "ci.yml:914": { "file": ".github/workflows/ci.yml", "start": "tool-suites:" },
       "ci.yml:918": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
       "ci.yml:919": { "file": ".github/workflows/ci.yml", "start": "if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' || needs.setup.outputs.gate_qa_tools_test == 'true' }}" },
-      "ci.yml:1013": { "file": ".github/workflows/ci.yml", "start": "prisma-migration-gate:" },
-      "ci.yml:1017": { "file": ".github/workflows/ci.yml", "start": "if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_prisma_migration_drift == 'true' }}" },
-      "ci.yml:1018": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
-      "ci.yml:1094": { "file": ".github/workflows/ci.yml", "start": "e2e:" },
-      "ci.yml:1100": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
-      "ci.yml:1106-1107": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
-      "ci.yml:1172": { "file": ".github/workflows/ci.yml", "start": "- name: Build frontend for E2E" },
-      "ci.yml:1206": { "file": ".github/workflows/ci.yml", "start": "e2e-report:" },
-      "ci.yml:1211-1212": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- e2e" },
-      "ci.yml:1225": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
-      "ci.yml:1229": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
-      "ci.yml:1233-1234": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
-      "ci.yml:1272": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
-      "ci.yml:1276": { "file": ".github/workflows/ci.yml", "start": "# Pull requests no longer run this job (issue #1396): each E2E shard's own" },
-      "ci.yml:1280": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name != 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
-      "ci.yml:1281-1285": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
-      "ci.yml:1321": { "file": ".github/workflows/ci.yml", "start": "e2e-live-logout:" },
-      "ci.yml:1325": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
-      "ci.yml:1327-1328": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
-      "ci.yml:1411": { "file": ".github/workflows/ci.yml", "start": "build-mobile:" },
-      "ci.yml:1415": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'mobile') }}" },
-      "ci.yml:1416-1420": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
-      "ci.yml:1457": { "file": ".github/workflows/ci.yml", "start": "build-storybook:" },
-      "ci.yml:1463": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:1022": { "file": ".github/workflows/ci.yml", "start": "prisma-migration-gate:" },
+      "ci.yml:1026": { "file": ".github/workflows/ci.yml", "start": "if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_prisma_migration_drift == 'true' }}" },
+      "ci.yml:1027": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
+      "ci.yml:1103": { "file": ".github/workflows/ci.yml", "start": "e2e:" },
+      "ci.yml:1109": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
+      "ci.yml:1115-1116": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1181": { "file": ".github/workflows/ci.yml", "start": "- name: Build frontend for E2E" },
+      "ci.yml:1215": { "file": ".github/workflows/ci.yml", "start": "e2e-report:" },
+      "ci.yml:1220-1221": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- e2e" },
+      "ci.yml:1234": { "file": ".github/workflows/ci.yml", "start": "build-backend:" },
+      "ci.yml:1238": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'backend') }}" },
+      "ci.yml:1242-1243": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1281": { "file": ".github/workflows/ci.yml", "start": "build-frontend:" },
+      "ci.yml:1285": { "file": ".github/workflows/ci.yml", "start": "# Pull requests no longer run this job (issue #1396): each E2E shard's own" },
+      "ci.yml:1289": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name != 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web') }}" },
+      "ci.yml:1290-1294": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
+      "ci.yml:1330": { "file": ".github/workflows/ci.yml", "start": "e2e-live-logout:" },
+      "ci.yml:1334": { "file": ".github/workflows/ci.yml", "start": "if: ${{ github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.affected_projects), 'web-e2e') }}" },
+      "ci.yml:1336-1337": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- setup" },
+      "ci.yml:1420": { "file": ".github/workflows/ci.yml", "start": "build-mobile:" },
+      "ci.yml:1424": { "file": ".github/workflows/ci.yml", "start": "if: ${{ contains(fromJson(needs.setup.outputs.affected_projects), 'mobile') }}" },
+      "ci.yml:1425-1429": { "file": ".github/workflows/ci.yml", "start": "needs:", "end": "- typecheck" },
+      "ci.yml:1466": { "file": ".github/workflows/ci.yml", "start": "build-storybook:" },
+      "ci.yml:1472": { "file": ".github/workflows/ci.yml", "start": "needs: setup" },
       "deploy-production.yml:1": { "file": ".github/workflows/deploy-production.yml", "start": "name: Deploy Production (manual)" },
       "deploy-production.yml:5-6": { "file": ".github/workflows/deploy-production.yml", "start": "on:", "end": "workflow_dispatch:" },
       "deploy-production.yml:20-23": { "file": ".github/workflows/deploy-production.yml", "start": "concurrency:", "end": "cancel-in-progress: false" },
