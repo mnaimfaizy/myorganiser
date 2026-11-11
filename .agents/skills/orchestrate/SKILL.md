@@ -37,6 +37,8 @@ All state lives in GitHub plus one local folder, `tmp/orchestrate/<run>/`. `tmp/
 | `<delegation>/log.md`    | The Delegation's own Activity Log                                                                    |
 | `<delegation>/drafts/`   | Writes the Delegation wants made as the human, waiting for the Chief of Staff                        |
 
+A Delegation in its own worktree may be refused writes to the primary checkout's `tmp/`. In the PRD #1507 run, a hook refused two of seven. When that happens, it writes its files into a folder it can write to, such as its Harness's own notes folder, with names prefixed `<delegation>-`, and gives the path. The Chief of Staff copies them into `<delegation>/` before checking them. That copy is the agreed route, so it is not a Decision Request, and the Delegation never routes around the refusal.
+
 Update `status.md` after every event. Before acting on any Delegation, re-read its row, its branch, its Pull Request and CI. A message may cross with work already done, so never act on a stale snapshot.
 
 An **Activity Log** line is `<UTC time> · <who> · <what> · <why> · <link>`. Log every message sent and the gist of each reply, every check and what it found, every nudge, re-run and background watch, every post made as the human with the approval it rests on, and every decision not to act. A Delegation logs every Sub-agent it starts and what came back, every background command, every permission block, and every judgement it made without asking.
@@ -60,7 +62,7 @@ Write one row per Delegation into `status.md` and show it to the human. Each row
 
 - **Executor.** Choose from the Harness's tier in [harnesses.md](harnesses.md): a Live Session, a `dispatch-agents` run (Standalone Run or PRD slice), or a Sub-agent in this session. Say which, and why.
 - **Model.** Take it from the issue's `complexity:*` label through `tools/config/agent-model-policy.json`, the mapping `dispatch-agents` uses. That mapping covers Claude only. On another Harness use the policy's default for it where one exists, otherwise the Harness's own default, and say which in the plan. A read-only Delegation gets the cheaper model.
-- **Waves.** Order by `## Blocked by`. Two Delegations that touch the same files never share a wave.
+- **Waves.** Order by `## Blocked by`. Two Delegations that touch the same files never share a wave, unless every shared file only gains appended lines on both sides, such as a new `package.json` script, a new command-reference entry or a new CI step. That overlap is a mechanical conflict the Chief of Staff resolves at integration (see Merge conflicts). Name each such shared file in the plan.
 - **Limits.** At most 4 building Delegations at once, plus any number of read-only ones. The plan may raise this with the human's approval. Each shared resource has one holder at a time: a local backend on `:3000`, a production build, a QA stack, or a CI-heavy experiment. QA stacks follow [Scheduling QA sessions](../finish-standalone-runs/SKILL.md#scheduling-qa-sessions). Stagger pushes that would land within minutes of each other, because CI runs share 20 concurrent jobs.
 - **Routine writes.** List the kinds of write the run will make as the human, such as new issues, routine comments, label changes and closing issues. Approving the plan approves those kinds. Every `## Maintainer Review` still needs its own yes.
 
@@ -68,7 +70,7 @@ Wait for one "go", unless the invocation said `go`.
 
 ### A PRD
 
-A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. A `dispatch-agents` run integrates its own slices. For any other Executor, the Chief of Staff fast-forwards `feat/<prd-slug>` onto each finished slice, in plan order, in its own integration worktree. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally. Say that a pushed branch is visible on the public remote until it is deleted after the PRD merges ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
+A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. A `dispatch-agents` run integrates its own slices. When the Chief of Staff cuts `feat/<prd-slug>` itself, it first writes the empty anchor commit `dispatch-agents` writes, ending `Closes #<prd>` ([ADR 0076](../../../docs/adr/0076-an-agent-branch-carries-its-issue-in-its-first-commit.md); `anchorBranchToIssue` in `.sandcastle/main.mts`). It does this before any slice is cut. Without it, the first slice's commit becomes the branch's spec, and the Pull Request's code review flags every other slice as behaviour nobody asked for. For any other Executor, the Chief of Staff fast-forwards `feat/<prd-slug>` onto each finished slice, in plan order, in its own integration worktree. After each fast-forward it re-gates there with the slice's own tests, `corepack yarn gates:run`, and `corepack yarn design:hygiene --all`. Pre-commit checks House Explainer Pages only `--staged`, so a slice that moves a line a page cites passes locally and fails CI. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally. Say that a pushed branch is visible on the public remote until it is deleted after the PRD merges ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
 
 ## 3. Dispatch: the Brief Contract
 
@@ -76,14 +78,22 @@ Every brief carries all eight items:
 
 1. **Read first:** the issue with its comments and history, [`AGENTS.md`](../../../AGENTS.md), `CODING_STANDARDS.md`, `CONTEXT.md` where domain terms are touched, the gate tier from `.claude/checklist.md` Step 0, and the ADRs and Skills that apply.
 2. **The goal and what "done" means:** for example "a Pull Request closing #N", or "evidence and options, then stop".
-3. **Phases with explicit STOP points**, for readiness-limited work.
+3. **Phases with explicit STOP points**, for readiness-limited work. Every building brief ends with a code-review phase before its final commit, whatever the gate tier. The Delegation runs the `code-review` Skill on its range against its issue, fixes every finding or raises a Decision Request, and records the verdicts under `## Code review` in its `report.md`.
 4. **Scope fences:** the files other Delegations hold right now, and what is out of scope.
 5. **The repository's command routes:** commits through `commit-change-workflow`, Pull Requests through `create-pull-request-workflow` and `ai:create-pr`, and the specialist Skills for the gate tier. Never hand a Delegation a raw `git` or `gh` command those routes replace.
 6. **The rules for writes.** A Delegation may push its own branch, open its own Pull Request, and reply on its own Pull Request's review. Any other write that speaks as the human goes in `<delegation>/drafts/` and is raised as a Decision Request. When a permission check blocks it, do not retry or route around it.
 7. **The Decision Request form:** one question, the options, and a recommendation, sent to the Chief of Staff, and then wait.
 8. **Its files:** its `report.md` and `log.md` paths.
 
-A `gate:full` Delegation sends a short plan before it writes code: approach, files, tests and risks. The Chief of Staff checks it against the standards, the ADRs and the spec. It answers what is within its own authority, and raises the rest as a Decision Request.
+For a slice with a ready issue, the brief can be `/implement #<n>` plus a short overrides file. The issue is the spec, and the overrides carry only what differs from the `implement` Skill: the code-review phase above, the Chief of Staff makes every issue write, and the commit lands on the slice branch with no push and no Pull Request.
+
+A Delegation sends a short plan before it writes code (approach, files, tests and risks) when any of these hold:
+
+- it is `gate:full`;
+- it parses or filters untrusted text, such as redaction, authentication or URL handling. Its plan says whether it decides by allow-list or deny-list. If the issue prescribes a deny-list, the Chief of Staff raises a Decision Request before any code, because each review round of a deny-list finds another encoding it missed;
+- it ships an executor against Docker, ports or a database. Its plan includes one live smoke run, raised as a Decision Request because the QA stack is a shared resource, in that same slice. A stubbed executor suite cannot show that the real tool runs, so leaving the live run to whoever uses the tool next hides the defect a slice later. The smoke run's QA worktree gets its own install, never a symlinked `node_modules` ([The QA stack](../finish-standalone-runs/SKILL.md#the-qa-stack)).
+
+The Chief of Staff checks the plan against the standards, the ADRs and the spec. It answers what is within its own authority, and raises the rest as a Decision Request.
 
 ## 4. Run the loop
 
@@ -134,7 +144,7 @@ Close out through the existing Skills: `finish-standalone-runs` for Standalone R
 
 1. CI is green;
 2. the automated review approves, or every remaining finding is fixed or accepted in a `## Maintainer Review`;
-3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed";
+3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed". For a PRD, the QA Report on the Pull Request gives the headline and links the QA Plan Issue's Execution record, which stays the full record;
 4. `git merge-tree` against `main` is clean.
 
 When every Delegation is Ready to Merge, give the human one merge order, built by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), as a `yarn merge:train <pr> …` command ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).

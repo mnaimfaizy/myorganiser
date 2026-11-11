@@ -231,3 +231,12 @@ cannot be written within the rule, stop and say so rather than improvising.
 > was documented nowhere they read. That is why it is written here. This very section was itself
 > blocked on first write, for quoting a long literal as an example; the fix was to describe it
 > instead, not to work around the scanner.
+
+GitGuardian also scans every Pull Request, and it is wider than the hook. It flags a random-looking
+literal with no credential keyword near it as a `Generic High Entropy Secret`. A 32-character
+random hex `HEX_TOKEN` in a redactor test failed Pull Request #1513 this way. When a test needs a
+value shaped like a token, write one that is visibly not random: a repeated or sequential run such
+as `0123456789abcdef0123456789abcdef`, or a readable sentinel. Nothing in a fixture is a secret, so
+nothing in it should look like one
+([ADR 0122](../adr/0122-a-qa-accounts-credentials-are-public-fixtures-in-tracked-source.md)).
+There is no local check for this rule, so the scaffold has to keep it.
