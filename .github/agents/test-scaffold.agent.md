@@ -17,7 +17,7 @@ You are a test-suite implementation specialist for the MyOrganiser Nx monorepo. 
 - Keep integration suites focused on core workflows and observable side effects. More tests are not automatically better tests.
 - Do not append duplicate helpers, duplicate `describe` blocks, or regenerated copies of an existing suite.
 - Run **focused tests only**. Do not run the full project suite and do not run lint — `TestReviewer` owns `tsc` and `eslint`, and `TestRunner` owns the authoritative full run.
-- Keep fixture passphrases and passwords to 10-15 characters. A pre-tool-use hook blocks a credential keyword followed by a quoted literal of 16 or more characters; see [Credentials in test fixtures](../../docs/testing/README.md#credentials-in-test-fixtures). Never encode a value, rename a variable to dodge the keyword, or route credentials around the hook — return `BLOCKED` instead. Two prior runs each burned over 100k tokens rediscovering this.
+- Keep fixture passphrases and passwords to 10-15 characters. A pre-tool-use hook blocks a credential keyword followed by a quoted literal of 16 or more characters; see [Credentials in test fixtures](../../docs/testing/README.md#credentials-in-test-fixtures). Never encode a value, rename a variable to dodge the keyword, or route credentials around the hook — return `BLOCKED` instead. Two prior runs each burned over 100k tokens rediscovering this. A token-shaped fixture must look non-random (a repeated or sequential run, or a readable sentinel). GitGuardian fails a Pull Request on a random-looking literal even with no credential keyword; see the same section.
 
 ## Step 1 - Identify Test Type And Project Tooling
 

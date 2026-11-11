@@ -397,7 +397,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
         <div class="legend" id="legend">
           <label><input type="checkbox" data-t="B" checked>
             <svg width="62" height="14" aria-hidden="true"><path d="M2,7 H52" stroke="var(--accent)" stroke-width="2.6" fill="none" marker-end="url(#ar-B)"/></svg>
-            <span class="ltext"><b>hands-off-to</b> &#x2014; heaviest. This runs after that. <i>Carries the pulse. 21 drawn.</i></span>
+            <span class="ltext"><b>hands-off-to</b> &#x2014; heaviest. This runs after that. <i>Carries the pulse. 29 drawn.</i></span>
           </label>
           <label><input type="checkbox" data-t="C" checked>
             <svg width="62" height="14" aria-hidden="true"><path d="M2,7 H50" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3.5" fill="none" marker-end="url(#ar-C)"/></svg>
@@ -531,7 +531,7 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
   "subAgentCanonicalFileCount": 23,
   "subAgentMirrorFileCount": 23,
   "subAgentsUnreferencedBySkills": ["Docs"],
-  "skillToSkillEdgeCount": 79,
+  "skillToSkillEdgeCount": 81,
   "skillToSkillWarnsOffEdgeCount": 5,
   "skillToSubAgentEdgeCount": 60,
   "upstreamOwnedSkillCount": 6,
@@ -737,7 +737,15 @@ footer.foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--l
       "file": ".agents/skills/orchestrate/SKILL.md",
       "start": "5. **The repository's command routes:** commits through `commit-change-workflow`, Pull Requests through `create-pull-request-workflow` and `ai:create-pr`, and the specialist Skills for the gate tier. Never hand a Delegation a raw `git` or `gh` command those routes replace."
     },
-    "orchestrate/SKILL.md:133": {
+    "orchestrate/SKILL.md:79": {
+      "file": ".agents/skills/orchestrate/SKILL.md",
+      "start": "3. **Phases with explicit STOP points**, for readiness-limited work. Every building brief ends with a code-review phase before its final commit, whatever the gate tier. The Delegation runs the `code-review` Skill on its range against its issue, fixes every finding or raises a Decision Request, and records the verdicts under `## Code review` in its `report.md`."
+    },
+    "orchestrate/SKILL.md:86": {
+      "file": ".agents/skills/orchestrate/SKILL.md",
+      "start": "For a slice with a ready issue, the brief can be `/implement #<n>` plus a short overrides file. The issue is the spec, and the overrides carry only what differs from the `implement` Skill: the code-review phase above, the Chief of Staff makes every issue write, and the commit lands on the slice branch with no push and no Pull Request."
+    },
+    "orchestrate/SKILL.md:141": {
       "file": ".agents/skills/orchestrate/SKILL.md",
       "start": "Close out through the existing Skills: `finish-standalone-runs` for Standalone Runs and issue branches, and `create-pull-request-workflow` then `qa-plan` for a PRD. A Delegation is **Ready to Merge** when all four hold:"
     },
@@ -834,9 +842,11 @@ const SS = [
   ["unit-test-delegation-workflow","playwright-e2e-workflow","B","unit-test-delegation-workflow/SKILL.md:17"],
   ["orchestrate","my-triage","A","orchestrate/SKILL.md:55 \u2014 an issue with no brief is triaged with my-triage before any Delegation."],
   ["orchestrate","commit-change-workflow","B","orchestrate/SKILL.md:81 \u2014 every brief routes a Delegation's commits through it."],
-  ["orchestrate","create-pull-request-workflow","B","orchestrate/SKILL.md:133 \u2014 a PRD closes out through it, then qa-plan; briefs also route Pull Requests through it (:81)."],
-  ["orchestrate","finish-standalone-runs","B","orchestrate/SKILL.md:133 \u2014 Standalone Runs and issue branches close out through it."],
-  ["orchestrate","qa-plan","B","orchestrate/SKILL.md:133 \u2014 a PRD's QA comes from qa-plan after its Pull Request opens."],
+  ["orchestrate","create-pull-request-workflow","B","orchestrate/SKILL.md:141 \u2014 a PRD closes out through it, then qa-plan; briefs also route Pull Requests through it (:81)."],
+  ["orchestrate","finish-standalone-runs","B","orchestrate/SKILL.md:141 \u2014 Standalone Runs and issue branches close out through it."],
+  ["orchestrate","qa-plan","B","orchestrate/SKILL.md:141 \u2014 a PRD's QA comes from qa-plan after its Pull Request opens."],
+  ["orchestrate","code-review","B","orchestrate/SKILL.md:79 \u2014 every building brief ends with a code-review phase before its final commit."],
+  ["orchestrate","implement","B","orchestrate/SKILL.md:86 \u2014 a slice brief can be /implement #<n> plus an overrides file."],
   ["finish-standalone-runs","create-pull-request-workflow","B","finish-standalone-runs/SKILL.md:61 \u2014 pass 1 opens each clean branch's Pull Request through that skill."],
   ["finish-standalone-runs","address-pr-review","B","finish-standalone-runs/SKILL.md:67 \u2014 pass 2 starts by running it on the Pull Requests."],
   ["finish-standalone-runs","qa-plan","B","finish-standalone-runs/SKILL.md:69 \u2014 composes each plan with qa-plan Issue mode."],

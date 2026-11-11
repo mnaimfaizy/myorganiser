@@ -68,7 +68,7 @@ Wait for one "go", unless the invocation said `go`.
 
 ### A PRD
 
-A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. A `dispatch-agents` run integrates its own slices. For any other Executor, the Chief of Staff fast-forwards `feat/<prd-slug>` onto each finished slice, in plan order, in its own integration worktree. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally. Say that a pushed branch is visible on the public remote until it is deleted after the PRD merges ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
+A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. A `dispatch-agents` run integrates its own slices. When the Chief of Staff cuts `feat/<prd-slug>` itself, it first writes the empty anchor commit `dispatch-agents` writes, ending `Closes #<prd>` ([ADR 0076](../../../docs/adr/0076-an-agent-branch-carries-its-issue-in-its-first-commit.md); `anchorBranchToIssue` in `.sandcastle/main.mts`). It does this before any slice is cut. Without it, the first slice's commit becomes the branch's spec, and the Pull Request's code review flags every other slice as behaviour nobody asked for. For any other Executor, the Chief of Staff fast-forwards `feat/<prd-slug>` onto each finished slice, in plan order, in its own integration worktree. After each fast-forward it re-gates there with the slice's own tests, `corepack yarn gates:run`, and `corepack yarn design:hygiene --all`. Pre-commit checks House Explainer Pages only `--staged`, so a slice that moves a line a page cites passes locally and fails CI. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally. Say that a pushed branch is visible on the public remote until it is deleted after the PRD merges ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
 
 ## 3. Dispatch: the Brief Contract
 
@@ -76,14 +76,22 @@ Every brief carries all eight items:
 
 1. **Read first:** the issue with its comments and history, [`AGENTS.md`](../../../AGENTS.md), `CODING_STANDARDS.md`, `CONTEXT.md` where domain terms are touched, the gate tier from `.claude/checklist.md` Step 0, and the ADRs and Skills that apply.
 2. **The goal and what "done" means:** for example "a Pull Request closing #N", or "evidence and options, then stop".
-3. **Phases with explicit STOP points**, for readiness-limited work.
+3. **Phases with explicit STOP points**, for readiness-limited work. Every building brief ends with a code-review phase before its final commit, whatever the gate tier. The Delegation runs the `code-review` Skill on its range against its issue, fixes every finding or raises a Decision Request, and records the verdicts under `## Code review` in its `report.md`.
 4. **Scope fences:** the files other Delegations hold right now, and what is out of scope.
 5. **The repository's command routes:** commits through `commit-change-workflow`, Pull Requests through `create-pull-request-workflow` and `ai:create-pr`, and the specialist Skills for the gate tier. Never hand a Delegation a raw `git` or `gh` command those routes replace.
 6. **The rules for writes.** A Delegation may push its own branch, open its own Pull Request, and reply on its own Pull Request's review. Any other write that speaks as the human goes in `<delegation>/drafts/` and is raised as a Decision Request. When a permission check blocks it, do not retry or route around it.
 7. **The Decision Request form:** one question, the options, and a recommendation, sent to the Chief of Staff, and then wait.
 8. **Its files:** its `report.md` and `log.md` paths.
 
-A `gate:full` Delegation sends a short plan before it writes code: approach, files, tests and risks. The Chief of Staff checks it against the standards, the ADRs and the spec. It answers what is within its own authority, and raises the rest as a Decision Request.
+For a slice with a ready issue, the brief can be `/implement #<n>` plus a short overrides file. The issue is the spec, and the overrides carry only what differs from the `implement` Skill: the code-review phase above, the Chief of Staff makes every issue write, and the commit lands on the slice branch with no push and no Pull Request.
+
+A Delegation sends a short plan before it writes code (approach, files, tests and risks) when any of these hold:
+
+- it is `gate:full`;
+- it parses or filters untrusted text, such as redaction, authentication or URL handling. Its plan says whether it decides by allow-list or deny-list. If the issue prescribes a deny-list, the Chief of Staff raises a Decision Request before any code, because each review round of a deny-list finds another encoding it missed;
+- it ships an executor against Docker, ports or a database. Its plan includes one live smoke run, raised as a Decision Request because the QA stack is a shared resource, in that same slice. A stubbed executor suite cannot show that the real tool runs, so leaving the live run to whoever uses the tool next hides the defect a slice later. The smoke run's QA worktree gets its own install, never a symlinked `node_modules` ([The QA stack](../finish-standalone-runs/SKILL.md#the-qa-stack)).
+
+The Chief of Staff checks the plan against the standards, the ADRs and the spec. It answers what is within its own authority, and raises the rest as a Decision Request.
 
 ## 4. Run the loop
 
