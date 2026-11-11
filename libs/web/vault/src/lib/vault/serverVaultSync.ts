@@ -70,6 +70,204 @@ function requestOptions(signal: AbortSignal | undefined): {
   return { signal };
 }
 
+/**
+ * One wire request that several callers are waiting on.
+ *
+ * `waiting` counts the callers still waiting. The request is aborted only when
+ * that count drops to zero, so a caller that gives up does not end the request
+ * for the callers still waiting on it.
+ */
+type SharedVaultRead = {
+  response: Promise<unknown>;
+  controller: AbortController;
+  waiting: number;
+};
+
+/**
+ * The unconditional Vault reads in flight right now, keyed by owner and read.
+ *
+ * In-flight only: an entry is removed the moment its request settles, so
+ * nothing here is ever a cache and a read that starts after a settle always
+ * goes to the server (#1489).
+ */
+const inFlightVaultReads = new Map<string, SharedVaultRead>();
+
+type SharedVaultReadKind = 'vault-meta' | 'vault-blob-inventory';
+
+function sharedVaultReadKey(owner: string, kind: SharedVaultReadKind): string {
+  return JSON.stringify([owner, kind]);
+}
+
+function forgetSharedVaultRead(key: string, entry: SharedVaultRead): void {
+  // A write may already have removed this entry and a newer read may have
+  // taken its key. Only remove the entry this request owns.
+  if (inFlightVaultReads.get(key) === entry) inFlightVaultReads.delete(key);
+}
+
+/**
+ * Each caller gets its own copy of the response body. The body is parsed from
+ * JSON on the wire, so a JSON round trip copies it without loss. jsdom has no
+ * `structuredClone`.
+ */
+function copyVaultReadResponse<T>(response: T): T {
+  const maybeResponse = response as { data?: unknown } | null;
+  if (!maybeResponse || maybeResponse.data === undefined) return response;
+  return {
+    ...maybeResponse,
+    data: JSON.parse(JSON.stringify(maybeResponse.data)),
+  } as T;
+}
+
+/**
+ * Join the identical read already in flight for `key`, or send it.
+ *
+ * The request is sent with a signal this module owns, not the caller's. A
+ * caller's own `signal` ends only that caller's wait. The request is aborted
+ * once every caller waiting on it has aborted, so the budget and supersede
+ * rules in ADR 0088 still free the socket when nobody is left to answer.
+ */
+function joinVaultRead<T>(
+  key: string,
+  send: (signal: AbortSignal) => Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<T> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+
+  let entry = inFlightVaultReads.get(key);
+  if (!entry) {
+    const controller = new AbortController();
+    const created: SharedVaultRead = {
+      response: send(controller.signal),
+      controller,
+      waiting: 0,
+    };
+    inFlightVaultReads.set(key, created);
+    // Both branches handle the rejection, so a request that every caller
+    // abandoned does not raise an unhandled rejection.
+    created.response.then(
+      () => forgetSharedVaultRead(key, created),
+      () => forgetSharedVaultRead(key, created),
+    );
+    entry = created;
+  }
+
+  const shared = entry;
+  shared.waiting += 1;
+
+  return new Promise<T>((resolve, reject) => {
+    let left = false;
+    const leave = () => {
+      if (left) return false;
+      left = true;
+      signal?.removeEventListener('abort', onAbort);
+      shared.waiting -= 1;
+      return true;
+    };
+    const onAbort = () => {
+      if (!leave()) return;
+      if (shared.waiting === 0) {
+        forgetSharedVaultRead(key, shared);
+        shared.controller.abort(signal?.reason);
+      }
+      reject(signal?.reason);
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    shared.response.then(
+      (response) => {
+        if (leave()) resolve(copyVaultReadResponse(response as T));
+      },
+      (error: unknown) => {
+        if (leave()) reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Send a write of Vault Meta or a Vault Blob. Every in-flight shared read is
+ * forgotten before the write is sent and again after it settles.
+ *
+ * Before: a read that starts while the write is in flight must not join a
+ * request sent before the write. After: a read that starts after the write
+ * settles must not join a request sent while the write was in flight. Every
+ * owner's entries are forgotten, because a write does not name its owner. The
+ * only cost of forgetting too much is one request that is not shared.
+ *
+ * Every `putVaultMeta` and `putVaultBlob` in this library goes through here.
+ */
+export async function sendVaultWrite<T>(write: () => Promise<T>): Promise<T> {
+  inFlightVaultReads.clear();
+  try {
+    return await write();
+  } finally {
+    inFlightVaultReads.clear();
+  }
+}
+
+/**
+ * The same Vault API, except that its unconditional reads of Vault Meta and of
+ * the Vault Blob Inventory share one wire request with any identical read
+ * already in flight for the same `owner` (#1489).
+ *
+ * The dashboard mounts `VaultReconcileRunner`, `VaultMetaConvergeRunner` and
+ * `VaultPullRunner` together, and each one reads at mount. They stay
+ * independent on purpose (ADR 0057, ADR 0087). Only the wire request is
+ * shared, never a decision:
+ *
+ * - In flight only. Nothing is kept after the request settles.
+ * - A conditional read (`If-None-Match`) is never shared. Its answer depends
+ *   on the ETag its caller holds, so the ETag and Sync Bookmark semantics are
+ *   unchanged.
+ * - Each caller gets its own copy of the response body, so no caller can
+ *   change another caller's data.
+ * - Any write through {@link sendVaultWrite}, or through this wrapper's own
+ *   `putVaultMeta` / `putVaultBlob`, forgets the shared reads.
+ * - The shared request uses the first caller's request options. Only `signal`
+ *   is read per caller; every caller here passes nothing else.
+ * - `getVaultBlob` is passed through unchanged.
+ */
+export function shareInFlightVaultReads(
+  api: VaultApiLike,
+  owner: string,
+): VaultApiLike {
+  const getVaultMeta: VaultApiLike['getVaultMeta'] = (options) =>
+    joinVaultRead(
+      sharedVaultReadKey(owner, 'vault-meta'),
+      (signal) => api.getVaultMeta({ ...options, signal }),
+      options?.signal as AbortSignal | undefined,
+    );
+
+  const getVaultBlobInventory: VaultApiLike['getVaultBlobInventory'] = (
+    requestParameters,
+    options,
+  ) => {
+    if (requestParameters?.ifNoneMatch != null) {
+      return api.getVaultBlobInventory(requestParameters, options);
+    }
+    return joinVaultRead(
+      sharedVaultReadKey(owner, 'vault-blob-inventory'),
+      (signal) =>
+        api.getVaultBlobInventory(requestParameters, { ...options, signal }),
+      options?.signal as AbortSignal | undefined,
+    );
+  };
+
+  return {
+    getVaultMeta,
+    getVaultBlobInventory,
+    getVaultBlob: (requestParameters, options) =>
+      api.getVaultBlob(requestParameters, options),
+    // Nested inside `sendVaultWrite` when a caller in this library writes.
+    // Forgetting twice costs nothing, and a direct write through this wrapper
+    // still forgets.
+    putVaultMeta: (requestParameters, options) =>
+      sendVaultWrite(() => api.putVaultMeta(requestParameters, options)),
+    putVaultBlob: (requestParameters, options) =>
+      sendVaultWrite(() => api.putVaultBlob(requestParameters, options)),
+  };
+}
+
 function defaultBlobConflictHandler(params: {
   local: EncryptedBlobV1;
   remote: ServerVaultBlob;
@@ -392,10 +590,12 @@ export async function putServerVaultMetaEtagAware(options: {
   const { onConflict } = options;
 
   try {
-    const response = await options.api.putVaultMeta({
-      putVaultMetaRequest: { meta: options.meta },
-      ifMatch: options.ifMatch,
-    });
+    const response = await sendVaultWrite(() =>
+      options.api.putVaultMeta({
+        putVaultMetaRequest: { meta: options.meta },
+        ifMatch: options.ifMatch,
+      }),
+    );
 
     const data = response.data as PutVaultMetaResponse;
     return { kind: 'updated', etag: data.etag, updatedAt: data.updatedAt };
@@ -410,10 +610,12 @@ export async function putServerVaultMetaEtagAware(options: {
       return { kind: 'kept-remote', remote };
     }
 
-    const retry = await options.api.putVaultMeta({
-      putVaultMetaRequest: { meta: options.meta },
-      ifMatch: remote.etag,
-    });
+    const retry = await sendVaultWrite(() =>
+      options.api.putVaultMeta({
+        putVaultMetaRequest: { meta: options.meta },
+        ifMatch: remote.etag,
+      }),
+    );
 
     const data = retry.data as PutVaultMetaResponse;
     return { kind: 'updated', etag: data.etag, updatedAt: data.updatedAt };
@@ -441,11 +643,13 @@ export async function putServerVaultBlobEtagAware(options: {
   const onConflict = options.onConflict ?? defaultBlobConflictHandler;
 
   try {
-    const response = await options.api.putVaultBlob({
-      type: options.type,
-      putVaultBlobRequest: { type: options.type, blob: options.blob },
-      ifMatch: options.ifMatch,
-    });
+    const response = await sendVaultWrite(() =>
+      options.api.putVaultBlob({
+        type: options.type,
+        putVaultBlobRequest: { type: options.type, blob: options.blob },
+        ifMatch: options.ifMatch,
+      }),
+    );
 
     const data = response.data as PutVaultBlobResponse;
     return { kind: 'updated', etag: data.etag, updatedAt: data.updatedAt };
@@ -460,11 +664,13 @@ export async function putServerVaultBlobEtagAware(options: {
       return { kind: 'kept-remote', remote };
     }
 
-    const retry = await options.api.putVaultBlob({
-      type: options.type,
-      putVaultBlobRequest: { type: options.type, blob: options.blob },
-      ifMatch: remote.etag,
-    });
+    const retry = await sendVaultWrite(() =>
+      options.api.putVaultBlob({
+        type: options.type,
+        putVaultBlobRequest: { type: options.type, blob: options.blob },
+        ifMatch: remote.etag,
+      }),
+    );
 
     const data = retry.data as PutVaultBlobResponse;
     return { kind: 'updated', etag: data.etag, updatedAt: data.updatedAt };

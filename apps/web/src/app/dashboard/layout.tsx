@@ -82,11 +82,16 @@ export default function DashboardLayout({
              * (ADR 0057), so a passphrase changed on another device raises its
              * own prompt while every blob keeps merging normally.
              *
-             * Because the three runners stay independent, one dashboard load
-             * reads GET /vault twice (reconcile, then meta converge) and GET
-             * /vault/blobs twice (reconcile, then the pull's first pass). That
-             * is on purpose, measured in #1358; coalescing those in-flight
-             * reads without merging the runners is tracked in #1489.
+             * The three runners stay independent, but each one's api comes
+             * from `createSharedVaultApi(owner)`. An unconditional GET /vault
+             * or GET /vault/blobs that is identical to one already in flight
+             * shares that wire request (#1489). Nothing is kept after it
+             * settles, and any PUT forgets it. So one load reads GET /vault
+             * once: reconcile and meta converge ask at the same moment.
+             * GET /vault/blobs is read twice on purpose, about 500 ms apart:
+             * reconcile reads it at mount, and the pull's first pass reads it
+             * after its ADR 0066 debounce, by which time reconcile's request
+             * has settled. That is accepted in #1489's Maintainer Review.
              * GET /vault/backups/latest is not one of these: Home asks it once
              * per load, and only after unlock (the extra calls in #1358 were
              * dev StrictMode and lock/unlock), so it has no duplicate.

@@ -3,6 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mockToast = jest.fn();
 const mockSettleVaultMeta = jest.fn();
+const mockCreateVaultApi = jest.fn(() => ({}));
+/** The default shared api is the plain fake, so existing assertions hold. */
+const mockCreateSharedVaultApi = jest.fn<unknown, [string]>(() =>
+  mockCreateVaultApi(),
+);
 const mockReportMountSettled = jest.fn();
 
 jest.mock('@myorganiser/web-ui', () => {
@@ -14,7 +19,8 @@ jest.mock('@myorganiser/web-ui', () => {
 });
 
 jest.mock('@myorganiser/web-vault', () => ({
-  createVaultApi: jest.fn(() => ({})),
+  createVaultApi: () => mockCreateVaultApi(),
+  createSharedVaultApi: (owner: string) => mockCreateSharedVaultApi(owner),
   getHttpStatus: jest.fn(() => undefined),
   settleVaultMeta: (options: SettleVaultMetaOptions) =>
     mockSettleVaultMeta(options),
@@ -154,6 +160,26 @@ describe('VaultMetaConvergeRunner', () => {
     jest.clearAllMocks();
     window.sessionStorage.clear();
     mockSettleVaultMeta.mockClear();
+    mockCreateSharedVaultApi.mockImplementation(() => mockCreateVaultApi());
+  });
+
+  test('should build its api with createSharedVaultApi(owner) when it mounts with an owner', async () => {
+    const sharedApi = { shared: true };
+    mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
+    arrangeNoPromptMetaConverge();
+    (useOptionalVaultSession as jest.Mock).mockReturnValue({
+      handle: createMockHandle('user-a'),
+    });
+
+    render(<VaultMetaConvergeRunner />);
+
+    await waitFor(() => {
+      expect(mockSettleVaultMeta).toHaveBeenCalledWith(
+        expect.objectContaining({ api: sharedApi }),
+      );
+    });
+    expect(mockCreateSharedVaultApi).toHaveBeenCalledWith('user-a');
+    expect(mockCreateVaultApi).not.toHaveBeenCalled();
   });
 
   test('should display passphrase dialog with correct copy when passphrase diverged', async () => {

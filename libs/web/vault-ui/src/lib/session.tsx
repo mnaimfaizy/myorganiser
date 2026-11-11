@@ -13,6 +13,7 @@ import React, {
 import { getCurrentUser } from '@myorganiser/auth';
 import {
   createLocalVaultRevision,
+  createSharedVaultApi,
   createVaultApi,
   createVaultHandle,
   createVaultPullTrigger,
@@ -235,7 +236,11 @@ export function VaultSessionProvider({ children }: VaultSessionProviderProps) {
     if (owner === null) return null;
 
     return createVaultPullTrigger({
-      api: createVaultApi(),
+      // An unconditional inventory read joins an identical one in flight for
+      // this owner; conditional reads are never shared (#1489). The first
+      // pass runs after the 500 ms debounce, by which time reconcile's
+      // inventory read has normally settled, so in practice it rarely joins.
+      api: createSharedVaultApi(owner),
       // Same reasoning as the queue's prompt: a pull never interrupts the
       // User with a dialog.
       prompt: () => 'defer',

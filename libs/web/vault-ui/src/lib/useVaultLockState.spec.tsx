@@ -7,6 +7,10 @@ const mockCreateVaultHandle = jest.fn();
 const mockCreateVaultApi = jest.fn();
 const mockCreateVaultSyncQueue = jest.fn();
 const mockCreateVaultPullTrigger = jest.fn();
+/** The default shared api is the plain fake, so existing assertions hold. */
+const mockCreateSharedVaultApi = jest.fn<unknown, [string]>(() =>
+  mockCreateVaultApi(),
+);
 const mockClaimUnclaimedLocalVaultOnEvidence = jest.fn();
 const mockCheckVaultAbsentEvidence = jest.fn();
 
@@ -17,6 +21,7 @@ jest.mock('@myorganiser/auth', () => ({
 jest.mock('@myorganiser/web-vault', () => ({
   createVaultHandle: (opts: unknown) => mockCreateVaultHandle(opts),
   createVaultApi: () => mockCreateVaultApi(),
+  createSharedVaultApi: (owner: string) => mockCreateSharedVaultApi(owner),
   createVaultSyncQueue: (opts: unknown) => mockCreateVaultSyncQueue(opts),
   createVaultPullTrigger: (opts: unknown) => mockCreateVaultPullTrigger(opts),
   createLocalVaultRevision: () => ({

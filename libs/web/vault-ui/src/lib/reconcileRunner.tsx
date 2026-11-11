@@ -20,7 +20,7 @@ import type {
   VaultReconcileStart,
 } from '@myorganiser/web-vault';
 import {
-  createVaultApi,
+  createSharedVaultApi,
   getHttpStatus,
   reconcileVaultWithServer,
 } from '@myorganiser/web-vault';
@@ -363,7 +363,7 @@ export function VaultReconcileRunner() {
     if (typeof window === 'undefined') return;
     if (!owner) return;
 
-    const api = createVaultApi();
+    const api = createSharedVaultApi(owner);
 
     /**
      * The Local Vault Revision this runner last settled at, and the whole of

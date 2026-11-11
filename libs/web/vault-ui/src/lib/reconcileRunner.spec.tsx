@@ -9,6 +9,11 @@ import {
 
 const mockToast = jest.fn();
 const mockReconcileVaultWithServer = jest.fn();
+const mockCreateVaultApi = jest.fn(() => ({}));
+/** The default shared api is the plain fake, so existing assertions hold. */
+const mockCreateSharedVaultApi = jest.fn<unknown, [string]>(() =>
+  mockCreateVaultApi(),
+);
 const mockReportMountSettled = jest.fn();
 
 jest.mock('@myorganiser/web-ui', () => {
@@ -20,7 +25,8 @@ jest.mock('@myorganiser/web-ui', () => {
 });
 
 jest.mock('@myorganiser/web-vault', () => ({
-  createVaultApi: jest.fn(() => ({})),
+  createVaultApi: () => mockCreateVaultApi(),
+  createSharedVaultApi: (owner: string) => mockCreateSharedVaultApi(owner),
   getHttpStatus: jest.fn(() => undefined),
   reconcileVaultWithServer: (options: ReconcileOptions) =>
     mockReconcileVaultWithServer(options),
@@ -190,6 +196,23 @@ describe('VaultReconcileRunner', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.sessionStorage.clear();
+    mockCreateSharedVaultApi.mockImplementation(() => mockCreateVaultApi());
+  });
+
+  test('should build its api with createSharedVaultApi(owner) when it mounts with an owner', async () => {
+    const sharedApi = { shared: true };
+    mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
+    arrangeSession(createMockHandle('user-a'), null);
+    arrangeNoPromptReconcile();
+
+    render(<VaultReconcileRunner />);
+    await flushPasses();
+
+    expect(mockCreateSharedVaultApi).toHaveBeenCalledWith('user-a');
+    expect(mockCreateVaultApi).not.toHaveBeenCalled();
+    expect(mockReconcileVaultWithServer).toHaveBeenCalledWith(
+      expect.objectContaining({ api: sharedApi }),
+    );
   });
 
   test('renders dialog with proper copy for blob-type strategy ask', async () => {

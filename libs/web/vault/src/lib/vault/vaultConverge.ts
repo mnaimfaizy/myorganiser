@@ -57,6 +57,7 @@ import type {
 } from './localVaultStorage';
 import {
   getServerVaultBlob,
+  sendVaultWrite,
   type ServerVaultBlob,
   type ServerVaultMeta,
 } from './serverVaultSync';
@@ -394,14 +395,16 @@ async function send(
   blob: EncryptedBlob,
   ifMatch?: string,
 ): Promise<string> {
-  const response = await context.api.putVaultBlob({
-    type: context.type,
-    putVaultBlobRequest: {
+  const response = await sendVaultWrite(() =>
+    context.api.putVaultBlob({
       type: context.type,
-      blob: toEncryptedBlobV1(blob),
-    },
-    ifMatch,
-  });
+      putVaultBlobRequest: {
+        type: context.type,
+        blob: toEncryptedBlobV1(blob),
+      },
+      ifMatch,
+    }),
+  );
 
   const { etag } = response.data as PutVaultBlobResponse;
   await context.handle.recordPushSuccess({ type: context.field, etag });

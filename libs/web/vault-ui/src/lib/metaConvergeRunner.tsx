@@ -19,7 +19,7 @@ import type {
   VaultMetaRefusalLifetime,
 } from '@myorganiser/web-vault';
 import {
-  createVaultApi,
+  createSharedVaultApi,
   getHttpStatus,
   settleVaultMeta,
 } from '@myorganiser/web-vault';
@@ -208,7 +208,7 @@ export function VaultMetaConvergeRunner() {
     if (typeof window === 'undefined') return;
     if (!owner) return;
 
-    const api = createVaultApi();
+    const api = createSharedVaultApi(owner);
 
     // Mount+focus, coalesced, stop-for-good: the same shape
     // `createVaultPullTrigger` (`vaultPullTrigger.ts`) already gives
