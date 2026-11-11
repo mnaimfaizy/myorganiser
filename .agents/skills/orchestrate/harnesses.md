@@ -25,16 +25,16 @@ Every cloud Executor works from a clone of the remote, so it sees only pushed br
 
 ## Finding the Skill
 
-Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code reaches it through the committed `.claude/skills` symlink. No other adapter file is needed.
+Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code reaches it through the committed `.claude/skills` symlink. Gemini CLI also gets the thin command adapter every human-invoked Skill has, `.gemini/commands/orchestrate.md`.
 
-| Harness     | Invoke               | Notes                                                                                |
-| ----------- | -------------------- | ------------------------------------------------------------------------------------ |
-| Claude Code | `/orchestrate`       | Honours `disable-model-invocation` and `argument-hint`.                              |
-| Cursor      | `/orchestrate`       | `disable-model-invocation` makes it slash-only.                                      |
-| Codex       | `$orchestrate`       | A slash form does not work. Implicit invocation is governed by `agents/openai.yaml`. |
-| Copilot     | `/orchestrate`       | VS Code agent mode; **check before use** for Copilot CLI.                            |
-| OpenCode    | `@orchestrate`       | No slash form for Skills. A thin `.opencode/commands/orchestrate.md` could add one.  |
-| Gemini CLI  | **check before use** | The model activates Skills itself; a user slash form is unconfirmed.                 |
+| Harness     | Invoke         | Notes                                                                               |
+| ----------- | -------------- | ----------------------------------------------------------------------------------- |
+| Claude Code | `/orchestrate` | Honours `disable-model-invocation` and `argument-hint`.                             |
+| Cursor      | `/orchestrate` | `disable-model-invocation` makes it slash-only.                                     |
+| Codex       | `$orchestrate` | A slash form does not work. Invoke it explicitly; it has no `agents/openai.yaml`.   |
+| Copilot     | `/orchestrate` | VS Code agent mode; **check before use** for Copilot CLI.                           |
+| OpenCode    | `@orchestrate` | No slash form for Skills. A thin `.opencode/commands/orchestrate.md` could add one. |
+| Gemini CLI  | `/orchestrate` | Through `.gemini/commands/orchestrate.md`; **check before use**, see below.         |
 
 ## Claude Code
 
@@ -99,6 +99,7 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
 - `await`: the process exiting: 0 success, 1 error, 42 bad input, 53 turn limit.
 - `report`: the report files.
 - Gemini CLI reads `AGENTS.md` only when `context.fileName` lists it, as this repository's `.gemini/settings.json` does.
+- Gemini CLI documents custom commands as `.toml` files under `.gemini/commands/`. This repository's adapters are `.md`, so **check before use** that `/orchestrate` loads.
 
 ## Sources
 

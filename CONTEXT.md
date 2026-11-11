@@ -657,7 +657,7 @@ A question a Delegation raises that only the human may answer, sent with its opt
 _Avoid_: blocker, escalation, clarification
 
 **Activity Log**:
-The append-only, local record of everything a Chief of Staff or a Delegation did out of the human's sight: messages sent and received, checks made, Sub-agents and background work started, permission blocks hit, writes posted, and judgement calls made without asking. It is a working file, never committed or posted.
+The append-only, local record of what a Chief of Staff or a Delegation did out of the human's sight, kept so the human can audit the work without the chat. It is a working file, never committed or posted.
 _Avoid_: transcript, chat history, audit trail (as a committed artifact)
 
 **Run Summary**:

@@ -59,16 +59,16 @@ Readiness sets the Delegation's scope:
 Write one row per Delegation into `status.md` and show it to the human. Each row gives the issue, the scope, the gate tier, the Executor and model, the wave, and where it will stop for the human.
 
 - **Executor.** Choose from the Harness's tier in [harnesses.md](harnesses.md): a Live Session, a `dispatch-agents` run (Standalone Run or PRD slice), or a Sub-agent in this session. Say which, and why.
-- **Model.** Take it from the issue's `complexity:*` label through `tools/config/agent-model-policy.json`, the mapping `dispatch-agents` uses. A read-only Delegation gets the cheaper model.
+- **Model.** Take it from the issue's `complexity:*` label through `tools/config/agent-model-policy.json`, the mapping `dispatch-agents` uses. That mapping covers Claude only. On another Harness use the policy's default for it where one exists, otherwise the Harness's own default, and say which in the plan. A read-only Delegation gets the cheaper model.
 - **Waves.** Order by `## Blocked by`. Two Delegations that touch the same files never share a wave.
-- **Limits.** At most 4 building Delegations at once, plus any number of read-only ones. The plan may raise this with the human's approval. Each shared resource has one holder at a time: a local backend on `:3000`, a production build, a QA stack (at most two, as in `finish-standalone-runs`), or a CI-heavy experiment. Stagger pushes that would land within minutes of each other, because CI runs share 20 concurrent jobs.
+- **Limits.** At most 4 building Delegations at once, plus any number of read-only ones. The plan may raise this with the human's approval. Each shared resource has one holder at a time: a local backend on `:3000`, a production build, a QA stack, or a CI-heavy experiment. QA stacks follow [Scheduling QA sessions](../finish-standalone-runs/SKILL.md#scheduling-qa-sessions). Stagger pushes that would land within minutes of each other, because CI runs share 20 concurrent jobs.
 - **Routine writes.** List the kinds of write the run will make as the human, such as new issues, routine comments, label changes and closing issues. Approving the plan approves those kinds. Every `## Maintainer Review` still needs its own yes.
 
 Wait for one "go", unless the invocation said `go`.
 
 ### A PRD
 
-A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. The Chief of Staff integrates finished slices in plan order. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
+A PRD runs in parallel waves on its local integration branch `feat/<prd-slug>`, with one Pull Request to `main` ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). Each slice Delegation works on its own `slice/<n>-<slug>` branch, cut from the current `feat/<prd-slug>` head. A `dispatch-agents` run integrates its own slices. For any other Executor, the Chief of Staff fast-forwards `feat/<prd-slug>` onto each finished slice, in plan order, in its own integration worktree. An Executor that works from a clone cannot see a local branch. Before giving such an Executor a slice, raise a Decision Request: push `feat/<prd-slug>` for this run, or run the slice locally. Say that a pushed branch is visible on the public remote until it is deleted after the PRD merges ([ADR 0146](../../../docs/adr/0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md)).
 
 ## 3. Dispatch: the Brief Contract
 
@@ -105,7 +105,7 @@ When a Delegation stops, read its report and log, then check them against its br
 - any finding the Delegation and the Chief of Staff disagree on;
 - every merge.
 
-**Writes as the human.** The Chief of Staff makes them, never a Delegation. That covers issue comments, `## Maintainer Review` notes, new issues, label changes and closing issues. Show each `## Maintainer Review` and post it only after the human approves its exact text. Make routine writes under the kinds the plan approved, and list each one in the next report. Post a Delegation's draft word for word, then tell the Delegation it is done. A decision recorded only in a Pull Request is invisible to the spec reviewer and to `dispatch-agents`, which read only the issue body, the brief and `## Maintainer Review` ([ADR 0137](../../../docs/adr/0137-an-issue-is-specified-by-its-body-and-its-trusted-triage-brief.md)). Record each answer there.
+**Writes as the human.** The Chief of Staff makes them, never a Delegation. The one exception is a `dispatch-agents` run's own status labels and completion comment, which that tool writes by design ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). That covers issue comments, `## Maintainer Review` notes, new issues, label changes and closing issues. Show each `## Maintainer Review` and post it only after the human approves its exact text. Make routine writes under the kinds the plan approved, and list each one in the next report. Post a Delegation's draft word for word, then tell the Delegation it is done. A decision recorded only in a Pull Request is invisible to the spec reviewer and to `dispatch-agents`, which read only the issue body, the brief and `## Maintainer Review` ([ADR 0137](../../../docs/adr/0137-an-issue-is-specified-by-its-body-and-its-trusted-triage-brief.md)). Record each answer there.
 
 **Relaying a Decision Request.** Restate it so it stands alone: name the issue and what was found, give the options with their costs, and put the recommendation first. Relay the answer to the Delegation along with what it means for its next step.
 
@@ -134,10 +134,10 @@ Close out through the existing Skills: `finish-standalone-runs` for Standalone R
 
 1. CI is green;
 2. the automated review approves, or every remaining finding is fixed or accepted in a `## Maintainer Review`;
-3. its QA Report is on the Pull Request, even when it records "no manual QA needed";
+3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed";
 4. `git merge-tree` against `main` is clean.
 
-When every Delegation is Ready to Merge, give the human one merge order as a `yarn merge:train <pr> …` command ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
+When every Delegation is Ready to Merge, give the human one merge order, built by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), as a `yarn merge:train <pr> …` command ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
 
 After the human merges:
 
