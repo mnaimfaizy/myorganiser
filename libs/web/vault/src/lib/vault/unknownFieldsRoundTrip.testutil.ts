@@ -7,8 +7,14 @@
  * Not a `.test.ts` file: it holds no tests, and the `.testutil.ts` suffix keeps
  * it out of the shipped library (see `promisePending.testutil.ts`).
  */
-import type { VaultRecordType } from './localVaultStorage';
+import type { EncryptedBlob, VaultRecordType } from './localVaultStorage';
 import type { VaultRecordStore } from './vaultRecordWrite';
+
+/** The Ciphertext every stored fixture in this round trip is read under. */
+export const STORED_CIPHERTEXT: EncryptedBlob = {
+  iv: 'round-trip-iv',
+  ciphertext: 'round-trip-ciphertext',
+};
 
 /**
  * A store whose decrypted read returns `stored` and whose encrypted write is
@@ -21,17 +27,26 @@ export function storeHolding(stored: unknown): {
 } {
   const saveEncryptedData = jest.fn().mockResolvedValue(undefined);
   const store: VaultRecordStore = {
-    loadDecryptedData: jest.fn().mockResolvedValue(stored),
+    loadDecryptedDataWithCiphertext: jest.fn().mockResolvedValue({
+      value: stored,
+      ciphertext: stored === null ? null : STORED_CIPHERTEXT,
+    }),
     saveEncryptedData,
   };
   return { store, saveEncryptedData };
 }
 
-/** The one save a round trip makes: `type` and the envelope it writes. */
+/**
+ * The one save a round trip makes: `type`, the envelope it writes, and the
+ * stored Ciphertext it was conditioned on (ADR 0143).
+ */
 export function expectSavedEnvelope(
   saveEncryptedData: jest.Mock,
   saved: { type: VaultRecordType; value: unknown },
 ): void {
   expect(saveEncryptedData).toHaveBeenCalledTimes(1);
-  expect(saveEncryptedData).toHaveBeenCalledWith(saved);
+  expect(saveEncryptedData).toHaveBeenCalledWith({
+    ...saved,
+    expectedCiphertext: STORED_CIPHERTEXT,
+  });
 }

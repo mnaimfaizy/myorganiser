@@ -106,6 +106,7 @@ describe('VaultGate', () => {
       changePassphrase: jest.fn(),
       resetPassphrase: jest.fn(),
       loadDecryptedData: jest.fn(),
+      loadDecryptedDataWithCiphertext: jest.fn(),
       saveEncryptedData: jest.fn(),
       isRecoveryKeyUnacknowledged: jest.fn().mockResolvedValue(false),
       acknowledgeRecoveryKey: jest.fn(),

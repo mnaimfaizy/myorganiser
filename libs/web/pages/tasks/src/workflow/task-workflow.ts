@@ -72,12 +72,12 @@ export async function loadTasksFromVault(
     }
 
     const normalized = normalizeTasks(raw);
-    if (normalized.changed) {
-      await adapter.saveTasks(normalized.value);
-    }
+    const tasks = normalized.changed
+      ? await adapter.saveTasks(normalized.value)
+      : normalized.value;
     return {
       superseded: false,
-      tasks: sortTasks(normalized.value),
+      tasks: sortTasks(tasks),
       loadError: null,
     };
   } catch {
@@ -92,8 +92,9 @@ async function persistTasks(
 ): Promise<{ tasks: Task[]; error: TaskWorkflowError | null }> {
   const sorted = sortTasks(next);
   try {
-    await adapter.saveTasks(sorted);
-    return { tasks: sorted, error: null };
+    // What was written, not `sorted`: a contended save merges in what another
+    // writer stored meanwhile (ADR 0143).
+    return { tasks: sortTasks(await adapter.saveTasks(sorted)), error: null };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
     return { tasks: sorted, error: saveFailedError(message) };

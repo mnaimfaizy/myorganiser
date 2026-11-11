@@ -156,7 +156,13 @@ describe('useMobileNumbersPage', () => {
 
     mockToast.mockReset();
     jest.mocked(saveVaultRecords).mockReset();
-    jest.mocked(saveVaultRecords).mockResolvedValue(undefined);
+    // Resolves what was written: the records given, less any deletion. A
+    // test that needs a contended save overrides this.
+    jest
+      .mocked(saveVaultRecords)
+      .mockImplementation(async (_store, _type, records, deletion) =>
+        records.filter((record) => record.id !== deletion?.deletedId),
+      );
     jest.mocked(normalizeMobileNumbers).mockReset();
     jest.mocked(normalizeMobileNumbers).mockImplementation((raw) => ({
       value: raw as MobileNumberRecord[],
@@ -217,6 +223,26 @@ describe('useMobileNumbersPage', () => {
         );
       });
       expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the records the write-back resolved with, when a contended write-back merged in another writer’s record', async () => {
+      const normalized = [{ ...WORK }];
+      jest
+        .mocked(normalizeMobileNumbers)
+        .mockReturnValue({ value: normalized, changed: true });
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          PERSONAL,
+        ]);
+
+      const { result } = await renderLoaded([{ legacy: true }]);
+
+      await waitFor(() => {
+        expect(result.current.items).toEqual([WORK, PERSONAL]);
+      });
+      expect(result.current.loading).toBe(false);
     });
 
     it('reports a decrypt failure with the destructive toast and stops loading', async () => {
@@ -407,6 +433,28 @@ describe('useMobileNumbersPage', () => {
         title: 'Saved',
         description: 'Mobile number saved (encrypted).',
       });
+    });
+
+    it('shows the records the save resolved with, when a contended save merged in another writer’s record', async () => {
+      // The Vault merged a record another device stored meanwhile into the write.
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          WORK,
+        ]);
+
+      const { result } = await renderLoaded([PERSONAL]);
+
+      await act(async () => {
+        await result.current.addMobileNumber(mobileValues({ label: 'Travel' }));
+      });
+
+      expect(result.current.items).toEqual([
+        expect.objectContaining({ label: 'Travel' }),
+        PERSONAL,
+        WORK,
+      ]);
     });
 
     it('rejects to the caller, toasts the message, and keeps the items when an add or update save fails', async () => {

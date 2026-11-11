@@ -168,8 +168,9 @@ export function useGroceriesVault({
     // Cancellation matters because this effect re-fires on every convergence:
     // without it, an earlier read resolving late can put stale lists back on
     // screen and save them over the ones a later read just applied (#1280).
-    // What this decides is whether the save starts: a save already in flight
-    // fixes its payload when it is entered, and nothing here aborts it.
+    // What this decides is whether the save starts. A save already in flight
+    // is not aborted, but it writes only over the Ciphertext it read, merging
+    // with whatever moved in instead (ADR 0143).
     let isActive = true;
 
     setError(null);
@@ -195,7 +196,9 @@ export function useGroceriesVault({
         });
         // Re-save if data was normalized (data migration or repair)
         if (normalized.changed) {
-          await saveGroceriesPayload(handle, normalized.value);
+          const written = await saveGroceriesPayload(handle, normalized.value);
+          // A contended write-back merged in what another writer stored.
+          if (isActive) setPayload(written);
         }
         // A read superseded during that save leaves loading to the newer one.
         if (isActive) setLoading(false);
@@ -220,14 +223,16 @@ export function useGroceriesVault({
     ) => {
       setError(null);
       try {
-        await saveGroceriesPayload(
+        const written = await saveGroceriesPayload(
           handle,
           nextPayload,
           deletedIds !== undefined && deletedIds.length > 0
             ? { deletedIds }
             : undefined,
         );
-        setPayload(nextPayload);
+        // What was written, not `nextPayload`: a contended save merges in
+        // what another writer stored meanwhile (ADR 0143).
+        setPayload(written);
       } catch (err) {
         console.error('Failed to save grocery lists to vault:', err);
         setError('Failed to save your changes. Please try again.');
