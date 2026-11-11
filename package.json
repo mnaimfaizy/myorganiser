@@ -93,6 +93,7 @@
     "upstream:briefs:check": "node tools/scripts/check-upstream-briefs.ts",
     "qa:combine": "node tools/qa/qa-combine.ts",
     "qa:grade": "node tools/qa/grade-scenarios.ts",
+    "qa:redact": "node tools/qa/redact-transcript.ts",
     "qa:stack:start": "node tools/qa/qa-stack.ts start",
     "qa:stack:status": "node tools/qa/qa-stack.ts status",
     "qa:stack:stop": "node tools/qa/qa-stack.ts stop",

@@ -361,7 +361,7 @@ decision 4). Set it while composing, using these criteria:
 | ------------ | ---------------------------------------------------------------------------------------------------------------- |
 | `video`      | The claim is about change over time: an ordered flow, timing, a transient state, or keyboard and focus movement. |
 | `screenshot` | The claim is about a resting state.                                                                              |
-| `transcript` | The scenario is API residue: the calls it made and what came back.                                               |
+| `transcript` | The scenario is API residue: the calls it made and what came back, redacted with `yarn qa:redact`.               |
 | `none`       | A text result says it all.                                                                                       |
 
 ## Results and the headline
