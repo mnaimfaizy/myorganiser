@@ -191,4 +191,26 @@ module.exports = [
       ],
     },
   },
+  {
+    // `tools/qa` is its own inferred project (its `package.json`), so the
+    // boundary rule reads its relative import of `tools/scripts` as crossing
+    // projects. The QA stack reaches exactly one file there on purpose: it
+    // refuses a non-local database with the QA Account tooling's own
+    // `localDatabaseRefusal`, unchanged and with no override (ADR 0122, ADR
+    // 0147 decision 9), rather than a second copy that could drift from it.
+    // Only that file is allowed, and only from `tools/qa`.
+    files: ['tools/qa/**/*.ts'],
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          ...MODULE_BOUNDARY_OPTIONS,
+          allow: [
+            ...MODULE_BOUNDARY_OPTIONS.allow,
+            '^(\\.\\./)+scripts/lib/qa-accounts\\.ts$',
+          ],
+        },
+      ],
+    },
+  },
 ];

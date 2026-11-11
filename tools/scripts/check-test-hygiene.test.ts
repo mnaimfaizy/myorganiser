@@ -347,6 +347,59 @@ test('a tools/scripts Contract Suite with no assertion fails, naming the file', 
   assert.match(result.stdout, new RegExp(file.replace(/[/\\]/g, '.')));
 });
 
+test('a tools/qa Contract Suite with a node:assert call passes', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/qa/lib/widget.test.ts',
+    "import assert from 'node:assert/strict';\n" +
+      "import test from 'node:test';\n" +
+      "test('widget', () => { assert.ok(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /PASS — asserts with node:assert/);
+});
+
+test('a tools/qa Contract Suite with no assertion fails, naming the file', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/qa/lib/widget.test.ts',
+    "import test from 'node:test';\n" +
+      "test('widget', () => { console.info('no assertion'); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+  assert.ok(
+    result.stdout.includes(file),
+    `expected stdout to name ${file}:\n${result.stdout}`,
+  );
+});
+
+test('a tools/qa spec using node:assert is not a Contract Suite and fails the Jest no-assertions rule', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/qa/lib/widget.spec.ts',
+    "import assert from 'node:assert/strict';\n" +
+      "import test from 'node:test';\n" +
+      "test('widget', () => { assert.ok(true); });\n",
+  );
+
+  const result = runChecker(workspace, file);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /ERROR no-assertions/);
+  assert.match(result.stdout, /No expect\(\) calls found/);
+  assert.doesNotMatch(result.stdout, /asserts with node:assert/);
+});
+
 test('a tools/scripts Contract Suite passes via a local helper whose exported body asserts', (t) => {
   const workspace = createWorkspace(t);
   writeFixture(

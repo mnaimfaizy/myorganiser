@@ -1,0 +1,292 @@
+/**
+ * The local QA stack: web, backend and a database for one QA session
+ * (ADR 0147 decisions 2 and 9).
+ *
+ * Pure: every fact about the machine (git, ports, processes) is passed in,
+ * and every action is returned as a step for `qa-stack-executor.ts` to run.
+ * The command-line wrapper is `tools/qa/qa-stack.ts`.
+ *
+ * Rules this module is the one place for:
+ *
+ *   - The stack runs on its own ports, never the Maintainer's 4200/3000/5453,
+ *     so it cannot collide with services a person is running.
+ *   - It refuses a database that is not local by calling the QA Account
+ *     tooling's `localDatabaseRefusal` unchanged. That refusal has no
+ *     override, and neither does this one (ADR 0122).
+ *   - It refuses the repository's primary checkout and a worktree with
+ *     uncommitted changes, because starting and switching check out commits.
+ *   - The served commit is checked at the process level, since neither the
+ *     backend nor web exposes the commit it runs: see `servedCommitProblems`.
+ */
+import { localDatabaseRefusal } from '../../scripts/lib/qa-accounts.ts';
+
+export const QA_STACK = {
+  webPort: 4300,
+  backendPort: 3300,
+  databaseHost: '127.0.0.1',
+  databasePort: 5499,
+  databaseUser: 'qa',
+  databaseName: 'myorganiser_qa',
+  containerName: 'myorganiser-qa-db',
+  /** Relative to the repository the tooling runs from; gitignored. */
+  stateDir: 'tmp/qa/stack',
+} as const;
+
+export const QA_SERVICES = ['backend', 'web'] as const;
+export type QaService = (typeof QA_SERVICES)[number];
+
+export const SERVICE_PORT = {
+  backend: QA_STACK.backendPort,
+  web: QA_STACK.webPort,
+} as const satisfies Record<QaService, number>;
+
+/** How each service is started from the worktree root. */
+export const SERVICE_COMMAND = {
+  backend: ['corepack', 'yarn', 'nx', 'serve', '--project=backend'],
+  web: [
+    'corepack',
+    'yarn',
+    'nx',
+    'run',
+    'web:dev',
+    `--port=${QA_STACK.webPort}`,
+  ],
+} as const satisfies Record<QaService, readonly string[]>;
+
+/** The file `next dev` rewrites on every start; not a person's edit. */
+export const NEXT_DEV_REWRITE = 'apps/web/AGENTS.md';
+
+/** `.env.example` keys left blank there that the stack fills with a fresh local-only secret. */
+export const GENERATED_SECRET_KEYS = [
+  'ACCESS_JWT_SECRET',
+  'REFRESH_JWT_SECRET',
+  'VERIFY_JWT_SECRET',
+  'RESET_JWT_SECRET',
+  'YOUTUBE_TOKEN_ENCRYPTION_KEY',
+  'YOUTUBE_CRON_SECRET',
+] as const;
+
+export class QaStackInputError extends Error {}
+
+/** The database URL of the stack's own container. */
+export function qaContainerDatabaseUrl(password: string): string {
+  return `postgresql://${QA_STACK.databaseUser}:${encodeURIComponent(password)}@${QA_STACK.databaseHost}:${QA_STACK.databasePort}/${QA_STACK.databaseName}`;
+}
+
+/** `KEY=value` lines of an env file; comments and blank lines are skipped. */
+export function parseEnvExample(text: string): Map<string, string> {
+  const values = new Map<string, string>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line.trim());
+    if (match) values.set(match[1], match[2]);
+  }
+  return values;
+}
+
+export interface QaEnvInput {
+  envExample: string;
+  databaseUrl: string;
+  generateSecret: () => string;
+}
+
+/**
+ * The stack's environment: every `.env.example` key, its blank secrets
+ * generated, and the ports, origins, API address and database pointed at the
+ * QA stack. Nothing is read from a person's own env files.
+ */
+export function buildQaEnv({
+  envExample,
+  databaseUrl,
+  generateSecret,
+}: QaEnvInput): Record<string, string> {
+  // Any local-development origin in the example (say GOOGLE_REDIRECT_URI) is
+  // moved to the QA ports, so no key, including one added later, points the
+  // stack at the Maintainer's own web or backend.
+  const env: Record<string, string> = Object.fromEntries(
+    [...parseEnvExample(envExample)].map(([key, value]) => [
+      key,
+      value
+        .replaceAll('//localhost:4200', `//localhost:${QA_STACK.webPort}`)
+        .replaceAll('//localhost:3000', `//localhost:${QA_STACK.backendPort}`),
+    ]),
+  );
+  for (const key of GENERATED_SECRET_KEYS) {
+    if (!env[key]) env[key] = generateSecret();
+  }
+  const web = `http://localhost:${QA_STACK.webPort}`;
+  const api = `http://localhost:${QA_STACK.backendPort}/api/v1`;
+  Object.assign(env, {
+    NODE_ENV: 'development',
+    PORT: String(QA_STACK.backendPort),
+    APP_FRONTEND_URL: web,
+    CORS_ORIGINS: web,
+    API_BASE_URL: api,
+    NEXT_PUBLIC_API_BASE_URL: api,
+    YOUTUBE_API_BASE_URL: api,
+    DATABASE_URL: databaseUrl,
+  });
+  return env;
+}
+
+/** `export KEY='value'` lines, so a person can `source` what the stack runs with. */
+export function renderEnvFile(env: Record<string, string>): string {
+  const lines = Object.keys(env)
+    .sort()
+    .map((key) => `export ${key}='${env[key].replaceAll("'", `'\\''`)}'`);
+  return `# Generated by yarn qa:stack:start. Local only; never commit.\n${lines.join('\n')}\n`;
+}
+
+/** Why the stack must not use this environment's database, or `null`. */
+export function stackDatabaseRefusal(
+  env: Record<string, string | undefined>,
+): string | null {
+  return localDatabaseRefusal({
+    databaseUrl: env.DATABASE_URL,
+    nodeEnv: env.NODE_ENV,
+  });
+}
+
+export interface WorktreeFacts {
+  /** `git rev-parse --path-format=absolute --git-dir` in the worktree. */
+  gitDir: string;
+  /** `git rev-parse --path-format=absolute --git-common-dir` in the worktree. */
+  gitCommonDir: string;
+  /** `git status --porcelain` in the worktree. */
+  statusPorcelain: string;
+}
+
+/** Paths `git status --porcelain` lists, without the `next dev` rewrite. */
+export function uncommittedPaths(statusPorcelain: string): string[] {
+  return statusPorcelain
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => line.slice(3))
+    .filter((path) => path !== NEXT_DEV_REWRITE);
+}
+
+/**
+ * Why the stack must not check out commits in this worktree, or `null`.
+ * The primary checkout is the one whose git dir is the common dir; a linked
+ * worktree's git dir sits under `<common>/worktrees/`.
+ */
+export function worktreeRefusal(facts: WorktreeFacts): string | null {
+  if (stripSlash(facts.gitDir) === stripSlash(facts.gitCommonDir)) {
+    return 'it is the repository\'s primary checkout; give the stack a linked worktree ("git worktree add --detach tmp/qa/worktree <commit>")';
+  }
+  const dirty = uncommittedPaths(facts.statusPorcelain);
+  if (dirty.length > 0) {
+    return `it has uncommitted changes (${dirty.join(', ')}), which a checkout could drop`;
+  }
+  return null;
+}
+
+function stripSlash(path: string): string {
+  return path.replace(/\/+$/, '');
+}
+
+/** Why a port the stack needs is not free, or `null`. */
+export function portRefusal(
+  listeners: Readonly<Record<number, number | null>>,
+): string | null {
+  const taken = Object.entries(listeners)
+    .filter(([, pid]) => pid !== null)
+    .map(([port, pid]) => `${port} (pid ${pid})`);
+  return taken.length === 0
+    ? null
+    : `port ${taken.join(', ')} is in use; the stack never stops what it did not start`;
+}
+
+export interface ServiceRecord {
+  /** Process group the service was spawned as the leader of. */
+  pgid: number;
+  /** The worktree's HEAD when the service was spawned. */
+  spawnCommit: string;
+  port: number;
+}
+
+/** What `tmp/qa/stack/state.json` holds while a stack is up. */
+export interface QaStackState {
+  worktree: string;
+  /** The stack's own container, or `null` when it was given `--database-url`. */
+  container: string | null;
+  mergeBase: string;
+  head: string;
+  /** The sides to serve, in order, and the index currently served. */
+  sides: Side[];
+  current: number;
+  services: Partial<Record<QaService, ServiceRecord>>;
+  /** What the services and migrations run with; `env.sh` is the same values for a person. */
+  env: Record<string, string>;
+}
+
+/**
+ * The database image `docker-compose.yml` pins for `myorganiser_db`, so the
+ * stack's container runs the same PostgreSQL as local development.
+ */
+export function composeDatabaseImage(composeText: string): string | null {
+  const match =
+    /^ {2}myorganiser_db:\s*\n(?:(?: {4,}.*)?\n)*? {4}image:\s*(\S+)/m.exec(
+      composeText,
+    );
+  return match ? match[1] : null;
+}
+
+export type Side = 'before' | 'after';
+
+export interface ServedServiceFacts {
+  record: ServiceRecord | undefined;
+  alive: boolean;
+  /** Process group of whatever listens on the record's port, or `null`. */
+  listenerPgid: number | null;
+}
+
+export interface ServedCommitFacts {
+  expected: string;
+  worktreeHead: string;
+  statusPorcelain: string;
+  services: Record<QaService, ServedServiceFacts>;
+}
+
+/**
+ * Every reason the stack may not be serving `expected`. Empty means it is.
+ *
+ * Passes only if the worktree's HEAD is the expected commit, it has no
+ * uncommitted change other than `next dev`'s rewrite, and for both services:
+ * the recorded process group is alive, it is the group listening on the
+ * service's port, and it was spawned while HEAD was the expected commit.
+ */
+export function servedCommitProblems(facts: ServedCommitFacts): string[] {
+  const problems: string[] = [];
+  if (facts.worktreeHead !== facts.expected) {
+    problems.push(
+      `the worktree is at ${facts.worktreeHead}, not ${facts.expected}`,
+    );
+  }
+  const dirty = uncommittedPaths(facts.statusPorcelain);
+  if (dirty.length > 0) {
+    problems.push(`the worktree has uncommitted changes (${dirty.join(', ')})`);
+  }
+  for (const service of QA_SERVICES) {
+    const { record, alive, listenerPgid } = facts.services[service];
+    if (!record) {
+      problems.push(`${service} has no recorded process`);
+      continue;
+    }
+    if (!alive) {
+      problems.push(`${service} (process group ${record.pgid}) is not running`);
+    }
+    if (listenerPgid !== record.pgid) {
+      problems.push(
+        listenerPgid === null
+          ? `nothing listens on ${service}'s port ${record.port}`
+          : `${service}'s port ${record.port} is served by process group ${listenerPgid}, not ${record.pgid}`,
+      );
+    }
+    if (record.spawnCommit !== facts.expected) {
+      problems.push(
+        `${service} was started at ${record.spawnCommit}, not ${facts.expected}`,
+      );
+    }
+  }
+  return problems;
+}

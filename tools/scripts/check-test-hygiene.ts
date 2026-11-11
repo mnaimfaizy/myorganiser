@@ -2,7 +2,7 @@
 
 /**
  * Deterministic mechanical checks for Jest test files, plus one assertion
- * check for tools/scripts Contract Suites (ADR 0135).
+ * check for Contract Suites under tools/scripts and tools/qa (ADR 0135, ADR 0147).
  *
  * These are the TestReviewer checklist items that do not require judgment.
  * ADR 0004 defines TestReviewer as a static gate with "no judgment required";
@@ -10,14 +10,14 @@
  * eyeball import order. TestReviewer runs this and reports the output.
  *
  * What this asserts, by file kind:
- *   - Jest `*.test.*` / `*.spec.*` outside apps/web-e2e and tools/scripts:
+ *   - Jest `*.test.*` / `*.spec.*` outside apps/web-e2e and the Contract Suite trees:
  *     jest.mock() ordering against workspace imports, mock setup inside
  *     beforeAll(), duplicate top-level describe/helper names, stacked
  *     *Once() queues, unused jest.Mock casts, the vacuous-assertion ratio,
  *     and that at least one expect() — direct or via an asserting local
  *     helper — exists.
- *   - A tools/scripts Contract Suite (any *.test.ts under tools/scripts,
- *     ADR 0135): only that at least one assert()/assert.<method>()/
+ *   - A Contract Suite (any *.test.ts under tools/scripts or tools/qa,
+ *     ADR 0135, ADR 0147): only that at least one assert()/assert.<method>()/
  *     t.assert… call exists, directly or via an asserting local helper. An
  *     assert call counts only under the name the module imports node:assert
  *     or node:assert/strict as; console.assert() and other member .assert()
@@ -58,7 +58,7 @@ const USAGE = `Usage:
 Runs the mechanical (non-judgment) TestReviewer checklist items against Jest
 test files. E2E specs under apps/web-e2e are skipped — they have their
 own rules in .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
-A tools/scripts Contract Suite (ADR 0135) is not a Jest spec — it is a
+A tools/scripts or tools/qa Contract Suite (ADR 0135) is not a Jest spec — it is a
 node --test suite that asserts with node:assert, not expect() — so the Jest
 rules above do not run against it. It is still required to assert something:
 a Contract Suite with no node:assert or t.assert… call fails. An assert call
@@ -491,7 +491,7 @@ const contractSuitePattern: AssertionPattern = (raw) => {
   return new RegExp([...calls, TEST_CONTEXT_ASSERTION].join('|'));
 };
 
-/** A tools/scripts Contract Suite's only mechanical rule (ADR 0135): it must
+/** A Contract Suite (tools/scripts or tools/qa)'s only mechanical rule (ADR 0135): it must
  *  call an assertion somewhere, directly or through a local helper (such as
  *  copilot-hooks/hook-harness.ts's expectContext()) whose exported body
  *  asserts. Every other check in CHECKS is Jest-specific and does not apply
@@ -515,17 +515,21 @@ function isE2E(file: string) {
   return path.normalize(file).replace(/\\/g, '/').includes('apps/web-e2e/');
 }
 
-/** A `node --test` Contract Suite (ADR 0135), not a Jest spec: it asserts
+/** A `node --test` Contract Suite (ADR 0135), not a Jest spec, under either
+ *  `tools/scripts/` or `tools/qa/` (ADR 0147 decision 9: the shared QA tooling
+ *  follows ADR 0135's convention): it asserts
  *  with `node:assert`, never `expect()`, so the Jest-oriented checks below
  *  would misread it as having none. It is routed to inspectContractSuite
  *  instead, which checks for an assertion call without applying any
  *  Jest-specific rule. Matched by `.test.ts` specifically — a `*.spec.ts`
  *  file under tools/scripts would be a Jest spec this checker still has to
  *  run. */
-function isToolsScripts(file: string) {
+function isContractSuite(file: string) {
   const normalized = path.normalize(file).replace(/\\/g, '/');
   return (
-    normalized.includes('tools/scripts/') && normalized.endsWith('.test.ts')
+    (normalized.includes('tools/scripts/') ||
+      normalized.includes('tools/qa/')) &&
+    normalized.endsWith('.test.ts')
   );
 }
 
@@ -635,7 +639,7 @@ async function main() {
       results.push({ file, skipped: 'e2e', findings: [] });
       continue;
     }
-    const kind = isToolsScripts(file) ? 'contract-suite' : undefined;
+    const kind = isContractSuite(file) ? 'contract-suite' : undefined;
     let findings: Finding[];
     try {
       findings =
