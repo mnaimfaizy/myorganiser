@@ -19,10 +19,9 @@ import type {
   VaultMetaRefusalLifetime,
 } from '@myorganiser/web-vault';
 import {
-  createVaultApi,
+  createSharedVaultApi,
   getHttpStatus,
   settleVaultMeta,
-  shareInFlightVaultReads,
 } from '@myorganiser/web-vault';
 
 import { useOptionalVaultSession } from './session';
@@ -209,9 +208,7 @@ export function VaultMetaConvergeRunner() {
     if (typeof window === 'undefined') return;
     if (!owner) return;
 
-    // Shares an unconditional read with the other dashboard runners while
-    // it is in flight. Nothing is kept after it settles (#1489).
-    const api = shareInFlightVaultReads(createVaultApi(), owner);
+    const api = createSharedVaultApi(owner);
 
     // Mount+focus, coalesced, stop-for-good: the same shape
     // `createVaultPullTrigger` (`vaultPullTrigger.ts`) already gives

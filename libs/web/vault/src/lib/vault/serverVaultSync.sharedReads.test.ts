@@ -161,8 +161,8 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe('serverVaultSync shared reads (#1489)', () => {
-  test('joins an identical unconditional meta read already in flight', async () => {
+describe('shareInFlightVaultReads', () => {
+  it('should share one wire request when an identical meta read is in flight', async () => {
     const owner = 'owner-meta-join';
     const first = fakeVaultApi();
     const second = fakeVaultApi();
@@ -179,7 +179,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await expect(b).resolves.toEqual(metaResponse());
   });
 
-  test('joins an unconditional inventory read whether its parameters are {} or undefined', async () => {
+  it('should share one wire request for {} and undefined inventory params when both are in flight', async () => {
     const owner = 'owner-inventory-join';
     const first = fakeVaultApi();
     const second = fakeVaultApi();
@@ -196,7 +196,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await expect(b).resolves.toEqual(inventoryResponse());
   });
 
-  test('never shares across owners, for meta or for the inventory, nor between meta and inventory', async () => {
+  it('should send separate requests when owners or read kinds differ', async () => {
     const fakeA = fakeVaultApi();
     const fakeB = fakeVaultApi();
 
@@ -220,7 +220,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     settleOpen(fakeB);
   });
 
-  test('ifNoneMatch null is unconditional, so it is shared like an absent one', async () => {
+  it('should share the request when ifNoneMatch is null', async () => {
     const owner = 'owner-null-match';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -241,7 +241,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await expect(b).resolves.toEqual(inventoryResponse());
   });
 
-  test('a settled shared read is forgotten, on success and on rejection', async () => {
+  it('should send a new request when the previous shared read has settled or rejected', async () => {
     const owner = 'owner-settle-ok';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -279,7 +279,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await expect(retry).resolves.toEqual(metaResponse());
   });
 
-  test('conditional inventory reads are never shared: they pass straight through with the caller params and options, and do not join an unconditional read', async () => {
+  it('should pass conditional reads through unshared when ifNoneMatch is set', async () => {
     const owner = 'owner-conditional';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -317,7 +317,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     );
   });
 
-  test('each caller gets its own copy: mutating one response does not change another', async () => {
+  it('should give each caller its own copy when a response is shared', async () => {
     const metaOwner = 'owner-copies-meta';
     const fakeA = fakeVaultApi();
     const fakeB = fakeVaultApi();
@@ -363,287 +363,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     expect(sourceInventory.data.blobs[0].etag).toBe('groceries-etag-1');
   });
 
-  test('a write forgets in-flight reads: a read started after the write began sends a new request', async () => {
-    const owner = 'owner-write-forget';
-    const fake = fakeVaultApi();
-    const wrapper = wrap(fake, owner);
-
-    const beforeWrite = wrapper.getVaultMeta();
-    // requests[1] is the write itself.
-    const write = sendVaultWrite(() => fake.api.putVaultMeta({}));
-    const afterWriteBegan = wrapper.getVaultMeta();
-
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    fake.requests[1].resolve({});
-    await write;
-    fake.requests[0].resolve(metaResponse('before-write'));
-    fake.requests[2].resolve(metaResponse('after-write-began'));
-
-    await expect(beforeWrite).resolves.toEqual(metaResponse('before-write'));
-    await expect(afterWriteBegan).resolves.toEqual(
-      metaResponse('after-write-began'),
-    );
-  });
-
-  test('a read that started during a write is forgotten once the write settles', async () => {
-    const owner = 'owner-write-settle';
-    const fake = fakeVaultApi();
-    const wrapper = wrap(fake, owner);
-
-    // requests[0] is the write itself.
-    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
-    // requests[1] is a read started while the write is in flight.
-    const during = wrapper.getVaultMeta();
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(1);
-
-    fake.requests[0].resolve({});
-    await write;
-
-    // requests[2] starts after the write settled: it must not join `during`.
-    const after = wrapper.getVaultMeta();
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    fake.requests[1].resolve(metaResponse('during-write'));
-    fake.requests[2].resolve(metaResponse('after-write'));
-
-    await expect(during).resolves.toEqual(metaResponse('during-write'));
-    await expect(after).resolves.toEqual(metaResponse('after-write'));
-  });
-
-  test('a settle does not remove a newer entry for the same key', async () => {
-    const owner = 'owner-identity-guard';
-    const fake = fakeVaultApi();
-    const wrapper = wrap(fake, owner);
-
-    // requests[0] is E1. The write clears it from the registry.
-    const e1 = wrapper.getVaultMeta();
-    // requests[1] is the write, which stays pending.
-    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
-    // requests[2] is E2, a newer entry under the same key.
-    const e2 = wrapper.getVaultMeta();
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    // E1 settles while the write is still pending. Its settle must not
-    // remove E2 from the registry.
-    fake.requests[0].resolve(metaResponse('e1'));
-    await e1;
-
-    // R3 starts while the write is still pending and must join E2.
-    const r3 = wrapper.getVaultMeta();
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    fake.requests[2].resolve(metaResponse('e2'));
-    fake.requests[1].resolve({});
-    await write;
-
-    await expect(e2).resolves.toEqual(metaResponse('e2'));
-    await expect(r3).resolves.toEqual(metaResponse('e2'));
-  });
-
-  test('sendVaultWrite passes the write value through, rethrows its error, and forgets reads even when the write fails', async () => {
-    await expect(sendVaultWrite(async () => 'written')).resolves.toBe(
-      'written',
-    );
-
-    const owner = 'owner-write-error';
-    const fake = fakeVaultApi();
-    const wrapper = wrap(fake, owner);
-    const error = new Error('write refused');
-
-    // requests[0] is the write, which fails.
-    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
-    // requests[1] starts while the failing write is in flight.
-    const during = wrapper.getVaultMeta();
-
-    fake.requests[0].reject(error);
-    await expect(write).rejects.toBe(error);
-
-    // requests[2] starts after the failed write: it must not join `during`.
-    const after = wrapper.getVaultMeta();
-    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    settleOpen(fake);
-    await during;
-    await after;
-  });
-
-  test('a meta PUT through the raw api forgets in-flight reads on the wrapper, during and after it', async () => {
-    const owner = 'owner-raw-meta-put';
-    const readFake = fakeVaultApi();
-    const rawFake = fakeVaultApi();
-    const reads = wrap(readFake, owner);
-
-    // readFake.requests[0] is a read in flight before the PUT.
-    const beforePut = reads.getVaultMeta();
-    // rawFake.requests[0] is the PUT, which is not wrapped.
-    const put = putServerVaultMetaEtagAware({
-      api: rawApi(rawFake),
-      meta: makeMeta(),
-      ifMatch: 'meta-etag-1',
-      onConflict: () => 'keep-remote',
-    });
-
-    // readFake.requests[1] starts during the PUT: must not join beforePut.
-    const duringPut = reads.getVaultMeta();
-    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    rawFake.requests[0].resolve(putMetaResponse('meta-etag-2'));
-    await expect(put).resolves.toEqual({
-      kind: 'updated',
-      etag: 'meta-etag-2',
-      updatedAt: 'meta-t2',
-    });
-
-    // readFake.requests[2] starts after the PUT settled: must not join duringPut.
-    const afterPut = reads.getVaultMeta();
-    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(3);
-
-    settleOpen(readFake);
-    settleOpen(rawFake);
-    await beforePut;
-    await duringPut;
-    await afterPut;
-  });
-
-  test('a blob PUT through the raw api forgets in-flight inventory reads on the wrapper, during and after it', async () => {
-    const owner = 'owner-raw-blob-put';
-    const readFake = fakeVaultApi();
-    const rawFake = fakeVaultApi();
-    const reads = wrap(readFake, owner);
-
-    const beforePut = reads.getVaultBlobInventory({});
-    const put = putServerVaultBlobEtagAware({
-      api: rawApi(rawFake),
-      type: VaultBlobType.Groceries,
-      blob: makeBlob(),
-      ifMatch: 'groceries-etag-1',
-    });
-
-    const duringPut = reads.getVaultBlobInventory({});
-    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(2);
-
-    rawFake.requests[0].resolve(putBlobResponse('groceries-etag-2'));
-    await expect(put).resolves.toEqual({
-      kind: 'updated',
-      etag: 'groceries-etag-2',
-      updatedAt: 'blob-t2',
-    });
-
-    const afterPut = reads.getVaultBlobInventory({});
-    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(3);
-
-    settleOpen(readFake);
-    settleOpen(rawFake);
-    await beforePut;
-    await duringPut;
-    await afterPut;
-  });
-
-  test('the 409 retry of a raw meta PUT forgets reads started during the remote GET', async () => {
-    const owner = 'owner-retry-meta';
-    const readFake = fakeVaultApi();
-    const rawFake = fakeVaultApi();
-    const reads = wrap(readFake, owner);
-
-    // readFake.requests[0] is in flight before the first PUT.
-    const beforeFirstPut = reads.getVaultMeta();
-    const put = putServerVaultMetaEtagAware({
-      api: rawApi(rawFake),
-      meta: makeMeta({ kdf_salt: 'local' }),
-      ifMatch: 'local-etag',
-      onConflict: () => 'keep-local',
-    });
-
-    // rawFake.requests[0] is the first PUT, refused with a 409.
-    rawFake.requests[0].reject(httpError(409));
-    await flush();
-
-    // readFake.requests[1] starts during the remote GET, after the first PUT
-    // has settled. Only the retry's own write can forget it.
-    const duringRemoteGet = reads.getVaultMeta();
-    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(2);
-
-    // rawFake.requests[1] is the remote GET of Vault Meta.
-    rawFake.requests[1].resolve(metaResponse('remote'));
-    await flush();
-
-    // rawFake.requests[2] is the retry PUT, still pending.
-    expect(rawFake.api.putVaultMeta).toHaveBeenCalledTimes(2);
-
-    // readFake.requests[2] starts during the retry: must not join
-    // duringRemoteGet, nor beforeFirstPut.
-    const duringRetry = reads.getVaultMeta();
-    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(3);
-
-    rawFake.requests[2].resolve(putMetaResponse('meta-etag-2'));
-    await expect(put).resolves.toEqual({
-      kind: 'updated',
-      etag: 'meta-etag-2',
-      updatedAt: 'meta-t2',
-    });
-
-    settleOpen(readFake);
-    settleOpen(rawFake);
-    await beforeFirstPut;
-    await duringRemoteGet;
-    await duringRetry;
-  });
-
-  test('the 409 retry of a raw blob PUT forgets reads started during the remote GET', async () => {
-    const owner = 'owner-retry-blob';
-    const readFake = fakeVaultApi();
-    const rawFake = fakeVaultApi();
-    const reads = wrap(readFake, owner);
-
-    const beforeFirstPut = reads.getVaultBlobInventory({});
-    const put = putServerVaultBlobEtagAware({
-      api: rawApi(rawFake),
-      type: VaultBlobType.Groceries,
-      blob: makeBlob(),
-      ifMatch: 'groceries-etag-1',
-      onConflict: () => 'keep-local',
-    });
-
-    // rawFake.requests[0] is the first PUT, refused with a 409.
-    rawFake.requests[0].reject(httpError(409));
-    await flush();
-
-    const duringRemoteGet = reads.getVaultBlobInventory({});
-    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(2);
-
-    // rawFake.requests[1] is the remote GET of the Vault Blob.
-    rawFake.requests[1].resolve({
-      data: {
-        etag: 'groceries-etag-remote',
-        updatedAt: 'blob-t1',
-        type: VaultBlobType.Groceries,
-        blob: makeBlob(),
-      },
-    });
-    await flush();
-
-    // rawFake.requests[2] is the retry PUT, still pending.
-    expect(rawFake.api.putVaultBlob).toHaveBeenCalledTimes(2);
-
-    const duringRetry = reads.getVaultBlobInventory({});
-    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(3);
-
-    rawFake.requests[2].resolve(putBlobResponse('groceries-etag-2'));
-    await expect(put).resolves.toEqual({
-      kind: 'updated',
-      etag: 'groceries-etag-2',
-      updatedAt: 'blob-t2',
-    });
-
-    settleOpen(readFake);
-    settleOpen(rawFake);
-    await beforeFirstPut;
-    await duringRemoteGet;
-    await duringRetry;
-  });
-
-  test('aborting one waiter rejects only that caller and leaves the shared request for the rest', async () => {
+  it('should reject only the aborting caller when one of two waiters aborts', async () => {
     const owner = 'owner-abort-one';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -667,7 +387,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await expect(kept).resolves.toEqual(metaResponse());
   });
 
-  test('the shared request is aborted only when every waiter has aborted, and the next read sends a fresh request', async () => {
+  it('should abort the shared request only when every waiter has aborted', async () => {
     const owner = 'owner-abort-all';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -699,7 +419,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     settleOpen(fake);
   });
 
-  test('a signal that is already aborted rejects at once and sends no request', async () => {
+  it('should reject at once without sending when the signal is already aborted', async () => {
     const owner = 'owner-pre-aborted';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -718,7 +438,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     expect(fake.api.getVaultBlobInventory).not.toHaveBeenCalled();
   });
 
-  test("the shared request carries the wrapper's own signal and the caller's other options", () => {
+  it('should send the wrapper signal and forward other options when a read is shared', () => {
     const owner = 'owner-options';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -751,7 +471,7 @@ describe('serverVaultSync shared reads (#1489)', () => {
     settleOpen(fake);
   });
 
-  test('getVaultBlob, putVaultMeta and putVaultBlob pass straight through, and getVaultBlob is not shared', () => {
+  it('should pass getVaultBlob, putVaultMeta and putVaultBlob straight through when called on the wrapper', () => {
     const owner = 'owner-pass-through';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -793,8 +513,115 @@ describe('serverVaultSync shared reads (#1489)', () => {
 
     settleOpen(fake);
   });
+});
 
-  test('a direct PUT through the wrapper forgets in-flight reads, for meta and for blobs', async () => {
+describe('sendVaultWrite', () => {
+  it('should send a new request when a read starts after a write began', async () => {
+    const owner = 'owner-write-forget';
+    const fake = fakeVaultApi();
+    const wrapper = wrap(fake, owner);
+
+    const beforeWrite = wrapper.getVaultMeta();
+    // requests[1] is the write itself.
+    const write = sendVaultWrite(() => fake.api.putVaultMeta({}));
+    const afterWriteBegan = wrapper.getVaultMeta();
+
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    fake.requests[1].resolve({});
+    await write;
+    fake.requests[0].resolve(metaResponse('before-write'));
+    fake.requests[2].resolve(metaResponse('after-write-began'));
+
+    await expect(beforeWrite).resolves.toEqual(metaResponse('before-write'));
+    await expect(afterWriteBegan).resolves.toEqual(
+      metaResponse('after-write-began'),
+    );
+  });
+
+  it('should forget a read started during a write once the write settles', async () => {
+    const owner = 'owner-write-settle';
+    const fake = fakeVaultApi();
+    const wrapper = wrap(fake, owner);
+
+    // requests[0] is the write itself.
+    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
+    // requests[1] is a read started while the write is in flight.
+    const during = wrapper.getVaultMeta();
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(1);
+
+    fake.requests[0].resolve({});
+    await write;
+
+    // requests[2] starts after the write settled: it must not join `during`.
+    const after = wrapper.getVaultMeta();
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    fake.requests[1].resolve(metaResponse('during-write'));
+    fake.requests[2].resolve(metaResponse('after-write'));
+
+    await expect(during).resolves.toEqual(metaResponse('during-write'));
+    await expect(after).resolves.toEqual(metaResponse('after-write'));
+  });
+
+  it('should keep a newer entry when an older request settles', async () => {
+    const owner = 'owner-identity-guard';
+    const fake = fakeVaultApi();
+    const wrapper = wrap(fake, owner);
+
+    // requests[0] is E1. The write clears it from the registry.
+    const e1 = wrapper.getVaultMeta();
+    // requests[1] is the write, which stays pending.
+    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
+    // requests[2] is E2, a newer entry under the same key.
+    const e2 = wrapper.getVaultMeta();
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    // E1 settles while the write is still pending. Its settle must not
+    // remove E2 from the registry.
+    fake.requests[0].resolve(metaResponse('e1'));
+    await e1;
+
+    // R3 starts while the write is still pending and must join E2.
+    const r3 = wrapper.getVaultMeta();
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    fake.requests[2].resolve(metaResponse('e2'));
+    fake.requests[1].resolve({});
+    await write;
+
+    await expect(e2).resolves.toEqual(metaResponse('e2'));
+    await expect(r3).resolves.toEqual(metaResponse('e2'));
+  });
+
+  it('should return the write value and rethrow its error, forgetting reads even when the write fails', async () => {
+    await expect(sendVaultWrite(async () => 'written')).resolves.toBe(
+      'written',
+    );
+
+    const owner = 'owner-write-error';
+    const fake = fakeVaultApi();
+    const wrapper = wrap(fake, owner);
+    const error = new Error('write refused');
+
+    // requests[0] is the write, which fails.
+    const write = sendVaultWrite(() => fake.api.putVaultBlob({}));
+    // requests[1] starts while the failing write is in flight.
+    const during = wrapper.getVaultMeta();
+
+    fake.requests[0].reject(error);
+    await expect(write).rejects.toBe(error);
+
+    // requests[2] starts after the failed write: it must not join `during`.
+    const after = wrapper.getVaultMeta();
+    expect(fake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    settleOpen(fake);
+    await during;
+    await after;
+  });
+
+  it('should forget in-flight reads when a PUT is made through the wrapper', async () => {
     const owner = 'owner-direct-put';
     const fake = fakeVaultApi();
     const wrapper = wrap(fake, owner);
@@ -849,8 +676,185 @@ describe('serverVaultSync shared reads (#1489)', () => {
     await duringBlobPut;
     await afterBlobPut;
   });
+});
 
-  test('a convergence push forgets a shared read that is in flight', async () => {
+describe('put functions and convergence', () => {
+  it('should forget reads on the wrapper when a raw meta PUT is in flight', async () => {
+    const owner = 'owner-raw-meta-put';
+    const readFake = fakeVaultApi();
+    const rawFake = fakeVaultApi();
+    const reads = wrap(readFake, owner);
+
+    // readFake.requests[0] is a read in flight before the PUT.
+    const beforePut = reads.getVaultMeta();
+    // rawFake.requests[0] is the PUT, which is not wrapped.
+    const put = putServerVaultMetaEtagAware({
+      api: rawApi(rawFake),
+      meta: makeMeta(),
+      ifMatch: 'meta-etag-1',
+      onConflict: () => 'keep-remote',
+    });
+
+    // readFake.requests[1] starts during the PUT: must not join beforePut.
+    const duringPut = reads.getVaultMeta();
+    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    rawFake.requests[0].resolve(putMetaResponse('meta-etag-2'));
+    await expect(put).resolves.toEqual({
+      kind: 'updated',
+      etag: 'meta-etag-2',
+      updatedAt: 'meta-t2',
+    });
+
+    // readFake.requests[2] starts after the PUT settled: must not join duringPut.
+    const afterPut = reads.getVaultMeta();
+    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(3);
+
+    settleOpen(readFake);
+    settleOpen(rawFake);
+    await beforePut;
+    await duringPut;
+    await afterPut;
+  });
+
+  it('should forget inventory reads on the wrapper when a raw blob PUT is in flight', async () => {
+    const owner = 'owner-raw-blob-put';
+    const readFake = fakeVaultApi();
+    const rawFake = fakeVaultApi();
+    const reads = wrap(readFake, owner);
+
+    const beforePut = reads.getVaultBlobInventory({});
+    const put = putServerVaultBlobEtagAware({
+      api: rawApi(rawFake),
+      type: VaultBlobType.Groceries,
+      blob: makeBlob(),
+      ifMatch: 'groceries-etag-1',
+    });
+
+    const duringPut = reads.getVaultBlobInventory({});
+    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(2);
+
+    rawFake.requests[0].resolve(putBlobResponse('groceries-etag-2'));
+    await expect(put).resolves.toEqual({
+      kind: 'updated',
+      etag: 'groceries-etag-2',
+      updatedAt: 'blob-t2',
+    });
+
+    const afterPut = reads.getVaultBlobInventory({});
+    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(3);
+
+    settleOpen(readFake);
+    settleOpen(rawFake);
+    await beforePut;
+    await duringPut;
+    await afterPut;
+  });
+
+  it('should forget reads started during the remote GET when a meta PUT retries after a 409', async () => {
+    const owner = 'owner-retry-meta';
+    const readFake = fakeVaultApi();
+    const rawFake = fakeVaultApi();
+    const reads = wrap(readFake, owner);
+
+    // readFake.requests[0] is in flight before the first PUT.
+    const beforeFirstPut = reads.getVaultMeta();
+    const put = putServerVaultMetaEtagAware({
+      api: rawApi(rawFake),
+      meta: makeMeta({ kdf_salt: 'local' }),
+      ifMatch: 'local-etag',
+      onConflict: () => 'keep-local',
+    });
+
+    // rawFake.requests[0] is the first PUT, refused with a 409.
+    rawFake.requests[0].reject(httpError(409));
+    await flush();
+
+    // readFake.requests[1] starts during the remote GET, after the first PUT
+    // has settled. Only the retry's own write can forget it.
+    const duringRemoteGet = reads.getVaultMeta();
+    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(2);
+
+    // rawFake.requests[1] is the remote GET of Vault Meta.
+    rawFake.requests[1].resolve(metaResponse('remote'));
+    await flush();
+
+    // rawFake.requests[2] is the retry PUT, still pending.
+    expect(rawFake.api.putVaultMeta).toHaveBeenCalledTimes(2);
+
+    // readFake.requests[2] starts during the retry: must not join
+    // duringRemoteGet, nor beforeFirstPut.
+    const duringRetry = reads.getVaultMeta();
+    expect(readFake.api.getVaultMeta).toHaveBeenCalledTimes(3);
+
+    rawFake.requests[2].resolve(putMetaResponse('meta-etag-2'));
+    await expect(put).resolves.toEqual({
+      kind: 'updated',
+      etag: 'meta-etag-2',
+      updatedAt: 'meta-t2',
+    });
+
+    settleOpen(readFake);
+    settleOpen(rawFake);
+    await beforeFirstPut;
+    await duringRemoteGet;
+    await duringRetry;
+  });
+
+  it('should forget reads started during the remote GET when a blob PUT retries after a 409', async () => {
+    const owner = 'owner-retry-blob';
+    const readFake = fakeVaultApi();
+    const rawFake = fakeVaultApi();
+    const reads = wrap(readFake, owner);
+
+    const beforeFirstPut = reads.getVaultBlobInventory({});
+    const put = putServerVaultBlobEtagAware({
+      api: rawApi(rawFake),
+      type: VaultBlobType.Groceries,
+      blob: makeBlob(),
+      ifMatch: 'groceries-etag-1',
+      onConflict: () => 'keep-local',
+    });
+
+    // rawFake.requests[0] is the first PUT, refused with a 409.
+    rawFake.requests[0].reject(httpError(409));
+    await flush();
+
+    const duringRemoteGet = reads.getVaultBlobInventory({});
+    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(2);
+
+    // rawFake.requests[1] is the remote GET of the Vault Blob.
+    rawFake.requests[1].resolve({
+      data: {
+        etag: 'groceries-etag-remote',
+        updatedAt: 'blob-t1',
+        type: VaultBlobType.Groceries,
+        blob: makeBlob(),
+      },
+    });
+    await flush();
+
+    // rawFake.requests[2] is the retry PUT, still pending.
+    expect(rawFake.api.putVaultBlob).toHaveBeenCalledTimes(2);
+
+    const duringRetry = reads.getVaultBlobInventory({});
+    expect(readFake.api.getVaultBlobInventory).toHaveBeenCalledTimes(3);
+
+    rawFake.requests[2].resolve(putBlobResponse('groceries-etag-2'));
+    await expect(put).resolves.toEqual({
+      kind: 'updated',
+      etag: 'groceries-etag-2',
+      updatedAt: 'blob-t2',
+    });
+
+    settleOpen(readFake);
+    settleOpen(rawFake);
+    await beforeFirstPut;
+    await duringRemoteGet;
+    await duringRetry;
+  });
+
+  it('should forget a shared read in flight when a convergence push starts', async () => {
     const owner = 'owner-converge-push';
     const passphrase = 'vault key 2026';
     const handle = createVaultHandle({ owner });

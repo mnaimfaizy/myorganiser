@@ -13,11 +13,11 @@ import React, {
 import { getCurrentUser } from '@myorganiser/auth';
 import {
   createLocalVaultRevision,
+  createSharedVaultApi,
   createVaultApi,
   createVaultHandle,
   createVaultPullTrigger,
   createVaultSyncQueue,
-  shareInFlightVaultReads,
   type LocalVaultRevision,
   type VaultHandle,
   type VaultPullTrigger,
@@ -236,10 +236,11 @@ export function VaultSessionProvider({ children }: VaultSessionProviderProps) {
     if (owner === null) return null;
 
     return createVaultPullTrigger({
-      // The first pass reads the Vault Blob Inventory with no ETag yet, at
-      // the same moment as Vault Reconcile. While both are in flight they
-      // share one request; conditional reads are never shared (#1489).
-      api: shareInFlightVaultReads(createVaultApi(), owner),
+      // An unconditional inventory read joins an identical one in flight for
+      // this owner; conditional reads are never shared (#1489). The first
+      // pass runs after the 500 ms debounce, by which time reconcile's
+      // inventory read has normally settled, so in practice it rarely joins.
+      api: createSharedVaultApi(owner),
       // Same reasoning as the queue's prompt: a pull never interrupts the
       // User with a dialog.
       prompt: () => 'defer',

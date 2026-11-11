@@ -7,6 +7,10 @@ const mockCreateVaultHandle = jest.fn();
 const mockCreateVaultApi = jest.fn();
 const mockCreateVaultSyncQueue = jest.fn();
 const mockCreateVaultPullTrigger = jest.fn();
+/** The default shared api is the plain fake, so existing assertions hold. */
+const mockCreateSharedVaultApi = jest.fn<unknown, [string]>(() =>
+  mockCreateVaultApi(),
+);
 const mockCreateLocalVaultRevision = jest.fn(() => ({
   current: () => 0,
   bump: jest.fn(),
@@ -22,7 +26,7 @@ jest.mock('@myorganiser/auth', () => ({
 jest.mock('@myorganiser/web-vault', () => ({
   createVaultHandle: (opts: unknown) => mockCreateVaultHandle(opts),
   createVaultApi: () => mockCreateVaultApi(),
-  shareInFlightVaultReads: (api: unknown) => api,
+  createSharedVaultApi: (owner: string) => mockCreateSharedVaultApi(owner),
   createVaultSyncQueue: (opts: unknown) => mockCreateVaultSyncQueue(opts),
   createVaultPullTrigger: (opts: unknown) => mockCreateVaultPullTrigger(opts),
   createLocalVaultRevision: () => mockCreateLocalVaultRevision(),
@@ -82,6 +86,7 @@ describe('VaultSessionProvider', () => {
     // Standard mock setup used by most tests
     mockApi = { getVaultBlob: jest.fn(), putVaultBlob: jest.fn() };
     mockCreateVaultApi.mockReturnValue(mockApi);
+    mockCreateSharedVaultApi.mockImplementation(() => mockCreateVaultApi());
 
     mockQueue = {
       vaultBlobChanged: jest.fn(),
@@ -835,6 +840,36 @@ describe('VaultSessionProvider', () => {
       // Verify the prompt function returns 'defer'
       const callArgs = mockCreateVaultSyncQueue.mock.calls[0][0];
       expect(callArgs.prompt()).toBe('defer');
+    });
+
+    test('pull trigger is built from the shared api for the owner', () => {
+      const sharedApi = { shared: true };
+      mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+      mockCreateVaultHandle.mockImplementation(() => ({
+        owner: 'user-a',
+        vaultStatus: jest.fn(() => 'owned'),
+      }));
+
+      renderHook(() => useVaultSession(), { wrapper });
+
+      expect(mockCreateSharedVaultApi).toHaveBeenCalledWith('user-a');
+      expect(mockCreateVaultPullTrigger.mock.calls[0][0].api).toBe(sharedApi);
+    });
+
+    test('sync queue is built from the plain api, never the shared one', () => {
+      const sharedApi = { shared: true };
+      mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
+      mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
+      mockCreateVaultHandle.mockImplementation(() => ({
+        owner: 'user-a',
+        vaultStatus: jest.fn(() => 'owned'),
+      }));
+
+      renderHook(() => useVaultSession(), { wrapper });
+
+      expect(mockCreateVaultSyncQueue.mock.calls[0][0].api).toBe(mockApi);
+      expect(mockCreateVaultSyncQueue.mock.calls[0][0].api).not.toBe(sharedApi);
     });
 
     test('no owner, no api or queue', () => {
