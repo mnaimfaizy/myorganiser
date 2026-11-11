@@ -47,7 +47,7 @@ every property above and simply has **no integration step**:
 
 ## Status
 
-accepted. Amended by [0045](0045-a-prd-is-gated-once-on-the-assembled-feature-branch.md): in PRD mode the gate no longer runs per slice and no longer blocks integration. Slices integrate unconditionally and the assembled feature branch is gated once, against `origin/main`. Standalone runs keep the fail-closed per-slice gate described here.
+accepted. Amended by [0045](0045-a-prd-is-gated-once-on-the-assembled-feature-branch.md): in PRD mode the gate no longer runs per slice and no longer blocks integration. Slices integrate unconditionally and the assembled feature branch is gated once, against `origin/main`. Standalone runs keep the fail-closed per-slice gate described here. Amended by [0146](0146-a-prd-integration-branch-may-be-pushed-for-one-run-with-the-maintainers-consent.md): a Chief of Staff may push `feat/<slug>` for one run, with the Maintainer's consent, so a cloud Executor can take a slice.
 
 ## Why
 

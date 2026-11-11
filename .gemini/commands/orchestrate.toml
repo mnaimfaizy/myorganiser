@@ -1,0 +1,6 @@
+description = "Make this session the Chief of Staff for a set of issues or a PRD Issue."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/orchestrate/SKILL.md}
+"""
