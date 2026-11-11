@@ -157,7 +157,7 @@ Commit: `<sha>`. Run by an agent. Result: QA passed | Failures listed below
 A scenario whose `Capture:` line is `transcript` (an API change, with no screen to show) keeps a Request Transcript: the calls it made and what came back, Before and After. Write the calls to a JSON file in the shape `yarn qa:redact` documents in [the command reference](../../../docs/agents/command-reference.md), then run `yarn qa:redact --input <file>`. It prints one collapsed `<details>` block.
 
 - Paste that block into the QA Report under the scenario, inline. A Request Transcript is never uploaded and has no upload choice (ADR 0147 decision 7): it holds only QA Account data, and the Maintainer reads the report's text before it is posted.
-- If `yarn qa:redact` exits 1, it refused a field it does not recognise as safe and printed nothing. Remove the field from the calls, or, if it is safe, have it added to the allow-list in `tools/qa/lib/redact-transcript.ts`. Do not edit the output by hand to get past a refusal.
+- If `yarn qa:redact` exits 1, it refused a field or URL parameter name it does not recognise as safe and printed nothing. Remove it from the calls, or, if it is safe, have it added to the allow-list in `tools/qa/lib/redact-transcript.ts`. Do not edit the output by hand to get past a refusal.
 - Never paste a call that did not go through `yarn qa:redact`, and never include a real person's token, cookie or Ciphertext: only the QA Account's.
 
 Say "QA passed" only when every scenario passed. An agent never marks a "Left for a person" item as passed, and those items do not block the report or the merge ([ADR 0048](../../../docs/adr/0048-a-qa-plan-carries-only-what-automation-does-not-prove.md)).

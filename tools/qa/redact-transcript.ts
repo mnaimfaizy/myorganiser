@@ -9,10 +9,14 @@
 //
 // Every field is allow-listed: safe fields pass through, credentials, cookies,
 // tokens and authorization headers are withheld, and Ciphertext is shortened.
-// Any other field refuses the whole transcript, naming its path on stderr and
-// never its value; nothing is written to stdout.
+// URL-typed strings (path, query, location, anything that starts like a URL)
+// are decoded and split into parameters; each parameter name is judged by the
+// same allow-list. Any other field or parameter name refuses the whole
+// transcript, naming where on stderr (`<path> key #n`, `<path> parameter #n`,
+// `<path> (an @ in a URL)`) and
+// never a value or an unrecognised name; nothing is written to stdout.
 //
-// Exit 0 = rendered, 1 = refused (an unknown field), 2 = bad invocation or
+// Exit 0 = rendered, 1 = refused (an unknown field or parameter), 2 = bad invocation or
 // malformed input. This does not capture traffic: the caller supplies the
 // calls.
 import { readFileSync } from 'node:fs';
@@ -62,7 +66,7 @@ try {
 const result = redactTranscript(input);
 if (!result.ok) {
   console.error(
-    `qa:redact: refused - ${result.refusedPaths.length} field(s) not recognised as safe:\n`,
+    `qa:redact: refused - ${result.refusedPaths.length} problem(s), each named by position (a field or parameter not recognised as safe, an @ in a URL, or a URL that will not finish decoding):\n`,
   );
   for (const path of result.refusedPaths) console.error(`  - ${path}`);
   console.error(

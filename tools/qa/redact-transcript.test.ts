@@ -87,6 +87,18 @@ function runWithStdin(input: unknown) {
   return runCli(['--input', '-'], JSON.stringify(input));
 }
 
+/** A transcript holding one After call with the given request and a 200 response. */
+function transcriptWithRequest(request: object) {
+  return {
+    scenarios: [
+      {
+        id: 'S1',
+        calls: [{ side: 'after', request, response: { status: 200 } }],
+      },
+    ],
+  };
+}
+
 function tempDir(t: TestContext): string {
   const dir = mkdtempSync(join(tmpdir(), 'redact-transcript-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -122,7 +134,7 @@ test('withheld and ciphertext values are redacted in stdout, and the raw credent
   assert.ok(!result.stdout.includes('ijklmnop'));
 });
 
-test('a credential parameter inside a path is withheld in stdout, and its value never appears', () => {
+test('a credential parameter inside a path is withheld in stdout, the safe parameter beside it is kept, and its value never appears', () => {
   const input = {
     scenarios: [
       {
@@ -130,7 +142,7 @@ test('a credential parameter inside a path is withheld in stdout, and its value 
         calls: [
           {
             side: 'after',
-            request: { method: 'GET', path: '/api/x?token=synth-001' },
+            request: { method: 'GET', path: '/api/x?page=2&token=synth-001' },
             response: { status: 200 },
           },
         ],
@@ -139,11 +151,11 @@ test('a credential parameter inside a path is withheld in stdout, and its value 
   };
   const result = runWithStdin(input);
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.stdout.includes('"path": "[withheld]"'));
+  assert.ok(result.stdout.includes('"path": "/api/x?page=2&token=[withheld]"'));
   assert.ok(!result.stdout.includes('synth-001'));
 });
 
-test('a bare credential parameter in a query string is withheld in stdout, and its value never appears', () => {
+test('a credential parameter in a query string is withheld in stdout, the safe parameter beside it is kept, and its value never appears', () => {
   const input = {
     scenarios: [
       {
@@ -154,7 +166,7 @@ test('a bare credential parameter in a query string is withheld in stdout, and i
             request: {
               method: 'GET',
               path: '/api/x',
-              query: 'token=synth-005',
+              query: 'page=2&token=synth-005',
             },
             response: { status: 200 },
           },
@@ -164,9 +176,40 @@ test('a bare credential parameter in a query string is withheld in stdout, and i
   };
   const result = runWithStdin(input);
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.stdout.includes('"query": "[withheld]"'));
+  assert.ok(result.stdout.includes('"query": "page=2&token=[withheld]"'));
   assert.ok(!result.stdout.includes('synth-005'));
 });
+
+for (const { form, query, expected, sentinel } of [
+  {
+    form: '%3B',
+    query: 'page=2%3Btoken=SYNTH-E03',
+    expected: 'page=2;token=[withheld]',
+    sentinel: 'SYNTH-E03',
+  },
+  {
+    form: '%3D',
+    query: 'page=2&token%3DSYNTH-E04',
+    expected: 'page=2&token=[withheld]',
+    sentinel: 'SYNTH-E04',
+  },
+  {
+    form: '%2526',
+    query: 'page=2%2526token=SYNTH-E05',
+    expected: 'page=2&token=[withheld]',
+    sentinel: 'SYNTH-E05',
+  },
+]) {
+  test(`exit 0 with the encoded credential parameter (${form}) withheld in stdout, and its value absent`, () => {
+    const result = runWithStdin(
+      transcriptWithRequest({ method: 'GET', path: '/api/x', query }),
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.ok(result.stdout.includes(`"query": "${expected}"`));
+    assert.ok(!result.stdout.includes(sentinel));
+  });
+}
 
 test('a transcript whose output is larger than a pipe buffer is written in full', () => {
   const big = {
@@ -197,13 +240,318 @@ test('exit 1 with nothing on stdout when a field is unknown, and stderr names th
   const result = runWithStdin(REFUSED);
   assert.equal(result.status, 1, result.stderr);
   assert.equal(result.stdout, '');
-  assert.match(result.stderr, /qa:redact: refused - 1 field\(s\)/);
+  assert.match(
+    result.stderr,
+    /qa:redact: refused - 1 problem\(s\), each named by position \(a field or parameter not recognised as safe, an @ in a URL, or a URL that will not finish decoding\):/,
+  );
   assert.ok(
     result.stderr.includes(
-      '  - scenarios[0].calls[0].response.body.items[0].mystery',
+      '  - scenarios[0].calls[0].response.body.items[0] key #2',
     ),
   );
   assert.ok(!result.stderr.includes(MYSTERY));
+});
+
+test('exit 1 with nothing on stdout when an encoded parameter name is unknown, and stderr names its position but not the name or value', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({
+      method: 'GET',
+      path: '/api/x?page=2%26zzz%3DSYNTH-E06',
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #2',
+    ),
+  );
+  assert.ok(!result.stderr.includes('SYNTH-E06'));
+});
+
+test('exit 1 with nothing on stdout when a string does not finish decoding, and stderr holds no part of its value', () => {
+  let layered = 'token=SYNTH-E07';
+  for (let level = 0; level < 7; level++) {
+    layered = encodeURIComponent(layered);
+  }
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: `/api/x?${layered}` }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      'scenarios[0].calls[0].request.path (does not finish decoding)',
+    ),
+  );
+  assert.ok(!result.stderr.includes('SYNTH-E07'));
+});
+
+test('exit 1 and stderr print key #n for an opaque JSON key, never the key', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({
+      method: 'GET',
+      path: '/api/x',
+      body: { 'Xk9+Opaque': 1 },
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes('  - scenarios[0].calls[0].request.body key #1'),
+  );
+  assert.ok(!result.stderr.includes('Xk9'));
+  assert.ok(!result.stderr.includes('Opaque'));
+});
+
+test('exit 0 with a raw second = withheld in stdout, and its value absent', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x?page=token=SYNTH-E08' }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes('"path": "/x?[withheld]"'));
+  assert.ok(!result.stdout.includes('SYNTH-E08'));
+});
+
+test('exit 0 with an encoded second = (%3D) withheld in stdout, and its value absent', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x?page%3Dtoken=SYNTH-E09' }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes('"path": "/x?[withheld]"'));
+  assert.ok(!result.stdout.includes('SYNTH-E09'));
+});
+
+test('exit 1 with nothing on stdout when a second = leaves an unknown name, and stderr holds no name or value', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x?q=abc==SYNTH-E10' }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #1',
+    ),
+  );
+  assert.ok(!result.stderr.includes('SYNTH-E10'));
+});
+
+test('exit 1 and stderr print parameter #n for a hex token as a parameter name, never the token', () => {
+  const hex = 'a3f9c2d8e1b74f6a9c0d2e5f8a1b3c4d';
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: `/x?${hex}` }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #1',
+    ),
+  );
+  assert.ok(!result.stderr.includes(hex));
+});
+
+test('exit 1 and stderr print key #n for a hex token as a JSON key, never the token', () => {
+  const hex = 'a3f9c2d8e1b74f6a9c0d2e5f8a1b3c4d';
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x', body: { [hex]: 1 } }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes('  - scenarios[0].calls[0].request.body key #1'),
+  );
+  assert.ok(!result.stderr.includes(hex));
+});
+
+test('exit 1 and stderr do not print a 25-letter parameter name, and print parameter #1', () => {
+  const name = 'abcdefghijklmnopqrstuvwxy';
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: `/x?${name}` }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #1',
+    ),
+  );
+  assert.ok(!result.stderr.includes(name));
+});
+
+test('exit 1 and stderr do not print a name with three digits, and print parameter #1', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x?ab123c' }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #1',
+    ),
+  );
+  assert.ok(!result.stderr.includes('ab123c'));
+});
+
+test('exit 0 with a Bearer value in a path withheld in stdout, and the value absent from stdout and stderr', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x/Bearer%20SYNTH-AU2' }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.ok(result.stdout.includes('"path": "[withheld]"'));
+  assert.ok(!result.stdout.includes('SYNTH-AU2'));
+});
+
+test('exit 1 with nothing on stdout when a parameter name is empty, naming parameter #1 and never the value', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({ method: 'GET', path: '/x?=SYNTH-EN3' }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.path parameter #1',
+    ),
+  );
+  assert.ok(!result.stderr.includes('SYNTH-EN3'));
+});
+
+test('exit 1 with nothing on stdout for an @ or a look-alike of it in a URL, each named by its position, and no value on stderr', () => {
+  const forms: [object, string][] = [
+    [{ method: 'GET', path: 'https://user:SYNTH-UI1@host/x' }, 'request.path'],
+    [{ method: 'GET', path: 'https:///user:SYNTH-UI1@host/x' }, 'request.path'],
+    [
+      { method: 'GET', path: 'https:////user:SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [{ method: 'GET', path: 'http:/user:SYNTH-UI1@host/x' }, 'request.path'],
+    [
+      { method: 'GET', path: 'https:\\\\user:SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [{ method: 'GET', path: '\\\\user:SYNTH-UI1@host/x' }, 'request.path'],
+    [{ method: 'GET', path: '/\\user:SYNTH-UI1@host/x' }, 'request.path'],
+    [{ method: 'GET', path: 'https:/\\user:SYNTH-UI1@h/x' }, 'request.path'],
+    [
+      { method: 'GET', path: 'https:%5C%5Cuser:SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https:%2F%2F%2Fuser:SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:A%2FSYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:A%20SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:A%09SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:A SYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:A\tSYNTH-UI1@host/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:SYNTH-UI1%40host/x' },
+      'request.path',
+    ],
+    [{ method: 'GET', path: 'https://user:SYNTH-UI1＠host/x' }, 'request.path'],
+    [
+      { method: 'GET', path: 'https%3A%2F%2Fu%3ASYNTH-UI1%40h/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https%253A%252F%252Fu%253ASYNTH-UI1%2540h/x' },
+      'request.path',
+    ],
+    [{ method: 'GET', path: '//user:SYNTH-UI1@host/x' }, 'request.path'],
+    [
+      { method: 'GET', path: '/x', query: 'q=1https://u:SYNTH-UI1@h/x' },
+      'request.query',
+    ],
+    [{ method: 'GET', path: '/users/SYNTH-UI1@b.example' }, 'request.path'],
+    [
+      { method: 'GET', path: '/x', query: 'page=2&q=SYNTH-UI1@b' },
+      'request.query',
+    ],
+    [{ method: 'GET', path: '/x#SYNTH-UI1@b' }, 'request.path'],
+    [{ method: 'GET', path: 'https://user:SYNTH-UI1﹫host/x' }, 'request.path'],
+    [
+      { method: 'GET', path: 'https://user:SYNTH-UI1%EF%B9%ABhost/x' },
+      'request.path',
+    ],
+    [
+      { method: 'GET', path: 'https://user:SYNTH-UI1％４０host/x' },
+      'request.path',
+    ],
+  ];
+  for (const [request, field] of forms) {
+    const result = runWithStdin(transcriptWithRequest(request));
+    assert.equal(result.status, 1, JSON.stringify(request));
+    assert.equal(result.stdout, '', JSON.stringify(request));
+    assert.ok(
+      result.stderr.includes(
+        `  - scenarios[0].calls[0].${field} (an @ in a URL)\n`,
+      ),
+      JSON.stringify(request),
+    );
+    assert.ok(!result.stderr.includes('SYNTH-UI1'), JSON.stringify(request));
+  }
+});
+
+test('exit 0 with a withheld key outside the clean list printed as <field #1>, and its text absent from stdout', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({
+      method: 'GET',
+      path: '/x',
+      body: { 'token=SYNTH-UI2': 1 },
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.ok(result.stdout.includes('"<field #1>": "[withheld]"'));
+  assert.ok(!result.stdout.includes('SYNTH-UI2'));
+});
+
+test('exit 0 with a zero-width space inside a JWT withheld in stdout, and the value absent', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({
+      method: 'GET',
+      path: '/x',
+      query: 'q=eyJhbGci​Oi.abc.SYNTH-ZW1',
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.ok(result.stdout.includes('"query": "[withheld]"'));
+  assert.ok(!result.stdout.includes('SYNTH-ZW1'));
+});
+
+test('exit 1 with nothing on stdout for a zero-width spelling of the path key holding an @, named as <field #2>, and no value on stderr', () => {
+  const result = runWithStdin(
+    transcriptWithRequest({
+      method: 'GET',
+      ['pa​th']: 'user:SYNTH-YZ1@host/x',
+    }),
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(
+    result.stderr.includes(
+      '  - scenarios[0].calls[0].request.<field #2> (an @ in a URL)\n',
+    ),
+  );
+  assert.ok(!result.stderr.includes('SYNTH-YZ1'));
 });
 
 test('exit 2 with usage when --input is missing', () => {
