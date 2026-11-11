@@ -665,7 +665,7 @@ test('every tracked project.json whose root has a tsconfig infers at least one p
   assert.ok(checked.length > 0, 'no tracked project carries a tsconfig');
 });
 
-test('every live project with a tsconfig carries a typecheck target, except the tools/scripts fixed job', () => {
+test('every live project with a tsconfig carries a typecheck target, except the tools/scripts and tools/qa fixed jobs', () => {
   const nodes = Object.values(graph().nodes);
   const withConfigButNoTarget = nodes
     .filter(
@@ -676,16 +676,25 @@ test('every live project with a tsconfig carries a typecheck target, except the 
     .map((node) => node.name)
     .sort();
 
-  // `tools/scripts` has a tsconfig and no project.json, so the plugin does
-  // not reach it. It is the fixed job `check-typecheck.ts` runs (ADR 0135), and
-  // the one exclusion stated by name here rather than left as a silent gap.
-  assert.deepEqual(withConfigButNoTarget, ['scripts']);
+  // `tools/scripts` and `tools/qa` each have a tsconfig and no project.json, so
+  // the plugin does not reach them. `tools/scripts` is the fixed job
+  // `check-typecheck.ts` runs (ADR 0135). `tools/qa` is the second fixed job,
+  // `qa:tools:typecheck` (package.json; gate id `qa:tools:typecheck`). Both exclusions are stated by
+  // name here rather than left as a silent gap.
+  assert.deepEqual(withConfigButNoTarget, ['qa', 'scripts']);
   const scripts = graph().nodes.scripts;
   assert.equal(scripts?.data.root, 'tools/scripts');
   assert.equal(
     trackedProjectRoots().includes('tools/scripts'),
     false,
     'tools/scripts must stay without a project.json',
+  );
+  const qa = graph().nodes.qa;
+  assert.equal(qa?.data.root, 'tools/qa');
+  assert.equal(
+    trackedProjectRoots().includes('tools/qa'),
+    false,
+    'tools/qa must stay without a project.json',
   );
 });
 

@@ -456,6 +456,8 @@ jobs:
       gate_openapi_check: ${{ steps.gate-triggers.outputs.run_openapi_check }}
       gate_prisma_migration_drift: ${{ steps.gate-triggers.outputs.run_prisma_migration_drift }}
       gate_typecheck_tools_scripts: ${{ steps.gate-triggers.outputs.run_typecheck_tools_scripts }}
+      gate_qa_tools_test: ${{ steps.gate-triggers.outputs.run_qa_tools_test }}
+      gate_qa_tools_typecheck: ${{ steps.gate-triggers.outputs.run_qa_tools_typecheck }}
 
     steps:
       - name: Checkout repository
@@ -898,6 +900,13 @@ jobs:
         if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_typecheck_tools_scripts == 'true'
         run: corepack yarn typecheck:tools-scripts
 
+      # The shared QA tooling (ADR 0147) is its own tsc program under
+      # tools/qa/, path-gated like the fixed job above and run by the gate id's
+      # own script.
+      - name: Typecheck tools/qa
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_qa_tools_typecheck == 'true'
+        run: corepack yarn qa:tools:typecheck
+
   # The path-gated heavy suites that prove tooling rather than the app
   # (ADR 0140), split out of `Test` so they run beside it. The job is skipped
   # when none of them is selected, and a skipped job reads as passing to the
@@ -907,7 +916,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: setup
-    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' }}
+    if: ${{ needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_tools_test == 'true' || needs.setup.outputs.gate_openapi_check == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true' || needs.setup.outputs.gate_qa_tools_test == 'true' }}
 
     env:
       # Prisma generate reads this without connecting, to satisfy Prisma v7
@@ -986,6 +995,12 @@ jobs:
       - name: Upstream Brief report contract and checker contracts
         if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_upstream_briefs_test == 'true'
         run: corepack yarn upstream:briefs:test
+
+      # The shared QA tooling's suites sit beside the tooling in tools/qa/, so
+      # `tools:test`'s glob does not reach them either (ADR 0147).
+      - name: QA tooling contracts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_qa_tools_test == 'true'
+        run: corepack yarn qa:tools:test
 
   # Tier 2 of the Prisma migration gate (ADR 0094): applies the migration
   # history to an ephemeral Postgres and asserts applying it reproduces the

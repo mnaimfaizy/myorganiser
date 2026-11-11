@@ -337,7 +337,54 @@ QA-specific lines:
    (login, vault mint, MailHog) is done.
 2. **Screenshots** for assertions about presence/absence of fields or copy (e.g. no **Current
    passphrase** after recovery unlock).
-3. **Never upload a video of a failed run.** Discard, fix, re-record.
+
+Which QA Artifact a scenario keeps is fixed when the plan is composed, by its `Capture:` line (see
+[The `Capture:` line](#the-capture-line)), not chosen mid-run. Uploading stays the Maintainer's
+choice.
+
+## The `Capture:` line
+
+Every scenario carries a `Capture:` line naming the QA Artifact it keeps
+([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)
+decision 4). Set it while composing, using these criteria:
+
+| `Capture:`   | Use it when                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `video`      | The claim is about change over time: an ordered flow, timing, a transient state, or keyboard and focus movement. |
+| `screenshot` | The claim is about a resting state.                                                                              |
+| `transcript` | The scenario is API residue: the calls it made and what came back.                                               |
+| `none`       | A text result says it all.                                                                                       |
+
+## Results and the headline
+
+A scenario ends in one of five results
+([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)
+decision 3). Each is decided from the scenario's Before and After outcomes, where Before is the
+Pull Request's merge-base and After is its head:
+
+- **PASS.**
+- **FAIL: regression.** After fails where Before did not. It blocks the merge.
+- **FAIL: pre-existing.** It fails the same way on the merge-base. It always goes to the
+  Maintainer's batched decision, and once filed it is written with its issue number and does not
+  block.
+- **Not proven.** Before does not show the defect, or cannot run. A fix scenario that passes on
+  Before is Not proven, because a passing After then says nothing about the fix. The Maintainer
+  decides whether to rewrite the scenario, accept it, or hold the Pull Request.
+- **Left for a person.** Unchanged: what the run could not judge.
+
+A fix scenario runs on Before and After. A feature scenario runs After only, and is re-run on the
+merge-base only after it fails.
+
+The QA Report headline follows from the results:
+
+- **QA passed** when every scenario passed.
+- **QA passed, not proven or pre-existing items listed** when no scenario regressed.
+- **QA failed** otherwise.
+
+Do not apply this by judgement. Write each scenario's outcomes to a file and run
+`yarn qa:grade --input <file>`, which prints every result and the headline. Its input shape, its
+exit codes, and the calls it makes where the ADR is silent are in the
+[command reference](../../../docs/agents/command-reference.md#qa-tooling).
 
 ## The Plan Anatomy
 
@@ -362,6 +409,7 @@ Include vault/crypto capture steps when scenarios need a Recovery Key other than
 Numbered. Each carries:
   - Why only a human can prove this — one sentence, the justification for its existence
   - Steps, using real UI copy
+  - `Capture:` — video, screenshot, transcript or none (see The `Capture:` line)
   - Expected result
   - What a failure means — whether it blocks the merge or is a follow-up
   - If this fails, first rule out… — required when the scenario uses a Recovery Key or
@@ -405,6 +453,7 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - Every coverage claim is tagged `[observed]` or `[reconstructed]`.
 - No scenario re-tests something the coverage section says is covered.
 - Every scenario states why a human is required for it.
+- Every scenario carries a `Capture:` line.
 - Steps quote UI copy read from source, not invented.
 - Secret-touching scenarios include failure-class preconditions.
 - Pre-existing failures appear as red herrings, never as scenarios.
@@ -416,7 +465,8 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 
 - The plan source was stated (pasted/attached path, `tmp/` path, or compose-then-execute).
 - Vault/crypto hazards were obeyed when applicable.
-- Every scenario has an Execution record row with PASS/FAIL and evidence.
+- Every scenario has an Execution record row with its result (one of the five) and evidence.
+- The headline came from `yarn qa:grade`, not from judgement.
 - Defects and automatable-residue follow-ups were filed as issues (follow-ups do not block sign-off).
-- QA Artifacts follow the Evidence section and its three QA lines.
+- QA Artifacts follow the Evidence section and each scenario's `Capture:` line.
 - Sign-off checklist is ticked at the correct destination (QA Plan Issue vs `tmp/`).

@@ -67,6 +67,13 @@ fi
 # request, so this incomplete local selection is a speed trade-off, not the
 # only place the full set runs.
 corepack yarn tools:test:staged
+# The shared QA tooling's suites live in tools/qa/, outside the tools:test glob (ADR 0147), so
+# a commit that stages anything there pays for that one suite. CI runs it on the same paths.
+if ! git diff --cached --quiet --diff-filter=ACMRT -- tools/qa
+then
+corepack yarn qa:tools:test
+corepack yarn qa:tools:typecheck
+fi
 # The five sandcastle atlas pages state constants that live as module-local literals in the
 # two orchestrator files and in the slice-selection lib they share, as exports in
 # sandcastle-resume.ts and sandcastle-subagent-trace.ts, and as JSON in the model policy,

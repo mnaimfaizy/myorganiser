@@ -1204,15 +1204,15 @@
           <code>Lint</code>, <code>Test</code>, <code>Typecheck</code>,
           <code>Tool Suites</code>, <code>Prisma Migration Gate</code>,
           <code>E2E Report</code>
-          (<code>ci.yml:41, :160, :438, :586, :649, :825, :906, :999, :1192</code>).
+          (<code>ci.yml:41, :160, :438, :588, :651, :827, :915, :1014, :1207</code>).
           <code>Tool Suites</code> and <code>Prisma Migration Gate</code> are
           path-gated: when their triggers skip them they report as skipped,
           and a skipped job reads as passing. The
           <code>Test</code> job sets a dummy <code>DATABASE_URL</code> for
-          Prisma config loading only (<code>ci.yml:660</code>); the
+          Prisma config loading only (<code>ci.yml:662</code>); the
           path-gated <code>Prisma Migration Gate</code> job starts a
           throwaway Postgres service and runs migrate deploy/diff separately
-          (<code>ci.yml:1026</code>). Affected Jest runs against mocks without
+          (<code>ci.yml:1041</code>). Affected Jest runs against mocks without
           needing either service &mdash; which is why the Reviewer's
           <code>executed</code> evidence is feasible in CI, in the same
           environment.
@@ -1840,35 +1840,35 @@
         "file": ".github/workflows/ci.yml",
         "start": "name: Setup Affected Context"
       },
-      "ci.yml:586": {
+      "ci.yml:588": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Lint"
       },
-      "ci.yml:649": {
+      "ci.yml:651": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Test"
       },
-      "ci.yml:660": {
+      "ci.yml:662": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://localhost:5432/myorganiser"
       },
-      "ci.yml:825": {
+      "ci.yml:827": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Typecheck"
       },
-      "ci.yml:906": {
+      "ci.yml:915": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Tool Suites"
       },
-      "ci.yml:999": {
+      "ci.yml:1014": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Prisma Migration Gate"
       },
-      "ci.yml:1192": {
+      "ci.yml:1207": {
         "file": ".github/workflows/ci.yml",
         "start": "name: E2E Report"
       },
-      "ci.yml:1026": {
+      "ci.yml:1041": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser"
       },

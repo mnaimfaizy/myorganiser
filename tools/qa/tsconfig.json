@@ -1,0 +1,27 @@
+{
+  // ADR 0147 decision 9: shared QA tooling lives in `tools/qa/`, and ADR 0135's
+  // convention applies to it — strict TypeScript run by Node's type stripping,
+  // no build step. The compiler options are `tools/scripts/tsconfig.json`'s
+  // verbatim (minus `allowJs`, since nothing here imports a `.mjs`), and this
+  // config does not extend `tsconfig.base.json` for the same reason that one
+  // does not: the base sets the deprecated `node` module resolution.
+  //
+  // It is its own program because the `tools/scripts` one compiles only its
+  // own tree, and `node --test` strips types without checking them, so a type
+  // error here would otherwise reach `main` unchecked. `yarn qa:tools:typecheck`
+  // compiles it, path-gated in CI on `tools/qa/**`.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["**/*.ts"]
+}
