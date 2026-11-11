@@ -842,7 +842,7 @@ describe('VaultSessionProvider', () => {
       expect(callArgs.prompt()).toBe('defer');
     });
 
-    test('pull trigger is built from the shared api for the owner', () => {
+    test('should build the pull trigger from the shared api when an owner is signed in', () => {
       const sharedApi = { shared: true };
       mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
       mockGetCurrentUser.mockReturnValue({ id: 'user-a' });
@@ -857,7 +857,7 @@ describe('VaultSessionProvider', () => {
       expect(mockCreateVaultPullTrigger.mock.calls[0][0].api).toBe(sharedApi);
     });
 
-    test('sync queue is built from the plain api, never the shared one', () => {
+    test('should build the sync queue from the plain api when an owner is signed in', () => {
       const sharedApi = { shared: true };
       mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
       mockGetCurrentUser.mockReturnValue({ id: 'user-a' });

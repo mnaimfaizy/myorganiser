@@ -199,7 +199,7 @@ describe('VaultReconcileRunner', () => {
     mockCreateSharedVaultApi.mockImplementation(() => mockCreateVaultApi());
   });
 
-  test('builds its api with createSharedVaultApi for the owner, never the plain api', async () => {
+  test('should build its api with createSharedVaultApi(owner) when it mounts with an owner', async () => {
     const sharedApi = { shared: true };
     mockCreateSharedVaultApi.mockImplementation(() => sharedApi);
     arrangeSession(createMockHandle('user-a'), null);
