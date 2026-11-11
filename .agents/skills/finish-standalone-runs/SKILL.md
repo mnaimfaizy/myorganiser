@@ -20,13 +20,16 @@ git worktree add --detach tmp/qa/worktree origin/main   # first use only
 git -C tmp/qa/worktree fetch origin
 ```
 
+Give the worktree its own install, never a symlink to another checkout's `node_modules`: the stack generates the Prisma client into it, which would overwrite that checkout's client with the merge-base's schema.
+
 The QA stack checks out commits itself, detached, so the worktree never holds a branch. Reach it with `git -C` and absolute paths; a `cd` moves the session's working directory. Name the commit to any sub-agent that inspects it.
 
 ### The QA stack
 
-One command starts the stack for a Pull Request, and one stops it. They are documented in [the command reference](../../../docs/agents/command-reference.md#qa-tooling).
+A QA session runs its scenarios with one command, `yarn qa:run`. It starts the stack, switches it from Before to After, and grades and combines what it captured; see [Starting QA sessions](#starting-qa-sessions). The stack commands under it are the manual route, and `yarn qa:stack:stop` ends every run. All of them are documented in [the command reference](../../../docs/agents/command-reference.md#qa-tooling).
 
 ```sh
+corepack yarn qa:run --worktree <abs>/tmp/qa/worktree --change-kind fix|feature --merge-base <sha> --head <sha> --scenarios tmp/qa/pr-<n>/scenarios --out tmp/qa/pr-<n> [--with-before]
 corepack yarn qa:stack:start --worktree <abs>/tmp/qa/worktree --change-kind fix|feature --merge-base <sha> --head <sha> [--with-before]
 corepack yarn qa:switch --worktree <abs>/tmp/qa/worktree --to after
 corepack yarn qa:stack:stop
@@ -37,7 +40,7 @@ corepack yarn qa:stack:stop
 - It refuses a database that is not local, the primary checkout, a worktree with uncommitted changes, and a port already in use. Report a refusal; never work around it.
 - It seeds the QA Accounts once, at start. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
 - Every start and switch ends by checking the commit the stack serves. A mismatch exits 1: run no scenario on it. `yarn qa:stack:status` re-checks at any time.
-- A switch back to Before after After is refused. When a feature's After fails, stop the stack and start a fresh one with `--before-only` for the merge-base re-run.
+- A switch back to Before after After is refused. When a feature's After fails, `yarn qa:run` stops the stack and starts a fresh one with `--before-only` for the merge-base re-run; by hand, do the same.
 
 ### Cleaning up
 
@@ -66,7 +69,7 @@ Report a blocked or crashed run and leave it alone. Sending it back to an agent 
 3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, report "no manual QA needed" and skip the run.
 4. Schedule the plans as in [Scheduling QA sessions](#scheduling-qa-sessions), and give each one to its own QA session.
 5. Check each report against its plan before relying on it. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code.
-6. Combine each Before/After pair with `yarn qa:combine` (a feature graded After only has no pair, so nothing to combine). Show the results and list each combined QA Artifact with its path and what it shows. Offer for upload only what [the upload rules](#uploading-qa-artifacts) allow: a FAIL: regression's QA Artifact stays local. Ask which to upload; the default is none.
+6. `yarn qa:run` has already combined each Before/After pair into `tmp/qa/pr-<n>/combined/` (a feature graded After only has no pair, so nothing to combine; combine a pair made by hand with `yarn qa:combine`). Show the results and list each combined QA Artifact with its path and what it shows. Offer for upload only the files `tmp/qa/pr-<n>/run.json` marks `uploadEligible`, which follow [the upload rules](#uploading-qa-artifacts): a FAIL: regression's QA Artifact stays local. Ask which to upload; the default is none.
 7. Upload what was chosen, then post the QA Report. Fill in [the QA Report](#the-qa-report) template for each one. Never post a local working note as the report.
 8. Finish as in [Closing report](#closing-report).
 
@@ -97,15 +100,16 @@ QA sessions start in the foreground of the turn the Maintainer began ([ADR 0147]
 
 Start each session in the stack's existing worktree, without a new worktree of its own. Brief it with the plan's path, the Pull Request's merge-base and head commits, whether it is a fix or a feature, the stack it holds, and these rules:
 
-- start the stack with `yarn qa:stack:start` and switch it with `yarn qa:switch`; if either reports that the stack is not serving the expected commit, report that instead of testing anything else
+- **Scripted Chromium is the primary driver.** Write each scenario as a script in `tmp/qa/pr-<n>/scenarios/<id>.ts` that carries the plan's `Capture:` line (its shape is in the command reference), and never commit it. Run them all with `yarn qa:run`. It starts the stack, runs each scenario on Before and After, and keeps only what each `Capture:` line asks for, plus a failed run's recording, in `tmp/qa/pr-<n>/local/` unless the line already asks for the video
+- **Before and After.** For a fix, `yarn qa:run` runs every scenario first on the merge-base (Before), then on the head (After), with the same QA Account, data and viewport. For a feature it runs After only, and re-runs a failed scenario on the merge-base; pass `--with-before` when a scenario claims existing behaviour still works
+- if `yarn qa:run` reports that the stack did not start, or a switch failed closed, report that instead of testing anything else
 - stop and report if a port it needs is in use, and never kill what it did not start
 - sign in only as a QA Account
-- **Before and After.** For a fix, run every scenario first on the merge-base (Before), then on the head (After), with the same QA Account, data and viewport. For a feature, run After only, unless a scenario claims existing behaviour still works; start that stack with `--with-before`
-- **Drive the app with a script.** Write each scenario as a script, run it in real Chromium, and inspect every screenshot and frame it captured before trusting a result
+- **Inspect before trusting.** Open every screenshot and frame the run kept, and each failed run's recording, before trusting a result. A script that passed while the screen shows something else is a failed scenario
 - **The built-in browser is for judgement only**, for what no script can decide. Reach it through the `qa-web` entry in `.claude/launch.json`, which attaches to the running stack without starting a second server. If it cannot load the app, judge from the captures, and list what captures cannot show under Left for a person. The QA Report names the route used
 - for a mobile plan, follow `apps/mobile/AGENTS.md` and cover each platform the change affects, in light and dark where the plan asks. The Before and After rule applies on the simulator and emulator too, with a native rebuild on each side when the change is native
-- capture a QA Artifact only where a written result would not be enough, such as a visual change or a multi-step flow, and none for a backend or logic-only fix, saved in `tmp/qa/pr-<n>/`
-- write each scenario as PASS or FAIL, or as left for a person when a session cannot verify it, such as a real device, a screen reader or design fidelity, to `tmp/qa/pr-<n>/report.md`
+- keep the QA Artifacts the `Capture:` lines ask for, which `yarn qa:run` does, in `tmp/qa/pr-<n>/`; choose none mid-run
+- write each scenario's result from `tmp/qa/pr-<n>/run.json`, which `yarn qa:run` graded, to `tmp/qa/pr-<n>/report.md`, with the headline it gives. A scenario the session cannot verify, such as one needing a real device, a screen reader or design fidelity, is left for a person
 - fix nothing, and post, upload or merge nothing
 - stop the stack with `yarn qa:stack:stop`, and end with the report's path and the overall result
 

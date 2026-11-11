@@ -358,6 +358,44 @@ describe('runQaStack start', () => {
     );
   });
 
+  test('the readiness probe names the QA user, so pg_isready can attempt a connection and the stack becomes ready', async () => {
+    // Without -U, libpq has no default user in the image's uid-without-a-
+    // passwd-entry, and pg_isready exits 3 whatever the server's state.
+    const f = fakeMachine();
+    const base = f.deps.run;
+    f.deps.run = (argv, runOptions) => {
+      const result = base(argv, runOptions);
+      if (
+        argv[0] === 'docker' &&
+        argv[1] === 'exec' &&
+        argv.includes('pg_isready')
+      ) {
+        const user = argv[argv.indexOf('-U') + 1];
+        return code(user === QA_STACK.databaseUser ? 0 : 3);
+      }
+      return result;
+    };
+    assert.equal(await runQaStack(startArgv(), f.deps), 0);
+
+    const probes = f.runs.filter(
+      (run) => run.argv[0] === 'docker' && run.argv[1] === 'exec',
+    );
+    assert.ok(probes.length > 0, 'expected a readiness probe');
+    assert.deepEqual(probes[0].argv, [
+      'docker',
+      'exec',
+      QA_STACK.containerName,
+      'pg_isready',
+      '-h',
+      '127.0.0.1',
+      '-p',
+      '5432',
+      '-U',
+      QA_STACK.databaseUser,
+    ]);
+    assert.ok(f.out.some((line) => line.startsWith('qa:stack: up')));
+  });
+
   const REFUSALS: readonly {
     name: string;
     machine: () => ReturnType<typeof fakeMachine>;

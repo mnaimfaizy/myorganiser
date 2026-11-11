@@ -17,6 +17,7 @@
  * steps are run by `qa-stack-executor.ts`; the command-line wrappers are
  * `tools/qa/qa-stack.ts` and `tools/qa/qa-switch.ts`.
  */
+import { readFlags } from './qa-cli.ts';
 import type { QaStackState, Side } from './qa-stack.ts';
 
 export const SIDES = ['before', 'after'] as const satisfies readonly Side[];
@@ -201,32 +202,6 @@ export const STACK_USAGE =
 
 export const SWITCH_USAGE =
   'usage: node tools/qa/qa-switch.ts --worktree <path> --to before|after';
-
-/** Reads `--flag value` pairs and bare `--flag`s; anything else is an error. */
-function readFlags(
-  argv: readonly string[],
-  valued: readonly string[],
-  bare: readonly string[],
-): Map<string, string | true> | string {
-  const flags = new Map<string, string | true>();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (flags.has(arg)) return `${arg} given twice`;
-    if (valued.includes(arg)) {
-      const value = argv[i + 1];
-      if (value === undefined || value.startsWith('--')) {
-        return `${arg} needs a value`;
-      }
-      flags.set(arg, value);
-      i++;
-    } else if (bare.includes(arg)) {
-      flags.set(arg, true);
-    } else {
-      return `unknown argument "${arg}"`;
-    }
-  }
-  return flags;
-}
 
 export function parseStackArgs(
   argv: readonly string[],

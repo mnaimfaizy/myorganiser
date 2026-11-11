@@ -306,6 +306,11 @@ async function runStep(step: Step, ctx: StepContext): Promise<void> {
               '127.0.0.1',
               '-p',
               '5432',
+              // The image runs as a uid with no user name, so libpq has no
+              // default user and pg_isready makes no attempt (exit 3) unless
+              // one is given, however ready the server is.
+              '-U',
+              QA_STACK.databaseUser,
             ],
             { cwd: worktree },
           ).status === 0,
