@@ -118,11 +118,12 @@ const SAFE_KEYS = new Set(
 /**
  * A string value shaped like a credential, whatever key holds it: a Bearer or
  * Basic header value, a JWT, or a URL or query string carrying a credential
- * parameter (`?token=…`, `&session=…`), which a safe `path` or `query` string
+ * parameter (`?token=…`, `&session=…`, `#access_token=…`, a bare `token=…`, or a
+ * percent-encoded `%26token=…`), which a safe `path` or `query` string
  * could otherwise smuggle through.
  */
 const CREDENTIAL_VALUE = new RegExp(
-  `^(?:Bearer|Basic)\\s+\\S|^eyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*$|[?&;][^=&;\\s]*(?:${CREDENTIAL_KEY.source})[^=&;\\s]*=`,
+  `^(?:Bearer|Basic)\\s+\\S|^eyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*$|(?:^|[?&;#]|%26|%3F|%23)[^=&;\\s]*(?:${CREDENTIAL_KEY.source})[^=&;\\s]*=`,
   'i',
 );
 

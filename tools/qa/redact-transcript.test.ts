@@ -143,6 +143,31 @@ test('a credential parameter inside a path is withheld in stdout, and its value 
   assert.ok(!result.stdout.includes('synth-001'));
 });
 
+test('a bare credential parameter in a query string is withheld in stdout, and its value never appears', () => {
+  const input = {
+    scenarios: [
+      {
+        id: 'S1',
+        calls: [
+          {
+            side: 'after',
+            request: {
+              method: 'GET',
+              path: '/api/x',
+              query: 'token=synth-005',
+            },
+            response: { status: 200 },
+          },
+        ],
+      },
+    ],
+  };
+  const result = runWithStdin(input);
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes('"query": "[withheld]"'));
+  assert.ok(!result.stdout.includes('synth-005'));
+});
+
 test('a transcript whose output is larger than a pipe buffer is written in full', () => {
   const big = {
     scenarios: [

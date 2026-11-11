@@ -288,51 +288,75 @@ describe('withheld fields', () => {
     ]);
     assertNoLeak(JSON.stringify(result), CREDENTIAL);
   });
-});
-
-describe('credential parameters inside string values', () => {
-  test('a path or query carrying a credential parameter is withheld, and its value never renders', () => {
+  test('a null under a credential key is withheld', () => {
     const input = transcriptOf(
       call(
         'after',
-        { method: 'GET', path: '/api/x?token=synth-001' },
-        {
-          status: 200,
-          body: {
-            query: '?a=1&session=synth-002',
-            message: 'x;api_key=synth-003',
-          },
-        },
+        { method: 'POST', path: '/x', body: { password: null } },
+        { status: 200 },
       ),
     );
     const result = redactOk(input);
-    assert.deepEqual(result.transcript, {
-      scenarios: [
-        {
-          id: 'S1',
-          calls: [
-            {
-              side: 'after',
-              request: { method: 'GET', path: '[withheld]' },
-              response: {
-                status: 200,
-                body: { query: '[withheld]', message: '[withheld]' },
-              },
-            },
-          ],
-        },
-      ],
+    assert.deepEqual(onlyCall(result.transcript).request, {
+      method: 'POST',
+      path: '/x',
+      body: { password: '[withheld]' },
     });
     assert.deepEqual(result.withheld, [
-      'scenarios[0].calls[0].request.path',
-      'scenarios[0].calls[0].response.body.query',
-      'scenarios[0].calls[0].response.body.message',
+      'scenarios[0].calls[0].request.body.password',
     ]);
-    const out = renderTranscript(result.transcript);
-    assertNoLeak(JSON.stringify(result), 'synth-001');
-    assertNoLeak(out, 'synth-002');
-    assertNoLeak(out, 'synth-003');
   });
+});
+
+describe('credential parameters inside string values', () => {
+  // One case per separator the CREDENTIAL_VALUE pattern recognises.
+  const FORMS = [
+    { form: 'after ?', value: '/api/x?token=synth-001', sentinel: 'synth-001' },
+    {
+      form: 'after &',
+      value: '/api/x?a=1&session=synth-002',
+      sentinel: 'synth-002',
+    },
+    { form: 'after ;', value: 'x;api_key=synth-003', sentinel: 'synth-003' },
+    {
+      form: 'after #',
+      value: '/x#access_token=synth-004',
+      sentinel: 'synth-004',
+    },
+    {
+      form: 'as a bare leading parameter',
+      value: 'token=synth-005',
+      sentinel: 'synth-005',
+    },
+    {
+      form: 'after a percent-encoded &',
+      value: '/x?a=1%26token=synth-006',
+      sentinel: 'synth-006',
+    },
+  ];
+
+  for (const { form, value, sentinel } of FORMS) {
+    test(`a credential parameter ${form} in a string is withheld`, () => {
+      const input = transcriptOf(
+        call(
+          'after',
+          { method: 'GET', path: '/x', query: value },
+          { status: 200 },
+        ),
+      );
+      const result = redactOk(input);
+      assert.deepEqual(onlyCall(result.transcript).request, {
+        method: 'GET',
+        path: '/x',
+        query: '[withheld]',
+      });
+      assert.deepEqual(result.withheld, [
+        'scenarios[0].calls[0].request.query',
+      ]);
+      assertNoLeak(JSON.stringify(result), sentinel);
+      assertNoLeak(renderTranscript(result.transcript), sentinel);
+    });
+  }
 
   test('a benign query string passes through unchanged', () => {
     const input = transcriptOf(
@@ -457,6 +481,38 @@ describe('ciphertext', () => {
       'scenarios[0].calls[0].response.body.encryptedBlob',
     ]);
     assertNoLeak(JSON.stringify(result), MYSTERY);
+  });
+  test('a null under a ciphertext key becomes [ciphertext]', () => {
+    const input = transcriptOf(
+      call(
+        'after',
+        { method: 'PUT', path: '/api/vault' },
+        { status: 200, body: { ciphertext: null } },
+      ),
+    );
+    const result = redactOk(input);
+    assert.deepEqual(onlyCall(result.transcript).response, {
+      status: 200,
+      body: { ciphertext: '[ciphertext]' },
+    });
+    assert.deepEqual(result.shortened, [
+      'scenarios[0].calls[0].response.body.ciphertext',
+    ]);
+  });
+
+  test('a 3-character Ciphertext has an empty prefix', () => {
+    const input = transcriptOf(
+      call(
+        'after',
+        { method: 'PUT', path: '/api/vault' },
+        { status: 200, body: { ciphertext: 'abc' } },
+      ),
+    );
+    const result = redactOk(input);
+    assert.deepEqual(onlyCall(result.transcript).response, {
+      status: 200,
+      body: { ciphertext: '…[ciphertext, 3 chars]' },
+    });
   });
 });
 
