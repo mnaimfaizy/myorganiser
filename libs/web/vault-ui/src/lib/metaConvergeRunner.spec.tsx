@@ -15,6 +15,7 @@ jest.mock('@myorganiser/web-ui', () => {
 
 jest.mock('@myorganiser/web-vault', () => ({
   createVaultApi: jest.fn(() => ({})),
+  shareInFlightVaultReads: (api: unknown) => api,
   getHttpStatus: jest.fn(() => undefined),
   settleVaultMeta: (options: SettleVaultMetaOptions) =>
     mockSettleVaultMeta(options),

@@ -22,6 +22,7 @@ jest.mock('@myorganiser/auth', () => ({
 jest.mock('@myorganiser/web-vault', () => ({
   createVaultHandle: (opts: unknown) => mockCreateVaultHandle(opts),
   createVaultApi: () => mockCreateVaultApi(),
+  shareInFlightVaultReads: (api: unknown) => api,
   createVaultSyncQueue: (opts: unknown) => mockCreateVaultSyncQueue(opts),
   createVaultPullTrigger: (opts: unknown) => mockCreateVaultPullTrigger(opts),
   createLocalVaultRevision: () => mockCreateLocalVaultRevision(),

@@ -21,6 +21,7 @@ jest.mock('@myorganiser/web-ui', () => {
 
 jest.mock('@myorganiser/web-vault', () => ({
   createVaultApi: jest.fn(() => ({})),
+  shareInFlightVaultReads: (api: unknown) => api,
   getHttpStatus: jest.fn(() => undefined),
   reconcileVaultWithServer: (options: ReconcileOptions) =>
     mockReconcileVaultWithServer(options),

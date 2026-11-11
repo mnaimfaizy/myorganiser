@@ -23,6 +23,7 @@ import {
   createVaultApi,
   getHttpStatus,
   reconcileVaultWithServer,
+  shareInFlightVaultReads,
 } from '@myorganiser/web-vault';
 
 import { useOptionalVaultSession } from './session';
@@ -359,7 +360,9 @@ export function VaultReconcileRunner() {
     if (typeof window === 'undefined') return;
     if (!owner) return;
 
-    const api = createVaultApi();
+    // Shares an unconditional read with the other dashboard runners while
+    // it is in flight. Nothing is kept after it settles (#1489).
+    const api = shareInFlightVaultReads(createVaultApi(), owner);
 
     /**
      * The Local Vault Revision this runner last settled at, and the whole of

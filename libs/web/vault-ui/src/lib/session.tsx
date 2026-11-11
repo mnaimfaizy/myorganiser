@@ -17,6 +17,7 @@ import {
   createVaultHandle,
   createVaultPullTrigger,
   createVaultSyncQueue,
+  shareInFlightVaultReads,
   type LocalVaultRevision,
   type VaultHandle,
   type VaultPullTrigger,
@@ -235,7 +236,10 @@ export function VaultSessionProvider({ children }: VaultSessionProviderProps) {
     if (owner === null) return null;
 
     return createVaultPullTrigger({
-      api: createVaultApi(),
+      // The first pass reads the Vault Blob Inventory with no ETag yet, at
+      // the same moment as Vault Reconcile. While both are in flight they
+      // share one request; conditional reads are never shared (#1489).
+      api: shareInFlightVaultReads(createVaultApi(), owner),
       // Same reasoning as the queue's prompt: a pull never interrupts the
       // User with a dialog.
       prompt: () => 'defer',
