@@ -998,8 +998,17 @@ jobs:
 
       # The shared QA tooling's suites sit beside the tooling in tools/qa/, so
       # `tools:test`'s glob does not reach them either (ADR 0147).
+      # The combiner wraps the system ffmpeg, and its one real-ffmpeg test must
+      # run here rather than skip: QA_REQUIRE_FFMPEG makes a missing ffmpeg a
+      # failure on CI while it stays a visible skip on a machine without it.
+      - name: Install ffmpeg for the QA tooling contracts
+        if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_qa_tools_test == 'true'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: QA tooling contracts
         if: needs.setup.outputs.gate_run_all == 'true' || needs.setup.outputs.gate_qa_tools_test == 'true'
+        env:
+          QA_REQUIRE_FFMPEG: '1'
         run: corepack yarn qa:tools:test
 
   # Tier 2 of the Prisma migration gate (ADR 0094): applies the migration

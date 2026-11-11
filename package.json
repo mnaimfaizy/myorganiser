@@ -91,6 +91,7 @@
     "tools:test": "node --test 'tools/scripts/**/*.test.ts'",
     "tools:test:staged": "node tools/scripts/run-tools-test-selection.ts",
     "upstream:briefs:check": "node tools/scripts/check-upstream-briefs.ts",
+    "qa:combine": "node tools/qa/qa-combine.ts",
     "qa:grade": "node tools/qa/grade-scenarios.ts",
     "qa:stack:start": "node tools/qa/qa-stack.ts start",
     "qa:stack:status": "node tools/qa/qa-stack.ts status",

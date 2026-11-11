@@ -338,6 +338,15 @@ QA-specific lines:
 2. **Screenshots** for assertions about presence/absence of fields or copy (e.g. no **Current
    passphrase** after recovery unlock).
 
+A fix's Before and After captures are combined into one QA Artifact with `yarn qa:combine`: a
+screenshot pair into one labelled side-by-side PNG, a video pair into one side-by-side MP4 plus a GIF
+preview. Only a combined file may be uploaded, and the upload rules follow the result
+([Uploading QA Artifacts](../finish-standalone-runs/SKILL.md#uploading-qa-artifacts)): a Before that
+shows the defect and a FAIL: pre-existing's file may be offered, as may Not proven and Left for a
+person (none is a failed run; ADR 0142 decision 3, ADR 0147 decision 6), a FAIL: regression's stays in
+`tmp/qa/`, and nothing is uploaded unless the Maintainer chooses it. A failed scenario's recording
+is kept locally for inspection either way.
+
 Which QA Artifact a scenario keeps is fixed when the plan is composed, by its `Capture:` line (see
 [The `Capture:` line](#the-capture-line)), not chosen mid-run. Uploading stays the Maintainer's
 choice.
