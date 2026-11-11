@@ -1,0 +1,6 @@
+description = "Synchronise Sub-agent definitions across harnesses."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/sub-agent-sync-workflow/SKILL.md}
+"""

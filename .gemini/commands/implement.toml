@@ -1,0 +1,6 @@
+description = "Implement agreed work from a spec, PRD, or set of tickets."
+prompt = """
+Follow this Skill:
+
+@{.agents/skills/implement/SKILL.md}
+"""
