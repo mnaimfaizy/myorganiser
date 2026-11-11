@@ -60,4 +60,4 @@ Any other post needs the Maintainer's approval.
 
 ## Finish
 
-Give each Pull Request's state, what was pushed, and what is still pending. Name any QA Report the push made stale, recommend a merge order, and say to run this Skill again once reviews finish.
+Give each Pull Request's state, what was pushed, and what is still pending. Name any QA Report the push made stale, recommend a merge order as the `yarn merge:train <pr>…` command that merges in that order ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)), and say to run this Skill again once reviews finish.

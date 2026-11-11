@@ -28,7 +28,7 @@ import {
   NOT_CACHEABLE_NX_STEPS,
   SIGNAL_IDS,
   SIGNALS,
-  STALE_BRANCH_SHARE,
+  MERGES_BEHIND_MAIN_MAX,
   TARGET_P50_SECONDS,
   TEST_JOB_NAME,
   cacheableStepSeconds,
@@ -43,6 +43,8 @@ import {
   isStaleBranchRun,
   lastFinisher,
   lastFinisherShares,
+  mergesBehindMain,
+  mergesBehindSentence,
   percentile,
   percentiles,
   projectOfFile,
@@ -56,9 +58,11 @@ import {
   ROOTS,
   at,
   fastRun,
+  hotMerge,
   hotRun,
   job,
   measure,
+  merged,
   prRun,
   repeat,
   step,
@@ -520,13 +524,67 @@ describe('skipped steps and jobs', () => {
   });
 });
 
+// ---------------------------------------------------- merges behind main
+
+describe('merges behind main', () => {
+  test('counts merges main had moved past, oldest first, and keeps unreadable ones out', () => {
+    const later = merged({ number: 5, behindBy: 2, mergedAt: at(60) });
+    const earlier = merged({ number: 4, behindBy: 9, mergedAt: at(0) });
+    const result = mergesBehindMain([
+      later,
+      merged({ number: 6, behindBy: 0 }),
+      earlier,
+      merged({ number: 7, behindBy: null }),
+    ]);
+    assert.deepEqual(result, {
+      behind: [earlier, later],
+      readable: 3,
+      unreadable: 1,
+    });
+  });
+
+  test('a gather saved before merges were read has none readable, never zero behind', () => {
+    const result = mergesBehindMain(undefined);
+    assert.deepEqual(result, { behind: [], readable: 0, unreadable: 0 });
+    assert.match(
+      mergesBehindSentence(result),
+      /No merge into `main` could be compared/,
+    );
+  });
+
+  test('the report lists each merge behind main and calls the stale share informational', () => {
+    const text = renderCiDurationMeasurement(
+      measure(repeat(MIN_SINGLE_LIBRARY_RUNS, fastRun), undefined, [
+        merged(),
+        hotMerge(),
+      ]),
+    );
+    assert.match(
+      text,
+      /1 of 2 readable merge\(s\) landed while `main` had moved past the head/,
+    );
+    assert.match(text, /- #101 \(`fix\/1-stale`\), 3 commit\(s\) behind/);
+    assert.match(text, /Reported, not a signal/);
+  });
+
+  test('with no readable merge the signal row says not measurable', () => {
+    const text = renderCiDurationMeasurement(
+      measure(repeat(MIN_SINGLE_LIBRARY_RUNS, fastRun)),
+    );
+    const row = text
+      .split('\n')
+      .find((line) => line.includes(SIGNALS['merged-behind-main'].title));
+    assert.ok(row?.includes('| not measurable |'), row);
+  });
+});
+
 // --------------------------------------------- the five signals' boundaries
 
 describe('the five signals, each at its boundary', () => {
   test('the thresholds are the literal values the PRD and the decisions name', () => {
     assert.equal(TARGET_P50_SECONDS, 300);
     assert.equal(CACHEABLE_STEP_P50_SECONDS, 60);
-    assert.equal(STALE_BRANCH_SHARE, 0.1);
+    assert.equal(MERGES_BEHIND_MAIN_MAX, 0);
     assert.equal(E2E_LANE_P50_SECONDS, 300);
     assert.equal(MIN_SINGLE_LIBRARY_RUNS, 10);
     assert.equal(LAST_FINISHER_MEDIAN_SHARE, 0.5);
@@ -587,26 +645,30 @@ describe('the five signals, each at its boundary', () => {
     assert.equal(tripped.decision, 1382);
   });
 
-  test('stale share at the line does not trip; over it does, naming 1376', () => {
-    const stale = (count: number) =>
-      measure(
-        repeat(10, (index) =>
-          prRun({
-            behindBy: index < count ? 1 : 0,
-            jobs: [job('Lint', 0, 120)],
-          }),
-        ),
-      );
-    // One stale run in ten is exactly the line.
-    assert.equal(stale(1).staleBranch.share, STALE_BRANCH_SHARE);
-    assert.deepEqual(stale(1).signals, []);
+  test('no merge behind main does not trip; one does, naming 1376', () => {
+    const fresh = repeat(10, () => prRun({ jobs: [job('Lint', 0, 120)] }));
+    const clean = measure(fresh, undefined, [
+      merged(),
+      merged({ number: 102 }),
+    ]);
+    assert.equal(clean.mergedBehind.behind.length, 0);
+    assert.deepEqual(clean.signals, []);
 
-    const over = stale(2);
+    const over = measure(fresh, undefined, [merged(), hotMerge()]);
     const tripped = over.signals.find(
-      (signal) => signal.id === 'stale-branch-share',
+      (signal) => signal.id === 'merged-behind-main',
     );
-    assert.ok(tripped, 'stale-branch-share should trip');
+    assert.ok(tripped, 'merged-behind-main should trip');
     assert.equal(tripped.decision, 1376);
+    assert.equal(tripped.measured, '1 of 2 readable merge(s)');
+  });
+
+  test('stale runs alone no longer trip anything: a stale first run costs nothing under the train', () => {
+    const allStale = measure(
+      repeat(10, () => prRun({ behindBy: 4, jobs: [job('Lint', 0, 120)] })),
+    );
+    assert.equal(allStale.staleBranch.share, 1);
+    assert.deepEqual(allStale.signals, []);
   });
 
   test('E2E lane p50 at the target does not trip; over it does, naming 1381', () => {
@@ -733,14 +795,22 @@ describe('only runs with a measurable conclusion are counted', () => {
 
 describe('the ten-run cutoff', () => {
   test('nine Single-Library runs suppress every signal, not just the target one', () => {
-    const summary = measure(repeat(MIN_SINGLE_LIBRARY_RUNS - 1, hotRun));
+    const summary = measure(
+      repeat(MIN_SINGLE_LIBRARY_RUNS - 1, hotRun),
+      undefined,
+      [hotMerge()],
+    );
     assert.equal(summary.verdict, 'not-enough-data');
     assert.equal(summary.enoughData, false);
     assert.deepEqual(summary.signals, []);
   });
 
   test('ten Single-Library runs make the window measurable and the target signal can trip', () => {
-    const summary = measure(repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun));
+    const summary = measure(
+      repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun),
+      undefined,
+      [hotMerge()],
+    );
     assert.equal(summary.verdict, 'over-target');
     assert.ok(
       summary.signals.some((signal) => signal.id === 'single-library-p50'),
@@ -864,7 +934,11 @@ describe('populations stay separate', () => {
 
 describe('the rendered report', () => {
   test('a tripped summary names each tripped signal, its decision and its title', () => {
-    const summary = measure(repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun));
+    const summary = measure(
+      repeat(MIN_SINGLE_LIBRARY_RUNS, hotRun),
+      undefined,
+      [hotMerge()],
+    );
     const text = renderCiDurationMeasurement(summary);
     assert.equal(summary.signals.length, SIGNAL_IDS.length);
     for (const signal of summary.signals) {
@@ -1123,7 +1197,8 @@ describe('ci.yml facts the constants depend on', () => {
       .map((entry) => entry.name)
       .sort();
     assert.deepEqual(lane, [
-      'E2E Chromium (shard ${{ matrix.shard }}/3)',
+      'E2E Chromium (shard ${{ matrix.shard }}/4)',
+      'E2E HTML Report',
       'E2E Report',
       'E2E live logout',
     ]);

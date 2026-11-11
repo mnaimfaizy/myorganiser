@@ -20,4 +20,4 @@ Every item ends as exactly one of these, and the Maintainer picks in one batched
 - **File a follow-up issue**, through the `github-issue-creation-workflow` Skill.
 - **Accept**, recorded under the Pull Request's known gaps with the reason.
 
-Finish with a recommended merge order and the reason for it. Conflicting branches go last, and work that needs the Maintainer's own review goes after work that does not.
+Finish with a recommended merge order and the reason for it. Conflicting branches go last, and work that needs the Maintainer's own review goes after work that does not. Give the order as the `yarn merge:train <pr>…` command that merges it ([ADR 0144](../adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).

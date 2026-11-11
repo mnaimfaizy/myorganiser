@@ -81,6 +81,15 @@ export default function DashboardLayout({
              * converges on its own terms and cannot gate Vault Blob merging
              * (ADR 0057), so a passphrase changed on another device raises its
              * own prompt while every blob keeps merging normally.
+             *
+             * Because the three runners stay independent, one dashboard load
+             * reads GET /vault twice (reconcile, then meta converge) and GET
+             * /vault/blobs twice (reconcile, then the pull's first pass). That
+             * is on purpose, measured in #1358; coalescing those in-flight
+             * reads without merging the runners is tracked in #1489.
+             * GET /vault/backups/latest is not one of these: Home asks it once
+             * per load, and only after unlock (the extra calls in #1358 were
+             * dev StrictMode and lock/unlock), so it has no duplicate.
              */}
             <VaultMetaConvergeRunner />
             <VaultPullRunner />

@@ -11,6 +11,7 @@ import {
   summarizeCiDuration,
   type CiDurationGather,
   type GatheredJob,
+  type GatheredMerge,
   type GatheredRun,
   type GatheredStep,
 } from './ci-duration.ts';
@@ -92,28 +93,47 @@ export const repeat = <T>(count: number, make: (index: number) => T): T[] =>
 export const gather = (
   runs: GatheredRun[],
   evidence: Record<string, string> = {},
+  merges: GatheredMerge[] = [],
 ): CiDurationGather => ({
   window: { since: '2026-10-12', until: '2026-10-26' },
   workflow: 'ci.yml',
   projectRoots: ROOTS,
   evidence,
   runs,
+  merges,
 });
 
 /** The whole measurement, over a fixture gather. */
 export const measure = (
   runs: GatheredRun[],
   evidence?: Record<string, string>,
-) => summarizeCiDuration(gather(runs, evidence));
+  merges?: GatheredMerge[],
+) => summarizeCiDuration(gather(runs, evidence, merges));
+
+/** A Pull Request merged up to date with `main`. */
+export const merged = (
+  overrides: Partial<GatheredMerge> = {},
+): GatheredMerge => ({
+  number: 100,
+  headBranch: 'feat/x',
+  mergedAt: at(0),
+  behindBy: 0,
+  ...overrides,
+});
+
+/** A Pull Request merged while `main` had moved three commits past it. */
+export const hotMerge = (): GatheredMerge =>
+  merged({ number: 101, headBranch: 'fix/1-stale', behindBy: 3 });
 
 /** A fast Single-Library run: one job, two minutes, fresh, Test not last. */
 export const fastRun = (): GatheredRun =>
   prRun({ jobs: [job('Lint', 0, 120)] });
 
 /**
- * A run that trips all five signals on its own once there is enough data:
- * Single-Library, twenty minutes, stale, Test last with a 900s cacheable step,
- * and an E2E lane of ten minutes.
+ * A run that trips four of the five signals on its own once there is enough
+ * data: Single-Library, twenty minutes, Test last with a 900s cacheable step,
+ * and an E2E lane of ten minutes. It is also stale, which is reported but no
+ * longer a signal; the fifth signal needs a `hotMerge`.
  */
 export const hotRun = (): GatheredRun =>
   prRun({

@@ -45,7 +45,7 @@ re-run, rather than setting `reuseExistingServer: true`.
 `E2E_LIVE_BACKEND=1` also starts the built API (`tools/scripts/e2e-live-backend.ts`)
 on port 3000, migrates, and seeds one verified user so `auth-logout-live.spec.ts`
 can call `POST /auth/logout` instead of the stub in `multiUserVault.ts`. The
-three Chromium shards leave the flag unset, so they stay stubbed; the separate
+four Chromium shards leave the flag unset, so they stay stubbed; the separate
 `e2e-live-logout` job sets it and runs only that spec. Without the flag the spec
 is skipped. The API process is not reused: stop anything already listening on
 3000, and run `yarn build:backend` first. `NODE_ENV` for that process is
@@ -62,8 +62,13 @@ for manual work on 4200.
 ## CI lanes
 
 - **Blocking** — Chromium, on pull requests that `nx affected` says touch `web-e2e`,
-  split across 3 shards in `.github/workflows/ci.yml`. Keeps `retries: 2` and passes on retry.
-  The live logout spec is a fourth job, `e2e-live-logout`, not one of the shards.
+  split across 4 shards in `.github/workflows/ci.yml`. Keeps `retries: 2` and passes on retry.
+  The live logout spec is a separate job, `e2e-live-logout`, not one of the shards.
+- **Shards are balanced by duration, not by Playwright's `--shard`.**
+  `tools/scripts/ci/e2e-shard-plan.ts` assigns each spec file to a shard by its weight in
+  `shard-weights.json`; a new spec with no weight still runs, at a default weight. When the
+  shards drift apart, refresh the weights from a run's blob reports and check the balance with
+  `node tools/scripts/ci/e2e-shard-plan.ts --print 4`.
 - **Nightly** — all three browsers as a matrix in `.github/workflows/nightly-e2e.yml`, run with
   `--fail-on-flaky-tests`. Failures open or comment on a single tracking issue.
 

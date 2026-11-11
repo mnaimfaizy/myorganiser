@@ -1077,7 +1077,7 @@ jobs:
             --no-coverage --forceExit
 
   e2e:
-    name: E2E Chromium (shard ${{ matrix.shard }}/3)
+    name: E2E Chromium (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Pull requests only: the same commits ran this seconds earlier on the PR,
@@ -1091,10 +1091,15 @@ jobs:
     needs:
       - setup
 
+    # Four shards balanced by measured duration rather than Playwright's own
+    # count-based `--shard`, which cut the suite alphabetically and left one
+    # shard at 76s of specs and another at 248s (issue #1381). The shard count
+    # here and the `/4` in the job name and `Run E2E shard` move together;
+    # tools/scripts/ci/e2e-lane-workflow.test.ts holds them to each other.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
 
     env:
       # Playwright's webServer starts Nx as a nested child process, and the Nx
@@ -1140,16 +1145,34 @@ jobs:
 
       # Only the browser this lane needs. Playwright advises against caching
       # browser binaries: restoring the cache costs about what downloading does.
+      # No `--with-deps`: the ubuntu-24.04 image already carries Chromium's
+      # system libraries, and the apt step only added fonts — which, fetched
+      # from the Ubuntu mirror at ~30 kB/s, stalled this step for 3–9 minutes
+      # in 5 of 65 runs (issue #1381). The nightly keeps `--with-deps`.
       - name: Install Playwright Chromium
-        run: corepack yarn playwright install --with-deps chromium
+        run: corepack yarn playwright install chromium
 
       # Built here rather than inside Playwright's webServer timeout, so a build
       # failure is attributable and starting the server is only that.
       - name: Build frontend for E2E
         run: corepack yarn nx build web
 
+      # The shard's spec files come from tools/scripts/ci/e2e-shard-plan.ts,
+      # which assigns every spec file on disk to a shard by its weight in
+      # apps/web-e2e/shard-weights.json. A file with no weight still runs, at
+      # a default weight. The plan fails on an empty shard, because
+      # Playwright given no file filter would run the whole suite.
       - name: Run E2E shard
-        run: corepack yarn nx run web-e2e:e2e --shard=${{ matrix.shard }}/3 --reporter=blob
+        env:
+          SHARD: ${{ matrix.shard }}/4
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan="$(node tools/scripts/ci/e2e-shard-plan.ts --shard "$SHARD")"
+          mapfile -t files <<< "$plan"
+          echo "Shard $SHARD runs ${#files[@]} spec file(s):"
+          printf '  %s\n' "${files[@]}"
+          corepack yarn nx run web-e2e:e2e --reporter=blob "${files[@]}"
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
@@ -1159,52 +1182,30 @@ jobs:
           path: blob-report/
           retention-days: 7
 
+  # The required check for the blocking lane (ADR 0050, #1397). It reads the
+  # shards' result and nothing else: no checkout, no dependencies, so it adds
+  # seconds after the last shard rather than the ~35s the report merge took
+  # (issue #1381). A shard that failed or was cancelled fails it. When
+  # `web-e2e` is not affected the shards are skipped, this is skipped too,
+  # and a skipped required check reads as passing.
   e2e-report:
     name: E2E Report
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
     needs:
       - e2e
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22.18'
-
-      - name: Restore dependency cache
-        id: dependency-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .yarn/install-state.gz
-            node_modules
-          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
-
-      - name: Install dependencies
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: corepack yarn install --immutable
-
-      - name: Download blob reports
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          pattern: e2e-blob-report-*
-          path: all-blob-reports
-          merge-multiple: true
-
-      - name: Merge into a single HTML report
-        run: corepack yarn playwright merge-reports --reporter html ./all-blob-reports
-
-      - name: Upload HTML report
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: e2e-html-report
-          path: playwright-report/
-          retention-days: 7
+      - name: Require every E2E shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.e2e.result }}
+        run: |
+          if [ "$SHARDS_RESULT" != 'success' ]; then
+            echo "::error title=E2E failed::The E2E shards finished with '$SHARDS_RESULT'. See the E2E HTML Report job's artifact."
+            exit 1
+          fi
+          echo 'Every E2E shard passed.'
 
   build-backend:
     name: Build Backend
@@ -1371,8 +1372,9 @@ jobs:
             ${{ runner.os }}-nx-22-e2e-
             ${{ runner.os }}-nx-22-
 
+      # No `--with-deps`, for the reason the `e2e` job gives (issue #1381).
       - name: Install Playwright Chromium
-        run: corepack yarn playwright install --with-deps chromium
+        run: corepack yarn playwright install chromium
 
       - name: Build frontend for E2E
         run: corepack yarn nx build web
@@ -1478,3 +1480,55 @@ jobs:
 
       - name: Build Storybook
         run: corepack yarn build-storybook
+
+  # The merged HTML report, for reading a failure. Not a required check, and
+  # it runs only when a shard failed: a green lane needs no report, and the
+  # merge was the ~35s tail every pull request waited on (issue #1381). Each
+  # shard's blob report is still uploaded, so a green run's report can be
+  # merged locally with `yarn playwright merge-reports`.
+  e2e-html-report:
+    name: E2E HTML Report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ !cancelled() && needs.e2e.result == 'failure' }}
+    needs:
+      - e2e
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .yarn/install-state.gz
+            node_modules
+          key: ${{ runner.os }}-node-22-deps-${{ hashFiles('yarn.lock', 'package.json', '.yarnrc.yml', 'apps/**/package.json', 'libs/**/package.json') }}
+
+      - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: corepack yarn install --immutable
+
+      - name: Download blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: e2e-blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into a single HTML report
+        run: corepack yarn playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: e2e-html-report
+          path: playwright-report/
+          retention-days: 7

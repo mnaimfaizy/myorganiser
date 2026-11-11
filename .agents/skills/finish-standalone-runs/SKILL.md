@@ -145,4 +145,4 @@ Then recommend a merge order. Number the Pull Requests, and give each a one-line
 3. **Then risk.** Documentation-only and tooling changes go first, then narrow fixes, then changes to a shared library (`libs/web/ui`, `libs/auth`, `libs/app-api-client`) or to a backend contract.
 4. **Keep related branches next to each other.** For example, two branches that move the same feature to the generated client merge one after the other.
 
-Say what to do after each merge: check that CI passes on the next Pull Request before merging it, because each QA Report was run on its branch alone.
+End with the one command that merges them, in that order: `yarn merge:train <pr> <pr> …`, leaving out every Pull Request held back by rule 1. Each QA Report was run on its branch alone, so the train brings each branch up to date with `main` and waits for its required checks before merging it, and stops at the first red one. Do not tell the Maintainer to merge by hand or with the admin bypass: a merge behind `main` lands a tree no check ran on ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).

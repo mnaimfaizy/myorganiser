@@ -1,26 +1,57 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, waitFor, within } from '@storybook/test';
-import { type FormEvent, useState } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 
 import {
   PassphraseUnlockForm,
   type PassphraseUnlockFormProps,
+  type PassphraseUnlockValues,
+  passphraseUnlockSchema,
 } from './PassphraseUnlockForm';
 
 /**
- * Holds the typed passphrase locally so the field can be typed into, as the
- * gate does in production. The spy `onChange` still sees every keystroke.
+ * The story-level args. The real form is owned by the caller (the vault gate in
+ * production), so the wrapper creates it from these args and hands it down.
  */
-function PassphraseUnlockFormWithState(props: PassphraseUnlockFormProps) {
-  const [value, setValue] = useState(props.value);
+interface PassphraseUnlockStoryArgs extends Omit<
+  PassphraseUnlockFormProps,
+  'form'
+> {
+  /** The passphrase the field starts with. */
+  initialPassphrase: string;
+  /** An error to show on the field, set the way the gate sets its mismatch error. */
+  error?: string;
+}
+
+/**
+ * Creates the React Hook Form instance the gate would own, with the same
+ * resolver, and sets the error through `setError` so the story renders the
+ * error exactly as the gate does.
+ */
+function PassphraseUnlockFormWithForm({
+  initialPassphrase,
+  error,
+  onSubmit,
+  unlocking,
+}: PassphraseUnlockStoryArgs) {
+  const form = useForm<PassphraseUnlockValues>({
+    resolver: zodResolver(passphraseUnlockSchema),
+    defaultValues: { passphrase: initialPassphrase },
+  });
+
+  useEffect(() => {
+    if (error) {
+      form.setError('passphrase', { type: 'mismatch', message: error });
+    }
+  }, [error, form]);
+
   return (
     <PassphraseUnlockForm
-      {...props}
-      value={value}
-      onChange={(next) => {
-        setValue(next);
-        props.onChange(next);
-      }}
+      form={form}
+      onSubmit={onSubmit}
+      unlocking={unlocking}
     />
   );
 }
@@ -28,26 +59,34 @@ function PassphraseUnlockFormWithState(props: PassphraseUnlockFormProps) {
 /**
  * The passphrase field, show/hide control, inline error, and Unlock submit.
  *
- * `onSubmit` mirrors the gate: the component's contract asks the handler to call
- * `preventDefault`, so the mock does, and a submit play does not navigate the
- * test-runner iframe.
+ * `onSubmit` is the gate's handler. React Hook Form's `handleSubmit` calls
+ * `preventDefault` itself, so a submit play does not navigate the test-runner
+ * iframe.
+ *
+ * The wrapper is keyed on its story args: `useForm` reads `defaultValues` once,
+ * so changing the initial passphrase or the error in the Controls panel
+ * remounts the form instead of leaving a stale value on screen.
  */
-const meta: Meta<typeof PassphraseUnlockForm> = {
+const meta: Meta<typeof PassphraseUnlockFormWithForm> = {
   component: PassphraseUnlockForm,
   title: 'Vault/PassphraseUnlockForm',
   tags: ['autodocs'],
-  render: (args) => <PassphraseUnlockFormWithState {...args} />,
+  render: (args) => (
+    <PassphraseUnlockFormWithForm
+      key={`${args.initialPassphrase}|${args.error ?? ''}`}
+      {...args}
+    />
+  ),
   args: {
-    value: '',
-    onChange: fn(),
-    onSubmit: fn((event: FormEvent<HTMLFormElement>) => event.preventDefault()),
-    error: null,
+    initialPassphrase: '',
+    error: undefined,
+    onSubmit: fn(),
     unlocking: false,
   },
 };
 
 export default meta;
-type Story = StoryObj<typeof PassphraseUnlockForm>;
+type Story = StoryObj<typeof PassphraseUnlockFormWithForm>;
 
 /** Nothing typed yet. The field is masked and the reveal control is unpressed. */
 export const Default: Story = {};
@@ -55,7 +94,7 @@ export const Default: Story = {};
 /** A passphrase has been typed. The field stays masked until the User reveals it. */
 export const Filled: Story = {
   args: {
-    value: 'correct horse',
+    initialPassphrase: 'correct horse',
   },
 };
 
@@ -66,7 +105,7 @@ export const Filled: Story = {
  */
 export const WrongPassphrase: Story = {
   args: {
-    value: 'wrong horse',
+    initialPassphrase: 'wrong horse',
     error: "That passphrase didn't unlock your vault. Nothing was changed.",
   },
 };
@@ -77,7 +116,7 @@ export const WrongPassphrase: Story = {
  */
 export const Unlocking: Story = {
   args: {
-    value: 'correct horse',
+    initialPassphrase: 'correct horse',
     unlocking: true,
   },
 };
@@ -89,7 +128,7 @@ export const Unlocking: Story = {
  */
 export const UnlockingPhone: Story = {
   args: {
-    value: 'correct horse',
+    initialPassphrase: 'correct horse',
     unlocking: true,
   },
   parameters: {
@@ -103,7 +142,7 @@ export const UnlockingPhone: Story = {
  */
 export const RevealToggle: Story = {
   args: {
-    value: 'correct horse',
+    initialPassphrase: 'correct horse',
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

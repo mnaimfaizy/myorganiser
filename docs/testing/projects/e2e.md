@@ -67,7 +67,7 @@ separate targets, which is what the nightly matrix runs.
 `auth-logout-live.spec.ts` is skipped unless `E2E_LIVE_BACKEND=1`. That flag
 starts `tools/scripts/e2e-live-backend.ts` (migrate, seed a verified user,
 serve the built API on port 3000) beside the frontend. CI runs that spec in the
-`e2e-live-logout` job, not in the three hermetic shards. Locally, Postgres must
+`e2e-live-logout` job, not in the four hermetic shards. Locally, Postgres must
 already match `DATABASE_URL` in `.env`, port
 3000 must be free, and the API must already be built:
 

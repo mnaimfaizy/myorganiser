@@ -38,7 +38,13 @@
  *   target is missed, and the target is about that population.
  * - the stale-branch share is over every readable pull request run, because
  *   how far a branch has fallen behind `main` has nothing to do with how
- *   many projects it touches.
+ *   many projects it touches. It is reported, not a signal: a run that
+ *   starts behind `main` costs nothing when the branch is brought up to date
+ *   before it merges (#1376, 2026-11-11).
+ * - the merges-behind-`main` count is over every Pull Request merged into
+ *   `main` in the window whose head could be compared with `main` as it
+ *   stood at the merge. A merge behind `main` is a combined tree no check
+ *   ran on, which is the guarantee strict up-to-date exists to keep.
  *
  * **Not enough data is an answer.** Under `MIN_SINGLE_LIBRARY_RUNS` runs in
  * the window, the verdict is `not-enough-data` and no signal is evaluated: a
@@ -54,8 +60,13 @@ export const TARGET_P50_SECONDS = 5 * 60;
 /** Where the cacheable Nx steps stop looking like a cache hit. */
 export const CACHEABLE_STEP_P50_SECONDS = 60;
 
-/** Share of runs whose branch had fallen behind `main` before they started. */
-export const STALE_BRANCH_SHARE = 0.1;
+/**
+ * Pull Requests that may merge while `main` has moved past their head. Zero:
+ * each one landed a combined tree that no required check ran on — the
+ * admin bypass, used where the Merge Train (`yarn merge:train`) should have
+ * been. Replaced the 10% stale-run share on 2026-11-11 (#1376).
+ */
+export const MERGES_BEHIND_MAIN_MAX = 0;
 
 /** The blocking E2E lane's own median (ADR 0050). */
 export const E2E_LANE_P50_SECONDS = 5 * 60;
@@ -76,7 +87,7 @@ export const CI_WORKFLOW = 'ci.yml';
 export const TEST_JOB_NAME = 'Test';
 
 /**
- * The blocking E2E lane's jobs, by name: `E2E Chromium (shard 1/3)`,
+ * The blocking E2E lane's jobs, by name: `E2E Chromium (shard 1/4)`,
  * `E2E Report`, `E2E live logout`. Anchored and word-bounded so a future
  * `E2E`-prefixed job joins the lane and a job merely mentioning E2E does
  * not.
@@ -211,13 +222,35 @@ export interface CiDurationGather {
   /** What could not be read, named rather than assumed. */
   evidence: Record<string, string>;
   runs: readonly GatheredRun[];
+  /**
+   * Every Pull Request merged into `main` in the window. Optional because a
+   * gather saved before 2026-11-11 has none; its merges count as unreadable,
+   * never as clean.
+   */
+  merges?: readonly GatheredMerge[];
+}
+
+/**
+ * One Pull Request merged into `main`, and how far `main` had moved past its
+ * head when it landed.
+ */
+export interface GatheredMerge {
+  number: number;
+  headBranch: string;
+  mergedAt: string;
+  /**
+   * Commits on `main` at the moment of the merge — the merge commit's first
+   * parent — that the head did not have, or null when the comparison could
+   * not be made. Above zero, the tree that landed was never checked whole.
+   */
+  behindBy: number | null;
 }
 
 /** The five signals, in the order the report prints them. */
 export const SIGNAL_IDS = [
   'single-library-p50',
   'cacheable-steps-p50',
-  'stale-branch-share',
+  'merged-behind-main',
   'e2e-lane-p50',
   'test-last-finisher',
 ] as const;
@@ -257,9 +290,9 @@ export const SIGNALS = {
     decision: 1382,
     decisionTitle: 'Choose how Nx results are shared across CI runs',
   },
-  'stale-branch-share': {
-    title: 'Too many runs start from a branch that is behind `main`',
-    threshold: `stale-branch runs > ${STALE_BRANCH_SHARE * 100}%`,
+  'merged-behind-main': {
+    title: 'A Pull Request merged while `main` had moved past it',
+    threshold: `merges behind \`main\` > ${MERGES_BEHIND_MAIN_MAX}`,
     decision: 1376,
     decisionTitle: 'Choose how a PR stays mergeable when main moves',
   },
@@ -601,6 +634,32 @@ export function staleBranchShare(
   };
 }
 
+/** The merges that landed behind `main`, and what they were readable over. */
+export interface MergesBehindMain {
+  /** Merges whose head `main` had moved past, oldest first. */
+  behind: GatheredMerge[];
+  readable: number;
+  unreadable: number;
+}
+
+export function mergesBehindMain(
+  merges: readonly GatheredMerge[] | undefined,
+): MergesBehindMain {
+  const behind: GatheredMerge[] = [];
+  let readable = 0;
+  let unreadable = 0;
+  for (const merge of merges ?? []) {
+    if (merge.behindBy === null || !Number.isFinite(merge.behindBy)) {
+      unreadable += 1;
+      continue;
+    }
+    readable += 1;
+    if (merge.behindBy > 0) behind.push(merge);
+  }
+  behind.sort((a, b) => a.mergedAt.localeCompare(b.mergedAt));
+  return { behind, readable, unreadable };
+}
+
 /** What the window as a whole says. */
 export type CiDurationVerdict =
   | 'not-enough-data'
@@ -614,7 +673,7 @@ export type CiDurationSummary = ReturnType<typeof summarizeCiDuration>;
  * The measurement. Pure: everything it knows arrives in `gather`.
  */
 export function summarizeCiDuration(gather: CiDurationGather) {
-  const { window, workflow, projectRoots, evidence, runs } = gather;
+  const { window, workflow, projectRoots, evidence, runs, merges } = gather;
 
   // Cancelled and still-running runs are dropped before anything is counted,
   // so no figure here is an average over truncated waits. They are reported
@@ -656,6 +715,7 @@ export function summarizeCiDuration(gather: CiDurationGather) {
       .filter((seconds): seconds is number => seconds !== null),
   );
   const stale = staleBranchShare(measured);
+  const mergedBehind = mergesBehindMain(merges);
   const finishers = lastFinisherShares(singleLibrary);
   const testShare =
     finishers.find((entry) => entry.name === TEST_JOB_NAME)?.share ?? 0;
@@ -688,10 +748,10 @@ export function summarizeCiDuration(gather: CiDurationGather) {
     ) {
       trip('cacheable-steps-p50', formatSeconds(cacheableSteps.p50));
     }
-    if (stale.share !== null && stale.share > STALE_BRANCH_SHARE) {
+    if (mergedBehind.behind.length > MERGES_BEHIND_MAIN_MAX) {
       trip(
-        'stale-branch-share',
-        `${formatShare(stale.share)} of ${stale.readable} readable run(s)`,
+        'merged-behind-main',
+        `${mergedBehind.behind.length} of ${mergedBehind.readable} readable merge(s)`,
       );
     }
     if (e2eLane.p50 !== null && e2eLane.p50 > E2E_LANE_P50_SECONDS) {
@@ -731,12 +791,13 @@ export function summarizeCiDuration(gather: CiDurationGather) {
     cacheableSteps,
     e2eLane,
     staleBranch: stale,
+    mergedBehind,
     lastFinishers: finishers,
     testLastFinisherShare: testShare,
     thresholds: {
       targetP50Seconds: TARGET_P50_SECONDS,
       cacheableStepP50Seconds: CACHEABLE_STEP_P50_SECONDS,
-      staleBranchShare: STALE_BRANCH_SHARE,
+      mergesBehindMain: MERGES_BEHIND_MAIN_MAX,
       e2eLaneP50Seconds: E2E_LANE_P50_SECONDS,
       minSingleLibraryRuns: MIN_SINGLE_LIBRARY_RUNS,
       lastFinisherMedianShare: LAST_FINISHER_MEDIAN_SHARE,
@@ -798,6 +859,21 @@ export function targetSentence(summary: CiDurationSummary): string {
 const percentilesRow = (label: string, pair: Percentiles): string =>
   `| ${label} | ${formatSeconds(pair.p50)} | ${formatSeconds(pair.p90)} | ${pair.count} |`;
 
+/** One sentence on the merges behind `main`, readable or not. */
+export function mergesBehindSentence(merged: MergesBehindMain): string {
+  const unread =
+    merged.unreadable === 0
+      ? ''
+      : ` ${merged.unreadable} merge(s) could not be compared.`;
+  if (merged.readable === 0) {
+    return `No merge into \`main\` could be compared with \`main\` at its merge.${unread}`;
+  }
+  return (
+    `${merged.behind.length} of ${merged.readable} readable merge(s) landed while \`main\` had moved past the head — ` +
+    `a combined tree no required check ran on.${unread}`
+  );
+}
+
 /**
  * The report, as Markdown. The same text goes to stdout, to `--out`, and
  * into the watch issue, so a reader comparing the issue with a local run is
@@ -836,7 +912,11 @@ export function renderCiDurationMeasurement(
   const measuredBySignal: Record<SignalId, string> = {
     'single-library-p50': formatSeconds(summary.durations.singleLibrary.p50),
     'cacheable-steps-p50': formatSeconds(summary.cacheableSteps.p50),
-    'stale-branch-share': formatShare(summary.staleBranch.share),
+    // No readable merge is not zero merges behind; it is unknown.
+    'merged-behind-main':
+      summary.mergedBehind.readable === 0
+        ? 'not measurable'
+        : String(summary.mergedBehind.behind.length),
     'e2e-lane-p50': formatSeconds(summary.e2eLane.p50),
     // A share over no readable run is not 0%, it is unknown.
     'test-last-finisher':
@@ -872,11 +952,20 @@ export function renderCiDurationMeasurement(
 
   lines.push(
     '',
+    '## Merges behind `main`',
+    '',
+    mergesBehindSentence(summary.mergedBehind),
+    ...summary.mergedBehind.behind.map(
+      (merge) =>
+        `- #${merge.number} (\`${merge.headBranch}\`), ${merge.behindBy} commit(s) behind, merged ${merge.mergedAt}`,
+    ),
+    '',
     '## Stale branches',
     '',
     `${summary.staleBranch.stale} of ${summary.staleBranch.readable} readable run(s) started from a branch ` +
       `\`main\` had already moved past — ${formatShare(summary.staleBranch.share)}. ` +
-      `${summary.staleBranch.unreadable} run(s) could not be compared.`,
+      `${summary.staleBranch.unreadable} run(s) could not be compared. ` +
+      'Reported, not a signal: a stale first run costs nothing when the branch is brought up to date before it merges.',
     '',
     '## Verdict',
     '',

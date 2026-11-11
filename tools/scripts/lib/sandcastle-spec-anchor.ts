@@ -105,8 +105,9 @@ export const prdBranchSlug = (title: string): string => {
  * out, the agent on #1273 named #1318 — a pull request that touched the file
  * but did not introduce the defect — and that passed. Triage writes the
  * attribution into the brief (the `my-triage` Skill), so the agent copies it;
- * with none to copy it declares the origin unknown, which the escaped-defect
- * measurement counts honestly, rather than guessing one it would count as fact.
+ * with none it does the archaeology in local git history and names only a
+ * number read from a merge or squash-merge subject on main, else `unknown: <why>`, which the
+ * escaped-defect measurement counts honestly rather than as a guessed fact.
  *
  * Whether the branch is a fix is the measurement's own `pullRequestType`, so
  * the prompt and `fix:attribution:check` cannot disagree about it.
@@ -115,10 +116,16 @@ export const fixAttributionInstruction = (branch: string): string | null => {
   if (pullRequestType({ branch }) !== 'fix') return null;
   return (
     'This is a fix branch, so the commit body must name what introduced the defect ' +
-    '(ADR 0100). Add the line to the message file before `ai:commit`: copy ' +
-    "`Introduced in #<n>` exactly from the triage brief's **Introduced in:** field. " +
-    'If the issue and its brief name none, write ' +
-    '`Introduced in unknown: not named in triage` instead. Never work out a pull ' +
-    'request number yourself: a plausible wrong one passes CI and is recorded as fact.'
+    '(ADR 0100). Add the line to the message file before `ai:commit`, in this order. ' +
+    '1. If the triage brief has an **Introduced in:** field, copy it exactly and do no archaeology. ' +
+    '2. Otherwise do the archaeology in local git history (`git log -S`, `git blame`, ' +
+    '`git log --merges --ancestry-path`): trace the defect to the commit that introduced it, ' +
+    'then find the commit on main that landed it. Write `Introduced in #<n>` only when `<n>` ' +
+    'is read from the subject of that commit: a merge commit (`Merge pull request #<n> from …`), ' +
+    "or a squash merge on main's first-parent history whose subject ends in `(#<n>)`. " +
+    '3. If no pull request can be read that way, write `Introduced in unknown: <why>`, ' +
+    'where `<why>` says what you searched and why it found no pull request. ' +
+    'Never write a number you recalled, inferred from a title, or matched by topic: ' +
+    'a plausible wrong one passes CI and is recorded as fact.'
   );
 };
