@@ -5,7 +5,7 @@ description: 'Use when one or more Standalone Runs from `yarn dispatch-agents` h
 
 # Finish Standalone Runs
 
-Take finished Standalone Runs from `ready-for-human` to Pull Requests that have been QA'd and are ready to merge. Orchestrate only: the procedures belong to the Skills and documents this one names. See [ADR 0142](../../../docs/adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md).
+Take finished Standalone Runs from `ready-for-human` to Pull Requests that have been QA'd and are ready to merge. Orchestrate only: the procedures belong to the Skills and documents this one names. See [ADR 0142](../../../docs/adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md), as amended by [ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md).
 
 GitHub holds the state, so a new session can run this Skill at any point. There is no progress file.
 
@@ -13,31 +13,35 @@ GitHub holds the state, so a new session can run this Skill at any point. There 
 
 ## The worktree
 
-Fixes and QA run in one reusable worktree, one branch at a time, because the app needs ports and a local database. It is the first QA stack; see [Scheduling QA sessions](#scheduling-qa-sessions) for when a second is worth having.
+Fixes and QA run in one reusable worktree, one Pull Request at a time, because the app needs ports and a local database. It holds the one QA stack; see [Scheduling QA sessions](#scheduling-qa-sessions).
 
 ```sh
 git worktree add --detach tmp/qa/worktree origin/main   # first use only
-git -C tmp/qa/worktree switch <branch>
-corepack yarn install --immutable                        # in the worktree, only when yarn.lock changed
+git -C tmp/qa/worktree fetch origin
 ```
 
-If the branch is checked out elsewhere, stop and say where. Reach the worktree with `git -C` and absolute paths; a `cd` moves the session's working directory. Name the branch to any sub-agent that inspects it, since the worktree may hold another.
+The QA stack checks out commits itself, detached, so the worktree never holds a branch. Reach it with `git -C` and absolute paths; a `cd` moves the session's working directory. Name the commit to any sub-agent that inspects it.
 
-Before switching branches, restore `apps/web/AGENTS.md`, which `next dev` rewrites.
+### The QA stack
 
-### Local environment
+One command starts the stack for a Pull Request, and one stops it. They are documented in [the command reference](../../../docs/agents/command-reference.md#qa-tooling).
 
-The worktree has no env file, and none is created. Never read the Maintainer's env files or work around the hook that protects them; if the steps below cannot run the app, stop and report it.
+```sh
+corepack yarn qa:stack:start --worktree <abs>/tmp/qa/worktree --change-kind fix|feature --merge-base <sha> --head <sha> [--with-before]
+corepack yarn qa:switch --worktree <abs>/tmp/qa/worktree --to after
+corepack yarn qa:stack:stop
+```
 
-1. Write `tmp/qa/env.sh`, which exports the values in `.env.example`, generated local-only secrets for what it leaves blank such as the JWT secrets, and a `DATABASE_URL` for the database in step 2. `source` it before starting anything.
-2. Start a throwaway Postgres container on a loopback port no other service uses. Apply the migrations with `prisma migrate deploy`, generate the client, and run `yarn qa:accounts:seed`.
-3. Start the backend and web from the worktree and record their PIDs in `tmp/qa/`.
-
-`next dev` may keep serving the previous branch after a switch. Restart web after each switch and confirm that the served code contains the change under test before trusting a result.
+- The stack serves web on `http://localhost:4300` and the backend on `3300`, with its own Postgres container on `127.0.0.1:5499`, so it never collides with the Maintainer's services.
+- It builds its environment from `.env.example` with generated local-only secrets and writes it to `tmp/qa/stack/`. Never read the Maintainer's env files or work around the hook that protects them. If the stack cannot run the app, stop and report it.
+- It refuses a database that is not local, the primary checkout, a worktree with uncommitted changes, and a port already in use. Report a refusal; never work around it.
+- It seeds the QA Accounts once, at start. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
+- Every start and switch ends by checking the commit the stack serves. A mismatch exits 1: run no scenario on it. `yarn qa:stack:status` re-checks at any time.
+- A switch back to Before after After is refused. When a feature's After fails, stop the stack and start a fresh one with `--before-only` for the merge-base re-run.
 
 ### Cleaning up
 
-When Pass 2 ends, stop only the processes recorded or shown to run from the worktree, by PID, shut down any simulator or emulator a QA session booted, remove the container and any extra stack's worktree, and offer to archive the finished QA sessions. Leave `tmp/qa/pr-<n>/` in place, since the Maintainer reads the QA Artifacts there.
+When Pass 2 ends, run `yarn qa:stack:stop`, which stops only the processes the stack recorded and removes only its own container. Shut down any simulator or emulator a QA session booted, remove any extra stack's worktree, and offer to archive the finished QA sessions. Leave `tmp/qa/pr-<n>/` in place, since the Maintainer reads the QA Artifacts there.
 
 ## Choose the pass
 
@@ -81,25 +85,31 @@ Before starting any, sort the plans by what each one needs:
 Then schedule by these rules:
 
 1. **Pilot first.** Start the smallest plan alone. It proves the stack and the brief before any other session spends time on them. Fix what it exposes before starting the next.
-2. **One holder per resource.** A worktree, a port, a database and a device each have one QA session at a time. Sessions sharing a database also share the QA Accounts' vaults, so a session starts with `yarn qa:accounts:seed --restore`.
+2. **One holder per resource.** A worktree, a port, a database and a device each have one QA session at a time. `yarn qa:stack:start` seeds the QA Accounts with `--restore`, so each session starts from empty vaults.
 3. **One at a time by default.** Start the next session when the last has reported and released its stack.
-4. **Overlap only when it saves real time.** Plans that need different branches need separate stacks, each with its own installed worktree, ports and database. The web port is pinned in `apps/web/project.json` and the API address comes from env, so confirm a second stack starts before giving it a session. Run at most two stacks, and keep to one when disk or memory is short.
+4. **No overlap yet.** The QA stack's ports and container name are fixed, and `yarn qa:stack:start` refuses a port already in use, so a second stack cannot start beside the first. Plans that need different Pull Requests run one after another.
 5. **Same feature, one after another.** When two plans cover the same screens or data, run them in turn, even with a spare stack, so a failure has one cause.
 6. **Say the schedule first.** State the order and the reason in one line, then start. Revise it as reports come in.
 
-Start each session in the stack's existing worktree, without a new worktree of its own. Brief it with the plan's path, the branch and commit, the stack it holds, and these rules:
+### Starting QA sessions
 
-- check that the commit is what the stack serves, and report instead of testing anything else
+QA sessions start in the foreground of the turn the Maintainer began ([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md) decision 8). Do everything up to the last session start in that turn. A start that is refused, or that falls in a later turn, such as each plan after the pilot, becomes a proposal card the Maintainer clicks. While separate sessions exist, this session never runs a plan itself.
+
+Start each session in the stack's existing worktree, without a new worktree of its own. Brief it with the plan's path, the Pull Request's merge-base and head commits, whether it is a fix or a feature, the stack it holds, and these rules:
+
+- start the stack with `yarn qa:stack:start` and switch it with `yarn qa:switch`; if either reports that the stack is not serving the expected commit, report that instead of testing anything else
 - stop and report if a port it needs is in use, and never kill what it did not start
 - sign in only as a QA Account
-- use the app as a person would, through its real screens, in the built-in browser or on a simulator or emulator, and look at the result as well as checking the code's output
-- for a mobile plan, follow `apps/mobile/AGENTS.md` and cover each platform the change affects, in light and dark where the plan asks
+- **Before and After.** For a fix, run every scenario first on the merge-base (Before), then on the head (After), with the same QA Account, data and viewport. For a feature, run After only, unless a scenario claims existing behaviour still works; start that stack with `--with-before`
+- **Drive the app with a script.** Write each scenario as a script, run it in real Chromium, and inspect every screenshot and frame it captured before trusting a result
+- **The built-in browser is for judgement only**, for what no script can decide. Reach it through the `qa-web` entry in `.claude/launch.json`, which attaches to the running stack without starting a second server. If it cannot load the app, judge from the captures, and list what captures cannot show under Left for a person. The QA Report names the route used
+- for a mobile plan, follow `apps/mobile/AGENTS.md` and cover each platform the change affects, in light and dark where the plan asks. The Before and After rule applies on the simulator and emulator too, with a native rebuild on each side when the change is native
 - capture a QA Artifact only where a written result would not be enough, such as a visual change or a multi-step flow, and none for a backend or logic-only fix, saved in `tmp/qa/pr-<n>/`
 - write each scenario as PASS or FAIL, or as left for a person when a session cannot verify it, such as a real device, a screen reader or design fidelity, to `tmp/qa/pr-<n>/report.md`
 - fix nothing, and post, upload or merge nothing
-- stop the processes it started, release the stack, and end with the report's path and the overall result
+- stop the stack with `yarn qa:stack:stop`, and end with the report's path and the overall result
 
-A session's closing message may be cut short, so read the report file instead. If the harness has no separate sessions, or a session is refused, run the plan in this session under the same brief, one at a time, and say so in the results.
+A session's closing message may be cut short, so read the report file instead. Only if the harness has no separate sessions at all, run the plan in this session under the same brief, one at a time, and say so in the results. A refused start is a proposal card, not a reason to run it here.
 
 ## Uploading QA Artifacts
 

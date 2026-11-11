@@ -20,6 +20,10 @@
       "port": 4200
     },
     {
+      "name": "qa-web",
+      "url": "http://localhost:4300"
+    },
+    {
       "name": "metro",
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["yarn", "nx", "start", "mobile"],
