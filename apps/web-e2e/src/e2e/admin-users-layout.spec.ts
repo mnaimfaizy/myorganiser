@@ -68,9 +68,12 @@ async function openAdminUsers(page: Page): Promise<AdminUsersRequest[]> {
   return requests;
 }
 
-/** Every directory row, on both widths: one link per user, each with its join date. */
+/**
+ * Every directory row, on both widths: one link per user. A row's name carries
+ * its join date, or "Disabled" for a Disabled User on the phone (#1445).
+ */
 function getDirectoryRows(page: Page): Locator {
-  return page.getByRole('link', { name: /Joined/ });
+  return page.getByRole('link', { name: /Joined|Disabled/ });
 }
 
 test.describe('Admin Users layout (E2E)', () => {
