@@ -9,7 +9,13 @@ import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { SUMMARY_AUTHOR_LOGIN, summaryBody } from '../review/publish.ts';
+import type { Verdict } from '../review/schema.ts';
+import { VERDICT_VALUES, verdictHeading } from '../review/schema.ts';
+
 import {
+  AGENT_VERDICT_HOLDS,
+  AGENT_VERDICT_UNREADABLE,
   AUTO_MERGE_MODE_PATH,
   AUTO_MERGE_MODE_PASS,
   AUTO_MERGE_MODES,
@@ -23,6 +29,8 @@ import {
   UNREAD_AGENT_VERDICT,
   UNREAD_QA_REPORT,
   UNREAD_REVIEW_TIER,
+  agentVerdictFrom,
+  agentVerdictFromView,
   autoMergeHolds,
   checksOnCurrentHead,
   decideAutoMerge,
@@ -32,6 +40,7 @@ import {
   renderAutoTrainResult,
   renderShadowComment,
   runAutoTrain,
+  type AgentVerdictFact,
   type AutoMergeDecision,
   type AutoMergeFacts,
   type AutoMergeMode,
@@ -40,9 +49,9 @@ import {
   type CheckRun,
   type MainCiFact,
   type MergeMethod,
+  type MissingFact,
   type PullRequestSnapshot,
   type ReviewTier,
-  type ReviewTierFact,
 } from './merge-train.ts';
 
 const REPO_ROOT = join(
@@ -81,7 +90,7 @@ const snapshot = (
 // ------------------------------------------------------------- fixtures
 
 /** The reason a fact that has no reader yet holds the merge with. */
-function missingReason(fact: ReviewTierFact): string {
+function missingReason(fact: MissingFact | { status: 'read' }): string {
   return fact.status === 'missing'
     ? fact.reason
     : assert.fail('expected a fact with no reader yet');
@@ -159,6 +168,8 @@ interface AutoFakeOptions {
   /** When set, the Review Tier reads as this tier; otherwise it is unread. */
   tier?: ReviewTier;
   commentRefusals?: Set<number>;
+  /** When set, the Agent Verdict reads as this; otherwise it is unread. */
+  agentVerdict?: (pr: number, headRefOid: string) => AgentVerdictFact;
 }
 
 const fakeAutoIo = (
@@ -169,6 +180,7 @@ const fakeAutoIo = (
     mainCi = MAIN_GREEN,
     tier,
     commentRefusals = new Set<number>(),
+    agentVerdict = () => UNREAD_AGENT_VERDICT,
   }: AutoFakeOptions = {},
 ) => {
   const reads = new Map<number, number>();
@@ -207,7 +219,7 @@ const fakeAutoIo = (
       return mainCi;
     },
     reviewTier: () => (tier ? { status: 'read', tier } : UNREAD_REVIEW_TIER),
-    agentVerdict: () => UNREAD_AGENT_VERDICT,
+    agentVerdict,
     qaReport: () => UNREAD_QA_REPORT,
     upsertShadowComment: (pr, body) => {
       writes.push(`comment #${pr} ${decisionLine(body)}`);
@@ -673,6 +685,208 @@ describe('decideAutoMerge', () => {
   });
 });
 
+// ------------------------------------------- D2: the Agent Verdict (ADR 0148)
+
+const OLDER_HEAD = 'c'.repeat(40);
+
+/**
+ * The hold each verdict gets on a head it reviewed. Typed over every Verdict,
+ * so a verdict added to the contract without a row here fails to compile, and
+ * the loop below fails at run time if one is missing.
+ */
+const HOLD_BY_VERDICT: Record<Verdict, string | null> = {
+  approve: null,
+  comment: 'the Agent Verdict is comment, not approve',
+  'request-changes': 'the Agent Verdict is request-changes',
+};
+
+describe('the Agent Verdict rule', () => {
+  for (const tier of ['auto', 'agent'] as const) {
+    // The rule ignores the tier: the same fact holds the same way on either.
+    for (const verdict of VERDICT_VALUES) {
+      const expected = HOLD_BY_VERDICT[verdict];
+      test(`${tier}: ${verdict} on the head ${expected ? 'holds with its reason' : 'adds no Agent Verdict hold'}`, () => {
+        const holds = autoMergeHolds(
+          facts({
+            reviewTier: { status: 'read', tier },
+            agentVerdict: { status: 'read', verdict, reviewedOid: HEAD },
+          }),
+        );
+        assert.deepEqual(
+          holds,
+          expected ? [expected, NOT_READ.qaReport] : [NOT_READ.qaReport],
+        );
+      });
+    }
+
+    test(`${tier}: approve for an older commit holds, naming both short shas`, () => {
+      const holds = autoMergeHolds(
+        facts({
+          reviewTier: { status: 'read', tier },
+          agentVerdict: {
+            status: 'read',
+            verdict: 'approve',
+            reviewedOid: OLDER_HEAD,
+          },
+        }),
+      );
+      assert.deepEqual(holds, [
+        `the Agent Verdict approved \`${OLDER_HEAD.slice(0, 8)}\`, not the head \`${HEAD.slice(0, 8)}\``,
+        NOT_READ.qaReport,
+      ]);
+      assert.match(holds[0], /not the head/);
+    });
+
+    test(`${tier}: approve that names no commit holds, saying it names none`, () => {
+      const holds = autoMergeHolds(
+        facts({
+          reviewTier: { status: 'read', tier },
+          agentVerdict: {
+            status: 'read',
+            verdict: 'approve',
+            reviewedOid: null,
+          },
+        }),
+      );
+      assert.deepEqual(holds, [
+        'the Agent Verdict does not name the commit it reviewed',
+        NOT_READ.qaReport,
+      ]);
+    });
+  }
+
+  test('approve on the head adds no Agent Verdict reason to the decision', () => {
+    const decision = decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'auto' },
+        agentVerdict: { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+      }),
+      'shadow',
+    );
+    assert.equal(decision.reason, NOT_READ.qaReport);
+  });
+
+  test('a missing Agent Verdict holds with the reason the read gave', () => {
+    const cases: [AgentVerdictFact, string][] = [
+      [
+        agentVerdictFrom({
+          outcome: 'unreviewed',
+          verdict: null,
+          reviewedOid: null,
+        }),
+        'there is no code-review summary comment',
+      ],
+      [
+        agentVerdictFrom({
+          outcome: 'no-verdict',
+          verdict: null,
+          reviewedOid: null,
+        }),
+        'the code-review summary has no verdict',
+      ],
+      [
+        agentVerdictFrom({
+          outcome: 'unrecognised',
+          verdict: null,
+          reviewedOid: null,
+        }),
+        'the code-review summary heading is not recognised',
+      ],
+      [
+        AGENT_VERDICT_UNREADABLE,
+        'the Agent Verdict could not be read (no code-review summary comment)',
+      ],
+    ];
+    for (const [fact, reason] of cases) {
+      assert.deepEqual(
+        autoMergeHolds(facts({ agentVerdict: fact })).slice(0, 2),
+        [NOT_READ.reviewTier, reason],
+        reason,
+      );
+    }
+  });
+
+  test('a read verdict carries its reviewed commit through agentVerdictFrom', () => {
+    assert.deepEqual(
+      agentVerdictFrom({
+        outcome: 'passed',
+        verdict: 'approve',
+        reviewedOid: HEAD,
+      }),
+      { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+    );
+  });
+
+  // The reader the train calls: the publisher's own summary, read through the
+  // author check, and the minimise check, as `gh pr view --json comments` shows it.
+  describe('agentVerdictFromView', () => {
+    const publisherSummary = summaryBody({
+      rendered: `${verdictHeading('approve')}\n`,
+      headSha: HEAD,
+      runUrl: 'https://example.invalid/run/9',
+    });
+
+    test('no view (gh could not read the comments) is the unreadable fact', () => {
+      assert.deepEqual(agentVerdictFromView(null), AGENT_VERDICT_UNREADABLE);
+    });
+
+    test('a summary written by someone else is not the Agent Verdict', () => {
+      assert.deepEqual(
+        agentVerdictFromView({
+          comments: [
+            {
+              body: publisherSummary,
+              author: { login: 'someone-else' },
+            },
+          ],
+        }),
+        {
+          status: 'missing',
+          reason: 'there is no code-review summary comment',
+        },
+      );
+    });
+
+    test('the publisher summary reads as the verdict and the commit it reviewed', () => {
+      assert.deepEqual(
+        agentVerdictFromView({
+          comments: [
+            {
+              body: publisherSummary,
+              author: { login: SUMMARY_AUTHOR_LOGIN },
+            },
+          ],
+        }),
+        { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+      );
+    });
+
+    test('a minimised publisher summary is not the Agent Verdict', () => {
+      assert.deepEqual(
+        agentVerdictFromView({
+          comments: [
+            {
+              body: publisherSummary,
+              author: { login: SUMMARY_AUTHOR_LOGIN },
+              isMinimized: true,
+            },
+          ],
+        }),
+        {
+          status: 'missing',
+          reason: 'there is no code-review summary comment',
+        },
+      );
+    });
+  });
+
+  test('every verdict has a row in both the expected table and the rule table', () => {
+    const verdicts = [...VERDICT_VALUES].sort();
+    assert.deepEqual(Object.keys(HOLD_BY_VERDICT).sort(), verdicts);
+    assert.deepEqual(Object.keys(AGENT_VERDICT_HOLDS).sort(), verdicts);
+  });
+});
+
 // ------------------------------------------------- E: the shadow comment
 
 describe('renderShadowComment', () => {
@@ -1088,6 +1302,48 @@ describe('runAutoTrain', () => {
       },
     ]);
     assert.equal(result.held.length, 1);
+  });
+
+  test('shadow holds an approve for an older commit, and the comment says which commit', async () => {
+    const { io, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        agentVerdict: () => ({
+          status: 'read',
+          verdict: 'approve',
+          reviewedOid: OLDER_HEAD,
+        }),
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    const verdictHold = `the Agent Verdict approved \`${OLDER_HEAD.slice(0, 8)}\`, not the head \`${HEAD.slice(0, 8)}\``;
+    assert.deepEqual(result.wouldMerge, []);
+    assert.equal(result.held.length, 1);
+    assert.ok(
+      result.held[0].reason.includes(verdictHold),
+      result.held[0].reason,
+    );
+    assert.deepEqual(writes, [`comment #1 held: ${result.held[0].reason}`]);
+  });
+
+  test('shadow does not hold on the Agent Verdict when approve names the head', async () => {
+    const { io } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        tier: 'auto',
+        agentVerdict: (_pr, headRefOid) => ({
+          status: 'read',
+          verdict: 'approve',
+          reviewedOid: headRefOid,
+        }),
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.equal(result.held.length, 1, 'the other unread facts still hold');
+    assert.doesNotMatch(result.held[0].reason, /Agent Verdict/);
+    assert.equal(result.held[0].reason, NOT_READ.qaReport);
   });
 });
 

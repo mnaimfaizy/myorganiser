@@ -38,7 +38,7 @@ import {
   AUTO_MERGE_MODE_PATH,
   SHADOW_COMMENT_MARKER,
   TRAIN_BASE,
-  UNREAD_AGENT_VERDICT,
+  agentVerdictFromView,
   UNREAD_QA_REPORT,
   UNREAD_REVIEW_TIER,
   mainCiFromRuns,
@@ -62,6 +62,7 @@ import {
   isMain,
   parseArgs,
 } from '../review/cli.ts';
+import type { ReviewComment } from '../review/escaped-defects.ts';
 
 const bail = cannotRun('merge-train');
 
@@ -208,7 +209,18 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
         ]),
       ),
     reviewTier: () => UNREAD_REVIEW_TIER,
-    agentVerdict: () => UNREAD_AGENT_VERDICT,
+    agentVerdict: (pr) => {
+      const view = ghJsonOrNull([
+        'pr',
+        'view',
+        String(pr),
+        '--repo',
+        repository,
+        '--json',
+        'comments',
+      ]) as { comments?: ReviewComment[] } | null;
+      return agentVerdictFromView(view);
+    },
     qaReport: () => UNREAD_QA_REPORT,
     upsertShadowComment: (pr, body) => {
       if (login === undefined) login = viewerLogin();

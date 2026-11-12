@@ -22,6 +22,13 @@
  * Run the tests with: node --test tools/scripts/lib/merge-train.test.ts
  */
 
+import {
+  readTrustedReview,
+  type ReviewComment,
+  type ReviewOutcome,
+  type ReviewRead,
+} from '../review/escaped-defects.ts';
+import type { Verdict } from '../review/schema.ts';
 import type { ReviewTier } from './review-tier.ts';
 
 /** The branch the train merges into, and whose ruleset it reads. */
@@ -592,8 +599,79 @@ export type { ReviewTier };
 /** The Review Tier recorded for the head. */
 export type ReviewTierFact = MissingFact | { status: 'read'; tier: ReviewTier };
 
-/** The Agent Verdict for the head. No reader yet, so always missing. */
-export type AgentVerdictFact = MissingFact;
+/**
+ * The Agent Verdict from the code-review summary comment. `read` carries the
+ * verdict and the full commit that summary reviewed (`null` when the comment
+ * does not name one in full); no comment, a no-verdict heading, or one nothing
+ * recognises is `missing`.
+ */
+export type AgentVerdictFact =
+  | MissingFact
+  | { status: 'read'; verdict: Verdict; reviewedOid: string | null };
+
+/**
+ * Why each verdict that is not `approve` holds (ADR 0148 decision 3; ADR
+ * 0053). `approve` has no row: it holds only when it reviewed another commit.
+ */
+export const AGENT_VERDICT_HOLDS = {
+  approve: null,
+  comment: 'the Agent Verdict is comment, not approve',
+  'request-changes': 'the Agent Verdict is request-changes',
+} as const satisfies Record<Verdict, string | null>;
+
+/** The fact when `gh` could not read the Pull Request's comments at all. */
+export const AGENT_VERDICT_UNREADABLE: AgentVerdictFact = {
+  status: 'missing',
+  reason:
+    'the Agent Verdict could not be read (no code-review summary comment)',
+};
+
+/**
+ * Why a summary with no verdict holds, per outcome (ADR 0053). `passed` and
+ * `blocked` always carry a verdict, so they never reach this table.
+ */
+const NO_VERDICT_REASONS = {
+  passed: 'the code-review summary carries a verdict',
+  blocked: 'the code-review summary carries a verdict',
+  'no-verdict': 'the code-review summary has no verdict',
+  unrecognised: 'the code-review summary heading is not recognised',
+  unreviewed: 'there is no code-review summary comment',
+} as const satisfies Record<ReviewOutcome, string>;
+
+/** The fact for what the review reader found (`readTrustedReview`). */
+export function agentVerdictFrom(read: ReviewRead): AgentVerdictFact {
+  if (read.verdict !== null)
+    return {
+      status: 'read',
+      verdict: read.verdict,
+      reviewedOid: read.reviewedOid,
+    };
+  return { status: 'missing', reason: NO_VERDICT_REASONS[read.outcome] };
+}
+
+/**
+ * The fact for `gh pr view --json comments` output: `null` (the call failed)
+ * is unreadable, and only the publisher's own, unminimised summary counts.
+ */
+export function agentVerdictFromView(
+  view: { comments?: ReviewComment[] } | null,
+): AgentVerdictFact {
+  if (!view) return AGENT_VERDICT_UNREADABLE;
+  return agentVerdictFrom(readTrustedReview(view.comments ?? []));
+}
+
+const agentVerdictHold = (
+  fact: AgentVerdictFact,
+  head: string,
+): string | null => {
+  if (fact.status === 'missing') return fact.reason;
+  const hold = AGENT_VERDICT_HOLDS[fact.verdict];
+  if (hold) return hold;
+  if (fact.reviewedOid === head) return null;
+  return fact.reviewedOid === null
+    ? 'the Agent Verdict does not name the commit it reviewed'
+    : `the Agent Verdict approved \`${fact.reviewedOid.slice(0, 8)}\`, not the head \`${head.slice(0, 8)}\``;
+};
 
 /** The QA Report for the head. No reader yet, so always missing. */
 export type QaReportFact = MissingFact;
@@ -626,7 +704,7 @@ export interface AutoMergeFacts {
 
 export type AutoMergeFactName = Exclude<keyof AutoMergeFacts, 'headRefOid'>;
 
-/** This slice's readers for the facts with no reader yet. Each one holds. */
+/** Readers for the facts with no reader yet. Each one holds. */
 export const UNREAD_REVIEW_TIER: ReviewTierFact = {
   status: 'missing',
   reason: 'the Review Tier is not read yet (no per-head record)',
@@ -709,7 +787,8 @@ export const AUTO_MERGE_RULES = {
       : fact.tier === 'human'
         ? 'the Review Tier is human'
         : null,
-  agentVerdict: (fact: AgentVerdictFact): string | null => fact.reason,
+  agentVerdict: (fact: AgentVerdictFact, head: string): string | null =>
+    agentVerdictHold(fact, head),
   qaReport: (fact: QaReportFact): string | null => fact.reason,
   door: (fact: DoorFact): string | null =>
     fact.status === 'one-way'
@@ -718,7 +797,10 @@ export const AUTO_MERGE_RULES = {
         ? DOOR_UNREADABLE_REASON
         : null,
 } as const satisfies {
-  [K in AutoMergeFactName]: (fact: AutoMergeFacts[K]) => string | null;
+  [K in AutoMergeFactName]: (
+    fact: AutoMergeFacts[K],
+    head: string,
+  ) => string | null;
 };
 
 /** The held reason every candidate gets while the setting is `off`. */
@@ -780,8 +862,9 @@ export function autoMergeHolds(facts: AutoMergeFacts): string[] {
   const judge = <K extends AutoMergeFactName>(name: K) => {
     const rule = AUTO_MERGE_RULES[name] as (
       fact: AutoMergeFacts[K],
+      head: string,
     ) => string | null;
-    const reason = rule(facts[name]);
+    const reason = rule(facts[name], facts.headRefOid);
     if (reason) holds.push(reason);
   };
   for (const name of Object.keys(AUTO_MERGE_RULES) as AutoMergeFactName[]) {

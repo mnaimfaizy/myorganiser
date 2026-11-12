@@ -30,7 +30,12 @@
  * `gh`, and exits.
  */
 
-import { NO_VERDICT_HEADING, SUMMARY_MARKER } from './publish.ts';
+import {
+  NO_VERDICT_HEADING,
+  REVIEWED_COMMIT_LEAD,
+  SUMMARY_AUTHOR_LOGIN,
+  SUMMARY_MARKER,
+} from './publish.ts';
 import type { Verdict } from './schema.ts';
 import { VERDICT_VALUES, verdictHeading } from './schema.ts';
 
@@ -154,37 +159,87 @@ const HEADING_TO_VERDICT = new Map(
   VERDICT_VALUES.map((verdict) => [verdictHeading(verdict), verdict]),
 );
 
+/** One issue comment, in the shape `gh pr view --json comments` returns. */
+export interface ReviewComment {
+  body?: string | null;
+  author?: { login?: string | null } | null;
+  isMinimized?: boolean | null;
+}
+
+const REVIEWED_COMMIT_RE = new RegExp(
+  `${REVIEWED_COMMIT_LEAD} \`([0-9a-f]{40})\``,
+);
+
+/**
+ * The commit a summary says it reviewed: the full 40-character SHA the
+ * publisher writes. A header from before the publisher wrote it in full (7
+ * characters) is `null`; it is never matched by prefix.
+ */
+const reviewedOidOf = (body: string): string | null =>
+  REVIEWED_COMMIT_RE.exec(body)?.[1] ?? null;
+
+/** What a Pull Request's review summary says. */
+export interface ReviewRead {
+  outcome: ReviewOutcome;
+  verdict: Verdict | null;
+  /** The full commit the summary reviewed; null when it does not name one in full. */
+  reviewedOid: string | null;
+}
+
+/** What the last of `summaries` says; the shape both readers share. */
+const readSummary = (summaries: ReviewComment[]): ReviewRead => {
+  if (summaries.length === 0)
+    return { outcome: 'unreviewed', verdict: null, reviewedOid: null };
+  const body = String(summaries.at(-1)!.body ?? '');
+  const reviewedOid = reviewedOidOf(body);
+  for (const [heading, verdict] of HEADING_TO_VERDICT) {
+    if (body.includes(heading))
+      return { outcome: VERDICT_OUTCOMES[verdict], verdict, reviewedOid };
+  }
+  if (body.includes(NO_VERDICT_HEADING))
+    return { outcome: 'no-verdict', verdict: null, reviewedOid };
+  return { outcome: 'unrecognised', verdict: null, reviewedOid };
+};
+
+const summariesOf = (comments: ReviewComment[] = []): ReviewComment[] =>
+  comments.filter(
+    (c) =>
+      String(c?.body ?? '').includes(SUMMARY_MARKER) && c?.isMinimized !== true,
+  );
+
 /**
  * What one Pull Request's comments say about its review.
  *
  * Input is every issue comment on the Pull Request, oldest first — the shape
  * `gh` returns. Only comments carrying the publisher's summary marker are
- * read; the last of them is the current review, because the publisher posts
- * a new summary per run and marks the previous one outdated rather than
- * deleting it.
+ * read, and a minimised one is skipped (the publisher minimises a superseded
+ * summary); the last of the rest is the current review, because the publisher
+ * posts a new summary per run.
  *
  * An unknown heading is `unrecognised`, never `passed`. The publisher's
  * format is the only thing that says a review happened at all, and guessing
  * on an unfamiliar one would add fabricated passes to the denominator.
  *
+ * This reader does not check who wrote the comment: it feeds a measurement,
+ * not a decision. A decision uses `readTrustedReview`.
+ *
  * @param comments every issue comment on the Pull Request, oldest first
  */
 export const parseReviewOutcome = (
-  comments: { body?: string | null }[] = [],
-): { outcome: ReviewOutcome; verdict: Verdict | null } => {
-  const summaries = (comments ?? []).filter((c) =>
-    String(c?.body ?? '').includes(SUMMARY_MARKER),
+  comments: ReviewComment[] = [],
+): ReviewRead => readSummary(summariesOf(comments));
+
+/**
+ * The same read, for a decision (Auto-merge, ADR 0148): only a comment the
+ * publisher's identity wrote counts. Anyone who can comment can paste the
+ * marker, a heading and a SHA, so text alone is not a fact.
+ */
+export const readTrustedReview = (comments: ReviewComment[] = []): ReviewRead =>
+  readSummary(
+    summariesOf(comments).filter(
+      (c) => c.author?.login === SUMMARY_AUTHOR_LOGIN,
+    ),
   );
-  if (summaries.length === 0) return { outcome: 'unreviewed', verdict: null };
-  const body = String(summaries.at(-1)!.body ?? '');
-  for (const [heading, verdict] of HEADING_TO_VERDICT) {
-    if (body.includes(heading))
-      return { outcome: VERDICT_OUTCOMES[verdict], verdict };
-  }
-  if (body.includes(NO_VERDICT_HEADING))
-    return { outcome: 'no-verdict', verdict: null };
-  return { outcome: 'unrecognised', verdict: null };
-};
 
 /**
  * A reference a fix names as the origin of the defect: a Pull Request, or a

@@ -11,11 +11,12 @@ import {
   classifyFix,
   parseReviewOutcome,
   parseRootCause,
+  readTrustedReview,
   renderMeasurement,
   summarize,
 } from './escaped-defects.ts';
 import {
-  NO_VERDICT_HEADING,
+  SUMMARY_AUTHOR_LOGIN,
   SUMMARY_MARKER,
   rejectedBody,
   summaryBody,
@@ -308,12 +309,24 @@ const summaryFor = (verdict: Verdict) =>
     runUrl: 'https://example.invalid/run/1',
   });
 
+// The header names the commit the summary reviewed, in full. The auto-merge
+// decision compares that SHA with the head, so it must round-trip exactly.
 test('every verdict the contract can compute is read back from a real summary', () => {
   for (const verdict of VERDICT_VALUES) {
     const read = parseReviewOutcome([{ body: summaryFor(verdict) }]);
     assert.equal(read.verdict, verdict);
     assert.equal(read.outcome, VERDICT_OUTCOMES[verdict]);
+    assert.equal(read.reviewedOid, 'b'.repeat(40));
   }
+});
+
+test('a rejected report keeps the commit it was rejected for', () => {
+  const body = rejectedBody({
+    reason: 'x',
+    headSha: 'c'.repeat(40),
+    runUrl: 'https://example.invalid/run/3',
+  });
+  assert.equal(parseReviewOutcome([{ body }]).reviewedOid, 'c'.repeat(40));
 });
 
 // `Agent Verdict` fails only on request-changes (ADR 0073), so a `comment`
@@ -333,16 +346,47 @@ test('a rejected report is no-verdict, which is not a pass', () => {
   assert.deepEqual(parseReviewOutcome([{ body }]), {
     outcome: 'no-verdict',
     verdict: null,
+    reviewedOid: 'c'.repeat(40),
   });
 });
 
 test('a Pull Request with no summary comment was never reviewed', () => {
   assert.deepEqual(
     parseReviewOutcome([{ body: 'LGTM' }, { body: 'thanks!' }]),
-    { outcome: 'unreviewed', verdict: null },
+    { outcome: 'unreviewed', verdict: null, reviewedOid: null },
   );
   assert.equal(parseReviewOutcome([]).outcome, 'unreviewed');
   assert.equal(parseReviewOutcome().outcome, 'unreviewed');
+});
+
+// The publisher minimises a superseded summary. A minimised summary is not the
+// current review, and it must not be read as one.
+test('a minimised summary is skipped, so an earlier live one still decides', () => {
+  const read = parseReviewOutcome([
+    { body: summaryFor('approve') },
+    { body: summaryFor('request-changes'), isMinimized: true },
+  ]);
+  assert.equal(read.verdict, 'approve');
+  assert.equal(read.reviewedOid, 'b'.repeat(40));
+});
+
+test('a Pull Request whose only summary is minimised was never reviewed', () => {
+  assert.deepEqual(
+    parseReviewOutcome([{ body: summaryFor('approve'), isMinimized: true }]),
+    { outcome: 'unreviewed', verdict: null, reviewedOid: null },
+  );
+});
+
+// A header from before the publisher wrote the SHA in full names a 7-character
+// prefix. That is not a commit the decision can compare, so it is null, and it
+// is never matched by prefix against the head.
+test('a legacy 7-character header names no full commit', () => {
+  const legacy = summaryFor('approve').replace('b'.repeat(40), 'b'.repeat(7));
+  assert.deepEqual(parseReviewOutcome([{ body: legacy }]), {
+    outcome: 'passed',
+    verdict: 'approve',
+    reviewedOid: null,
+  });
 });
 
 test('the latest summary decides, not the first', () => {
@@ -360,18 +404,61 @@ test('an unreadable summary is unrecognised, never passed', () => {
   const read = parseReviewOutcome([
     { body: `${SUMMARY_MARKER}\n\n# Code review — Looks fine to me\n` },
   ]);
-  assert.deepEqual(read, { outcome: 'unrecognised', verdict: null });
+  assert.deepEqual(read, {
+    outcome: 'unrecognised',
+    verdict: null,
+    reviewedOid: null,
+  });
 });
 
-test('the parser reads the publisher, not a second copy of its wording', () => {
-  assert.ok(summaryFor('approve').includes(verdictHeading('approve')));
-  assert.ok(
-    rejectedBody({
-      reason: 'x',
-      headSha: 'd'.repeat(40),
-      runUrl: 'u',
-    }).includes(NO_VERDICT_HEADING),
-  );
+// ---------------------------------------------------------------------------
+// The trusted read: a decision counts only what the publisher's identity wrote
+// ---------------------------------------------------------------------------
+
+const byPublisher = (body: string) => ({
+  body,
+  author: { login: SUMMARY_AUTHOR_LOGIN },
+});
+const byStranger = (body: string) => ({
+  body,
+  author: { login: 'someone-else' },
+});
+
+// Anyone who can comment can paste the marker, a heading and a full SHA. The
+// decision must not take a forgery posted after the real summary as the review.
+test('a forged summary posted after the real one is ignored by the trusted read', () => {
+  const comments = [
+    byPublisher(summaryFor('request-changes')),
+    byStranger(summaryFor('approve')),
+  ];
+  const trusted = readTrustedReview(comments);
+  assert.equal(trusted.verdict, 'request-changes');
+  assert.equal(trusted.outcome, 'blocked');
+  assert.equal(trusted.reviewedOid, 'b'.repeat(40));
+  // The measurement reader does not check the author; the decision does.
+  assert.equal(parseReviewOutcome(comments).verdict, 'approve');
+});
+
+test('a forged summary with no real one behind it is unreviewed to the decision', () => {
+  assert.deepEqual(readTrustedReview([byStranger(summaryFor('approve'))]), {
+    outcome: 'unreviewed',
+    verdict: null,
+    reviewedOid: null,
+  });
+});
+
+test('a summary with no author is ignored by the trusted read but read by the measurement', () => {
+  const comments = [{ body: summaryFor('approve') }];
+  assert.equal(readTrustedReview(comments).outcome, 'unreviewed');
+  assert.equal(parseReviewOutcome(comments).verdict, 'approve');
+});
+
+test("the trusted read takes the publisher's latest summary, and a minimised one does not count", () => {
+  const read = readTrustedReview([
+    byPublisher(summaryFor('approve')),
+    { ...byPublisher(summaryFor('request-changes')), isMinimized: true },
+  ]);
+  assert.equal(read.verdict, 'approve');
 });
 
 // ---------------------------------------------------------------------------
