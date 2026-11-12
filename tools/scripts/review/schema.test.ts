@@ -942,3 +942,53 @@ test('cost is optional and rendered when present', () => {
     /1\.2k in \/ 300 out tokens/,
   );
 });
+
+// ADR 0149. A none spec that found an issue and judged the change its design
+// record names that issue, and the report says so; an issue spec cannot carry
+// the mark, and a plain none spec is unchanged.
+test('a none spec naming its design record validates, and the report says which issue', () => {
+  const report = normalizeReport(
+    envelope({
+      spec: {
+        kind: 'none',
+        foundBy: 'none',
+        designRecordFor: '#1405',
+        reason: 'design record: a docs-only change for #1405',
+      },
+    }),
+  );
+  assert.equal(report.spec.designRecordFor, '#1405');
+  assert.match(
+    renderReport(report, null, { hunks: false }),
+    /- spec: none \(design record for #1405, not its implementation\) \(tightened to review:human\)/,
+  );
+});
+
+test('an issue spec cannot carry a design-record mark', () => {
+  rejects(
+    envelope({
+      spec: {
+        kind: 'issue',
+        ref: '#1405',
+        foundBy: 'branch',
+        designRecordFor: '#1405',
+      },
+    }),
+    /designRecordFor: only a none spec names the issue it is a design record for/,
+  );
+});
+
+test('a plain none spec is unchanged, and renders as before', () => {
+  const report = normalizeReport(
+    envelope({ spec: { kind: 'none', foundBy: 'none' } }),
+  );
+  assert.deepEqual(report.spec, { kind: 'none', foundBy: 'none' });
+  assert.match(
+    renderReport(report, null, { hunks: false }),
+    /- spec: none \(tightened to review:human\)/,
+  );
+  assert.doesNotMatch(
+    renderReport(report, null, { hunks: false }),
+    /design record/,
+  );
+});
