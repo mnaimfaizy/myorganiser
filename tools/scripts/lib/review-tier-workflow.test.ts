@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { jobBlock, stepNamed } from './workflow-yaml.ts';
+import { ifOf, jobBlock, stepNamed } from './workflow-yaml.ts';
 
 const REVIEW_TIER = readFileSync('.github/workflows/review-tier.yml', 'utf8');
 const CODE_REVIEW = readFileSync('.github/workflows/code-review.yml', 'utf8');
@@ -147,4 +147,24 @@ test('release-pr.yml is the only workflow that opens a Pull Request', () => {
     [...push[1].matchAll(/^\s*-\s*'([^']+)'/gm)].map((m) => m[1]),
     ['release/v*'],
   );
+});
+
+// The per-commit record the Merge Train reads (#1526): published from the same
+// repository only, and a publish error never fails the required check. A fork's
+// token cannot write, so a fork Pull Request has no record and the train reads
+// it as human.
+test('the Review Tier record is published same-repo only and never fails the job', () => {
+  const classify = jobBlock(REVIEW_TIER, 'classify');
+  const publish = stepNamed(classify, 'Publish the Review Tier record');
+  assert.match(
+    publish,
+    /continue-on-error:\s*true/,
+    'a failed record write is logged and the train then reads human; it must not fail the check',
+  );
+  assert.match(
+    ifOf(publish) ?? '',
+    /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
+    'a fork token cannot write the comment',
+  );
+  assert.match(publish, /publish-review-tier-record\.ts/);
 });

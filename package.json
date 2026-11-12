@@ -130,6 +130,7 @@
     "review:escaped:measure": "node tools/scripts/review/measure-escaped-defects.ts",
     "review:noise:measure": "node tools/scripts/review/measure-noise.ts",
     "ci:duration:measure": "node tools/scripts/ci/measure-ci-duration.ts",
+    "merge-train:shadow:measure": "node tools/scripts/ci/measure-shadow-record.ts",
     "merge:train": "node tools/scripts/ci/merge-train.ts",
     "review:concurrency:check": "node tools/scripts/check-review-concurrency.ts",
     "review:pages:check": "node tools/scripts/check-review-pages.ts",

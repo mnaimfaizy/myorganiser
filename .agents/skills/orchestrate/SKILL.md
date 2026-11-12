@@ -11,7 +11,7 @@ This session becomes the **Chief of Staff** for the work named. It owns four thi
 
 The Chief of Staff is still the human's main agent. A question, a lookup or a handful of tool calls it answers itself.
 
-**Never** merge, force-push, change repository settings, or destroy a branch, worktree or checkpoint without the human's yes.
+**Never** merge (except the `--auto` pass in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), whose comments are the train's own writes under [ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)), force-push, change repository settings, or destroy a branch, worktree or checkpoint without the human's yes.
 
 Invoke it as `/orchestrate` (Codex: `$orchestrate`):
 
@@ -113,7 +113,7 @@ When a Delegation stops, read its report and log, then check them against its br
 - every write that speaks as the human;
 - anything that widens scope, adds a Delegation, or spends something notable, such as a download, a large batch of CI runs, or a paid service;
 - any finding the Delegation and the Chief of Staff disagree on;
-- every merge.
+- every merge except that `--auto` pass.
 
 **Writes as the human.** The Chief of Staff makes them, never a Delegation. The one exception is a `dispatch-agents` run's own status labels and completion comment, which that tool writes by design ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). That covers issue comments, `## Maintainer Review` notes, new issues, label changes and closing issues. Show each `## Maintainer Review` and post it only after the human approves its exact text. Make routine writes under the kinds the plan approved, and list each one in the next report. Post a Delegation's draft word for word, then tell the Delegation it is done. A decision recorded only in a Pull Request is invisible to the spec reviewer and to `dispatch-agents`, which read only the issue body, the brief and `## Maintainer Review` ([ADR 0137](../../../docs/adr/0137-an-issue-is-specified-by-its-body-and-its-trusted-triage-brief.md)). Record each answer there.
 
@@ -147,7 +147,7 @@ Close out through the existing Skills: `finish-standalone-runs` for Standalone R
 3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed". For a PRD, the QA Report on the Pull Request gives the headline and links the QA Plan Issue's Execution record, which stays the full record;
 4. `git merge-tree` against `main` is clean.
 
-When every Delegation is Ready to Merge, give the human one merge order, built by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), as a `yarn merge:train <pr> …` command ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
+When every Delegation is Ready to Merge, build the merge order by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), run `yarn merge:train --auto <pr> …` over it, and end as that section ends: a plain `yarn merge:train <pr> …` for every Pull Request the pass did not merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md), [ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)). A PRD Pull Request's QA Report carries no header the train can read yet, so it always comes back held.
 
 After the human merges:
 

@@ -84,6 +84,15 @@ export interface PublicationPlan {
 
 export const SUMMARY_MARKER = '<!-- code-review-report -->';
 /**
+ * The login `gh` reports for the summary comment's author. The workflow
+ * posts it with `GITHUB_TOKEN`, i.e. as `github-actions[bot]` in REST; the
+ * GraphQL view `gh pr view --json comments` returns, which the reader uses,
+ * drops the `[bot]` suffix (read from #1522).
+ */
+export const SUMMARY_AUTHOR_LOGIN = 'github-actions';
+/** The line the header opens with; the full reviewed commit follows in backticks. */
+export const REVIEWED_COMMIT_LEAD = 'Automated code review of';
+/**
  * The heading a summary carries when the reviewer produced nothing usable.
  * Named rather than inlined for the same reason `verdictHeading` is: the
  * escaped-defect measurement reads this line back out of a merged Pull
@@ -147,7 +156,7 @@ const header = ({
 }): string =>
   [
     SUMMARY_MARKER,
-    `<sub>Automated code review of \`${headSha.slice(0, 7)}\` · [run](${runUrl}) · findings are JSON validated by \`tools/scripts/review/schema.ts\`; the verdict below is computed, never written (ADR 0071).</sub>`,
+    `<sub>${REVIEWED_COMMIT_LEAD} \`${headSha}\` · [run](${runUrl}) · findings are JSON validated by \`tools/scripts/review/schema.ts\`; the verdict below is computed, never written (ADR 0071).</sub>`,
     '',
   ].join('\n');
 

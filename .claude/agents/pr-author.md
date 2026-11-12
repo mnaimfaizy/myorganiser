@@ -135,6 +135,7 @@ MERGE-BASE: <full SHA from step 3>
 Rules:
 
 - Omit any section that would be empty. `## Merge danger` is never empty: every body carries it.
+- The Door value is exactly `one-way` or `two-way`. What follows it is either nothing or a space, an em dash (`—`), a space, and text (`two-way — the migration drops a column`); never a period, comma, colon, or hyphen straight after the value (`**Door:** two-way. The branch adds …` is unreadable to the Merge Train and holds the Pull Request). Before returning, re-read the `**Door:**` line of your draft against this.
 - A visual in Changes is fenced with a language tag (`diff`, `text`, or `mermaid`). It is the only fenced block the body may contain besides commands in Test plan.
 - `TITLE:` is required, one line, no surrounding quotes, conventional-commit style preferred (`feat(scope): …`, `fix(scope): …`).
 - `LABELS:` is optional. When present it is one line, comma-separated Surface Labels from `tools/config/github-labels.json`, no surrounding quotes.
