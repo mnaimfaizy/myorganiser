@@ -30,7 +30,7 @@
  *     'a3f9c2…'` failed PR #1513. This rule asserts the one direction that bit:
  *     a literal of 16+ characters from the base64/hex alphabet, bound by `=`
  *     or `:` to a name carrying a secret word. It passes only an allow-list of
- *     visibly non-random shapes (periodic with a period of 8 or less, a mostly
+ *     visibly non-random shapes (one character repeated, a mostly
  *     sequential run, a one-case word block of 12 or fewer repeated, or base64
  *     of words of 12 letters or fewer and numbers of 6 digits or fewer joined
  *     by separators), so any other shape fails closed, because nothing in a
@@ -42,7 +42,10 @@
  *     `Bearer <token>`), or base64 of short random words joined by separators
  *     is not caught, so this rule does not replace GitGuardian. It reads the
  *     raw text, comments included, and a secret word inside a longer name
- *     (`monkey`) counts: both err toward a false alarm, never a miss.
+ *     (`monkey`) counts: both err toward a false alarm, never a miss. A
+ *     multi-character block repeated is not on the allow-list: GitGuardian
+ *     flagged `'0f1e2d3c'` written out four times as a 32-character literal on
+ *     PR #1517.
  *   - apps/web-e2e specs: not asserted here at all. Their structural rules
  *     are a judgment call TestReviewer makes by reading the file against
  *     .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
@@ -383,7 +386,8 @@ function isRepeatedWord(value: string): boolean {
 
 /**
  * 16+ characters of the base64/hex alphabet that are not on the allow-list of
- * visibly non-random shapes: periodic, sequential, a repeated one-case word
+ * visibly non-random shapes: one character repeated (`AAAA…==`), sequential,
+ * a repeated one-case word
  * (`WRAPPEDKEYWRAPPEDKEY`), or base64 of readable text. Everything
  * else counts as random, so a new encoding fails closed.
  */
@@ -391,7 +395,7 @@ function looksRandom(value: string): boolean {
   return (
     /^[A-Za-z0-9+/]{16,}={0,2}$/.test(value) &&
     !isRepeatedWord(value) &&
-    !isPeriodic(value) &&
+    !isPeriodic(value, 1) &&
     !isSequential(value) &&
     !isReadableBase64(value)
   );
@@ -405,7 +409,7 @@ function checkRandomLookingFixtures(raw: string, findings: Finding[]) {
       level: 'error',
       rule: 'random-looking-fixture',
       line: lineOf(raw, match.index),
-      message: `${name} is bound to a random-looking literal. GitGuardian fails a Pull Request on that shape even in a test. Use a value that is visibly not random — a repeated block such as '0f1e2d3c0f1e2d3c', or a readable sentinel such as 'SYNTH-TOKEN-1' — see docs/testing/README.md#credentials-in-test-fixtures.`,
+      message: `${name} is bound to a random-looking literal. GitGuardian fails a Pull Request on that shape even in a test. Use a value that is visibly not random — a readable sentinel such as 'SYNTH-TOKEN-1', or a value built at runtime such as '0f1e2d3c'.repeat(4) — see docs/testing/README.md#credentials-in-test-fixtures.`,
     });
   }
 }

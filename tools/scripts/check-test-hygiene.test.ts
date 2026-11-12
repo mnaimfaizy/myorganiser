@@ -613,7 +613,7 @@ const RANDOM_HEX_64 = [
   'e9a7d3b1',
 ].join('');
 const RANDOM_MIXED_24 = ['Qx4mR9tL', 'p2vHnWc8', 'eYk3Fj7N'].join('');
-// A block of 9 characters: one past the period-8 exemption, so it must flag.
+// A block of 9 characters: a repeated block longer than one character is random-looking.
 const PERIOD_9_BLOCK = ['a3f9c2b1', 'd'].join('');
 
 interface ReportedFinding {
@@ -750,8 +750,9 @@ test('flags base64 of a random mixed-case string under access_token in a Contrac
 // Jest specs whose bound value is random-looking in a shape the rule must still
 // catch: mixed-case letters with no digit; base64 of random text, which decodes
 // to one unbroken run, or to a run split by a separator that is not itself
-// readable; a period-9 block, just past the period-8 exemption; and a
-// 17-character hex value, not a multiple of four, so not base64 at all.
+// readable; a period-8 and a period-9 block, since only a one-character repeat
+// is exempt; and a 17-character hex value, not a multiple of four, so not
+// base64 at all.
 const FLAGGED_FIXTURES: [string, string, string][] = [
   [
     'a mixed-case letters-only value bound to SECRET_KEY',
@@ -787,6 +788,11 @@ const FLAGGED_FIXTURES: [string, string, string][] = [
     'a 17-character random hex value bound to SECRET_KEY',
     'SECRET_KEY',
     `const SECRET_KEY = '${['a3f9c2d8', 'e1b74f6a', '9'].join('')}';`,
+  ],
+  [
+    'a period-8 block repeated four times bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${['0f1e2d3c', '0f1e2d3c', '0f1e2d3c', '0f1e2d3c'].join('')}';`,
   ],
   [
     'a random lowercase one-case value bound to SECRET_KEY',
@@ -840,8 +846,8 @@ for (const [shape, name, binding] of FLAGGED_FIXTURES) {
 // the fixture itself was accepted.
 const EXEMPT_FIXTURES: [string, string][] = [
   [
-    'a periodic value (period 8) bound to SECRET_KEY',
-    `const SECRET_KEY = '${['0f1e2d3c', '0f1e2d3c', '0f1e2d3c', '0f1e2d3c'].join('')}';`,
+    'a period-8 block written with .repeat(), below the 16-character floor (declared residue)',
+    "const SECRET_KEY = '0f1e2d3c'.repeat(4);",
   ],
   [
     'a sequential run bound to apiKey',
