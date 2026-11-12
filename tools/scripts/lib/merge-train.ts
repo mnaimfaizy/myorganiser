@@ -29,7 +29,20 @@ import {
   type ReviewRead,
 } from '../review/escaped-defects.ts';
 import type { Verdict } from '../review/schema.ts';
-import type { ReviewTier } from './review-tier.ts';
+import { sep } from 'node:path';
+
+import {
+  assertPathMap,
+  humanRuleFor,
+  REVIEW_TIER_PATHS_CONFIG,
+  type ReviewTier,
+  type ReviewTierPathMap,
+} from './review-tier.ts';
+import {
+  parseReviewTierRecord,
+  isReviewTierRecordBody,
+} from './review-tier-record.ts';
+import { SUMMARY_AUTHOR_LOGIN } from '../review/publish.ts';
 
 /** The branch the train merges into, and whose ruleset it reads. */
 export const TRAIN_BASE = 'main';
@@ -600,6 +613,150 @@ export type { ReviewTier };
 export type ReviewTierFact = MissingFact | { status: 'read'; tier: ReviewTier };
 
 /**
+ * The fact for `gh pr view --json comments` output: the record the Review
+ * Tier workflow posted for `head` (#1526). Only a comment its own login wrote
+ * counts, an outdated (minimised) one does not, and the latest wins. No
+ * record, one for another commit, or one that does not parse is `missing`,
+ * which holds like human with the reason named. The label is never read.
+ */
+export function reviewTierFromView(
+  view: { comments?: ReviewComment[] } | null,
+  head: string,
+): ReviewTierFact {
+  if (!view)
+    return {
+      status: 'missing',
+      reason: 'the Review Tier record could not be read',
+    };
+  const own = (view.comments ?? []).filter(
+    (c) =>
+      c.author?.login === SUMMARY_AUTHOR_LOGIN &&
+      !c.isMinimized &&
+      isReviewTierRecordBody(c.body),
+  );
+  const latest = own.at(-1);
+  if (!latest)
+    return {
+      status: 'missing',
+      reason: 'there is no Review Tier record for this Pull Request',
+    };
+  const record = parseReviewTierRecord(latest.body);
+  if (!record)
+    return {
+      status: 'missing',
+      reason: 'the Review Tier record is malformed',
+    };
+  if (record.headRefOid !== head)
+    return {
+      status: 'missing',
+      reason: `the Review Tier record is for \`${record.headRefOid.slice(0, 8)}\`, not the head \`${head.slice(0, 8)}\``,
+    };
+  return { status: 'read', tier: record.tier };
+}
+
+/** One file of a Pull Request, as `gh api pulls/N/files` returns it. */
+export interface ChangedFile {
+  filename: string;
+  previous_filename?: string | null;
+}
+
+/**
+ * The path guard (#1526, at the human's direction): the Review Tier record
+ * comes from the Pull Request's own tree, so a Pull Request that edits the
+ * path map, the classifier or the workflow could classify itself. The train
+ * therefore checks the changed files against the human rules of `main`'s own
+ * path map, which that Pull Request has not changed. `unreadable` is a map or
+ * file list the train could not read.
+ */
+export type PathGuardFact =
+  | { status: 'clear' }
+  | { status: 'matched'; path: string; rule: string }
+  | { status: 'unreadable'; reason: string };
+
+/** `gh api --paginate pulls/N/files --jq '.[] | {…}'` output as the fact reads it; null when it failed or does not parse. */
+export function changedFilesFromGh(result: {
+  status: number;
+  stdout: string;
+}): ChangedFile[] | null {
+  if (result.status !== 0) return null;
+  try {
+    return result.stdout
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as ChangedFile);
+  } catch {
+    return null;
+  }
+}
+
+/** What one `git` call returned; a spawn that never produced a status is 1. */
+export interface GitResult {
+  status: number | null;
+  stdout: string | null;
+}
+
+/**
+ * `main`'s path map, read from `main` itself and never from the working
+ * tree: fetch, then `git show origin/main:<the map>`. A failed fetch (no show
+ * is run), a failed show, or a map that does not validate is null, which
+ * holds every candidate. `git` is injected so the branches are testable.
+ */
+export function readPathMapFromGit(
+  git: (args: string[]) => GitResult,
+): ReviewTierPathMap | null {
+  const ok = (result: GitResult) => (result.status ?? 1) === 0;
+  if (!ok(git(['fetch', '--quiet', 'origin', TRAIN_BASE]))) return null;
+  // The config constant is already repo-relative (git wants a posix path).
+  const path = REVIEW_TIER_PATHS_CONFIG.split(sep).join('/');
+  const shown = git(['show', `origin/${TRAIN_BASE}:${path}`]);
+  if (!ok(shown)) return null;
+  try {
+    return assertPathMap(
+      JSON.parse(shown.stdout ?? ''),
+      `origin/${TRAIN_BASE}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** GitHub lists at most this many files of a Pull Request. */
+export const PULL_FILES_LIMIT = 3000;
+
+/**
+ * The fact from the Pull Request's files and `main`'s path map. A renamed
+ * file counts under both its new and its old path.
+ */
+export function pathGuardFrom(
+  files: readonly ChangedFile[] | null,
+  map: ReviewTierPathMap | null,
+): PathGuardFact {
+  if (!map)
+    return {
+      status: 'unreadable',
+      reason: `the path map of \`${TRAIN_BASE}\` could not be read`,
+    };
+  if (!files)
+    return {
+      status: 'unreadable',
+      reason: "the Pull Request's changed files could not be read",
+    };
+  if (files.length >= PULL_FILES_LIMIT)
+    return {
+      status: 'unreadable',
+      reason: `the Pull Request changes ${PULL_FILES_LIMIT} files or more, more than GitHub lists`,
+    };
+  for (const file of files) {
+    for (const path of [file.filename, file.previous_filename]) {
+      if (!path) continue;
+      const rule = humanRuleFor(map, path);
+      if (rule) return { status: 'matched', path, rule: rule.id };
+    }
+  }
+  return { status: 'clear' };
+}
+
+/**
  * The Agent Verdict from the code-review summary comment. `read` carries the
  * verdict and the full commit that summary reviewed (`null` when the comment
  * does not name one in full); no comment, a no-verdict heading, or one nothing
@@ -697,6 +854,7 @@ export interface AutoMergeFacts {
   mainCi: MainCiFact;
   requiredChecks: RequiredChecksFact;
   reviewTier: ReviewTierFact;
+  pathGuard: PathGuardFact;
   agentVerdict: AgentVerdictFact;
   qaReport: QaReportFact;
   door: DoorFact;
@@ -786,6 +944,12 @@ export const AUTO_MERGE_RULES = {
       ? fact.reason
       : fact.tier === 'human'
         ? 'the Review Tier is human'
+        : null,
+  pathGuard: (fact: PathGuardFact): string | null =>
+    fact.status === 'unreadable'
+      ? fact.reason
+      : fact.status === 'matched'
+        ? `\`${fact.path}\` matches the human rule "${fact.rule}" in the path map of \`${TRAIN_BASE}\``
         : null,
   agentVerdict: (fact: AgentVerdictFact, head: string): string | null =>
     agentVerdictHold(fact, head),
@@ -987,6 +1151,10 @@ export interface AutoTrainIo extends TrainIo {
   /** The latest completed `push` run of CI on `main`. */
   mainCi(): MainCiFact;
   reviewTier(pr: number, headRefOid: string): ReviewTierFact;
+  /** The Pull Request's changed files; null when `gh` could not list them. */
+  changedFiles(pr: number): ChangedFile[] | null;
+  /** The path map as `main` has it, not the working tree's; null when unreadable. */
+  mainPathMap(): ReviewTierPathMap | null;
   agentVerdict(pr: number, headRefOid: string): AgentVerdictFact;
   qaReport(pr: number, headRefOid: string): QaReportFact;
   /** Posts the shadow comment, or edits the one already there; false on failure. */
@@ -1055,6 +1223,7 @@ export async function runAutoTrain(
     return result;
   }
   const mainCi = io.mainCi();
+  const mainPathMap = io.mainPathMap();
   const factsFor = (
     pr: number,
     snapshot: PullRequestSnapshot,
@@ -1064,6 +1233,7 @@ export async function runAutoTrain(
     mainCi,
     requiredChecks,
     reviewTier: io.reviewTier(pr, snapshot.headRefOid),
+    pathGuard: pathGuardFrom(io.changedFiles(pr), mainPathMap),
     agentVerdict: io.agentVerdict(pr, snapshot.headRefOid),
     qaReport: io.qaReport(pr, snapshot.headRefOid),
     door: readDoor(snapshot.body),

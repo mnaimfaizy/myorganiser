@@ -227,6 +227,26 @@ const compileRules = (map: ReviewTierPathMap): CompiledRule[] =>
 const matchRule = (rules: readonly CompiledRule[], path: string) =>
   rules.find((rule) => rule.matchers.some((re) => re.test(path)));
 
+/**
+ * The first rule of `map` that marks `path` human, in rule order, or null.
+ * Unlike the classifier's first-match-wins it looks at every human rule: a
+ * file an earlier, lower rule also matches is still a human file. The Merge
+ * Train uses it against `main`'s own map (#1526).
+ */
+export function humanRuleFor(
+  map: ReviewTierPathMap,
+  path: string,
+): ReviewTierRule | null {
+  const normal = path.replace(/\\/g, '/');
+  return (
+    map.rules.find(
+      (rule) =>
+        rule.tier === 'human' &&
+        rule.patterns.some((glob) => globToRegExp(glob).test(normal)),
+    ) ?? null
+  );
+}
+
 /** The part of the Nx project graph the classifier reads. */
 export interface ReviewTierGraph {
   nodes?: Record<

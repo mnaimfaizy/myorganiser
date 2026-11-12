@@ -9,7 +9,12 @@ import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { SUMMARY_AUTHOR_LOGIN, summaryBody } from '../review/publish.ts';
+import type { ReviewComment } from '../review/escaped-defects.ts';
+import {
+  SUMMARY_AUTHOR_LOGIN,
+  SUMMARY_MARKER,
+  summaryBody,
+} from '../review/publish.ts';
 import type { Verdict } from '../review/schema.ts';
 import { VERDICT_VALUES, verdictHeading } from '../review/schema.ts';
 
@@ -32,13 +37,17 @@ import {
   agentVerdictFrom,
   agentVerdictFromView,
   autoMergeHolds,
+  changedFilesFromGh,
   checksOnCurrentHead,
   decideAutoMerge,
   mainCiFromRuns,
   parseAutoMergeMode,
+  pathGuardFrom,
+  readPathMapFromGit,
   readDoor,
   renderAutoTrainResult,
   renderShadowComment,
+  reviewTierFromView,
   runAutoTrain,
   type AgentVerdictFact,
   type AutoMergeDecision,
@@ -47,12 +56,25 @@ import {
   type AutoTrainIo,
   type AutoTrainResult,
   type CheckRun,
+  type ChangedFile,
   type MainCiFact,
   type MergeMethod,
+  type GitResult,
   type MissingFact,
+  type PathGuardFact,
   type PullRequestSnapshot,
   type ReviewTier,
+  type ReviewTierFact,
 } from './merge-train.ts';
+import {
+  loadPathMap,
+  REVIEW_TIER_PATHS_CONFIG,
+  type ReviewTierPathMap,
+} from './review-tier.ts';
+import {
+  renderReviewTierRecord,
+  REVIEW_TIER_RECORD_MARKER,
+} from './review-tier-record.ts';
 
 const REPO_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -60,6 +82,8 @@ const REPO_ROOT = join(
   '..',
   '..',
 );
+/** The committed path map, read as `main` would have it (the fake's default). */
+const REAL_PATH_MAP = loadPathMap(join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG));
 const PR_AUTHOR_TEMPLATE = '.github/agents/pr-author.agent.md';
 const DOOR_PLACEHOLDER =
   '<one-way or two-way> — <for one-way: the part a revert does not undo>';
@@ -128,6 +152,7 @@ const facts = (overrides: Partial<AutoMergeFacts> = {}): AutoMergeFacts => ({
   mainCi: MAIN_GREEN,
   requiredChecks: { status: 'green' },
   reviewTier: UNREAD_REVIEW_TIER,
+  pathGuard: { status: 'clear' },
   agentVerdict: UNREAD_AGENT_VERDICT,
   qaReport: UNREAD_QA_REPORT,
   door: { status: 'absent' },
@@ -170,6 +195,12 @@ interface AutoFakeOptions {
   commentRefusals?: Set<number>;
   /** When set, the Agent Verdict reads as this; otherwise it is unread. */
   agentVerdict?: (pr: number, headRefOid: string) => AgentVerdictFact;
+  /** When set, the Review Tier reads as this, and `tier` is ignored. */
+  reviewTierFact?: (pr: number, headRefOid: string) => ReviewTierFact;
+  /** The changed files of a Pull Request; none (clear) by default. */
+  changedFiles?: (pr: number) => ChangedFile[] | null;
+  /** `main`'s path map; the committed one by default. */
+  pathMap?: ReviewTierPathMap | null;
 }
 
 const fakeAutoIo = (
@@ -181,6 +212,9 @@ const fakeAutoIo = (
     tier,
     commentRefusals = new Set<number>(),
     agentVerdict = () => UNREAD_AGENT_VERDICT,
+    reviewTierFact,
+    changedFiles = () => [],
+    pathMap = REAL_PATH_MAP,
   }: AutoFakeOptions = {},
 ) => {
   const reads = new Map<number, number>();
@@ -188,7 +222,8 @@ const fakeAutoIo = (
   const log: string[] = [];
   const comments = new Map<number, string>();
   const created: number[] = [];
-  const counts = { read: 0, mainCi: 0 };
+  const counts = { read: 0, mainCi: 0, mainPathMap: 0 };
+  const changedFilesAsked: number[] = [];
   let clock = 0;
 
   const io: AutoTrainIo = {
@@ -218,7 +253,18 @@ const fakeAutoIo = (
       counts.mainCi += 1;
       return mainCi;
     },
-    reviewTier: () => (tier ? { status: 'read', tier } : UNREAD_REVIEW_TIER),
+    reviewTier: (pr, headRefOid) => {
+      if (reviewTierFact) return reviewTierFact(pr, headRefOid);
+      return tier ? { status: 'read', tier } : UNREAD_REVIEW_TIER;
+    },
+    changedFiles: (pr) => {
+      changedFilesAsked.push(pr);
+      return changedFiles(pr);
+    },
+    mainPathMap: () => {
+      counts.mainPathMap += 1;
+      return pathMap;
+    },
     agentVerdict,
     qaReport: () => UNREAD_QA_REPORT,
     upsertShadowComment: (pr, body) => {
@@ -237,6 +283,7 @@ const fakeAutoIo = (
     comments,
     created,
     counts,
+    changedFilesAsked,
     readsOf: (pr: number) => reads.get(pr) ?? 0,
   };
 };
@@ -1416,5 +1463,700 @@ describe('renderAutoTrainResult', () => {
         'Shadow comment not written: #3.',
       ].join('\n'),
     );
+  });
+});
+
+// ------------------------------------- F: the Review Tier record (#1526)
+
+const OTHER_HEAD = 'c'.repeat(40);
+
+/**
+ * One comment as `gh pr view --json comments` returns it. The workflow posts
+ * as `github-actions[bot]`; GraphQL, which the train reads, drops the suffix,
+ * so the login is `SUMMARY_AUTHOR_LOGIN`. The body is the publisher's render.
+ */
+const recordComment = (
+  headRefOid: string,
+  tier: ReviewTier,
+  overrides: Partial<ReviewComment> = {},
+): ReviewComment => ({
+  author: { login: SUMMARY_AUTHOR_LOGIN },
+  isMinimized: false,
+  body: renderReviewTierRecord(headRefOid, tier),
+  ...overrides,
+});
+
+/** Bodies the writer never produces, each with the marker and nothing valid. */
+const MALFORMED_RECORD_BODIES: [string, string][] = [
+  ['a marker with no record line', `${REVIEW_TIER_RECORD_MARKER}\nnothing`],
+  [
+    'a record with no commit',
+    `${REVIEW_TIER_RECORD_MARKER}\nReview Tier of: \`auto\``,
+  ],
+  [
+    'a record with an unknown tier',
+    `${REVIEW_TIER_RECORD_MARKER}\nReview Tier of \`${HEAD}\`: \`maybe\``,
+  ],
+  [
+    'a record with a short commit',
+    `${REVIEW_TIER_RECORD_MARKER}\nReview Tier of \`${HEAD.slice(0, 8)}\`: \`auto\``,
+  ],
+];
+
+const NO_RECORD_REASON = 'there is no Review Tier record for this Pull Request';
+const MALFORMED_REASON = 'the Review Tier record is malformed';
+
+describe('reviewTierFromView: the record as the train reads it', () => {
+  test('a record the workflow wrote reads back as its tier, for auto, agent and human', () => {
+    for (const tier of ['auto', 'agent', 'human'] as const) {
+      assert.deepEqual(
+        reviewTierFromView({ comments: [recordComment(HEAD, tier)] }, HEAD),
+        { status: 'read', tier },
+        tier,
+      );
+    }
+  });
+
+  test('a record for another commit names both commits and reads missing', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        { comments: [recordComment(OTHER_HEAD, 'auto')] },
+        HEAD,
+      ),
+      {
+        status: 'missing',
+        reason:
+          'the Review Tier record is for `cccccccc`, not the head `aaaaaaaa`',
+      },
+    );
+  });
+
+  test('a malformed record reads missing as malformed, whichever way it is malformed', () => {
+    for (const [name, body] of MALFORMED_RECORD_BODIES) {
+      assert.deepEqual(
+        reviewTierFromView(
+          {
+            comments: [
+              {
+                author: { login: SUMMARY_AUTHOR_LOGIN },
+                isMinimized: false,
+                body,
+              },
+            ],
+          },
+          HEAD,
+        ),
+        { status: 'missing', reason: MALFORMED_REASON },
+        name,
+      );
+    }
+  });
+
+  test('no record, a record for another commit and a malformed record each read missing with a different reason, and each holds the merge', () => {
+    const malformed: ReviewComment = {
+      author: { login: SUMMARY_AUTHOR_LOGIN },
+      isMinimized: false,
+      body: MALFORMED_RECORD_BODIES[1][1],
+    };
+    const reads = [
+      reviewTierFromView(null, HEAD),
+      reviewTierFromView({ comments: [] }, HEAD),
+      reviewTierFromView(
+        { comments: [recordComment(OTHER_HEAD, 'auto')] },
+        HEAD,
+      ),
+      reviewTierFromView({ comments: [malformed] }, HEAD),
+    ];
+    const reasons = reads.map(missingReason);
+    assert.equal(new Set(reasons).size, reasons.length, reasons.join(' | '));
+    for (const fact of reads) {
+      const decision = decideAutoMerge(facts({ reviewTier: fact }), 'shadow');
+      assert.equal(decision.held, true);
+      assert.ok(decision.reason.includes(missingReason(fact)), decision.reason);
+    }
+  });
+
+  test('a null view reads missing with the unreadable reason', () => {
+    assert.deepEqual(reviewTierFromView(null, HEAD), {
+      status: 'missing',
+      reason: 'the Review Tier record could not be read',
+    });
+  });
+
+  test('a view with no comments key reads missing as no record', () => {
+    assert.deepEqual(reviewTierFromView({}, HEAD), {
+      status: 'missing',
+      reason: NO_RECORD_REASON,
+    });
+  });
+
+  test('a forged record by another author after the real one is ignored', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'agent'),
+            recordComment(HEAD, 'auto', { author: { login: 'mallory' } }),
+          ],
+        },
+        HEAD,
+      ),
+      { status: 'read', tier: 'agent' },
+    );
+  });
+
+  test('a forged record by another author before the real one is ignored', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'auto', { author: { login: 'mallory' } }),
+            recordComment(HEAD, 'human'),
+          ],
+        },
+        HEAD,
+      ),
+      { status: 'read', tier: 'human' },
+    );
+  });
+
+  test('a forged record with no real record reads as no record', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'auto', { author: { login: 'mallory' } }),
+          ],
+        },
+        HEAD,
+      ),
+      { status: 'missing', reason: NO_RECORD_REASON },
+    );
+  });
+
+  test('a minimised record is ignored, and the record before it stands', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'agent'),
+            recordComment(HEAD, 'auto', { isMinimized: true }),
+          ],
+        },
+        HEAD,
+      ),
+      { status: 'read', tier: 'agent' },
+    );
+  });
+
+  test('a minimised record alone reads as no record', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        { comments: [recordComment(HEAD, 'auto', { isMinimized: true })] },
+        HEAD,
+      ),
+      { status: 'missing', reason: NO_RECORD_REASON },
+    );
+  });
+
+  test('the latest own record wins: a later record for another commit hides an earlier one for this head', () => {
+    assert.deepEqual(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'agent'),
+            recordComment(HEAD, 'human'),
+          ],
+        },
+        HEAD,
+      ),
+      { status: 'read', tier: 'human' },
+    );
+    assert.equal(
+      reviewTierFromView(
+        {
+          comments: [
+            recordComment(HEAD, 'auto'),
+            recordComment(OTHER_HEAD, 'auto'),
+          ],
+        },
+        HEAD,
+      ).status,
+      'missing',
+    );
+  });
+});
+
+describe('reviewTierFromView: a code-review summary that quotes a record', () => {
+  test('is not the record: alone it reads missing, and beside the real record it does not override it', () => {
+    const summary = recordComment(HEAD, 'auto', {
+      body: `${SUMMARY_MARKER}\nAutomated code review of \`${HEAD}\`\n\n${renderReviewTierRecord(HEAD, 'auto')}`,
+    });
+    assert.deepEqual(reviewTierFromView({ comments: [summary] }, HEAD), {
+      status: 'missing',
+      reason: NO_RECORD_REASON,
+    });
+    assert.deepEqual(
+      reviewTierFromView(
+        { comments: [recordComment(HEAD, 'agent'), summary] },
+        HEAD,
+      ),
+      { status: 'read', tier: 'agent' },
+    );
+  });
+});
+
+// ------------------------------------ G: the path guard rule (#1526)
+
+const GUARD_RULE = 'gates-and-their-config';
+const GATES_FILE = 'tools/config/review-tier-paths.json';
+
+/** The held reason a changed file gives when it matches a human rule of `main`. */
+const guardHeld = (path: string, rule: string): string =>
+  `\`${path}\` matches the human rule "${rule}" in the path map of \`main\``;
+
+describe('pathGuardFrom: the changed files against the human rules of main', () => {
+  test('clear when no changed file matches a human rule, and an empty list is clear', () => {
+    assert.deepEqual(pathGuardFrom([], REAL_PATH_MAP), { status: 'clear' });
+    assert.deepEqual(
+      pathGuardFrom(
+        [{ filename: 'package.json' }, { filename: 'docs/x.md' }],
+        REAL_PATH_MAP,
+      ),
+      { status: 'clear' },
+    );
+  });
+
+  test('a file matching a human rule of the committed map is matched by that rule', () => {
+    assert.deepEqual(pathGuardFrom([{ filename: GATES_FILE }], REAL_PATH_MAP), {
+      status: 'matched',
+      path: GATES_FILE,
+      rule: GUARD_RULE,
+    });
+  });
+
+  test('a rename counts under its previous path as well as its new one', () => {
+    assert.deepEqual(
+      pathGuardFrom(
+        [{ filename: 'docs/x.md', previous_filename: GATES_FILE }],
+        REAL_PATH_MAP,
+      ),
+      { status: 'matched', path: GATES_FILE, rule: GUARD_RULE },
+    );
+    assert.deepEqual(
+      pathGuardFrom(
+        [
+          {
+            filename: '.github/workflows/ci.yml',
+            previous_filename: 'docs/x.md',
+          },
+        ],
+        REAL_PATH_MAP,
+      ),
+      {
+        status: 'matched',
+        path: '.github/workflows/ci.yml',
+        rule: 'workflows-and-ownership',
+      },
+    );
+  });
+
+  test('a null map or a null file list is unreadable, with its reason', () => {
+    assert.deepEqual(pathGuardFrom([], null), {
+      status: 'unreadable',
+      reason: 'the path map of `main` could not be read',
+    });
+    assert.deepEqual(pathGuardFrom(null, REAL_PATH_MAP), {
+      status: 'unreadable',
+      reason: "the Pull Request's changed files could not be read",
+    });
+  });
+
+  test('2999 files are still judged, and 3000 is unreadable, whatever they are', () => {
+    const prose = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        filename: `docs/page-${i}.md`,
+      }));
+    assert.deepEqual(pathGuardFrom(prose(2999), REAL_PATH_MAP), {
+      status: 'clear',
+    });
+    assert.deepEqual(pathGuardFrom(prose(3000), REAL_PATH_MAP), {
+      status: 'unreadable',
+      reason:
+        'the Pull Request changes 3000 files or more, more than GitHub lists',
+    });
+  });
+});
+
+describe('the pathGuard rule and its place in the held reasons', () => {
+  test('clear holds nothing, a match names the file and the rule, and unreadable gives its own reason', () => {
+    assert.equal(AUTO_MERGE_RULES.pathGuard({ status: 'clear' }), null);
+    assert.equal(
+      AUTO_MERGE_RULES.pathGuard({
+        status: 'matched',
+        path: GATES_FILE,
+        rule: GUARD_RULE,
+      }),
+      guardHeld(GATES_FILE, GUARD_RULE),
+    );
+    assert.equal(
+      AUTO_MERGE_RULES.pathGuard({
+        status: 'unreadable',
+        reason: 'the path map of `main` could not be read',
+      }),
+      'the path map of `main` could not be read',
+    );
+  });
+
+  test('a matched guard holds in its slot, after the Review Tier and before the Agent Verdict', () => {
+    const matched: PathGuardFact = {
+      status: 'matched',
+      path: GATES_FILE,
+      rule: GUARD_RULE,
+    };
+    const decision = decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'auto' },
+        pathGuard: matched,
+      }),
+      'shadow',
+    );
+    assert.equal(
+      decision.reason,
+      [
+        guardHeld(GATES_FILE, GUARD_RULE),
+        NOT_READ.agentVerdict,
+        NOT_READ.qaReport,
+      ].join('; '),
+    );
+  });
+});
+
+describe('the Review Tier rule: only a human tier holds', () => {
+  test('auto and agent pass their row, human holds, and a missing tier holds with its reason', () => {
+    assert.equal(
+      AUTO_MERGE_RULES.reviewTier({ status: 'read', tier: 'auto' }),
+      null,
+    );
+    assert.equal(
+      AUTO_MERGE_RULES.reviewTier({ status: 'read', tier: 'agent' }),
+      null,
+    );
+    assert.equal(
+      AUTO_MERGE_RULES.reviewTier({ status: 'read', tier: 'human' }),
+      'the Review Tier is human',
+    );
+    assert.equal(
+      AUTO_MERGE_RULES.reviewTier(UNREAD_REVIEW_TIER),
+      NOT_READ.reviewTier,
+    );
+    const human = decideAutoMerge(
+      facts({ reviewTier: { status: 'read', tier: 'human' } }),
+      'shadow',
+    );
+    assert.equal(human.held, true);
+    assert.ok(human.reason.includes('the Review Tier is human'), human.reason);
+  });
+});
+
+// ----------------------- H: runAutoTrain, the record and the path guard (#1526)
+
+/** The Review Tier fact the train reads from one `gh pr view` view. */
+const tierReadFrom =
+  (view: { comments?: ReviewComment[] }) =>
+  (_pr: number, head: string): ReviewTierFact =>
+    reviewTierFromView(view, head);
+
+const AUTO_VIEW = { comments: [recordComment(HEAD, 'auto')] };
+
+describe('runAutoTrain: the Review Tier record and the path guard', () => {
+  test('the record decides the tier whatever labels the view carries: a human record holds, an auto record does not', async () => {
+    const views: Record<
+      number,
+      { labels: { name: string }[]; comments: ReviewComment[] }
+    > = {
+      1: {
+        labels: [{ name: 'review:agent' }],
+        comments: [recordComment(HEAD, 'human')],
+      },
+      2: {
+        labels: [{ name: 'review:human' }],
+        comments: [recordComment(HEAD, 'auto')],
+      },
+    };
+    const { io, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })], 2: [snapshot({ number: 2 })] },
+      {
+        reviewTierFact: (pr, head) => reviewTierFromView(views[pr], head),
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1, 2]), io);
+
+    const humanHold = [
+      'the Review Tier is human',
+      NOT_READ.agentVerdict,
+      NOT_READ.qaReport,
+    ].join('; ');
+    assert.deepEqual(result.held, [
+      { pr: 1, reason: humanHold },
+      {
+        pr: 2,
+        reason: [NOT_READ.agentVerdict, NOT_READ.qaReport].join('; '),
+      },
+    ]);
+    assert.deepEqual(result.wouldMerge, []);
+    assert.equal(writes[0], `comment #1 held: ${humanHold}`);
+  });
+
+  test('a record that says auto is held by the path guard when the diff changes the path map', async () => {
+    const { io } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        reviewTierFact: tierReadFrom(AUTO_VIEW),
+        changedFiles: () => [{ filename: GATES_FILE }],
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.deepEqual(result.held, [
+      {
+        pr: 1,
+        reason: [
+          guardHeld(GATES_FILE, GUARD_RULE),
+          NOT_READ.agentVerdict,
+          NOT_READ.qaReport,
+        ].join('; '),
+      },
+    ]);
+  });
+
+  test('a rename out of a human path is held on the old name', async () => {
+    const { io } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        reviewTierFact: tierReadFrom(AUTO_VIEW),
+        changedFiles: () => [
+          { filename: 'docs/x.md', previous_filename: GATES_FILE },
+        ],
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.equal(result.held.length, 1);
+    assert.ok(
+      result.held[0].reason.includes(guardHeld(GATES_FILE, GUARD_RULE)),
+      result.held[0].reason,
+    );
+    assert.doesNotMatch(result.held[0].reason, /`docs\/x\.md` matches/);
+  });
+
+  test('an unreadable main path map holds every candidate, and main is read once per pass', async () => {
+    const { io, counts } = fakeAutoIo(
+      {
+        1: [snapshot({ number: 1 })],
+        2: [snapshot({ number: 2 })],
+      },
+      { pathMap: null, reviewTierFact: tierReadFrom(AUTO_VIEW) },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1, 2]), io);
+
+    assert.equal(counts.mainPathMap, 1);
+    assert.deepEqual(result.held, [
+      {
+        pr: 1,
+        reason: [
+          'the path map of `main` could not be read',
+          NOT_READ.agentVerdict,
+          NOT_READ.qaReport,
+        ].join('; '),
+      },
+      {
+        pr: 2,
+        reason: [
+          'the path map of `main` could not be read',
+          NOT_READ.agentVerdict,
+          NOT_READ.qaReport,
+        ].join('; '),
+      },
+    ]);
+  });
+
+  test('changed files that cannot be listed hold the candidate with the unreadable reason', async () => {
+    const { io } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        reviewTierFact: tierReadFrom(AUTO_VIEW),
+        changedFiles: () => null,
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.deepEqual(result.held, [
+      {
+        pr: 1,
+        reason: [
+          "the Pull Request's changed files could not be read",
+          NOT_READ.agentVerdict,
+          NOT_READ.qaReport,
+        ].join('; '),
+      },
+    ]);
+  });
+
+  test('a prose-only diff is not held by the path guard', async () => {
+    const { io } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        reviewTierFact: tierReadFrom(AUTO_VIEW),
+        changedFiles: () => [
+          { filename: 'docs/x.md' },
+          { filename: 'README.md' },
+        ],
+      },
+    );
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.deepEqual(result.held, [
+      {
+        pr: 1,
+        reason: [NOT_READ.agentVerdict, NOT_READ.qaReport].join('; '),
+      },
+    ]);
+  });
+
+  test('changed files are asked for once per candidate', async () => {
+    const { io, changedFilesAsked } = fakeAutoIo({
+      1: [snapshot({ number: 1 })],
+      2: [snapshot({ number: 2 })],
+      3: [snapshot({ number: 3 })],
+    });
+    await runAutoTrain(autoArgs('shadow', [1, 2, 3]), io);
+
+    assert.deepEqual(changedFilesAsked, [1, 2, 3]);
+  });
+});
+
+// ------------------------------- I: the gh and git readers of the guard (#1526)
+
+describe('changedFilesFromGh: the changed files as gh api lists them', () => {
+  test('a failed listing is unreadable, not an empty list', () => {
+    assert.equal(changedFilesFromGh({ status: 1, stdout: '' }), null);
+  });
+
+  test('one line that is not JSON makes the whole listing unreadable', () => {
+    assert.equal(
+      changedFilesFromGh({
+        status: 0,
+        stdout: '{"filename":"a.ts"}\nnot json',
+      }),
+      null,
+    );
+  });
+
+  test('each file keeps its previous name, and blank lines are ignored', () => {
+    assert.deepEqual(
+      changedFilesFromGh({
+        status: 0,
+        stdout:
+          '{"filename":"docs/x.md","previous_filename":"tools/config/review-tier-paths.json"}\n\n{"filename":"b.ts","previous_filename":null}\n',
+      }),
+      [
+        { filename: 'docs/x.md', previous_filename: GATES_FILE },
+        { filename: 'b.ts', previous_filename: null },
+      ],
+    );
+  });
+
+  test('an empty listing is a Pull Request with no files', () => {
+    assert.deepEqual(changedFilesFromGh({ status: 0, stdout: '' }), []);
+  });
+});
+
+describe("readPathMapFromGit: main's path map through a counting fake git", () => {
+  const committed = readFileSync(
+    join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG),
+    'utf8',
+  );
+  const FETCH = ['fetch', '--quiet', 'origin', 'main'];
+  const SHOW = ['show', 'origin/main:tools/config/review-tier-paths.json'];
+
+  /** A fake git: answers each subcommand as scripted, and records every call. */
+  const fakeGit = (answers: { fetch: GitResult; show: GitResult }) => {
+    const calls: string[][] = [];
+    const git = (args: string[]): GitResult => {
+      calls.push(args);
+      return args[0] === 'fetch' ? answers.fetch : answers.show;
+    };
+    return { git, calls };
+  };
+  const OK_FETCH: GitResult = { status: 0, stdout: '' };
+
+  test('a successful fetch and show read the committed map, with exactly those two calls', () => {
+    const { git, calls } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 0, stdout: committed },
+    });
+    assert.deepEqual(
+      readPathMapFromGit(git),
+      loadPathMap(join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG)),
+    );
+    assert.deepEqual(calls, [FETCH, SHOW]);
+  });
+
+  test('a failed fetch is no map, and no show is run', () => {
+    const { git, calls } = fakeGit({
+      fetch: { status: 1, stdout: '' },
+      show: { status: 0, stdout: committed },
+    });
+    assert.equal(readPathMapFromGit(git), null);
+    assert.deepEqual(calls, [FETCH]);
+  });
+
+  test('a failed show is no map', () => {
+    const { git, calls } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 128, stdout: '' },
+    });
+    assert.equal(readPathMapFromGit(git), null);
+    assert.deepEqual(calls, [FETCH, SHOW]);
+  });
+
+  test('a null status counts as a failure, for the fetch and for the show', () => {
+    const failedFetch = fakeGit({
+      fetch: { status: null, stdout: null },
+      show: { status: 0, stdout: committed },
+    });
+    assert.equal(readPathMapFromGit(failedFetch.git), null);
+    assert.deepEqual(failedFetch.calls, [FETCH]);
+
+    const failedShow = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: null, stdout: committed },
+    });
+    assert.equal(readPathMapFromGit(failedShow.git), null);
+  });
+
+  test('a successful show with no stdout is no map', () => {
+    const { git } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 0, stdout: null },
+    });
+    assert.equal(readPathMapFromGit(git), null);
+  });
+
+  test('a show that is not JSON is no map', () => {
+    const { git } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 0, stdout: 'not json' },
+    });
+    assert.equal(readPathMapFromGit(git), null);
+  });
+
+  test('JSON that is not a valid map is no map', () => {
+    const { git } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 0, stdout: '{"schemaVersion":2,"rules":[]}' },
+    });
+    assert.equal(readPathMapFromGit(git), null);
   });
 });

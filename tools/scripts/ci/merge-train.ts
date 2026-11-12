@@ -39,8 +39,10 @@ import {
   SHADOW_COMMENT_MARKER,
   TRAIN_BASE,
   agentVerdictFromView,
+  reviewTierFromView,
+  changedFilesFromGh,
+  readPathMapFromGit,
   UNREAD_QA_REPORT,
-  UNREAD_REVIEW_TIER,
   mainCiFromRuns,
   parseAutoMergeMode,
   parseTrainArgs,
@@ -63,6 +65,7 @@ import {
   parseArgs,
 } from '../review/cli.ts';
 import type { ReviewComment } from '../review/escaped-defects.ts';
+import type { ReviewTierPathMap } from '../lib/review-tier.ts';
 
 const bail = cannotRun('merge-train');
 
@@ -180,8 +183,8 @@ const viewerLogin = (): string | null => {
 };
 
 /**
- * The `gh`-backed AutoTrainIo. The Review Tier, the Agent Verdict and the QA
- * Report have no reader yet, so each reads as missing and holds.
+ * The `gh`-backed AutoTrainIo. The QA Report has no reader yet, so it reads
+ * as missing and holds.
  */
 export function githubAutoTrainIo(repository: string): AutoTrainIo {
   let login: string | null | undefined;
@@ -208,7 +211,30 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
           'conclusion,headSha',
         ]),
       ),
-    reviewTier: () => UNREAD_REVIEW_TIER,
+    reviewTier: (pr, head) =>
+      reviewTierFromView(
+        ghJsonOrNull([
+          'pr',
+          'view',
+          String(pr),
+          '--repo',
+          repository,
+          '--json',
+          'comments',
+        ]) as { comments?: ReviewComment[] } | null,
+        head,
+      ),
+    changedFiles: (pr) =>
+      changedFilesFromGh(
+        runGh([
+          'api',
+          '--paginate',
+          `repos/${repository}/pulls/${pr}/files`,
+          '--jq',
+          '.[] | {filename: .filename, previous_filename: .previous_filename}',
+        ]),
+      ),
+    mainPathMap: readMainPathMap,
     agentVerdict: (pr) => {
       const view = ghJsonOrNull([
         'pr',
@@ -262,6 +288,22 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
 }
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/**
+ * The path map as `main` has it, never the working tree's: a train started
+ * from a feature branch must not judge with that branch's map. A failed
+ * fetch, a missing file or a map that does not validate is null, which holds
+ * every candidate.
+ */
+const readMainPathMap = (): ReviewTierPathMap | null =>
+  readPathMapFromGit((args) => {
+    const result = spawnSync('git', args, {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return { status: result.status, stdout: result.stdout };
+  });
 
 /** The Auto-merge mode; a missing or invalid setting reads as `off`. */
 const readAutoMergeMode = () => {

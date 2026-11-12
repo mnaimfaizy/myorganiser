@@ -10,11 +10,13 @@ import {
   classifyReviewTier,
   errorResult,
   globToRegExp,
+  humanRuleFor,
   loadPathMap,
   maxTier,
   parseNumstat,
   planRelabel,
   renderReviewTierSummary,
+  type ReviewTierPathMap,
 } from './review-tier.ts';
 
 const node = (name: string, root: string, tier?: ReviewTier) => ({
@@ -362,4 +364,58 @@ test('the summary names the tier, lists every signal, and points at the checker'
   assert.match(md, /Range: `aaaaaaa\.\.bbbbbbb`/);
   for (const s of result.signals)
     assert.ok(md.includes(`| ${s.id ? `${s.kind} · ${s.id}` : s.kind} |`));
+});
+
+test('humanRuleFor finds the human rule past an earlier auto or agent rule that also matches', () => {
+  // The classifier stops at the first rule that matches (`prose`); the Merge
+  // Train's guard must still see the human rule further down (#1526).
+  const map = {
+    schemaVersion: 1,
+    rules: [
+      { id: 'prose', tier: 'auto', reason: 'docs', patterns: ['**/*.md'] },
+      { id: 'docs', tier: 'agent', reason: 'docs', patterns: ['docs/**'] },
+      { id: 'adr', tier: 'human', reason: 'adr', patterns: ['docs/adr/**'] },
+      {
+        id: 'adr-numbered',
+        tier: 'human',
+        reason: 'adr',
+        patterns: ['docs/adr/0001*.md'],
+      },
+    ],
+  } as ReviewTierPathMap;
+
+  assert.equal(humanRuleFor(map, 'docs/adr/0002-x.md')?.id, 'adr');
+  assert.equal(
+    humanRuleFor(map, 'docs\\adr\\0002-x.md')?.id,
+    'adr',
+    'a Windows separator is read as the same path',
+  );
+  assert.equal(
+    humanRuleFor(map, 'docs/adr/0001-x.md')?.id,
+    'adr',
+    'of two human rules that match, the first in rule order is named',
+  );
+});
+
+test('humanRuleFor is null for a path only non-human rules match, or no rule matches', () => {
+  const map = {
+    schemaVersion: 1,
+    rules: [
+      { id: 'prose', tier: 'auto', reason: 'docs', patterns: ['**/*.md'] },
+      { id: 'docs', tier: 'agent', reason: 'docs', patterns: ['docs/**'] },
+      { id: 'adr', tier: 'human', reason: 'adr', patterns: ['docs/adr/**'] },
+    ],
+  } as ReviewTierPathMap;
+
+  assert.equal(humanRuleFor(map, 'docs/notes.md'), null);
+  assert.equal(humanRuleFor(map, 'src/index.ts'), null);
+});
+
+test('humanRuleFor on the committed map names the gates rule, and not for an agent-only path', () => {
+  const map = loadPathMap();
+  assert.equal(
+    humanRuleFor(map, 'tools/config/review-tier-paths.json')?.id,
+    'gates-and-their-config',
+  );
+  assert.equal(humanRuleFor(map, 'package.json'), null);
 });

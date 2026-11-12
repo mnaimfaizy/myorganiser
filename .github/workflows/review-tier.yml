@@ -94,3 +94,20 @@ jobs:
         run: |
           node tools/scripts/review/apply-review-tier-label.ts \
             --pr "$PR" --label "$LABEL" --repo "$GITHUB_REPOSITORY"
+
+      # The per-commit record the Merge Train reads (ADR 0148, #1526): a marker
+      # comment naming the full head and the tier, updated in place. The label
+      # above is never read. A publish error is logged and never fails the job,
+      # so the head has no record and the train reads human. A fork's token
+      # cannot write, so a fork Pull Request has no record either.
+      - name: Publish the Review Tier record
+        if: always() && steps.classify.outputs.tier != '' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIER: ${{ steps.classify.outputs.tier }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node tools/scripts/review/publish-review-tier-record.ts \
+            --pr "$PR" --tier "$TIER" --head "$HEAD_SHA" --repo "$GITHUB_REPOSITORY"
