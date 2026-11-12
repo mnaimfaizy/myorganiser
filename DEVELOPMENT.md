@@ -426,15 +426,17 @@ Examples of existing page libraries:
 1. **Create a Feature Branch**
 
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feat/123-your-feature-name
    ```
 
-   Branch naming conventions:
-   - `feature/` - New features
-   - `fix/` - Bug fixes
-   - `docs/` - Documentation updates
-   - `refactor/` - Code refactoring
-   - `test/` - Test additions/updates
+   Name the branch `<type>/<issue-number>-<short-slug>`, where `123` above is the issue number. Omit the number only when there is no issue. The type comes from what the work does:
+   - `feat/` - New features
+   - `fix/` - Bug and security fixes
+   - `docs/` - Documentation
+   - `chore/` - Tooling, maintenance, and dependencies
+   - `ci/` - CI and workflow changes only
+
+   [AGENTS.md](AGENTS.md#branch-naming) holds the full rules, including how issue labels map to a type and which prefixes are reserved.
 
 2. **Make Your Changes**
    - Follow the existing code style
@@ -474,7 +476,7 @@ Examples of existing page libraries:
 5. **Push Your Branch**
 
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 ### Working with the Database
@@ -722,7 +724,7 @@ To create an issue:
 2. **Create a Feature Branch**
 
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feat/123-your-feature-name
    ```
 
 3. **Make Your Changes**
@@ -770,7 +772,7 @@ To create an issue:
 7. **Push Your Branch**
 
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 8. **Create the Pull Request**
@@ -833,7 +835,7 @@ To create an issue:
    # Make requested changes
    # Stage the specific files for this change (never git add .)
    corepack yarn ai:commit --message "fix: address review feedback"
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 4. **Approval and Merge**
