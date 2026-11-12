@@ -66,7 +66,7 @@ Report a blocked or crashed run and leave it alone. Sending it back to an agent 
 
 1. Run the `address-pr-review` Skill on the Pull Requests.
 2. A Pull Request is ready for QA when CI has passed, its code review covers the latest commit, and no finding is waiting on a decision. Skip it if its QA Report already names that commit.
-3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, report "no manual QA needed" and skip the run.
+3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, skip the run and post a report whose header is the `no manual QA needed` form.
 4. Schedule the plans as in [Scheduling QA sessions](#scheduling-qa-sessions), and give each one to its own QA session.
 5. Check each report against its plan before relying on it. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code.
 6. `yarn qa:run` has already combined each Before/After pair into `tmp/qa/pr-<n>/combined/` (a feature graded After only has no pair, so nothing to combine; combine a pair made by hand with `yarn qa:combine`). Show the results and list each combined QA Artifact with its path and what it shows. Offer for upload only the files `tmp/qa/pr-<n>/run.json` marks `uploadEligible`, which follow [the upload rules](#uploading-qa-artifacts): a FAIL: regression's QA Artifact stays local. Ask which to upload; the default is none.
@@ -141,12 +141,21 @@ The asset URL is `https://github.com/mnaimfaizy/myorganiser/releases/download/qa
 
 One comment per Pull Request, starting with `<!-- qa-report -->`. Update it on a re-run instead of adding another.
 
+The line right after the marker is the **header**: the Merge Train reads it to decide an Auto-merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Keep it the first non-blank line after the marker, before the `## QA Report` heading, in exactly one of these two forms:
+
+- `QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>`, or `result=failed` in the same place. The commit is the full 40-character SHA QA ran on, in lowercase. `<n>` is the number of items under Left for a person, and must equal the number of items listed there.
+- `QA Report: no manual QA needed; commit=<40-hex sha>`, when the plan left nothing to verify by hand and no run was made.
+
+A header in any other form is unparseable, and an unparseable report holds the merge. The train reads only a report posted by the login it runs as, and only the latest one.
+
 ```md
 <!-- qa-report -->
 
+QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>
+
 ## QA Report
 
-Commit: `<sha>`. Run by an agent. Result: QA passed | Failures listed below
+Run by an agent. Result: QA passed | Failures listed below
 
 | Scenario | Result | Notes |
 | -------- | ------ | ----- |
@@ -168,7 +177,7 @@ Say "QA passed" only when every scenario passed. An agent never marks a "Left fo
 
 ## Closing report
 
-Pass 2 ends with a table: one row per Pull Request, giving its state (CI, review, QA result, and the commit the QA Report names), anything left for a person, and whether its QA Report is stale. Any commit after the commit the report names makes it stale.
+Pass 2 ends with a table: one row per Pull Request, giving its state (CI, review, QA result, and the commit the QA Report names), anything left for a person, and whether its QA Report is stale. A commit written on the branch after the commit the report names makes it stale. The train's own merge of `main` into the branch does not.
 
 Then recommend a merge order. Number the Pull Requests, and give each a one-line reason. Order them by these rules, in this order:
 

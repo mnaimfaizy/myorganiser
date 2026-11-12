@@ -41,8 +41,11 @@ import {
   checksOnCurrentHead,
   decideAutoMerge,
   mainCiFromRuns,
+  onMainFromCompare,
   parseAutoMergeMode,
   pathGuardFrom,
+  prCommitsFromGh,
+  qaReportFromView,
   readPathMapFromGit,
   readDoor,
   renderAutoTrainResult,
@@ -63,9 +66,11 @@ import {
   type MissingFact,
   type PathGuardFact,
   type PullRequestSnapshot,
+  type QaReportFact,
   type ReviewTier,
   type ReviewTierFact,
 } from './merge-train.ts';
+import { type PrCommit, QA_REPORT_MARKER } from './qa-report.ts';
 import {
   loadPathMap,
   REVIEW_TIER_PATHS_CONFIG,
@@ -201,6 +206,8 @@ interface AutoFakeOptions {
   changedFiles?: (pr: number) => ChangedFile[] | null;
   /** `main`'s path map; the committed one by default. */
   pathMap?: ReviewTierPathMap | null;
+  /** The QA Report for a head; unread (missing) by default. */
+  qaReportFact?: (pr: number, headRefOid: string) => QaReportFact;
 }
 
 const fakeAutoIo = (
@@ -215,6 +222,7 @@ const fakeAutoIo = (
     reviewTierFact,
     changedFiles = () => [],
     pathMap = REAL_PATH_MAP,
+    qaReportFact = () => UNREAD_QA_REPORT,
   }: AutoFakeOptions = {},
 ) => {
   const reads = new Map<number, number>();
@@ -266,7 +274,7 @@ const fakeAutoIo = (
       return pathMap;
     },
     agentVerdict,
-    qaReport: () => UNREAD_QA_REPORT,
+    qaReport: (pr, headRefOid) => qaReportFact(pr, headRefOid),
     upsertShadowComment: (pr, body) => {
       writes.push(`comment #${pr} ${decisionLine(body)}`);
       if (commentRefusals.has(pr)) return false;
@@ -2158,5 +2166,676 @@ describe("readPathMapFromGit: main's path map through a counting fake git", () =
       show: { status: 0, stdout: '{"schemaVersion":2,"rules":[]}' },
     });
     assert.equal(readPathMapFromGit(git), null);
+  });
+});
+
+// ------------------------------------------ F: the QA Report (ADR 0148, #1527)
+
+/** The commit a report named before the head moved on (QA ran on it). */
+const FORK = '1'.repeat(40);
+const UPDATED_HEAD = 'b'.repeat(40);
+const LATER = 'd'.repeat(40);
+const MAIN_SIDE = 'e'.repeat(40);
+const QA_TRUSTED = 'train-login';
+
+const qaComment = (
+  body: string,
+  login: string = QA_TRUSTED,
+  isMinimized = false,
+): ReviewComment => ({ body, author: { login }, isMinimized });
+
+const qaHeader = (result: 'passed' | 'failed', commit: string, left = 0) =>
+  `QA Report: result=${result}; commit=${commit}; left-for-person=${left}`;
+
+/** A report comment as the Skill posts it: the marker, the header, the heading. */
+const qaReportText = (header: string) =>
+  [QA_REPORT_MARKER, '', header, '', '## QA Report'].join('\n');
+
+/** The fact for a passed report that names the commit given, with nothing left. */
+const currentPassed = (commit: string): QaReportFact => ({
+  status: 'read',
+  result: 'passed',
+  commit,
+  leftForPerson: 0,
+  staleness: { status: 'current' },
+});
+
+/** `qaReportFromView` with the train's login, the head and the reads defaulted. */
+const readQa = (
+  comments: ReviewComment[],
+  {
+    head = HEAD,
+    commits = () => [],
+    isOnMain = () => null,
+  }: {
+    head?: string;
+    commits?: () => PrCommit[] | null;
+    isOnMain?: (sha: string) => boolean | null;
+  } = {},
+): QaReportFact =>
+  qaReportFromView({ comments }, QA_TRUSTED, head, commits, isOnMain);
+
+const NO_QA_REPORT = 'there is no QA Report for this Pull Request';
+const QA_HEADER_REASON =
+  'the QA Report header is missing or not in the fixed form';
+
+describe('qaReportFromView: the QA Report as the train reads it', () => {
+  test('a passed report for the head, with nothing left, reads passed and current, and asks for no commits', () => {
+    let asked = 0;
+    const fact = readQa([qaComment(qaReportText(qaHeader('passed', HEAD)))], {
+      commits: () => {
+        asked += 1;
+        return [];
+      },
+    });
+    assert.deepEqual(fact, currentPassed(HEAD));
+    assert.equal(asked, 0, 'the head is the named commit, so no list is read');
+  });
+
+  test('a forged passing report by another login, posted after a real failing one, is ignored: the result is failed', () => {
+    const fact = readQa([
+      qaComment(qaReportText(qaHeader('failed', HEAD))),
+      qaComment(qaReportText(qaHeader('passed', HEAD)), 'someone-else'),
+    ]);
+    assert.deepEqual(fact, {
+      status: 'read',
+      result: 'failed',
+      commit: HEAD,
+      leftForPerson: 0,
+      staleness: { status: 'current' },
+    });
+  });
+
+  test('a forged report with no real report from the train reads missing as no report', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportText(qaHeader('passed', HEAD)), 'someone-else'),
+      ]),
+      { status: 'missing', reason: NO_QA_REPORT },
+    );
+  });
+
+  test('a minimised report is ignored, and the one before it stands', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportText(qaHeader('failed', HEAD))),
+        qaComment(qaReportText(qaHeader('passed', HEAD)), QA_TRUSTED, true),
+      ]),
+      {
+        status: 'read',
+        result: 'failed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a minimised report alone reads missing as no report', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportText(qaHeader('passed', HEAD)), QA_TRUSTED, true),
+      ]),
+      { status: 'missing', reason: NO_QA_REPORT },
+    );
+  });
+
+  test('the latest trusted report wins: a later failure beats an earlier pass', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportText(qaHeader('passed', HEAD))),
+        qaComment(qaReportText(qaHeader('failed', HEAD))),
+      ]),
+      {
+        status: 'read',
+        result: 'failed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a malformed latest trusted report holds: the earlier pass does not stand in for it', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportText(qaHeader('passed', HEAD))),
+        qaComment(qaReportText('QA Report: result=passed; commit=short')),
+      ]),
+      { status: 'missing', reason: QA_HEADER_REASON },
+    );
+  });
+
+  test('a marker on a later line, not the first, is not a report', () => {
+    assert.deepEqual(
+      readQa([qaComment(`Intro\n${qaReportText(qaHeader('passed', HEAD))}`)]),
+      { status: 'missing', reason: NO_QA_REPORT },
+    );
+  });
+
+  test('a null view or a null login reads missing as could not be read', () => {
+    const could = 'the QA Report could not be read';
+    assert.deepEqual(
+      qaReportFromView(
+        null,
+        QA_TRUSTED,
+        HEAD,
+        () => [],
+        () => null,
+      ),
+      { status: 'missing', reason: could },
+    );
+    assert.deepEqual(
+      qaReportFromView(
+        { comments: [qaComment(qaReportText(qaHeader('passed', HEAD)))] },
+        null,
+        HEAD,
+        () => [],
+        () => null,
+      ),
+      { status: 'missing', reason: could },
+    );
+  });
+
+  test('a report naming another commit with the commit list unreadable is missing, not current', () => {
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', OLDER_HEAD)))], {
+        commits: () => null,
+      }),
+      {
+        status: 'missing',
+        reason: "the Pull Request's commits could not be read",
+      },
+    );
+  });
+
+  test('a report naming another commit is stale when a branch commit follows it, and asks isOnMain for nothing', () => {
+    let asked = 0;
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', OLDER_HEAD)))], {
+        commits: () => [
+          { sha: FORK, parents: [] },
+          { sha: OLDER_HEAD, parents: [FORK] },
+          { sha: HEAD, parents: [OLDER_HEAD] },
+        ],
+        isOnMain: () => {
+          asked += 1;
+          return true;
+        },
+      }),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: OLDER_HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'stale', byCommit: HEAD },
+      },
+    );
+    assert.equal(asked, 0);
+  });
+
+  test('an update merge of main after the named commit is current, read through the reader', () => {
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', OLDER_HEAD)))], {
+        commits: () => [
+          { sha: FORK, parents: [] },
+          { sha: OLDER_HEAD, parents: [FORK] },
+          { sha: HEAD, parents: [OLDER_HEAD, MAIN_SIDE] },
+        ],
+        isOnMain: (sha) => sha === MAIN_SIDE,
+      }),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: OLDER_HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a report naming a commit the branch no longer has is missing, with the reason', () => {
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', OLDER_HEAD)))], {
+        commits: () => [
+          { sha: FORK, parents: [] },
+          { sha: HEAD, parents: [FORK] },
+        ],
+      }),
+      {
+        status: 'missing',
+        reason:
+          'the QA Report names `cccccccc`, which is no longer on the branch',
+      },
+    );
+  });
+});
+
+describe('prCommitsFromGh: the commit list as gh api pulls/N/commits returns it', () => {
+  test('each JSON line is one commit, with its sha and its parents', () => {
+    const stdout = [
+      JSON.stringify({ sha: HEAD, parents: [OLDER_HEAD, MAIN_SIDE] }),
+      JSON.stringify({ sha: OLDER_HEAD, parents: [] }),
+    ].join('\n');
+    assert.deepEqual(prCommitsFromGh({ status: 0, stdout }), [
+      { sha: HEAD, parents: [OLDER_HEAD, MAIN_SIDE] },
+      { sha: OLDER_HEAD, parents: [] },
+    ]);
+  });
+
+  test('a failed call is no list, even when its output parses', () => {
+    assert.equal(
+      prCommitsFromGh({
+        status: 1,
+        stdout: JSON.stringify({ sha: HEAD, parents: [] }),
+      }),
+      null,
+    );
+  });
+
+  test('one line that is not JSON makes the whole list unreadable', () => {
+    assert.equal(
+      prCommitsFromGh({
+        status: 0,
+        stdout: `${JSON.stringify({ sha: HEAD, parents: [] })}\nnot json`,
+      }),
+      null,
+    );
+  });
+
+  test('a commit with no sha, or no parents array, makes the whole list unreadable', () => {
+    assert.equal(
+      prCommitsFromGh({ status: 0, stdout: '{"parents":[]}' }),
+      null,
+    );
+    assert.equal(
+      prCommitsFromGh({ status: 0, stdout: `{"sha":"${HEAD}"}` }),
+      null,
+    );
+  });
+
+  test('an empty listing, or one of blank lines, is an empty list', () => {
+    assert.deepEqual(prCommitsFromGh({ status: 0, stdout: '' }), []);
+    assert.deepEqual(prCommitsFromGh({ status: 0, stdout: '\n\n' }), []);
+  });
+});
+
+describe('the QA Report rule: what holds the merge and what passes', () => {
+  const staleFact: QaReportFact = {
+    status: 'read',
+    result: 'passed',
+    commit: OLDER_HEAD,
+    leftForPerson: 0,
+    staleness: { status: 'stale', byCommit: UPDATED_HEAD },
+  };
+  const holds: [string, QaReportFact, string][] = [
+    [
+      'a failed report',
+      {
+        status: 'read',
+        result: 'failed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      },
+      'the QA Report records a failure',
+    ],
+    [
+      'one item left for a person, in the singular',
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 1,
+        staleness: { status: 'current' },
+      },
+      'the QA Report leaves 1 item for a person',
+    ],
+    [
+      'two items left for a person, in the plural',
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 2,
+        staleness: { status: 'current' },
+      },
+      'the QA Report leaves 2 items for a person',
+    ],
+    [
+      'a stale report, naming both short shas',
+      staleFact,
+      'the QA Report is for `cccccccc`, and the branch commit `bbbbbbbb` came after it',
+    ],
+    [
+      'a missing report, with its reason',
+      { status: 'missing', reason: NO_QA_REPORT },
+      NO_QA_REPORT,
+    ],
+  ];
+  for (const [name, fact, reason] of holds) {
+    test(`${name} holds with its reason`, () => {
+      assert.equal(AUTO_MERGE_RULES.qaReport(fact), reason);
+    });
+  }
+
+  test('a passed report with nothing left, on the head, passes', () => {
+    assert.equal(AUTO_MERGE_RULES.qaReport(currentPassed(HEAD)), null);
+  });
+
+  test('a no-manual-QA report on the head passes, with nothing left', () => {
+    assert.equal(
+      AUTO_MERGE_RULES.qaReport({
+        status: 'read',
+        result: 'none-needed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      }),
+      null,
+    );
+  });
+});
+
+describe('decideAutoMerge: the QA Report under on and shadow', () => {
+  const withQa = (qaReport: QaReportFact): AutoMergeFacts =>
+    facts({
+      reviewTier: { status: 'read', tier: 'auto' },
+      agentVerdict: { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+      qaReport,
+    });
+  const holdCases: [string, QaReportFact, string][] = [
+    [
+      'failed',
+      {
+        status: 'read',
+        result: 'failed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'current' },
+      },
+      'the QA Report records a failure',
+    ],
+    [
+      'two items left',
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 2,
+        staleness: { status: 'current' },
+      },
+      'the QA Report leaves 2 items for a person',
+    ],
+    [
+      'stale',
+      {
+        status: 'read',
+        result: 'passed',
+        commit: OLDER_HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'stale', byCommit: UPDATED_HEAD },
+      },
+      'the QA Report is for `cccccccc`, and the branch commit `bbbbbbbb` came after it',
+    ],
+    [
+      'unparseable',
+      { status: 'missing', reason: QA_HEADER_REASON },
+      QA_HEADER_REASON,
+    ],
+  ];
+  for (const mode of ['on', 'shadow'] as const) {
+    const heldAction = mode === 'on' ? 'skip' : 'shadow-comment';
+    for (const [name, fact, reason] of holdCases) {
+      test(`${mode}: ${name} holds the candidate with its reason`, () => {
+        const decision = decideAutoMerge(withQa(fact), mode);
+        assert.equal(decision.held, true);
+        assert.equal(decision.action, heldAction);
+        assert.equal(decision.reason, reason);
+      });
+    }
+    const passes: [string, QaReportFact][] = [
+      ['a passed report with nothing left', currentPassed(HEAD)],
+      [
+        'a no-manual-QA report',
+        {
+          status: 'read',
+          result: 'none-needed',
+          commit: HEAD,
+          leftForPerson: 0,
+          staleness: { status: 'current' },
+        },
+      ],
+    ];
+    for (const [name, fact] of passes) {
+      test(`${mode}: ${name} is allowed`, () => {
+        const decision = decideAutoMerge(withQa(fact), mode);
+        assert.equal(decision.held, false);
+        assert.equal(decision.reason, `every fact holds for ${HEAD}`);
+        assert.equal(
+          decision.action,
+          mode === 'on' ? 'merge' : 'shadow-comment',
+        );
+      });
+    }
+  }
+});
+
+/** Records every `merge` the train asks for, and passes it through. */
+function recordMerges(
+  io: AutoTrainIo,
+): { pr: number; headOid: string; method: MergeMethod }[] {
+  const merges: { pr: number; headOid: string; method: MergeMethod }[] = [];
+  const merge = io.merge;
+  io.merge = (pr, headOid, method) => {
+    merges.push({ pr, headOid, method });
+    return merge(pr, headOid, method);
+  };
+  return merges;
+}
+
+describe('runAutoTrain under on: the facts for each head it would merge', () => {
+  test('on merges a candidate whose every fact passes, with the head it read', async () => {
+    const { io, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        tier: 'auto',
+        agentVerdict: (_pr, headRefOid) => ({
+          status: 'read',
+          verdict: 'approve',
+          reviewedOid: headRefOid,
+        }),
+        qaReportFact: (_pr, headRefOid) => currentPassed(headRefOid),
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(result.held, []);
+    assert.deepEqual(merges, [{ pr: 1, headOid: HEAD, method: 'merge' }]);
+    assert.deepEqual(writes, ['merge #1 @a merge'], 'no update was needed');
+  });
+
+  test('after the train updates the branch from A to B, every fact is read again at B, and B is merged', async () => {
+    const seen = {
+      reviewTier: [] as string[],
+      agentVerdict: [] as string[],
+      qaReport: [] as string[],
+    };
+    const { io, writes } = fakeAutoIo(
+      {
+        1: [
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+        ],
+      },
+      {
+        reviewTierFact: (_pr, headRefOid) => {
+          seen.reviewTier.push(headRefOid);
+          return { status: 'read', tier: 'auto' };
+        },
+        agentVerdict: (_pr, headRefOid) => {
+          seen.agentVerdict.push(headRefOid);
+          return {
+            status: 'read',
+            verdict: 'approve',
+            reviewedOid: headRefOid,
+          };
+        },
+        qaReportFact: (_pr, headRefOid) => {
+          seen.qaReport.push(headRefOid);
+          return currentPassed(headRefOid);
+        },
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(seen.reviewTier, [HEAD, UPDATED_HEAD]);
+    assert.deepEqual(seen.agentVerdict, [HEAD, UPDATED_HEAD]);
+    assert.deepEqual(seen.qaReport, [HEAD, UPDATED_HEAD]);
+    assert.deepEqual(writes, ['update #1 @a', 'merge #1 @b merge']);
+    assert.deepEqual(merges, [
+      { pr: 1, headOid: UPDATED_HEAD, method: 'merge' },
+    ]);
+    assert.deepEqual(result.merged, [1]);
+  });
+
+  for (const [name, fact, reason] of [
+    [
+      'stale',
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 0,
+        staleness: { status: 'stale', byCommit: LATER },
+      } as QaReportFact,
+      `the QA Report is for \`${HEAD.slice(0, 8)}\`, and the branch commit \`${LATER.slice(0, 8)}\` came after it`,
+    ],
+    [
+      'missing',
+      {
+        status: 'missing',
+        reason: "the Pull Request's commits could not be read",
+      } as QaReportFact,
+      "the Pull Request's commits could not be read",
+    ],
+  ] as const) {
+    test(`a QA Report ${name} at the updated head holds the merge with its reason, and nothing merges`, async () => {
+      const { io, writes } = fakeAutoIo(
+        {
+          1: [
+            snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+            snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+            snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+          ],
+        },
+        {
+          tier: 'auto',
+          agentVerdict: (_pr, headRefOid) => ({
+            status: 'read',
+            verdict: 'approve',
+            reviewedOid: headRefOid,
+          }),
+          qaReportFact: (_pr, headRefOid) =>
+            headRefOid === HEAD ? currentPassed(HEAD) : fact,
+        },
+      );
+      const merges = recordMerges(io);
+      const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+      assert.deepEqual(writes, ['update #1 @a']);
+      assert.deepEqual(merges, []);
+      assert.deepEqual(result.merged, []);
+      assert.deepEqual(result.held, [{ pr: 1, reason }]);
+    });
+  }
+
+  test('an Agent Verdict that approved the pre-update head holds the candidate at the updated head, and nothing merges', async () => {
+    const { io, writes } = fakeAutoIo(
+      {
+        1: [
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+        ],
+      },
+      {
+        tier: 'auto',
+        agentVerdict: () => ({
+          status: 'read',
+          verdict: 'approve',
+          reviewedOid: HEAD,
+        }),
+        qaReportFact: (_pr, headRefOid) => currentPassed(headRefOid),
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(writes, ['update #1 @a'], 'the pre-update head passed');
+    assert.deepEqual(merges, []);
+    assert.deepEqual(result.held, [
+      {
+        pr: 1,
+        reason: `the Agent Verdict approved \`${HEAD.slice(0, 8)}\`, not the head \`${UPDATED_HEAD.slice(0, 8)}\``,
+      },
+    ]);
+  });
+});
+
+describe('onMainFromCompare: whether a commit is on main, from gh api compare', () => {
+  for (const stdout of ['behind', 'identical', 'behind\n', 'identical\n']) {
+    test(`${JSON.stringify(stdout)} at status 0 means the commit is on main`, () => {
+      assert.equal(onMainFromCompare({ status: 0, stdout }), true);
+    });
+  }
+
+  for (const stdout of [
+    'ahead',
+    'diverged',
+    'ahead\n',
+    'diverged\n',
+    'something else',
+    '',
+  ]) {
+    test(`${JSON.stringify(stdout)} at status 0 means the commit is not on main`, () => {
+      assert.equal(onMainFromCompare({ status: 0, stdout }), false);
+    });
+  }
+
+  test('a nonzero status is unknown, whatever the text says', () => {
+    assert.equal(onMainFromCompare({ status: 1, stdout: 'behind' }), null);
+    assert.equal(onMainFromCompare({ status: 1, stdout: '' }), null);
+  });
+});
+
+describe('qaReportFromView: a named commit, a main merge after it, and isOnMain unknown', () => {
+  test('the report is missing with the could-not-be-checked reason, naming the second parent', () => {
+    const fact = readQa(
+      [qaComment(qaReportText(qaHeader('passed', OLDER_HEAD)))],
+      {
+        commits: () => [
+          { sha: FORK, parents: [] },
+          { sha: OLDER_HEAD, parents: [FORK] },
+          { sha: HEAD, parents: [OLDER_HEAD, MAIN_SIDE] },
+        ],
+        isOnMain: () => null,
+      },
+    );
+    assert.equal(fact.status, 'missing');
+    assert.ok(
+      fact.status === 'missing' &&
+        fact.reason.includes('could not be checked whether') &&
+        fact.reason.includes(MAIN_SIDE.slice(0, 8)),
+      JSON.stringify(fact),
+    );
+    assert.deepEqual(fact, {
+      status: 'missing',
+      reason: `it could not be checked whether \`${MAIN_SIDE.slice(0, 8)}\` is on \`main\``,
+    });
   });
 });

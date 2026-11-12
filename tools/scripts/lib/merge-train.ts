@@ -43,6 +43,14 @@ import {
   isReviewTierRecordBody,
 } from './review-tier-record.ts';
 import { SUMMARY_AUTHOR_LOGIN } from '../review/publish.ts';
+import {
+  parseQaReport,
+  qaStaleness,
+  QA_REPORT_MARKER,
+  type PrCommit,
+  type QaResult,
+  type QaStaleness,
+} from './qa-report.ts';
 
 /** The branch the train merges into, and whose ruleset it reads. */
 export const TRAIN_BASE = 'main';
@@ -689,6 +697,45 @@ export function changedFilesFromGh(result: {
   }
 }
 
+/**
+ * `gh api --paginate pulls/N/commits --jq '.[] | {sha, parents}'` output; null
+ * when it failed or does not parse. The endpoint lists at most 250 commits, so
+ * a longer branch lacks its head and the staleness check holds.
+ */
+export function prCommitsFromGh(result: {
+  status: number;
+  stdout: string;
+}): PrCommit[] | null {
+  if (result.status !== 0) return null;
+  try {
+    const commits = result.stdout
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as PrCommit);
+    return commits.every(
+      (c) => typeof c.sha === 'string' && Array.isArray(c.parents),
+    )
+      ? commits
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `gh api compare/main...<sha> -q .status` output as "is the commit on
+ * `main`": `behind` or `identical` means it is an ancestor of `main`. A failed
+ * call is null, which the staleness check turns into a hold.
+ */
+export function onMainFromCompare(result: {
+  status: number;
+  stdout: string;
+}): boolean | null {
+  return result.status === 0
+    ? ['behind', 'identical'].includes(result.stdout.trim())
+    : null;
+}
+
 /** What one `git` call returned; a spawn that never produced a status is 1. */
 export interface GitResult {
   status: number | null;
@@ -830,8 +877,80 @@ const agentVerdictHold = (
     : `the Agent Verdict approved \`${fact.reviewedOid.slice(0, 8)}\`, not the head \`${head.slice(0, 8)}\``;
 };
 
-/** The QA Report for the head. No reader yet, so always missing. */
-export type QaReportFact = MissingFact;
+/**
+ * The QA Report for the head: what it records, and whether a commit written
+ * on the branch has followed the commit it names (ADR 0148 decision 7).
+ */
+export type QaReportFact =
+  | MissingFact
+  | {
+      status: 'read';
+      result: QaResult;
+      commit: string;
+      leftForPerson: number;
+      staleness: Exclude<QaStaleness, { status: 'unknown' }>;
+    };
+
+/**
+ * The fact for `gh pr view --json comments` output (#1527). Only a report the
+ * train's own login wrote counts (a QA session posts as the Maintainer, so a
+ * header from anyone else is a forgery), an outdated (minimised) one does not,
+ * and the latest wins. No report, one that does not parse, or one whose
+ * staleness cannot be settled is `missing`, which holds with the reason.
+ * `commits` and `isOnMain` are asked only when the report names another
+ * commit than `head`.
+ */
+export function qaReportFromView(
+  view: { comments?: ReviewComment[] } | null,
+  trustedLogin: string | null,
+  head: string,
+  commits: () => PrCommit[] | null,
+  isOnMain: (sha: string) => boolean | null,
+): QaReportFact {
+  if (!view || !trustedLogin)
+    return { status: 'missing', reason: 'the QA Report could not be read' };
+  const own = (view.comments ?? []).filter(
+    (c) =>
+      c.author?.login === trustedLogin &&
+      !c.isMinimized &&
+      c.body?.split(/\r?\n/, 1)[0]?.trim() === QA_REPORT_MARKER,
+  );
+  const latest = own.at(-1);
+  if (!latest)
+    return {
+      status: 'missing',
+      reason: 'there is no QA Report for this Pull Request',
+    };
+  const header = parseQaReport(latest.body);
+  if (!header)
+    return {
+      status: 'missing',
+      reason: 'the QA Report header is missing or not in the fixed form',
+    };
+  let staleness: QaStaleness = { status: 'current' };
+  if (header.commit !== head) {
+    const list = commits();
+    if (!list)
+      return {
+        status: 'missing',
+        reason: "the Pull Request's commits could not be read",
+      };
+    staleness = qaStaleness(header.commit, head, list, isOnMain);
+  }
+  if (staleness.status === 'unknown')
+    return { status: 'missing', reason: staleness.reason };
+  return { status: 'read', ...header, staleness };
+}
+
+const qaReportHold = (fact: QaReportFact): string | null => {
+  if (fact.status === 'missing') return fact.reason;
+  if (fact.result === 'failed') return 'the QA Report records a failure';
+  if (fact.staleness.status === 'stale')
+    return `the QA Report is for \`${fact.commit.slice(0, 8)}\`, and the branch commit \`${fact.staleness.byCommit.slice(0, 8)}\` came after it`;
+  return fact.leftForPerson > 0
+    ? `the QA Report leaves ${fact.leftForPerson} item${fact.leftForPerson === 1 ? '' : 's'} for a person`
+    : null;
+};
 
 /**
  * The Merge Danger Door line, read exactly as PrAuthor writes it. `absent`
@@ -953,7 +1072,7 @@ export const AUTO_MERGE_RULES = {
         : null,
   agentVerdict: (fact: AgentVerdictFact, head: string): string | null =>
     agentVerdictHold(fact, head),
-  qaReport: (fact: QaReportFact): string | null => fact.reason,
+  qaReport: (fact: QaReportFact): string | null => qaReportHold(fact),
   door: (fact: DoorFact): string | null =>
     fact.status === 'one-way'
       ? 'the Merge Danger Door is one-way'

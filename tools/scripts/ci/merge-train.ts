@@ -42,7 +42,9 @@ import {
   reviewTierFromView,
   changedFilesFromGh,
   readPathMapFromGit,
-  UNREAD_QA_REPORT,
+  onMainFromCompare,
+  prCommitsFromGh,
+  qaReportFromView,
   mainCiFromRuns,
   parseAutoMergeMode,
   parseTrainArgs,
@@ -182,10 +184,7 @@ const viewerLogin = (): string | null => {
     : null;
 };
 
-/**
- * The `gh`-backed AutoTrainIo. The QA Report has no reader yet, so it reads
- * as missing and holds.
- */
+/** The `gh`-backed AutoTrainIo. */
 export function githubAutoTrainIo(repository: string): AutoTrainIo {
   let login: string | null | undefined;
   return {
@@ -247,7 +246,41 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
       ]) as { comments?: ReviewComment[] } | null;
       return agentVerdictFromView(view);
     },
-    qaReport: () => UNREAD_QA_REPORT,
+    qaReport: (pr, head) => {
+      if (login === undefined) login = viewerLogin();
+      return qaReportFromView(
+        ghJsonOrNull([
+          'pr',
+          'view',
+          String(pr),
+          '--repo',
+          repository,
+          '--json',
+          'comments',
+        ]) as { comments?: ReviewComment[] } | null,
+        login,
+        head,
+        () =>
+          prCommitsFromGh(
+            runGh([
+              'api',
+              '--paginate',
+              `repos/${repository}/pulls/${pr}/commits`,
+              '--jq',
+              '.[] | {sha: .sha, parents: [.parents[].sha]}',
+            ]),
+          ),
+        (sha) =>
+          onMainFromCompare(
+            runGh([
+              'api',
+              `repos/${repository}/compare/${TRAIN_BASE}...${sha}`,
+              '-q',
+              '.status',
+            ]),
+          ),
+      );
+    },
     upsertShadowComment: (pr, body) => {
       if (login === undefined) login = viewerLogin();
       if (!login) return false;
