@@ -467,6 +467,55 @@ describe('readDoor', () => {
   });
 });
 
+// The Door line PrAuthor writes must stay readable by the strict reader.
+describe('the PrAuthor template Door lines', () => {
+  const template = readFileSync(join(REPO_ROOT, PR_AUTHOR_TEMPLATE), 'utf8');
+  const BAD_DOOR = '**Door:** two-way. ';
+  const doorLines = template
+    .split('\n')
+    .filter((line) => line.startsWith('**Door:**'));
+
+  test('the template has at least one line that starts with **Door:**', () => {
+    assert.ok(doorLines.length > 0, 'a **Door:** line at the start of a line');
+  });
+
+  for (const line of doorLines) {
+    test(`"${line}" reads as a one-way or two-way Door fact`, () => {
+      const filled = line.replace(DOOR_PLACEHOLDER, 'two-way');
+      const fact = readDoor(`## Merge danger\n${filled}\n`);
+      assert.ok(
+        fact.status === 'one-way' || fact.status === 'two-way',
+        `expected a read Door fact, got ${JSON.stringify(fact)}`,
+      );
+    });
+  }
+
+  test('the bad Door form appears only inside inline code, and the strict reader holds it', () => {
+    const occurrences: number[] = [];
+    for (
+      let at = template.indexOf(BAD_DOOR);
+      at !== -1;
+      at = template.indexOf(BAD_DOOR, at + 1)
+    ) {
+      occurrences.push(at);
+    }
+    assert.ok(occurrences.length > 0, 'the rule names the bad Door form');
+    for (const at of occurrences) {
+      assert.equal(
+        template[at - 1],
+        '`',
+        'the bad Door form is quoted in inline code',
+      );
+    }
+    const example = /`(\*\*Door:\*\* two-way\. [^`]*)`/.exec(template)?.[1];
+    assert.ok(example, 'the quoted example is extractable');
+    assert.deepEqual(readDoor(`## Merge danger\n${example}\n`), {
+      status: 'unreadable',
+      line: example,
+    });
+  });
+});
+
 // --------------------------------------------------------- C: main's CI
 
 describe('mainCiFromRuns', () => {
