@@ -426,7 +426,7 @@ describe('useSubscriptionsPage', () => {
       });
     });
 
-    it('shows the records the save resolved with, when a contended save merged in another writer’s record', async () => {
+    it('saves its own list in one call and renders the records the save resolves with, including one another tab stored', async () => {
       // The Vault merged a record another device stored meanwhile into the write.
       jest
         .mocked(saveVaultRecords)
@@ -445,6 +445,7 @@ describe('useSubscriptionsPage', () => {
         });
       });
 
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
       expect(saveVaultRecords).toHaveBeenCalledWith(
         handle,
         'subscriptions',

@@ -61,7 +61,7 @@ describe('createProductionTasksVaultAdapter', () => {
   });
 
   describe('saveTasks', () => {
-    it('saves tasks with preserved deletion log', async () => {
+    it('saves tasks merged with the stored tasks, keeping the deletion log', async () => {
       const task = makeTask({ id: 'task-1' });
       const storedEnvelope = {
         records: [task],
@@ -78,15 +78,47 @@ describe('createProductionTasksVaultAdapter', () => {
       const newTask = makeTask({ id: 'task-2', title: 'New task' });
       const written = await adapter.saveTasks([newTask]);
 
-      expect(written).toEqual([newTask]);
+      // The stored task is kept beside the saved one: the save merges, it does not replace.
+      expect(written).toEqual([task, newTask]);
       expect(mockHandle.saveEncryptedData).toHaveBeenCalledWith({
         type: 'tasks',
         expectedCiphertext: STORED_BLOB,
         value: {
-          records: [newTask],
+          records: [task, newTask],
           deletions: { removed: '2024-01-01T00:00:00.000Z' },
         },
       });
+    });
+
+    it('saveTasks from a stale list keeps a task another tab stored', async () => {
+      // Another tab stored task-a after this list was read, so the list saved here does not hold it.
+      const stored = makeTask({
+        id: 'task-a',
+        title: 'Added on another tab',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-03-01T00:00:00.000Z',
+      });
+      const mine = makeTask({ id: 'task-b', title: 'Saved from stale list' });
+      (
+        mockHandle.loadDecryptedDataWithCiphertext as jest.Mock
+      ).mockResolvedValue({
+        value: { records: [stored], deletions: {} },
+        ciphertext: STORED_BLOB,
+      });
+      (mockHandle.saveEncryptedData as jest.Mock).mockResolvedValue(undefined);
+
+      const adapter = createProductionTasksVaultAdapter(
+        mockHandle as VaultHandle,
+      );
+      const written = await adapter.saveTasks([mine]);
+
+      expect(mockHandle.saveEncryptedData).toHaveBeenCalledTimes(1);
+      expect(mockHandle.saveEncryptedData).toHaveBeenCalledWith({
+        type: 'tasks',
+        expectedCiphertext: STORED_BLOB,
+        value: { records: [stored, mine], deletions: {} },
+      });
+      expect(written).toEqual([stored, mine]);
     });
   });
 
