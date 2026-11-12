@@ -5,7 +5,7 @@
 //
 //   node tools/scripts/ci/merge-train.ts <pr>… \
 //     [--method merge|squash|rebase] [--poll 30] [--timeout 45] \
-//     [--repository <owner/name>] [--dry-run]
+//     [--repository <owner/name>] [--dry-run] [--auto]
 //
 // For each Pull Request, in the order given: if `main` has moved past it,
 // bring the branch up to date; wait for every required check of `main`'s
@@ -21,15 +21,35 @@
 // Exit 0 when every Pull Request merged, 1 when the train stopped, 2 when it
 // could not start.
 //
+// `--auto` is Auto-merge (ADR 0148): the train decides each candidate by
+// itself from facts read for its head, under the mode in
+// tools/config/merge-train-auto-merge.json (`off`, `shadow`, `on`). A held
+// candidate is listed with its reason and the pass moves on. Exit 0 when the
+// pass finished, 1 when a shadow comment could not be written, 2 when it
+// could not start.
+//
 // Not a gate: it changes GitHub, never the tree, and runs only by hand.
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
+  AUTO_MERGE_MODE_PATH,
+  SHADOW_COMMENT_MARKER,
   TRAIN_BASE,
+  UNREAD_AGENT_VERDICT,
+  UNREAD_QA_REPORT,
+  UNREAD_REVIEW_TIER,
+  mainCiFromRuns,
+  parseAutoMergeMode,
   parseTrainArgs,
+  renderAutoTrainResult,
   renderTrainResult,
   requiredChecksFromRules,
+  runAutoTrain,
   runTrain,
+  type AutoTrainIo,
   type CheckRun,
   type MergeMethod,
   type PullRequestSnapshot,
@@ -89,7 +109,7 @@ export function githubTrainIo(repository: string): TrainIo {
         '--repo',
         repository,
         '--json',
-        'number,state,isDraft,baseRefName,headRefOid,mergeStateStatus,reviewDecision',
+        'number,state,isDraft,baseRefName,headRefOid,mergeStateStatus,reviewDecision,body',
       ]) as Omit<PullRequestSnapshot, 'checks'> | null;
       if (!view) return null;
       // `gh pr checks` exits non-zero while a check is pending (8) or has
@@ -150,13 +170,119 @@ export function githubTrainIo(repository: string): TrainIo {
   };
 }
 
+/** The `gh` login the train runs as, so it edits only its own comments. */
+const viewerLogin = (): string | null => {
+  const result = runGh(['api', 'user', '-q', '.login']);
+  return result.status === 0 && result.stdout.trim()
+    ? result.stdout.trim()
+    : null;
+};
+
+/**
+ * The `gh`-backed AutoTrainIo. The Review Tier, the Agent Verdict and the QA
+ * Report have no reader yet, so each reads as missing and holds.
+ */
+export function githubAutoTrainIo(repository: string): AutoTrainIo {
+  let login: string | null | undefined;
+  return {
+    ...githubTrainIo(repository),
+    mainCi: () =>
+      mainCiFromRuns(
+        ghJsonOrNull([
+          'run',
+          'list',
+          '--repo',
+          repository,
+          '--workflow',
+          'ci.yml',
+          '--branch',
+          TRAIN_BASE,
+          '--event',
+          'push',
+          '--status',
+          'completed',
+          '--limit',
+          '1',
+          '--json',
+          'conclusion,headSha',
+        ]),
+      ),
+    reviewTier: () => UNREAD_REVIEW_TIER,
+    agentVerdict: () => UNREAD_AGENT_VERDICT,
+    qaReport: () => UNREAD_QA_REPORT,
+    upsertShadowComment: (pr, body) => {
+      if (login === undefined) login = viewerLogin();
+      if (!login) return false;
+      // Only a comment this login wrote is edited: a marker pasted into
+      // someone else's comment is not the train's record.
+      const found = runGh([
+        'api',
+        '--paginate',
+        `repos/${repository}/issues/${pr}/comments`,
+        '--jq',
+        `.[] | select(.user.login == ${JSON.stringify(login)}) | select(.body | contains(${JSON.stringify(SHADOW_COMMENT_MARKER)})) | .id`,
+      ]);
+      if (found.status !== 0) return false;
+      const id = found.stdout.trim().split('\n')[0];
+      const result = id
+        ? runGh([
+            'api',
+            '--method',
+            'PATCH',
+            `repos/${repository}/issues/comments/${id}`,
+            '-f',
+            `body=${body}`,
+          ])
+        : runGh([
+            'api',
+            '--method',
+            'POST',
+            `repos/${repository}/issues/${pr}/comments`,
+            '-f',
+            `body=${body}`,
+          ]);
+      if (result.status !== 0) {
+        console.error(`merge-train: #${pr}: ${result.stderr.trim()}`);
+      }
+      return result.status === 0;
+    },
+  };
+}
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/** The Auto-merge mode; a missing or invalid setting reads as `off`. */
+const readAutoMergeMode = () => {
+  const path = join(REPO_ROOT, AUTO_MERGE_MODE_PATH);
+  return parseAutoMergeMode(
+    existsSync(path) ? readFileSync(path, 'utf8') : null,
+  );
+};
+
+/** Flags that never take a value, so `--auto 12` keeps 12 a Pull Request. */
+const BOOLEAN_FLAGS = ['--auto', '--dry-run'];
+
 async function main(argv: readonly string[]): Promise<number> {
-  const { positional, flags } = parseArgs(argv);
+  const booleans = new Set(argv.filter((arg) => BOOLEAN_FLAGS.includes(arg)));
+  const { positional, flags } = parseArgs(
+    argv.filter((arg) => !BOOLEAN_FLAGS.includes(arg)),
+  );
+  if (booleans.has('--dry-run')) flags['dry-run'] = null;
   const parsed = parseTrainArgs(positional, flags);
   if ('error' in parsed) return bail(parsed.error);
   if (!githubAvailable()) return bail('`gh` is not installed or not logged in');
   const repository = flags.repository ?? currentRepository();
   if (!repository) return bail('the repository could not be resolved');
+
+  if (booleans.has('--auto')) {
+    const mode = readAutoMergeMode();
+    const result = await runAutoTrain(
+      { ...parsed, mode },
+      githubAutoTrainIo(repository),
+    );
+    console.log(renderAutoTrainResult(result));
+    return result.commentFailures.length > 0 ? 1 : 0;
+  }
 
   const result = await runTrain(parsed, githubTrainIo(repository));
   console.log(renderTrainResult(result));

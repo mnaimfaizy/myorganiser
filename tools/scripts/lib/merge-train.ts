@@ -22,6 +22,8 @@
  * Run the tests with: node --test tools/scripts/lib/merge-train.test.ts
  */
 
+import type { ReviewTier } from './review-tier.ts';
+
 /** The branch the train merges into, and whose ruleset it reads. */
 export const TRAIN_BASE = 'main';
 
@@ -91,6 +93,8 @@ export interface PullRequestSnapshot {
   /** `APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or empty. */
   reviewDecision?: string | null;
   checks: readonly CheckRun[];
+  /** The description, where an Auto-merge reads the Merge Danger Door. */
+  body?: string | null;
 }
 
 /** What the required checks on one head add up to. */
@@ -368,99 +372,129 @@ export async function runTrain(
     };
   };
   if (required.length === 0) {
-    return stop(
-      0,
-      `no required checks could be read for \`${TRAIN_BASE}\`; the train will not merge what it cannot check`,
-    );
+    return stop(0, noRequiredChecksReason());
   }
 
   for (let index = 0; index < args.pullRequests.length; index += 1) {
     const pr = args.pullRequests[index];
-    const deadline = io.now() + args.timeoutMinutes * 60_000;
-    let updates = 0;
-    let refusals = 0;
-    let blockedGreenReads = 0;
-    let lastWait = '';
-
-    for (;;) {
-      const snapshot = io.read(pr);
-      if (!snapshot) return stop(index, `#${pr} could not be read`);
-      const step = decideNext(snapshot, required, { blockedGreenReads });
-
-      if (args.dryRun) {
-        io.log(`#${pr}: would ${describe(step)}`);
-        if (step.kind === 'stop') return stop(index, step.reason);
-        break;
-      }
-
-      if (step.kind === 'merged') {
-        io.log(`#${pr}: already merged`);
-        merged.push(pr);
-        break;
-      }
-      if (step.kind === 'stop') return stop(index, step.reason);
-
-      if (step.kind === 'update') {
-        if (updates >= MAX_UPDATES_PER_PULL_REQUEST) {
-          return stop(
-            index,
-            `#${pr} fell behind \`${TRAIN_BASE}\` ${updates + 1} times; something else is merging as fast as the train`,
-          );
-        }
-        updates += 1;
-        io.log(`#${pr}: behind \`${TRAIN_BASE}\`, updating the branch`);
-        if (!io.update(pr, snapshot.headRefOid)) {
-          return stop(index, `#${pr} could not be brought up to date`);
-        }
-        blockedGreenReads = 0;
-        lastWait = '';
-        await io.sleep(args.pollSeconds);
-        continue;
-      }
-
-      if (step.kind === 'merge') {
-        io.log(
-          `#${pr}: required checks green on ${step.headRefOid.slice(0, 8)}, merging`,
-        );
-        if (io.merge(pr, step.headRefOid, args.method)) {
-          merged.push(pr);
-          break;
-        }
-        // Refused: most often `main` moved between the read and the merge,
-        // and the next read is BEHIND and updates. A refusal that repeats on
-        // a green head is bounded twice over: by count and by the deadline.
-        refusals += 1;
-        if (refusals >= MAX_MERGE_REFUSALS) {
-          return stop(
-            index,
-            `GitHub refused to merge #${pr} ${refusals} times with every required check green`,
-          );
-        }
-        if (io.now() >= deadline) {
-          return stop(
-            index,
-            `#${pr} could not be merged within ${args.timeoutMinutes} min`,
-          );
-        }
-        io.log(`#${pr}: GitHub refused the merge; reading it again`);
-        await io.sleep(args.pollSeconds);
-        continue;
-      }
-
-      // wait
-      blockedGreenReads = step.blockedGreen ? blockedGreenReads + 1 : 0;
-      if (io.now() >= deadline) {
-        return stop(
-          index,
-          `#${pr} waited ${args.timeoutMinutes} min and is still ${step.reason}`,
-        );
-      }
-      if (step.reason !== lastWait) io.log(`#${pr}: ${step.reason}`);
-      lastWait = step.reason;
-      await io.sleep(args.pollSeconds);
-    }
+    const outcome = await drivePullRequest(pr, args, io, required);
+    if (outcome.kind === 'stopped') return stop(index, outcome.reason);
+    if (outcome.kind === 'merged') merged.push(pr);
   }
   return { merged, stoppedAt: null, notReached: [] };
+}
+
+const couldNotReadReason = (pr: number): string => `#${pr} could not be read`;
+
+const waitedReason = (pr: number, minutes: number, still: string): string =>
+  `#${pr} waited ${minutes} min and is still ${still}`;
+
+const noRequiredChecksReason = (): string =>
+  `no required checks could be read for \`${TRAIN_BASE}\`; the train will not merge what it cannot check`;
+
+/** How driving one Pull Request ended. */
+type DriveOutcome =
+  | { kind: 'merged' }
+  /** A dry run read it once and logged the step it would take. */
+  | { kind: 'read' }
+  | { kind: 'stopped'; reason: string };
+
+/**
+ * Drives one Pull Request until it merges or cannot: read, decide, act, read
+ * again. Both trains run exactly this loop, so the update and merge writes of
+ * an Auto-merge are the hand-started train's own.
+ *
+ * `beforeMerge` is asked, at the head about to merge, whether anything holds
+ * it; a reason it returns ends the drive with no merge.
+ */
+async function drivePullRequest(
+  pr: number,
+  args: Pick<TrainArgs, 'method' | 'pollSeconds' | 'timeoutMinutes' | 'dryRun'>,
+  io: TrainIo,
+  required: readonly string[],
+  beforeMerge?: (snapshot: PullRequestSnapshot) => string | null,
+): Promise<DriveOutcome> {
+  const stopped = (reason: string): DriveOutcome => ({
+    kind: 'stopped',
+    reason,
+  });
+  const deadline = io.now() + args.timeoutMinutes * 60_000;
+  let updates = 0;
+  let refusals = 0;
+  let blockedGreenReads = 0;
+  let lastWait = '';
+
+  for (;;) {
+    const snapshot = io.read(pr);
+    if (!snapshot) return stopped(couldNotReadReason(pr));
+    const step = decideNext(snapshot, required, { blockedGreenReads });
+
+    if (args.dryRun) {
+      io.log(`#${pr}: would ${describe(step)}`);
+      if (step.kind === 'stop') return stopped(step.reason);
+      return { kind: 'read' };
+    }
+
+    if (step.kind === 'merged') {
+      io.log(`#${pr}: already merged`);
+      return { kind: 'merged' };
+    }
+    if (step.kind === 'stop') return stopped(step.reason);
+
+    if (step.kind === 'update') {
+      if (updates >= MAX_UPDATES_PER_PULL_REQUEST) {
+        return stopped(
+          `#${pr} fell behind \`${TRAIN_BASE}\` ${updates + 1} times; something else is merging as fast as the train`,
+        );
+      }
+      updates += 1;
+      io.log(`#${pr}: behind \`${TRAIN_BASE}\`, updating the branch`);
+      if (!io.update(pr, snapshot.headRefOid)) {
+        return stopped(`#${pr} could not be brought up to date`);
+      }
+      blockedGreenReads = 0;
+      lastWait = '';
+      await io.sleep(args.pollSeconds);
+      continue;
+    }
+
+    if (step.kind === 'merge') {
+      const hold = beforeMerge?.(snapshot) ?? null;
+      if (hold) return stopped(hold);
+      io.log(
+        `#${pr}: required checks green on ${step.headRefOid.slice(0, 8)}, merging`,
+      );
+      if (io.merge(pr, step.headRefOid, args.method)) {
+        return { kind: 'merged' };
+      }
+      // Refused: most often `main` moved between the read and the merge,
+      // and the next read is BEHIND and updates. A refusal that repeats on
+      // a green head is bounded twice over: by count and by the deadline.
+      refusals += 1;
+      if (refusals >= MAX_MERGE_REFUSALS) {
+        return stopped(
+          `GitHub refused to merge #${pr} ${refusals} times with every required check green`,
+        );
+      }
+      if (io.now() >= deadline) {
+        return stopped(
+          `#${pr} could not be merged within ${args.timeoutMinutes} min`,
+        );
+      }
+      io.log(`#${pr}: GitHub refused the merge; reading it again`);
+      await io.sleep(args.pollSeconds);
+      continue;
+    }
+
+    // wait
+    blockedGreenReads = step.blockedGreen ? blockedGreenReads + 1 : 0;
+    if (io.now() >= deadline) {
+      return stopped(waitedReason(pr, args.timeoutMinutes, step.reason));
+    }
+    if (step.reason !== lastWait) io.log(`#${pr}: ${step.reason}`);
+    lastWait = step.reason;
+    await io.sleep(args.pollSeconds);
+  }
 }
 
 function describe(step: TrainStep): string {
@@ -488,6 +522,617 @@ export function renderTrainResult(result: TrainResult): string {
       `Stopped at #${result.stoppedAt.pr}: ${result.stoppedAt.reason}.`,
       `Not reached: ${list(result.notReached)}.`,
     );
+  }
+  return lines.join('\n');
+}
+
+// ------------------------------------------------------------ Auto-merge
+//
+// ADR 0148: under `--auto` the train decides by itself, per candidate, from
+// facts it reads for the exact head it would merge. Every rule below is pure;
+// the reads live behind `AutoTrainIo`. Each fact is its own type, read by its
+// own reader and judged by its own row of `AUTO_MERGE_RULES`, so the slice
+// that gives a fact a real reader changes that fact and nothing else.
+
+/** What `tools/config/merge-train-auto-merge.json` may set. */
+export const AUTO_MERGE_MODES = ['off', 'shadow', 'on'] as const;
+export type AutoMergeMode = (typeof AUTO_MERGE_MODES)[number];
+
+/**
+ * The mode setting, repo-relative. Under `tools/config/**`, which the Review
+ * Tier path map makes `human`, so only a Pull Request the Maintainer merges
+ * can change it (ADR 0148 decision 4).
+ */
+export const AUTO_MERGE_MODE_PATH = 'tools/config/merge-train-auto-merge.json';
+
+/**
+ * The mode, from the setting file's text (`null` when the file is missing).
+ * Anything but `{ "mode": "off" | "shadow" | "on" }` reads as `off`: a broken
+ * setting stops Auto-merge rather than guessing at it.
+ */
+export function parseAutoMergeMode(text: string | null): AutoMergeMode {
+  if (text === null) return 'off';
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return 'off';
+  }
+  const mode = (value as { mode?: unknown } | null)?.mode;
+  return typeof mode === 'string' &&
+    (AUTO_MERGE_MODES as readonly string[]).includes(mode)
+    ? (mode as AutoMergeMode)
+    : 'off';
+}
+
+/** A fact the train could not read. It always holds, with this reason. */
+export interface MissingFact {
+  status: 'missing';
+  reason: string;
+}
+
+/** The latest completed `push` run of CI on `main`. */
+export type MainCiFact =
+  | MissingFact
+  | { status: 'read'; conclusion: string; headSha: string };
+
+/**
+ * The required checks of `main`'s ruleset on the candidate. `gated-at-merge`
+ * is the `on` train before it updates the branch: the shared drive loop then
+ * gates them on the updated head exactly as a hand-started train does.
+ */
+export type RequiredChecksFact =
+  | { status: 'green' }
+  | { status: 'gated-at-merge' }
+  | { status: 'held'; reason: string };
+
+/** The Review Tiers of ADR 0070, from the classifier that computes them. */
+export type { ReviewTier };
+
+/** The Review Tier recorded for the head. */
+export type ReviewTierFact = MissingFact | { status: 'read'; tier: ReviewTier };
+
+/** The Agent Verdict for the head. No reader yet, so always missing. */
+export type AgentVerdictFact = MissingFact;
+
+/** The QA Report for the head. No reader yet, so always missing. */
+export type QaReportFact = MissingFact;
+
+/**
+ * The Merge Danger Door line, read exactly as PrAuthor writes it. `absent`
+ * (no `## Merge danger` section, or no `**Door:**` line in it) changes
+ * nothing; a `**Door:**` line in another form, or a line in that section
+ * that is a Door field written any other way (bulleted, `**Door**:`, another
+ * case), is `unreadable` and holds. Prose that merely starts with "Door" is
+ * not a Door field.
+ */
+export type DoorFact =
+  | { status: 'one-way' }
+  | { status: 'two-way' }
+  | { status: 'absent' }
+  | { status: 'unreadable'; line: string };
+
+/** Every fact one Auto-merge decision reads, for one head. */
+export interface AutoMergeFacts {
+  /** The head these facts were read for, and the one that would merge. */
+  headRefOid: string;
+  mainCi: MainCiFact;
+  requiredChecks: RequiredChecksFact;
+  reviewTier: ReviewTierFact;
+  agentVerdict: AgentVerdictFact;
+  qaReport: QaReportFact;
+  door: DoorFact;
+}
+
+export type AutoMergeFactName = Exclude<keyof AutoMergeFacts, 'headRefOid'>;
+
+/** This slice's readers for the facts with no reader yet. Each one holds. */
+export const UNREAD_REVIEW_TIER: ReviewTierFact = {
+  status: 'missing',
+  reason: 'the Review Tier is not read yet (no per-head record)',
+};
+export const UNREAD_AGENT_VERDICT: AgentVerdictFact = {
+  status: 'missing',
+  reason: 'the Agent Verdict is not read yet',
+};
+export const UNREAD_QA_REPORT: QaReportFact = {
+  status: 'missing',
+  reason: 'the QA Report is not read yet',
+};
+
+/** The held reason a `**Door:**` line in any other form gets. */
+export const DOOR_UNREADABLE_REASON = 'Door line unreadable';
+
+const DOOR_LINE = '**Door:**';
+const DOOR_VALUE_RE = /^(one-way|two-way)(?:\s+—\s+.*)?$/;
+const DOOR_NEAR_MISS_RE = /^(?:[-*+]\s+)?[*_]*\s*door[*_]*\s*:/i;
+
+/** Reads the Door from a Pull Request description. */
+export function readDoor(body: string | null | undefined): DoorFact {
+  const lines = (body ?? '').split(/\r?\n/);
+  const section = lines.findIndex((line) =>
+    /^##\s+Merge danger\s*$/i.test(line.trim()),
+  );
+  if (section === -1) return { status: 'absent' };
+  for (const raw of lines.slice(section + 1)) {
+    const line = raw.trim();
+    if (/^##?\s/.test(line)) break;
+    if (!line.startsWith(DOOR_LINE)) {
+      // A Door field in any other form — bulleted, the colon outside the
+      // bold, another case — is a Door the train cannot read, never a Door
+      // that is not there.
+      if (DOOR_NEAR_MISS_RE.test(line)) return { status: 'unreadable', line };
+      continue;
+    }
+    const value = DOOR_VALUE_RE.exec(line.slice(DOOR_LINE.length).trim());
+    if (!value) return { status: 'unreadable', line };
+    return { status: value[1] as 'one-way' | 'two-way' };
+  }
+  return { status: 'absent' };
+}
+
+/** `main`'s latest run, from `gh run list --json conclusion,headSha`. */
+export function mainCiFromRuns(runs: unknown): MainCiFact {
+  const run = Array.isArray(runs)
+    ? (runs[0] as { conclusion?: unknown; headSha?: unknown } | undefined)
+    : undefined;
+  if (
+    !run ||
+    typeof run.conclusion !== 'string' ||
+    !run.conclusion ||
+    typeof run.headSha !== 'string'
+  ) {
+    return {
+      status: 'missing',
+      reason: `the latest CI run on \`${TRAIN_BASE}\` could not be read`,
+    };
+  }
+  return { status: 'read', conclusion: run.conclusion, headSha: run.headSha };
+}
+
+/**
+ * One row per fact: the reason it holds the merge, or null. The insertion
+ * order is the order held reasons are listed in.
+ */
+export const AUTO_MERGE_RULES = {
+  mainCi: (fact: MainCiFact): string | null =>
+    fact.status === 'missing'
+      ? fact.reason
+      : fact.conclusion === 'success'
+        ? null
+        : `the latest CI run on \`${TRAIN_BASE}\` is ${fact.conclusion} (${fact.headSha.slice(0, 8)})`,
+  requiredChecks: (fact: RequiredChecksFact): string | null =>
+    fact.status === 'held' ? fact.reason : null,
+  reviewTier: (fact: ReviewTierFact): string | null =>
+    fact.status === 'missing'
+      ? fact.reason
+      : fact.tier === 'human'
+        ? 'the Review Tier is human'
+        : null,
+  agentVerdict: (fact: AgentVerdictFact): string | null => fact.reason,
+  qaReport: (fact: QaReportFact): string | null => fact.reason,
+  door: (fact: DoorFact): string | null =>
+    fact.status === 'one-way'
+      ? 'the Merge Danger Door is one-way'
+      : fact.status === 'unreadable'
+        ? DOOR_UNREADABLE_REASON
+        : null,
+} as const satisfies {
+  [K in AutoMergeFactName]: (fact: AutoMergeFacts[K]) => string | null;
+};
+
+/** The held reason every candidate gets while the setting is `off`. */
+export const AUTO_MERGE_OFF_REASON = `Auto-merge is off (\`${AUTO_MERGE_MODE_PATH}\`)`;
+
+/**
+ * What each mode does in a pass, one row per mode (ADR 0053): whether it
+ * reads and decides the candidates at all, the action for a candidate held or
+ * allowed, whether it drives an allowed one through the train's own update
+ * and merge loop, and the verb a dry run logs.
+ */
+export const AUTO_MERGE_MODE_PASS = {
+  off: {
+    decides: false,
+    heldAction: 'skip',
+    allowedAction: 'skip',
+    drives: false,
+    dryRunVerb: 'decide',
+  },
+  shadow: {
+    decides: true,
+    heldAction: 'shadow-comment',
+    allowedAction: 'shadow-comment',
+    drives: false,
+    dryRunVerb: 'comment',
+  },
+  on: {
+    decides: true,
+    heldAction: 'skip',
+    allowedAction: 'merge',
+    drives: true,
+    dryRunVerb: 'decide',
+  },
+} as const satisfies Record<
+  AutoMergeMode,
+  {
+    decides: boolean;
+    heldAction: AutoMergeDecision['action'];
+    allowedAction: AutoMergeDecision['action'];
+    drives: boolean;
+    dryRunVerb: string;
+  }
+>;
+
+/** What an Auto-merge does with one candidate. */
+export interface AutoMergeDecision {
+  action: 'merge' | 'shadow-comment' | 'skip';
+  /** True when any fact holds the merge (always, under `off`). */
+  held: boolean;
+  /** Every held reason in rule order, joined; or why it would merge. */
+  reason: string;
+  /** A `one-way` Door on an `auto` or `agent` Pull Request; else null. */
+  mismatch: string | null;
+}
+
+/** The reasons, in rule order, that any fact holds the merge. */
+export function autoMergeHolds(facts: AutoMergeFacts): string[] {
+  const holds: string[] = [];
+  const judge = <K extends AutoMergeFactName>(name: K) => {
+    const rule = AUTO_MERGE_RULES[name] as (
+      fact: AutoMergeFacts[K],
+    ) => string | null;
+    const reason = rule(facts[name]);
+    if (reason) holds.push(reason);
+  };
+  for (const name of Object.keys(AUTO_MERGE_RULES) as AutoMergeFactName[]) {
+    judge(name);
+  }
+  return holds;
+}
+
+/**
+ * The Auto-merge decision for one candidate (ADR 0148 decision 3). Every
+ * fact can hold a merge back and none can allow one alone: it merges only
+ * when no rule holds.
+ */
+export function decideAutoMerge(
+  facts: AutoMergeFacts,
+  mode: AutoMergeMode,
+): AutoMergeDecision {
+  const tier = facts.reviewTier;
+  const mismatch =
+    facts.door.status === 'one-way' &&
+    tier.status === 'read' &&
+    tier.tier !== 'human'
+      ? `the Merge Danger Door is one-way but the Review Tier is ${tier.tier}`
+      : null;
+  const pass = AUTO_MERGE_MODE_PASS[mode];
+  if (!pass.decides) {
+    return {
+      action: pass.heldAction,
+      held: true,
+      reason: AUTO_MERGE_OFF_REASON,
+      mismatch,
+    };
+  }
+  const holds = autoMergeHolds(facts);
+  const held = holds.length > 0;
+  const reason = held
+    ? holds.join('; ')
+    : `every fact holds for ${facts.headRefOid}`;
+  return {
+    action: held ? pass.heldAction : pass.allowedAction,
+    held,
+    reason,
+    mismatch,
+  };
+}
+
+/** The hidden marker of the one shadow comment on each candidate. */
+export const SHADOW_COMMENT_MARKER = '<!-- merge-train:auto-merge -->';
+/** The lead of the shadow comment's decision line. */
+export const SHADOW_COMMENT_LEAD = '**Merge Train Auto-merge (shadow):**';
+/** The shadow comment's two text forms (ADR 0148 decision 4). */
+export const SHADOW_WOULD_MERGE = 'would auto-merge at';
+export const SHADOW_HELD = 'held:';
+
+/**
+ * The shadow comment's body: the marker, then `would auto-merge at \`<sha>\``
+ * or `held: <reason>` with the head it was decided for, then any mismatch.
+ */
+export function renderShadowComment(
+  decision: AutoMergeDecision,
+  headRefOid: string,
+): string {
+  const lines = [SHADOW_COMMENT_MARKER];
+  if (decision.held) {
+    lines.push(
+      `${SHADOW_COMMENT_LEAD} ${SHADOW_HELD} ${decision.reason}`,
+      '',
+      `Head: \`${headRefOid}\``,
+    );
+  } else {
+    lines.push(
+      `${SHADOW_COMMENT_LEAD} ${SHADOW_WOULD_MERGE} \`${headRefOid}\``,
+    );
+  }
+  if (decision.mismatch) lines.push('', `Mismatch: ${decision.mismatch}`);
+  return lines.join('\n');
+}
+
+/**
+ * The required checks of one read, judged without writing anything: a branch
+ * that is behind is judged on its current head, since only the `on` train may
+ * update it.
+ */
+export function checksOnCurrentHead(
+  pr: PullRequestSnapshot,
+  required: readonly string[],
+  { blockedGreenReads = 0 }: { blockedGreenReads?: number } = {},
+):
+  | { kind: 'green' }
+  | { kind: 'held'; reason: string }
+  | { kind: 'wait'; reason: string; blockedGreen?: true } {
+  const judged =
+    pr.mergeStateStatus === 'BEHIND'
+      ? { ...pr, mergeStateStatus: 'CLEAN' }
+      : pr;
+  const step = decideNext(judged, required, { blockedGreenReads });
+  switch (step.kind) {
+    case 'merge':
+      return { kind: 'green' };
+    case 'wait':
+      return step.blockedGreen
+        ? { kind: 'wait', reason: step.reason, blockedGreen: true }
+        : { kind: 'wait', reason: step.reason };
+    case 'stop':
+      return { kind: 'held', reason: step.reason };
+    case 'merged':
+      return { kind: 'held', reason: `#${pr.number} is already merged` };
+    // Unreachable, since a behind branch was judged as up to date above; kept
+    // so the switch stays exhaustive over every TrainStep.
+    case 'update':
+      return {
+        kind: 'held',
+        reason: `#${pr.number} is behind \`${TRAIN_BASE}\``,
+      };
+  }
+}
+
+/** The train's IO, plus the reads and the one write an Auto-merge needs. */
+export interface AutoTrainIo extends TrainIo {
+  /** The latest completed `push` run of CI on `main`. */
+  mainCi(): MainCiFact;
+  reviewTier(pr: number, headRefOid: string): ReviewTierFact;
+  agentVerdict(pr: number, headRefOid: string): AgentVerdictFact;
+  qaReport(pr: number, headRefOid: string): QaReportFact;
+  /** Posts the shadow comment, or edits the one already there; false on failure. */
+  upsertShadowComment(pr: number, body: string): boolean;
+}
+
+/** How one `--auto` pass ended. */
+export interface AutoTrainResult {
+  mode: AutoMergeMode;
+  dryRun: boolean;
+  merged: number[];
+  /** Candidates every fact allowed, under `shadow` or a dry run. */
+  wouldMerge: { pr: number; headRefOid: string }[];
+  held: { pr: number; reason: string }[];
+  mismatches: { pr: number; reason: string }[];
+  /** Candidates whose shadow comment GitHub would not take. */
+  commentFailures: number[];
+}
+
+/**
+ * One `--auto` pass over the candidates, in the order given. Unlike the
+ * hand-started train it never stops at a candidate: one that fails a rule is
+ * held with its reason and the next is decided (ADR 0148 decision 1).
+ *
+ * `main`'s CI is read once, at the start: a red `main` holds every candidate
+ * in the pass, and the pass's own merges do not hold the candidates after
+ * them — each is still gated by its own required checks on its updated head.
+ *
+ * - `off`: reads and writes nothing; every candidate is held.
+ * - a candidate that cannot be read, or is no longer open, is held with no
+ *   comment written on it.
+ * - `shadow`: reads only, waiting for running checks as the train does, and
+ *   writes one marker comment per candidate.
+ * - `on`: judges the facts before updating, drives the candidate through the
+ *   hand-started train's own loop, and judges them again at the merge head.
+ * - a dry run writes nothing and logs what each candidate would get.
+ */
+export async function runAutoTrain(
+  args: Pick<
+    TrainArgs,
+    'pullRequests' | 'method' | 'pollSeconds' | 'timeoutMinutes' | 'dryRun'
+  > & { mode: AutoMergeMode },
+  io: AutoTrainIo,
+): Promise<AutoTrainResult> {
+  const result: AutoTrainResult = {
+    mode: args.mode,
+    dryRun: args.dryRun,
+    merged: [],
+    wouldMerge: [],
+    held: [],
+    mismatches: [],
+    commentFailures: [],
+  };
+  const hold = (pr: number, reason: string) => {
+    io.log(`#${pr}: held: ${reason}`);
+    result.held.push({ pr, reason });
+  };
+  const pass = AUTO_MERGE_MODE_PASS[args.mode];
+  if (!pass.decides) {
+    for (const pr of args.pullRequests) hold(pr, AUTO_MERGE_OFF_REASON);
+    return result;
+  }
+  const required = io.requiredChecks();
+  if (required.length === 0) {
+    for (const pr of args.pullRequests) hold(pr, noRequiredChecksReason());
+    return result;
+  }
+  const mainCi = io.mainCi();
+  const factsFor = (
+    pr: number,
+    snapshot: PullRequestSnapshot,
+    requiredChecks: RequiredChecksFact,
+  ): AutoMergeFacts => ({
+    headRefOid: snapshot.headRefOid,
+    mainCi,
+    requiredChecks,
+    reviewTier: io.reviewTier(pr, snapshot.headRefOid),
+    agentVerdict: io.agentVerdict(pr, snapshot.headRefOid),
+    qaReport: io.qaReport(pr, snapshot.headRefOid),
+    door: readDoor(snapshot.body),
+  });
+
+  for (const pr of args.pullRequests) {
+    const first = io.read(pr);
+    if (!first) {
+      hold(pr, couldNotReadReason(pr));
+      continue;
+    }
+    // A Pull Request no longer open is not a candidate: it is listed, and
+    // nothing is written on it.
+    if (first.state !== 'OPEN') {
+      hold(pr, `#${pr} is ${first.state.toLowerCase()}`);
+      continue;
+    }
+
+    if (pass.drives && !args.dryRun) {
+      const decision = decideAutoMerge(
+        factsFor(pr, first, { status: 'gated-at-merge' }),
+        args.mode,
+      );
+      if (decision.mismatch)
+        result.mismatches.push({ pr, reason: decision.mismatch });
+      if (decision.held) {
+        hold(pr, decision.reason);
+        continue;
+      }
+      const outcome = await drivePullRequest(
+        pr,
+        args,
+        io,
+        required,
+        (snapshot) => {
+          const atHead = decideAutoMerge(
+            factsFor(pr, snapshot, { status: 'green' }),
+            args.mode,
+          );
+          return atHead.held ? atHead.reason : null;
+        },
+      );
+      if (outcome.kind === 'merged') result.merged.push(pr);
+      else if (outcome.kind === 'stopped') hold(pr, outcome.reason);
+      continue;
+    }
+
+    const { snapshot, checks } = await judgeChecksWithoutWriting(
+      pr,
+      first,
+      required,
+      args,
+      io,
+    );
+    const decision = decideAutoMerge(factsFor(pr, snapshot, checks), args.mode);
+    if (decision.mismatch)
+      result.mismatches.push({ pr, reason: decision.mismatch });
+    if (decision.held) {
+      result.held.push({ pr, reason: decision.reason });
+    } else {
+      result.wouldMerge.push({ pr, headRefOid: snapshot.headRefOid });
+    }
+    const line = decision.held
+      ? `${SHADOW_HELD} ${decision.reason}`
+      : `${SHADOW_WOULD_MERGE} ${snapshot.headRefOid}`;
+    if (args.dryRun) {
+      io.log(`#${pr}: would ${pass.dryRunVerb} "${line}"`);
+      continue;
+    }
+    io.log(`#${pr}: ${line}`);
+    if (
+      !io.upsertShadowComment(
+        pr,
+        renderShadowComment(decision, snapshot.headRefOid),
+      )
+    ) {
+      io.log(`#${pr}: the shadow comment could not be written`);
+      result.commentFailures.push(pr);
+    }
+  }
+  return result;
+}
+
+/**
+ * Reads one candidate until its required checks settle, writing nothing. A
+ * dry run reads once, so a check still running holds with that reason.
+ */
+async function judgeChecksWithoutWriting(
+  pr: number,
+  first: PullRequestSnapshot,
+  required: readonly string[],
+  args: Pick<TrainArgs, 'pollSeconds' | 'timeoutMinutes' | 'dryRun'>,
+  io: TrainIo,
+): Promise<{ snapshot: PullRequestSnapshot; checks: RequiredChecksFact }> {
+  const deadline = io.now() + args.timeoutMinutes * 60_000;
+  let snapshot = first;
+  let blockedGreenReads = 0;
+  for (;;) {
+    const judged = checksOnCurrentHead(snapshot, required, {
+      blockedGreenReads,
+    });
+    if (judged.kind === 'green')
+      return { snapshot, checks: { status: 'green' } };
+    if (judged.kind === 'held') {
+      return { snapshot, checks: { status: 'held', reason: judged.reason } };
+    }
+    if (args.dryRun || io.now() >= deadline) {
+      const reason = args.dryRun
+        ? `#${pr} is still ${judged.reason}`
+        : waitedReason(pr, args.timeoutMinutes, judged.reason);
+      return { snapshot, checks: { status: 'held', reason } };
+    }
+    blockedGreenReads = judged.blockedGreen ? blockedGreenReads + 1 : 0;
+    await io.sleep(args.pollSeconds);
+    const next = io.read(pr);
+    if (!next) {
+      return {
+        snapshot,
+        checks: { status: 'held', reason: couldNotReadReason(pr) },
+      };
+    }
+    snapshot = next;
+  }
+}
+
+/** The closing lines of an `--auto` pass. */
+export function renderAutoTrainResult(result: AutoTrainResult): string {
+  const list = (prs: readonly number[]) =>
+    prs.length === 0 ? 'none' : prs.map((pr) => `#${pr}`).join(', ');
+  const lines = [
+    `Auto-merge mode: ${result.mode}${result.dryRun ? ' (dry run)' : ''}.`,
+    `Merged: ${list(result.merged)}.`,
+    `Would merge: ${
+      result.wouldMerge.length === 0
+        ? 'none'
+        : result.wouldMerge
+            .map(({ pr, headRefOid }) => `#${pr} at ${headRefOid.slice(0, 8)}`)
+            .join(', ')
+    }.`,
+  ];
+  lines.push(
+    result.held.length === 0 ? 'Held: none.' : 'Held:',
+    ...result.held.map(({ pr, reason }) => `- #${pr}: ${reason}`),
+  );
+  if (result.mismatches.length > 0) {
+    lines.push(
+      'Mismatches:',
+      ...result.mismatches.map(({ pr, reason }) => `- #${pr}: ${reason}`),
+    );
+  }
+  if (result.commentFailures.length > 0) {
+    lines.push(`Shadow comment not written: ${list(result.commentFailures)}.`);
   }
   return lines.join('\n');
 }
