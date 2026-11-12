@@ -23,6 +23,10 @@
       "reason": "Not a gate. It measures how long a pull request waited for CI over a fortnight of other branches' runs — the Single-Library Pull Request p50 and p90 the five-minute target is defined by, plus the five revisit signals — so its subject is weeks of Actions history, not the commit in front of it, and no threshold a change could cross fails here. It also reads `gh` and the Actions API, which a hook must not depend on. `.github/workflows/pr-ci-duration-watch.yml` runs it weekly and reports a breach on one tracked issue instead."
     },
     {
+      "check": "merge-train:shadow:measure",
+      "reason": "Not a gate. It measures whether Merge Train Auto-merge has earned `on` — over weeks of the train's shadow comments and the Pull Requests the Maintainer then merged, how many decisions, over what span, how many merged unchanged, and whether any was reverted or fixed within seven days (ADR 0148 decisions 5 and 6) — so its subject is weeks of GitHub history, not the commit in front of it, and no threshold a change could cross fails here. It also reads `gh`, which a hook must not depend on. The Maintainer runs it before changing `tools/config/merge-train-auto-merge.json`."
+    },
+    {
       "check": "graphify:project-edges",
       "reason": "Not a gate. It benchmarks graphify project-edge extraction and reports timings, so it has no fact to fail on and no threshold a commit could cross. Run it by hand when tuning extraction."
     }
