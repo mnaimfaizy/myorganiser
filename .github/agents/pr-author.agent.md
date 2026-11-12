@@ -70,6 +70,13 @@ NO_BRANCH_COMMITS: No commits found between <base> and HEAD. Nothing to describe
 9. Skip generated noise in Surfaces (`libs/app-api-client` unless the contract itself changed; `libs/design-tokens/src/generated/`).
 10. Infer a test plan from test files in the diff (`*.test.ts`, `*.spec.ts`, `*.spec.tsx`) plus the behavior a reviewer should check. Do not claim tests were run unless the commits themselves record that.
 11. Infer Surface Labels from the **combined diff**. Read kind and area names from `tools/config/github-labels.json` — do not invent names, and do not copy Issue Orchestration Labels (`ready-for-agent`, `type:*`, `gate:*`, `complexity:*`, `status:*`, `prd`). Linked-issue Surface Labels are hints, kept only if the diff still justifies them. Be stingy: typically one kind plus the areas the diff actually touches. Omit `LABELS:` when nothing fits. See ADR 0025.
+12. **Fact-check the finished draft against its sources.** Read the title and body one claim at a time. A claim is any statement of what a file, section, or commit changed, left unchanged, or now says, and every quoted string, count, and command. For each claim, find its source: the hunk, the commit message, the issue text, or the caller's own words for a caller-supplied fact. Then:
+    - A claim whose source says something narrower or different is reworded to what the source shows. A quoted string is copied from the hunk character for character.
+    - A claim with no source is deleted. "Other wording is tightened" on a file whose diff holds two edits you have already listed is such a claim.
+    - A claim about the whole branch ("wording only", "no behaviour change", "meaning unchanged") stands only when every hunk supports it. Otherwise state it as the intent ("no change of meaning is intended") or leave it out.
+    - A claim about what a commit message says uses that message's words; `git log` from step 3 is the source.
+
+    The step is done when you can name the source of every claim left in the draft.
 
 ## Issues section rules
 
