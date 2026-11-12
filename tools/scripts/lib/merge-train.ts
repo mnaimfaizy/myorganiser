@@ -1016,6 +1016,9 @@ export const DOOR_UNREADABLE_REASON = 'Door line unreadable';
 
 const DOOR_LINE = '**Door:**';
 const DOOR_VALUE_RE = /^(one-way|two-way)(?:\s+—\s+.*)?$/;
+/** The forms `DOOR_VALUE_RE` reads, for messages; change both together. */
+export const DOOR_LINE_FORM =
+  '`**Door:** one-way` or `**Door:** two-way`, optionally followed by a space, an em dash (`—`), a space, and text';
 const DOOR_NEAR_MISS_RE = /^(?:[-*+]\s+)?[*_]*\s*door[*_]*\s*:/i;
 
 /** Reads the Door from a Pull Request description. */
