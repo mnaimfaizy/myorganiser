@@ -685,7 +685,7 @@ The QA Artifact for a change with no screen to show: the API calls a QA Plan sce
 _Avoid_: API evidence, HAR, request log, trace
 
 **QA Report**:
-The Pull Request comment recording which QA Plan scenarios were run, against which commit, and with what result. A later commit makes it stale.
+The Pull Request comment recording which QA Plan scenarios were run, against which commit, and with what result. A later commit written on the branch makes it stale; the Merge Train's merge of `main` into the branch does not.
 _Avoid_: QA sign-off, QA comment, QA results
 
 **Issue Orchestration Label**:
@@ -703,6 +703,18 @@ _Avoid_: tier (alone), risk tier, review depth, Review Tier (a different questio
 **Review Tier**:
 The merge policy a Pull Request's diff earns — `review:auto`, `review:agent`, or `review:human` — computed after the code exists by a deterministic Wired Gate from affected projects, a path map, manifests, size, and author; never by an LLM and never by hand (ADR 0070). The job output is the state; the label is a view of it. Anything unclassifiable or any classifier error is `human`. Distinct from a Gate Tier in time, author, and question; either may only tighten the other's effect.
 _Avoid_: tier (alone), risk level, gate tier (for this sense), PR label, a Golden Case's Frontier/Guard tier (a third, different question)
+
+**Merge Train**:
+The one way a batch of Pull Requests reaches `main`: in a given order, each is brought up to date, waits for every required check on that head, and merges exactly that head without the admin bypass ([ADR 0144](docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
+_Avoid_: merge queue (GitHub's, ruled out), batch merge, merge script
+
+**Auto-merge**:
+A merge the Merge Train makes without the Maintainer starting it, allowed only by facts it reads for the head it merges — never by a model's judgment ([ADR 0148](docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Distinct from GitHub's auto-merge setting, which this repository leaves off.
+_Avoid_: automerge, auto-approve, unattended merge
+
+**Merge Danger**:
+A Pull Request description's statement of how a merge could go wrong: its Door — `one-way` when a revert does not undo what the merge did, otherwise `two-way` — and its blast radius. Written by PrAuthor, so it is a judgment: it may hold back an Auto-merge, and never allows one.
+_Avoid_: risk, risk level, Review Tier (the computed counterpart)
 
 **Request Label**:
 A GitHub label a human or `ai:create-pr` puts on a Pull Request to ask a workflow to run now, and which that workflow removes when the run ends — a button, not a state. There are two: `agent-review`, which starts the CI code review in any `CODE_REVIEW_MODE` (ADR 0070 item 7), and `golden-replay`, which replays the Golden Set against that Pull Request's reviewer (ADR 0109). Distinct from a Surface Label (names the change), a Review Tier label (computed, never hand-applied), and an Issue Orchestration Label (never on a Pull Request). Carries no classification and never appears on an Issue.
