@@ -123,7 +123,8 @@ Two tiers, deliberately separated.
 
 `jest.mock()` ordering against workspace imports · mock setup in `beforeAll()` ·
 duplicate top-level `describe` blocks and helpers · unused `jest.Mock` casts ·
-`*Once()` queues stacked inside one test · vacuous-assertion ratio · missing assertions.
+`*Once()` queues stacked inside one test · vacuous-assertion ratio · missing assertions ·
+random-looking fixtures bound to a secret-sounding name.
 
 A non-zero exit is an automatic REJECTED. There is nothing to weigh.
 
@@ -145,6 +146,11 @@ every FAIL** — a verdict without evidence is not usable by TestScaffold.
   call asserted with its arguments, not merely that it happened?
 - **Security-sensitive paths**: auth checks and ciphertext-only rules tested when in
   scope, or explicitly out of scope.
+- **Probes become tests**: when you run inputs of your own against the source (an
+  encoding, a shape, a boundary), every input that exposes a defect goes under
+  Required Revisions as a test case to add, with the exact input and expected
+  output. A probe kept only in your scratchpad is lost when the round ends, so the
+  next round rediscovers it.
 
 ### Not checked here
 

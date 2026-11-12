@@ -1,7 +1,6 @@
 import { decryptToken, encryptToken } from './YouTubeTokenEncryption';
 
-const TEST_KEY =
-  'a1b2c3d4e5f6071829304a5b6c7d8e9f0a1b2c3d4e5f6071829304a5b6c7d8ef';
+const TEST_KEY = '0f1e2d3c'.repeat(8);
 
 describe('YouTubeTokenEncryption', () => {
   beforeEach(() => {

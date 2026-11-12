@@ -183,8 +183,13 @@ function printable(name: string): string | null {
     : null;
 }
 
-/** A Bearer or Basic header value. */
-const AUTH_SCHEME_VALUE = /bearer[\s+]+\S|basic[\s+]+[a-z0-9+/=_-]{8,}/i;
+/**
+ * A Bearer or Basic header value. The separator is optional: `canonical` strips
+ * a format character, so `Bearer<U+200B>V` reaches this check as `BearerV`, and
+ * a glued `BearerV` is no less a credential. A word glued to `bearer` or
+ * `basic` in free text is withheld too, which is the safe direction.
+ */
+const AUTH_SCHEME_VALUE = /bearer[\s+]*\S|basic[\s+]*[a-z0-9+/=_-]{8,}/i;
 /** A JWT or JWE anywhere in a string, however it is glued to its neighbours. */
 const JWT = /eyJ[\w-]+(?:\.[\w-]*){2,}/;
 /** `@`, its percent form, or the fullwidth look-alike. */

@@ -586,3 +586,307 @@ test('missing input remains a bad invocation', (t) => {
   assert.equal(result.status, 2);
   assert.match(result.stdout, /Usage:/);
 });
+
+// random-looking-fixture (GitGuardian Generic High Entropy Secret, PR #1513).
+// Every random value below is joined at runtime from short pieces, so this
+// suite's own source never carries a random-looking literal bound to a
+// secret-sounding name: the rule scans this file too.
+// Built at runtime from short pieces on purpose: the rule reads literals, so
+// a random value written whole here would fail this suite's own hygiene run.
+// That runtime gap is the one the checker header declares, not a dodge of it.
+const RANDOM_HEX_32 = ['a3f9c2d8', 'e1b74f6a', '9c0d2e5f', '8a1b3c4d'].join('');
+const RANDOM_HEX_40 = [
+  'a3f9c2d8',
+  'e1b74f6a',
+  '9c0d2e5f',
+  '8a1b3c4d',
+  '7f2e0b9a',
+].join('');
+const RANDOM_HEX_64 = [
+  'a3f9c2d8',
+  'e1b74f6a',
+  '9c0d2e5f',
+  '8a1b3c4d',
+  '7f2e0b9a',
+  'd4c6a1e3',
+  '5b8f0c2d',
+  'e9a7d3b1',
+].join('');
+const RANDOM_MIXED_24 = ['Qx4mR9tL', 'p2vHnWc8', 'eYk3Fj7N'].join('');
+// A block of 9 characters: one past the period-8 exemption, so it must flag.
+const PERIOD_9_BLOCK = ['a3f9c2b1', 'd'].join('');
+
+interface ReportedFinding {
+  level: string;
+  rule: string;
+  line: number;
+  message: string;
+}
+
+/** Every finding the `--json` report carries, across all checked files. */
+function reportedFindings(stdout: string): ReportedFinding[] {
+  const report = JSON.parse(stdout) as {
+    results: { findings: ReportedFinding[] }[];
+  };
+  return report.results.flatMap((result) => result.findings);
+}
+
+function randomLookingFindings(stdout: string): ReportedFinding[] {
+  return reportedFindings(stdout).filter(
+    (finding) => finding.rule === 'random-looking-fixture',
+  );
+}
+
+test('flags a random hex value bound to HEX_TOKEN in a Jest spec, on the binding line', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'hex.test.ts',
+    [
+      "test('hex', () => {",
+      `  const HEX_TOKEN = '${RANDOM_HEX_32}';`,
+      '  expect(HEX_TOKEN.length).toBe(32);',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+  const findings = randomLookingFindings(result.stdout);
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].level, 'error');
+  assert.equal(findings[0].line, 2);
+  assert.match(findings[0].message, /HEX_TOKEN/);
+  assert.match(
+    findings[0].message,
+    /docs\/testing\/README\.md#credentials-in-test-fixtures/,
+  );
+});
+
+test('flags a random mixed-case value under a quoted access_token key in a Contract Suite that asserts', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/widget.test.ts',
+    [
+      "import assert from 'node:assert/strict';",
+      "import test from 'node:test';",
+      '',
+      "test('widget', () => {",
+      `  const fixture = { 'access_token': '${RANDOM_MIXED_24}' };`,
+      '  assert.equal(fixture.access_token.length, 24);',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+  const reported = reportedFindings(result.stdout);
+  const findings = randomLookingFindings(result.stdout);
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 5);
+  assert.match(findings[0].message, /access_token/);
+  assert.equal(
+    reported.some((finding) => finding.rule === 'no-assertions'),
+    false,
+  );
+});
+
+test('flags a multi-line TEST_KEY binding on the line that names it', (t) => {
+  const workspace = createWorkspace(t);
+  const file = writeFixture(
+    workspace,
+    'multiline.test.ts',
+    [
+      "test('multi-line', () => {",
+      '  const TEST_KEY =',
+      `    '${RANDOM_HEX_64}';`,
+      '  expect(TEST_KEY.length).toBe(64);',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+  const findings = randomLookingFindings(result.stdout);
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 2);
+  assert.match(findings[0].message, /TEST_KEY/);
+});
+
+test('flags base64 of a random mixed-case string under access_token in a Contract Suite that asserts', (t) => {
+  const workspace = createWorkspace(t);
+  const encoded = Buffer.from(RANDOM_MIXED_24).toString('base64');
+  const file = writeFixture(
+    workspace,
+    'tools/scripts/lib/encoded.test.ts',
+    [
+      "import assert from 'node:assert/strict';",
+      "import test from 'node:test';",
+      '',
+      "test('encoded', () => {",
+      `  const fixture = { 'access_token': '${encoded}' };`,
+      '  assert.equal(fixture.access_token.length, 32);',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
+  const result = runChecker(workspace, '--json', file);
+  const findings = randomLookingFindings(result.stdout);
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 5);
+  assert.match(findings[0].message, /access_token/);
+});
+
+// Jest specs whose bound value is random-looking in a shape the rule must still
+// catch: mixed-case letters with no digit; base64 of random text, which decodes
+// to one unbroken run, or to a run split by a separator that is not itself
+// readable; a period-9 block, just past the period-8 exemption; and a
+// 17-character hex value, not a multiple of four, so not base64 at all.
+const FLAGGED_FIXTURES: [string, string, string][] = [
+  [
+    'a mixed-case letters-only value bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${['QxRmTpLw', 'KjNbVcHg'].join('')}';`,
+  ],
+  [
+    'base64 of a random string bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${Buffer.from(['a3f9c2d8', 'e1b74f6a'].join('')).toString('base64')}';`,
+  ],
+  [
+    'base64 of a random hex pair joined by a hyphen bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${Buffer.from(['a3f9c2d8', '-', 'e1b74f6a'].join('')).toString('base64')}';`,
+  ],
+  [
+    'base64 of a random hex pair joined by a dot bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${Buffer.from(['a3f9c2d8', '.', 'e1b74f6a'].join('')).toString('base64')}';`,
+  ],
+  [
+    'base64 of a UUID-shaped value bound to sessionToken',
+    'sessionToken',
+    `const sessionToken = '${Buffer.from(['a3f9c2d8', '-', 'e1b7', '-', '4f6a', '-', '9c0d', '-', '2e5f8a1b', '3c4d'].join('')).toString('base64')}';`,
+  ],
+  [
+    'a period-9 block repeated twice bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${PERIOD_9_BLOCK + PERIOD_9_BLOCK}';`,
+  ],
+  [
+    'a 17-character random hex value bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${['a3f9c2d8', 'e1b74f6a', '9'].join('')}';`,
+  ],
+  [
+    'a random lowercase one-case value bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${['qwmzkxpv', 'bnrtyhgl'].join('')}';`,
+  ],
+  [
+    'a random uppercase one-case value bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${['QWMZKXPV', 'BNRTYHGL'].join('')}';`,
+  ],
+  [
+    'base64 of a readable-looking run with a 16-letter piece bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${Buffer.from(['qwmzkxpv', 'bnrtyhgl', '-', 'zxcvbnma', 'sdfghjkl'].join('')).toString('base64')}';`,
+  ],
+  [
+    'base64 of a run with a 15-letter piece and an 8-digit piece bound to SECRET_KEY',
+    'SECRET_KEY',
+    `const SECRET_KEY = '${Buffer.from(['kqzvbwxn', 'mtrplgh', '-', '48213907', '-', 'zxqvbfjt', 'w'].join('')).toString('base64')}';`,
+  ],
+];
+
+for (const [shape, name, binding] of FLAGGED_FIXTURES) {
+  test(`flags ${shape}, on the binding line`, (t) => {
+    const workspace = createWorkspace(t);
+    const file = writeFixture(
+      workspace,
+      'flagged.test.ts',
+      [
+        "test('flagged fixture', () => {",
+        `  ${binding}`,
+        '  expect(1).toBe(1);',
+        '});',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runChecker(workspace, '--json', file);
+    const findings = randomLookingFindings(result.stdout);
+
+    assert.equal(result.status, 1, result.stdout);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].line, 2);
+    assert.match(findings[0].message, new RegExp(name));
+  });
+}
+
+// Each row is a Jest spec whose only fixture is the shape under test. The
+// expect() call keeps the no-assertions rule out of the way, so exit 0 means
+// the fixture itself was accepted.
+const EXEMPT_FIXTURES: [string, string][] = [
+  [
+    'a periodic value (period 8) bound to SECRET_KEY',
+    `const SECRET_KEY = '${['0f1e2d3c', '0f1e2d3c', '0f1e2d3c', '0f1e2d3c'].join('')}';`,
+  ],
+  [
+    'a sequential run bound to apiKey',
+    `const apiKey = '${['01234567', '89abcdef'].join('')}';`,
+  ],
+  [
+    'canonical base64 of printable text bound to credentialId',
+    `const credentialId = '${Buffer.from('address-ct-123').toString('base64')}';`,
+  ],
+  [
+    'a random value bound to a neutral name (commitSha)',
+    `const commitSha = '${RANDOM_HEX_40}';`,
+  ],
+  [
+    'a single-case letters value bound to wrappedMasterKey',
+    `const wrappedMasterKey = '${['WRAPPEDKEY', 'WRAPPEDKEY'].join('')}';`,
+  ],
+  [
+    'a padded periodic value bound to authTag',
+    `const authTag = '${'A'.repeat(22)}==';`,
+  ],
+  [
+    'a hyphenated value bound to token',
+    `const config = { token: '${['valid', 'unsubscribe', 'token', '1234'].join('-')}' };`,
+  ],
+];
+
+for (const [shape, binding] of EXEMPT_FIXTURES) {
+  test(`passes ${shape}`, (t) => {
+    const workspace = createWorkspace(t);
+    const file = writeFixture(
+      workspace,
+      'exempt.test.ts',
+      [
+        "test('exempt fixture', () => {",
+        `  ${binding}`,
+        '  expect(1).toBe(1);',
+        '});',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runChecker(workspace, '--json', file);
+
+    assert.equal(result.status, 0, result.stdout);
+    assert.deepEqual(randomLookingFindings(result.stdout), []);
+  });
+}
