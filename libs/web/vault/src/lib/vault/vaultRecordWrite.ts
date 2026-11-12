@@ -65,8 +65,9 @@ type FirstAttempt = 'merge' | 'compose';
  * through the page that is about to save, and a newer client's envelope fields
  * must survive this save (ADR 0114 decision 3).
  *
- * Every merge takes what is stored, through `readStored`, as `local` and this
- * save's envelope as `remote` in the type's pinned merge
+ * Every merge takes what is stored, read through the type's pinned normalizer
+ * (`STORED_RECORD_NORMALIZERS`), as `local` and this save's envelope as
+ * `remote` in the type's pinned merge
  * ([ADR 0143](../../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
  * The User's edit wins on its newer timestamp, a record the other writer added
  * is kept, and the other writer's envelope fields are not put back to this
@@ -82,9 +83,6 @@ async function writeMergingOnContention<TPayload>(
   type: VaultRecordType,
   firstAttempt: FirstAttempt,
   compose: (stored: unknown) => VaultBlobEnvelope<TPayload>,
-  readStored: (
-    stored: unknown,
-  ) => VaultBlobEnvelope<unknown> = toVaultBlobEnvelope,
 ): Promise<VaultBlobEnvelope<TPayload>> {
   // Every type is pinned to `mergeById`. A type later pinned to
   // `promptOnConflict` has no merge, and fails to compile here until somebody
@@ -103,7 +101,7 @@ async function writeMergingOnContention<TPayload>(
       attempt === 1 && firstAttempt === 'compose'
         ? saved
         : (merge(
-            readStored(stored.value),
+            readStored(type, stored.value),
             saved,
           ) as VaultBlobEnvelope<TPayload>);
     try {
@@ -120,14 +118,20 @@ async function writeMergingOnContention<TPayload>(
   throw new VaultWriteContendedError(type);
 }
 
-/** The stored blob of `type` as a merge's `local` side, its records normalized. */
-function readStoredNormalized(
-  type: EditableVaultRecordType,
-): (stored: unknown) => VaultBlobEnvelope<unknown> {
-  return (stored) => ({
-    ...toVaultBlobEnvelope(stored),
-    records: STORED_RECORD_NORMALIZERS[type](stored),
-  });
+/**
+ * The stored blob of `type` as a merge's `local` side, its records read
+ * through the type's pinned normalizer. A type the table pins to `null`
+ * (Groceries) is read as it is stored.
+ */
+function readStored(
+  type: VaultRecordType,
+  stored: unknown,
+): VaultBlobEnvelope<unknown> {
+  const envelope = toVaultBlobEnvelope(stored);
+  const normalize = STORED_RECORD_NORMALIZERS[type];
+  return normalize === null
+    ? envelope
+    : { ...envelope, records: normalize(stored) };
 }
 
 /** A deletion to write down in the same save. */
@@ -192,7 +196,6 @@ export async function saveVaultRecords<TRecord extends IdentifiedRecord>(
         ? envelope
         : deleteVaultRecord(envelope, deleted.id, deleted.at);
     },
-    readStoredNormalized(type),
   );
   return written.records as TRecord[];
 }
