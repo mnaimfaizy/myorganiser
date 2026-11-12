@@ -2189,3 +2189,302 @@ describe('parseTranscriptInput', () => {
     );
   });
 });
+
+describe('sign-in, YouTube availability and vault response bodies (#1515)', () => {
+  // Readable synthetic values, kept short enough not to trip the secret-scan hook.
+  // KDF_SALT is 20 characters: its shortened form shows the first five and the
+  // length, so LATERTAIL must never print.
+  const KDF_SALT = 'SALTHEAD-LATERTAIL-9';
+  const NESTED = 'NESTED-VALUE-01';
+  const TIMESTAMP = '2026-11-01T09:00:00.000Z';
+
+  // Shaped as the backend sends them: FilteredUserInterface (phone is omitted
+  // when unset), the login body, the availability report, GET /vault (the vault
+  // meta sits under `meta`) and GET /vault/blobs (the inventory's etag is top-level).
+  const USER = {
+    id: 'user-0001',
+    name: 'QA Account',
+    email: 'qa.account@example.test',
+    firstName: 'QA',
+    lastName: 'Account',
+    role: 'user',
+    disabled: false,
+  };
+  const LOGIN_BODY = { token: CREDENTIAL, expires_in: 900000, user: USER };
+  const AVAILABILITY_BODY = { available: true };
+  const VAULT_BODY = {
+    meta: {
+      version: 1,
+      kdf_name: 'argon2id',
+      kdf_salt: KDF_SALT,
+      kdf_params: { memory: 65536, iterations: 3, parallelism: NESTED },
+      wrapped_mk_passphrase: { ciphertext: NESTED, nonce: NESTED },
+      wrapped_mk_recovery: { ciphertext: NESTED, nonce: NESTED },
+    },
+    updatedAt: TIMESTAMP,
+    etag: 'etag-vault-01',
+  };
+  const BLOBS_BODY = {
+    blobs: [
+      { type: 'tasks', etag: 'etag-tasks-01', updatedAt: TIMESTAMP },
+      { type: 'groceries', etag: 'etag-groceries-01', updatedAt: TIMESTAMP },
+    ],
+    etag: 'etag-inventory-01',
+  };
+
+  const LOGIN_CALL = {
+    method: 'POST',
+    path: '/api/v1/auth/login',
+  };
+
+  function vaultCall() {
+    return call(
+      'after',
+      { method: 'GET', path: '/api/v1/vault' },
+      { status: 200, body: VAULT_BODY },
+    );
+  }
+
+  test('the four bodies redact without a refusal, and availability and the blob inventory pass unchanged', () => {
+    const input = transcriptOf(
+      call('after', LOGIN_CALL, { status: 200, body: LOGIN_BODY }),
+      call(
+        'after',
+        { method: 'GET', path: '/api/v1/youtube/availability' },
+        { status: 200, body: AVAILABILITY_BODY },
+      ),
+      vaultCall(),
+      call(
+        'after',
+        { method: 'GET', path: '/api/v1/vault/blobs' },
+        { status: 200, body: BLOBS_BODY },
+      ),
+    );
+    const result = redactOk(input);
+    const calls = (result.transcript as Transcript).scenarios[0].calls;
+    assert.equal(calls.length, 4);
+    assert.deepEqual(calls[1].response, {
+      status: 200,
+      body: AVAILABILITY_BODY,
+    });
+    assert.deepEqual(calls[3].response, { status: 200, body: BLOBS_BODY });
+  });
+
+  test('the vault meta keeps its safe fields, and each key-derivation and wrapped-key value is shortened as one value', () => {
+    const result = redactOk(transcriptOf(vaultCall()));
+    assert.deepEqual(onlyCall(result.transcript).response, {
+      status: 200,
+      body: {
+        meta: {
+          version: 1,
+          kdf_name: 'argon2id',
+          kdf_salt: 'SALTH…[ciphertext, 20 chars]',
+          kdf_params: '[ciphertext]',
+          wrapped_mk_passphrase: '[ciphertext]',
+          wrapped_mk_recovery: '[ciphertext]',
+        },
+        updatedAt: TIMESTAMP,
+        etag: 'etag-vault-01',
+      },
+    });
+    assert.deepEqual(result.shortened, [
+      'scenarios[0].calls[0].response.body.meta.kdf_salt',
+      'scenarios[0].calls[0].response.body.meta.kdf_params',
+      'scenarios[0].calls[0].response.body.meta.wrapped_mk_passphrase',
+      'scenarios[0].calls[0].response.body.meta.wrapped_mk_recovery',
+    ]);
+    assert.deepEqual(result.withheld, []);
+  });
+
+  test('no nested key or value of kdf_params or a wrapped key reaches the output', () => {
+    const result = redactOk(transcriptOf(vaultCall()));
+    const text = JSON.stringify(result);
+    for (const nestedKey of ['memory', 'iterations', 'parallelism', 'nonce']) {
+      assert.ok(!text.includes(`"${nestedKey}"`), `nested key ${nestedKey}`);
+    }
+    assertNoLeak(text, NESTED);
+  });
+
+  test('a string kdf_salt shows its first five characters and its length, never the rest', () => {
+    const result = redactOk(transcriptOf(vaultCall()));
+    const salt = (
+      onlyCall(result.transcript).response as {
+        body: { meta: { kdf_salt: unknown } };
+      }
+    ).body.meta.kdf_salt;
+    assert.equal(salt, 'SALTH…[ciphertext, 20 chars]');
+    assertNoLeak(JSON.stringify(result), 'LATERTAIL');
+  });
+
+  test('an array value of a key-derivation or wrapped key prints as [ciphertext]', () => {
+    const result = redactOk(
+      transcriptOf(
+        call(
+          'after',
+          { method: 'GET', path: '/api/v1/vault' },
+          {
+            status: 200,
+            body: {
+              meta: { kdf_params: [NESTED, 3], wrapped_mk_recovery: [NESTED] },
+            },
+          },
+        ),
+      ),
+    );
+    assert.deepEqual(onlyCall(result.transcript).response, {
+      status: 200,
+      body: {
+        meta: {
+          kdf_params: '[ciphertext]',
+          wrapped_mk_recovery: '[ciphertext]',
+        },
+      },
+    });
+    assertNoLeak(JSON.stringify(result), NESTED);
+  });
+
+  test('login: the token is withheld and expires_in passes with its numeric value', () => {
+    const result = redactOk(
+      transcriptOf(
+        call('after', LOGIN_CALL, { status: 200, body: LOGIN_BODY }),
+      ),
+    );
+    const { body } = onlyCall(result.transcript).response as {
+      body: { token: unknown; expires_in: unknown; user: unknown };
+    };
+    assert.equal(body.token, '[withheld]');
+    assert.equal(body.expires_in, 900000);
+    assert.deepEqual(body.user, USER);
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].response.body.token',
+    ]);
+    assertNoLeak(JSON.stringify(result), CREDENTIAL);
+  });
+
+  test('a phone, details or unknown key beside the new keys refuses the transcript', () => {
+    const cases: [object, string[]][] = [
+      [
+        {
+          ...LOGIN_BODY,
+          user: { id: USER.id, email: USER.email, phone: NESTED },
+        },
+        ['scenarios[0].calls[0].response.body.user key #3'],
+      ],
+      [
+        { available: true, details: { reason: NESTED } },
+        ['scenarios[0].calls[0].response.body key #2'],
+      ],
+      [
+        { expires_in: 900000, mystery: MYSTERY },
+        ['scenarios[0].calls[0].response.body key #2'],
+      ],
+    ];
+    for (const [body, refusedPaths] of cases) {
+      const result = redactTranscript(
+        transcriptOf(call('after', LOGIN_CALL, { status: 200, body })),
+      );
+      assert.deepEqual(result, { ok: false, refusedPaths });
+      assertNoLeak(JSON.stringify(result), NESTED);
+      assertNoLeak(JSON.stringify(result), MYSTERY);
+    }
+  });
+
+  test('an unknown key nested inside user, blobs or meta refuses the transcript', () => {
+    const cases: [object, string[]][] = [
+      [
+        { user: { ...USER, nickname: MYSTERY } },
+        ['scenarios[0].calls[0].response.body.user key #8'],
+      ],
+      [
+        {
+          blobs: [{ ...BLOBS_BODY.blobs[0], mystery: MYSTERY }],
+          etag: 'etag-inventory-01',
+        },
+        ['scenarios[0].calls[0].response.body.blobs[0] key #4'],
+      ],
+      [
+        { meta: { version: 1, mystery: MYSTERY } },
+        ['scenarios[0].calls[0].response.body.meta key #2'],
+      ],
+    ];
+    for (const [body, refusedPaths] of cases) {
+      const result = redactTranscript(
+        transcriptOf(call('after', LOGIN_CALL, { status: 200, body })),
+      );
+      assert.deepEqual(result, { ok: false, refusedPaths });
+      assertNoLeak(JSON.stringify(result), MYSTERY);
+    }
+  });
+
+  test('a disabled boolean passes unchanged', () => {
+    const input = transcriptOf(
+      call('after', LOGIN_CALL, {
+        status: 200,
+        body: { ...LOGIN_BODY, user: { ...USER, disabled: true } },
+      }),
+    );
+    const result = redactOk(input);
+    assert.deepEqual(onlyCall(result.transcript).response, {
+      status: 200,
+      body: {
+        token: '[withheld]',
+        expires_in: 900000,
+        user: { ...USER, disabled: true },
+      },
+    });
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].response.body.token',
+    ]);
+  });
+
+  test('URL parameters named with the new safe keys pass unchanged', () => {
+    for (const path of [
+      '/x?user=1',
+      '/x?user=1&expires_in=900000&kdf_name=argon2id',
+    ]) {
+      const input = afterRequest({ method: 'GET', path });
+      assert.deepEqual(redactOk(input).transcript, input, path);
+    }
+    const query = afterRequest({
+      method: 'GET',
+      path: '/api/v1/vault/blobs',
+      query: 'available=true&blobs=1&disabled=false',
+    });
+    assert.deepEqual(redactOk(query).transcript, query);
+  });
+
+  test('a URL parameter named with a ciphertext key is withheld as a whole segment, its name and value never printed', () => {
+    for (const key of [
+      'kdf_salt',
+      'kdf_params',
+      'wrapped_mk_passphrase',
+      'wrapped_mk_recovery',
+    ]) {
+      const result = redactOk(
+        afterRequest({ method: 'GET', path: `/x?${key}=SALTURL01` }),
+      );
+      const { path } = onlyCall(result.transcript).request as { path: string };
+      assert.equal(path, '/x?[withheld]', key);
+      assert.deepEqual(
+        result.withheld,
+        ['scenarios[0].calls[0].request.path'],
+        key,
+      );
+      const text = JSON.stringify(result);
+      assert.ok(!text.includes(key), `name ${key} printed`);
+      assertNoLeak(text, 'SALTURL01');
+    }
+    const mixed = redactOk(
+      afterRequest({ method: 'GET', path: '/x?page=2&kdf_salt=SALTURL01' }),
+    );
+    const mixedRequest = onlyCall(mixed.transcript).request as { path: string };
+    assert.equal(mixedRequest.path, '/x?page=2&[withheld]');
+    const query = redactOk(
+      afterRequest({ method: 'GET', path: '/x', query: 'kdf_salt=SALTURL01' }),
+    );
+    const queryRequest = onlyCall(query.transcript).request as {
+      query: string;
+    };
+    assert.equal(queryRequest.query, '[withheld]');
+  });
+});
