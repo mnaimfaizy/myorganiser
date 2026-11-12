@@ -45,5 +45,5 @@ Reconcile's download of the server wrapping (made only when no Local Vault exist
 - Clock skew between devices decides merges here exactly as it already does in convergence.
 - Leaving a record out of a page save no longer deletes it in any path. Every page delete passes the deleted id, which writes the Deletion Log.
 - A record a stale tab adds lands after the stored records, not where that tab placed it. Pages that sort are unaffected.
-- A legacy record stored with no `id` gets a fresh id each time it is normalized, so a merge can see it under two ids and keep both. This is a known residue, not fixed here.
+- A stored entry with no usable `id`, such as a legacy string address or mobile number, is dropped from the stored side before it is normalized, as the merge already drops an entry it cannot match by `id`. Normalizing it would mint a fresh id, and the page's write-back mints another, so keeping it would store two copies. An entry the page loaded persists through the page's normalized write-back, which carries it with an id. An id-less entry the page never loaded is dropped, as convergence already drops it; only a pre-id client writing after the page loaded could leave one.
 - A stale Groceries tab can still replace what another tab stored, when its first attempt meets no contention.

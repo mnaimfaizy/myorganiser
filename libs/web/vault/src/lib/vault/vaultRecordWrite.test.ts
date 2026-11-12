@@ -13,6 +13,7 @@ import {
 } from './localVaultAccess';
 import type { EncryptedBlob, VaultRecordType } from './localVaultStorage';
 import { normalizeSubscriptions } from './subscriptionRecordNormalization';
+import { normalizeTasks } from './taskNormalization';
 import {
   type EditableVaultRecordType,
   type VaultRecordStore,
@@ -509,6 +510,225 @@ describe('vaultRecordWrite', () => {
         });
       },
     );
+  });
+
+  describe('legacy stored entries with no usable id (#1501)', () => {
+    const EARLIER = '2026-01-01T09:00:00.000Z';
+    const LATER = '2026-01-01T10:00:00.000Z';
+    const CREATED_AT = '2026-01-01T00:00:00.000Z';
+
+    // The page loads a legacy entry, normalizes it (minting an id), and saves
+    // that normalized list back. The stored side must not mint a second copy.
+
+    test('a legacy string address is written once, under the id the page write-back holds', async () => {
+      const stored = ['1 Main St'];
+      loadWithCiphertextMock.mockResolvedValue(holding(stored));
+      const pageCopies = normalizeAddresses(stored).value;
+
+      const result = await saveVaultRecords(store, 'addresses', pageCopies);
+
+      expect(pageCopies).toHaveLength(1);
+      expect(pageCopies[0]).toMatchObject({ address: '1 Main St' });
+      expect(typeof pageCopies[0].id).toBe('string');
+      expect(pageCopies[0].id.length).toBeGreaterThan(0);
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'addresses',
+        value: { records: [pageCopies[0]], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual(pageCopies);
+    });
+
+    test('a legacy string mobile number is written once, under the id the page write-back holds', async () => {
+      const stored = ['0400111222'];
+      loadWithCiphertextMock.mockResolvedValue(holding(stored));
+      const pageCopies = normalizeMobileNumbers(stored).value;
+
+      const result = await saveVaultRecords(store, 'mobileNumbers', pageCopies);
+
+      expect(pageCopies).toHaveLength(1);
+      expect(pageCopies[0]).toMatchObject({ mobileNumber: '0400111222' });
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'mobileNumbers',
+        value: { records: [pageCopies[0]], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual(pageCopies);
+    });
+
+    test('a stored Task with no id is written once, under the id the page write-back holds', async () => {
+      const stored = [
+        {
+          title: 'Legacy task',
+          status: 'pending',
+          priority: 'medium',
+          archived: false,
+          createdAt: CREATED_AT,
+        },
+      ];
+      loadWithCiphertextMock.mockResolvedValue(holding(stored));
+      const pageCopies = normalizeTasks(stored).value;
+
+      const result = await saveVaultRecords(store, 'tasks', pageCopies);
+
+      expect(pageCopies).toHaveLength(1);
+      expect(pageCopies[0]).toMatchObject({ title: 'Legacy task' });
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'tasks',
+        value: { records: [pageCopies[0]], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual(pageCopies);
+    });
+
+    test('a stored Subscription with no id is written once, under the id the page write-back holds', async () => {
+      const stored = [
+        {
+          name: 'Streamer',
+          startDate: CREATED_AT,
+          status: 'active',
+          updatedAt: EARLIER,
+        },
+      ];
+      loadWithCiphertextMock.mockResolvedValue(holding(stored));
+      const pageCopies = normalizeSubscriptions(stored).value;
+
+      const result = await saveVaultRecords(store, 'subscriptions', pageCopies);
+
+      expect(pageCopies).toHaveLength(1);
+      expect(pageCopies[0]).toMatchObject({ name: 'Streamer' });
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'subscriptions',
+        value: { records: [pageCopies[0]], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual(pageCopies);
+    });
+
+    test('a stale list saved over a stored legacy string adds no copy minted from it: the write is the id-bearing records only', async () => {
+      const addressA = normalizeAddresses([
+        {
+          id: 'AD1',
+          label: 'Home',
+          address: '2 High St',
+          createdAt: CREATED_AT,
+          updatedAt: EARLIER,
+        },
+      ]).value[0];
+      const addressB = normalizeAddresses([
+        {
+          id: 'AD2',
+          label: 'Work',
+          address: '3 Low Rd',
+          createdAt: CREATED_AT,
+          updatedAt: LATER,
+        },
+      ]).value[0];
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: ['1 Main St', addressA], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, 'addresses', [
+        addressA,
+        addressB,
+      ]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'addresses',
+        value: { records: [addressA, addressB], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual([addressA, addressB]);
+    });
+
+    test('a stored id-less entry the page never loaded is dropped, by decision (ADR 0143)', async () => {
+      const addressA = normalizeAddresses([
+        {
+          id: 'AD1',
+          label: 'Home',
+          address: '2 High St',
+          createdAt: CREATED_AT,
+          updatedAt: EARLIER,
+        },
+      ]).value[0];
+      const addressB = normalizeAddresses([
+        {
+          id: 'AD2',
+          label: 'Work',
+          address: '3 Low Rd',
+          createdAt: CREATED_AT,
+          updatedAt: LATER,
+        },
+      ]).value[0];
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: ['9 Unseen Rd', addressA], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, 'addresses', [
+        addressA,
+        addressB,
+      ]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'addresses',
+        value: { records: [addressA, addressB], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual([addressA, addressB]);
+    });
+
+    test('a stored null entry and an object whose id is a number are dropped, and each page record is written once', async () => {
+      // A numeric id is not a usable id, but the address normalizer would mint
+      // a fresh string id for it. Without the filter that copy would survive.
+      const addressA = normalizeAddresses([
+        {
+          id: 'AD1',
+          label: 'Home',
+          address: '2 High St',
+          createdAt: CREATED_AT,
+          updatedAt: EARLIER,
+        },
+      ]).value[0];
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({
+          records: [null, { id: 42, label: 'x', address: 'y' }, addressA],
+          deletions: {},
+        }),
+      );
+
+      const result = await saveVaultRecords(store, 'addresses', [addressA]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'addresses',
+        value: { records: [addressA], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual([addressA]);
+    });
+
+    test('stored records that are not an array are read as empty, and the page records are written', async () => {
+      const taskA = validTask('T1', 'Mine', EARLIER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: 'garbage', deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, 'tasks', [taskA]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'tasks',
+        value: { records: [taskA], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual([taskA]);
+    });
   });
 
   describe('unknown envelope keys (ADR 0114 decision 3)', () => {

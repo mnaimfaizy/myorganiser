@@ -30,9 +30,9 @@ export type StoredRecordNormalizer = (
  * attempt and merges only on contention, so it has no stored side to
  * normalize first (#1501 left Groceries out of scope).
  *
- * A legacy record stored with no `id` gets a fresh `randomId()` each time it
- * is normalized, so it can reach the merge under two ids and be kept twice.
- * That is a known residue, not fixed here.
+ * A stored entry with no usable `id` never reaches these: `readStored` in
+ * `vaultRecordWrite.ts` drops it first, because normalizing would mint it an
+ * id the page's own write-back does not share.
  *
  * The `satisfies` clause is the guard (ADR 0053): a sixth Vault Blob Type fails
  * to compile here until somebody decides how its stored side is read.
