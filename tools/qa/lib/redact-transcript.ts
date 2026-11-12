@@ -94,6 +94,13 @@ const CIPHERTEXT_KEYS = new Set(
     'encryptedData',
     'encryptedVault',
     'wrappedMasterKey',
+    // vault key-derivation and wrapped master keys (#1515). kdf_params and the
+    // wrapped_mk_* values are open JSON on the server, so they are shortened as
+    // one value: no nested key or value is read or printed.
+    'kdf_salt',
+    'kdf_params',
+    'wrapped_mk_passphrase',
+    'wrapped_mk_recovery',
     'iv',
     'nonce',
   ].map((key) => key.toLowerCase()),
@@ -152,6 +159,18 @@ const SAFE_KEYS = new Set(
     'updatedAt',
     'deletedAt',
     'userId',
+    // response bodies of sign-in, YouTube availability and the vault (#1515).
+    // `user`, `blobs` and `meta` are containers: each nested key is classified
+    // on its own. `phone` and `details` are left out on purpose.
+    'expires_in',
+    'available',
+    'user',
+    'firstName',
+    'lastName',
+    'disabled',
+    'blobs',
+    'meta',
+    'kdf_name',
     // query parameters the backend reads (apps/backend @Query()). Left out on
     // purpose: cursor, channelId, trackingIssueNumber (opaque or id-like; the
     // runner, #1512, adds what real calls need). `code` is not safe anywhere.
