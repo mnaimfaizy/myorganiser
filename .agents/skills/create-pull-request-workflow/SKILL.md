@@ -30,6 +30,7 @@ Humans (or CI) may still run `yarn ai:create-pr` with no `--title` / `--body-fil
 - Do not run `gh pr create` or `git push` directly. The only PR entry point is `corepack yarn ai:create-pr`.
 - Always pass `--title`, `--body-file`, and `--merge-base` from the `PrAuthor` draft.
 - The `MERGE-BASE:` SHA is the draft's proof that `PrAuthor` actually inspected the branch. The runner recomputes the merge base and rejects any agent-path invocation whose SHA is missing or wrong, so a draft returned without one is not publishable — send `PrAuthor` back to inspect the branch rather than filling the SHA in yourself. See #456.
+- The runner reads the body's `**Door:**` line with the Merge Train's own reader and refuses, before pushing, a body whose Door line is missing or unreadable. Send the draft back to `PrAuthor` with the runner's message rather than editing the Door line yourself.
 - If the draft includes a `LABELS:` line, pass each Surface Label with `--label`. Omit `--label` when the line is absent (default: unlabeled).
 - Do not invent labels. The runner rejects names that are not Surface Labels in `tools/config/github-labels.json` (ADR 0025); the only other names it accepts are the Request Labels in that file's `triggers` list — `agent-review`, which asks the CI code review to run on the new Pull Request (ADR 0070 item 7), and `golden-replay`, which asks for a Golden Set replay (ADR 0109).
 - Push the branch upstream if it is not already tracked (the runner does this).

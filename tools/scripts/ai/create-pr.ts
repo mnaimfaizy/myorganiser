@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,6 +13,7 @@ import {
   syncSurfaceLabelChanges,
   type GithubLabelCatalog,
 } from '../lib/github-labels.ts';
+import { checkDoorLine, suppliedBodyFrom } from '../lib/pr-door-line.ts';
 import {
   checkMergeBaseProof,
   isAgentDraftInvocation,
@@ -34,8 +35,8 @@ const usage = `Usage:
 Options:
   --base <branch>         Base branch for the pull request. Defaults to origin/HEAD or main.
   --title <text>          Pull request title. Agent sessions pass the PrAuthor draft; falls back to commit-derived text when omitted.
-  --body <text>           Pull request body text. Counts as an agent draft, so --merge-base is required with it.
-  --body-file <path>      Read the pull request body from a file. Agent sessions pass the PrAuthor draft here.
+  --body <text>           Pull request body text. Counts as an agent draft, so --merge-base is required with it, and it must carry a Merge danger Door line the Merge Train can read.
+  --body-file <path>      Read the pull request body from a file. Agent sessions pass the PrAuthor draft here. It must carry a Merge danger Door line the Merge Train can read, or nothing is pushed.
   --merge-base <sha>      Merge-base SHA the draft was written from. Required whenever --title or --body-file is passed; it is the PrAuthor draft's MERGE-BASE line and must match this branch.
   --reviewer <login>      Reviewer to request. Repeat the flag or pass a comma-separated list.
   --label <name>          Surface Label (ADR 0025) or a Request Label from the triggers list in tools/config/github-labels.json to apply. Repeat the flag or pass a comma-separated list. Default: none.
@@ -164,6 +165,12 @@ function parseArgs(argv: string[]): CreatePrOptions {
     fail(`Unknown argument: ${arg}`);
   }
 
+  // Refused here, before anything is pushed, so the body the Door gate reads
+  // is the only body that can be published.
+  if (options.body && options.bodyFile) {
+    fail('Provide either --body or --body-file, not both.');
+  }
+
   return options;
 }
 
@@ -258,6 +265,24 @@ function ensureMergeBaseProof(
     isAgentDraft: isAgentDraftInvocation(options),
     suppliedMergeBase: options.mergeBase,
   });
+
+  if (!result.ok) {
+    fail(result.message);
+  }
+}
+
+function ensureReadableDoorLine(options: CreatePrOptions): void {
+  let suppliedBody: string | null;
+  try {
+    suppliedBody = suppliedBodyFrom(options, (path) =>
+      readFileSync(path, 'utf8'),
+    );
+  } catch (error) {
+    fail(
+      `Unable to read --body-file ${options.bodyFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const result = checkDoorLine({ suppliedBody });
 
   if (!result.ok) {
     fail(result.message);
@@ -534,10 +559,6 @@ function readBody(
   branch: string,
   baseBranch: string,
 ): string | SpawnedBodySource {
-  if (options.body && options.bodyFile) {
-    fail('Provide either --body or --body-file, not both.');
-  }
-
   if (options.bodyFile) {
     return options.bodyFile;
   }
@@ -717,6 +738,7 @@ const mergeBase = getMergeBase(baseBranch);
 
 ensureNotBaseBranch(branch, baseBranch);
 ensureMergeBaseProof(options, mergeBase);
+ensureReadableDoorLine(options);
 
 if (!mergeBase) {
   fail(
