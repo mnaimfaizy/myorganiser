@@ -51,13 +51,12 @@ fi
 # House Explainer Pages carry accessibility and self-containment rules that a
 # generalist ships wrong and a reader only discovers in a browser: a root-`<svg>`
 # `<title>` covering the whole canvas got as far as users before anyone reported
-# it. `--staged` filters to the roster itself, so a commit touching an unrelated
-# HTML page under docs/ costs nothing. The roster-coverage half runs in CI, where
-# the whole tree is visible (ADR 0046).
-if ! git diff --cached --quiet --diff-filter=ACMRT -- 'docs/**/*.html'
-then
+# it. `--staged` checks the staged pages plus every page that cites a staged file,
+# so it runs on every commit: a citation goes stale when the cited file moves,
+# and that commit stages no page at all (PR #1513 failed CI on 32 such errors).
+# It reads only the roster's pages, so a commit citing nothing stays cheap. The
+# roster-coverage half runs in CI, where the whole tree is visible (ADR 0046).
 corepack yarn design:hygiene --staged
-fi
 # The full tools/scripts suite set (ADR 0135) takes about 34s in one
 # `node --test` run, so a tooling commit should pay for its own suite rather
 # than the whole set — and a commit outside tooling should pay nothing.

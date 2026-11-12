@@ -45,6 +45,18 @@
  * no `anchors` map) is itself a finding: it asserts nothing, and is not the
  * same as a page that carries no block.
  *
+ * `--staged` checks the staged pages plus every ROSTER or LEGACY page that cites
+ * a staged file. A citation goes stale when the file it cites moves, and that
+ * commit stages the cited file, not the page: PR #1513 edited `ci.yml` and a
+ * Skill, passed pre-commit, and failed CI on 32 anchor mismatches in three pages
+ * it never touched. "Cites" uses the resolver's path-suffix match on every
+ * citation the scanner reads, so a staged deletion counts too. A citation the
+ * scanner does not read (see above) does not pull its page in. The staged path
+ * list comes from the index, but every page, its citations included, and every
+ * cited file is read from the working tree. So a page whose citation exists only
+ * in its staged copy, with an unstaged edit removing it, is not selected; CI's
+ * `--all` run on the commit catches it.
+ *
  * Usage:
  *   node tools/scripts/check-design-hygiene.ts <file> [<file> ...]
  *   node tools/scripts/check-design-hygiene.ts --json <file>
@@ -61,6 +73,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {
+  findCitations,
   fontBlock,
   fontBlockHash,
   scanDesignPage,
@@ -147,16 +160,47 @@ function parseArgs(argv: string[]): DesignHygieneOptions {
   return { printFontBlock, json, all, staged, files };
 }
 
-function stagedHtmlFiles() {
+/**
+ * Whether a citation's `name` names `path`: exactly, or as a `/`-suffix, so
+ * `implement/SKILL.md` names `.agents/skills/implement/SKILL.md`. Shared by
+ * the resolver and by `--staged` selection, so the two cannot drift.
+ */
+function citesPath(path: string, name: string): boolean {
+  return path === name || path.endsWith(`/${name}`);
+}
+
+/** Every staged path, deletions included: a deleted file breaks its citations too. */
+function stagedPaths(): string[] {
   const out = execFileSync(
     'git',
-    ['diff', '--cached', '--name-only', '--diff-filter=ACMRT'],
+    ['diff', '--cached', '--name-only', '--diff-filter=ACMRTD'],
     { encoding: 'utf8' },
   );
   return out
     .split('\n')
     .map((f) => f.trim())
-    .filter((f) => f.endsWith('.html'));
+    .filter(Boolean)
+    .map(posix);
+}
+
+/**
+ * The pages a staged commit can break: the staged HTML pages that still exist,
+ * plus every ROSTER or LEGACY page with a citation naming a staged path
+ * (`citesPath`).
+ */
+function stagedSelection(): string[] {
+  const staged = stagedPaths();
+  const selected = new Set(
+    staged.filter((f) => f.endsWith('.html') && existsSync(f)),
+  );
+  for (const page of [...ROSTER, ...Object.keys(LEGACY)]) {
+    if (selected.has(page) || !existsSync(page)) continue;
+    const cited = findCitations(readFileSync(page, 'utf8'));
+    if (cited.some(({ name }) => staged.some((f) => citesPath(f, name)))) {
+      selected.add(page);
+    }
+  }
+  return [...selected].sort();
 }
 
 function htmlPagesUnderDocs() {
@@ -193,7 +237,7 @@ function prettierIgnoreMatcher(): (file: string) => boolean {
  * has to be found first, and more than one tracked file can share a basename.
  *
  * Reads the index with `git ls-files` rather than walking the filesystem, the
- * same way `stagedHtmlFiles` above already does — `node_modules` alone is
+ * same way `stagedPaths` above already does — `node_modules` alone is
  * gigabytes, and git already knows what belongs to the tree. Outside a git
  * checkout this returns an empty index rather than throwing, so a bare-name
  * citation reports unresolved instead of crashing the run.
@@ -244,8 +288,8 @@ function makeCitationResolver(index: Map<string, string[]>): ResolveCitation {
     const span = endLine !== line ? `${line}-${endLine}` : `${line}`;
     // As in `basenameIndex`: the fallback only satisfies the type.
     const base = name.split('/').pop() ?? name;
-    const candidates = (index.get(base) ?? []).filter(
-      (path) => path === name || path.endsWith(`/${name}`),
+    const candidates = (index.get(base) ?? []).filter((path) =>
+      citesPath(path, name),
     );
     if (candidates.length === 0) {
       return {
@@ -353,7 +397,9 @@ if (options.all) {
 
 const selected = options.all
   ? [...ROSTER, ...Object.keys(LEGACY)]
-  : (options.staged ? stagedHtmlFiles() : (options.files ?? [])).map(posix);
+  : options.staged
+    ? stagedSelection()
+    : (options.files ?? []).map(posix);
 
 for (const file of selected) {
   const inRoster = ROSTER.includes(file);

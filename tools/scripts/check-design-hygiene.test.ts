@@ -1188,3 +1188,240 @@ test('anchor comparison unescapes HTML entities', (t) => {
   assert.equal(result.status, 0, result.stdout);
   assert.doesNotMatch(result.stdout, /citation-anchor-mismatch/);
 });
+
+// --- --staged selection (#1513) -----------------------------------------------
+//
+// `--staged` checks the staged pages and every ROSTER or LEGACY page that cites a
+// staged file, so a commit that moves a cited file cannot pass pre-commit and fail
+// CI on the page it never touched. Selection reads the index (`git diff --cached`)
+// and the citation resolver reads the index too (`git ls-files`). A selected page's
+// content, and the file each anchor names, are read from the working tree. Each
+// test commits a baseline, stages only the change it names, and asserts the index
+// before it runs the checker, so a failed `git add` or `git rm` fails at the
+// precondition rather than surfacing as a checker assertion.
+
+const CITED_FILE = 'tools/scripts/lib/cited-fixture.ts';
+const CITED_FIRST_LINE = 'export const first = 1;';
+const MOVED_CITED_FILE = `// inserted at top\n${CITED_FIRST_LINE}\nexport const second = 2;\n`;
+const UNCITED_FILE = 'tools/scripts/lib/uncited-fixture.ts';
+const CITING_PAGE = 'docs/sandcastle/waves.html';
+const LEGACY_CITING_PAGE = 'docs/vault/lifecycle.html';
+
+/** `gitInWorkspace`, except a non-zero exit fails the test with git's own message. */
+function gitChecked(workspace: string, args: string[]): void {
+  const result = spawnSync('git', args, { cwd: workspace, encoding: 'utf8' });
+  assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
+}
+
+/** The paths `--staged` would see as changed: the index against HEAD, deletions included. */
+function indexChanges(workspace: string): string[] {
+  const result = spawnSync(
+    'git',
+    ['diff', '--cached', '--name-only', '--diff-filter=ACMRTD'],
+    { cwd: workspace, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.split('\n').filter(Boolean).sort();
+}
+
+/** Commits everything written so far, so later changes are the only thing staged. */
+function commitBaseline(workspace: string): void {
+  gitChecked(workspace, ['add', '-A']);
+  gitChecked(workspace, [
+    '-c',
+    'user.name=t',
+    '-c',
+    'user.email=t@t',
+    '-c',
+    'commit.gpgsign=false',
+    'commit',
+    '-qm',
+    'base',
+  ]);
+  assert.deepEqual(
+    indexChanges(workspace),
+    [],
+    'the baseline left a staged change',
+  );
+}
+
+interface CitingWorkspaceOptions {
+  /** The name the citing page writes: the full repo path, or a directory-short suffix. */
+  citedAs?: string;
+  /** The page that cites CITED_FILE. A ROSTER or LEGACY path. */
+  page?: string;
+}
+
+/**
+ * A committed workspace where `page` cites line 1 of CITED_FILE with a matching
+ * anchor, and nothing is staged.
+ */
+function committedCitingWorkspace(
+  t: TestContext,
+  { citedAs = CITED_FILE, page = CITING_PAGE }: CitingWorkspaceOptions = {},
+): string {
+  const workspace = createWorkspace(t);
+  write(
+    workspace,
+    CITED_FILE,
+    `${CITED_FIRST_LINE}\nexport const second = 2;\n`,
+  );
+  write(workspace, UNCITED_FILE, 'export const other = 1;\n');
+  write(
+    workspace,
+    page,
+    pageWithCitation((page.split('/').pop() ?? page).replace('.html', ''), {
+      citation: `${citedAs}:1`,
+      anchor: {
+        [`${citedAs}:1`]: { file: CITED_FILE, start: CITED_FIRST_LINE },
+      },
+    }),
+  );
+  commitBaseline(workspace);
+  return workspace;
+}
+
+test('--staged checks a roster page whose cited file moved, though the page is not staged', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  // Precondition: the committed page is clean, so a later failure is the move's.
+  const clean = run(workspace, CITING_PAGE);
+  assert.equal(clean.status, 0, clean.stdout);
+
+  write(workspace, CITED_FILE, MOVED_CITED_FILE);
+  gitChecked(workspace, ['add', CITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [CITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /docs\/sandcastle\/waves\.html/);
+  assert.match(result.stdout, /ERROR citation-anchor-mismatch/);
+  // Selection is by citation, not every roster page: gates.html cites nothing.
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/gates\.html/);
+});
+
+test('--staged checks a LEGACY page whose cited file moved, though the page is not staged', (t) => {
+  const workspace = committedCitingWorkspace(t, { page: LEGACY_CITING_PAGE });
+  const clean = run(workspace, LEGACY_CITING_PAGE);
+  assert.equal(clean.status, 0, clean.stdout);
+
+  write(workspace, CITED_FILE, MOVED_CITED_FILE);
+  gitChecked(workspace, ['add', CITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [CITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /docs\/vault\/lifecycle\.html/);
+  assert.match(result.stdout, /ERROR citation-anchor-mismatch/);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/waves\.html/);
+});
+
+test('--staged selects a page that cites a staged file by a directory-short suffix', (t) => {
+  const workspace = committedCitingWorkspace(t, {
+    citedAs: 'lib/cited-fixture.ts',
+  });
+  // The page names `lib/cited-fixture.ts`, which is not a staged path; only the
+  // suffix match can pull the page in.
+  write(
+    workspace,
+    CITED_FILE,
+    `export const first = 2;\nexport const second = 2;\n`,
+  );
+  gitChecked(workspace, ['add', CITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [CITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /docs\/sandcastle\/waves\.html/);
+  assert.match(result.stdout, /ERROR citation-anchor-mismatch/);
+});
+
+test('--staged selects a page whose cited file is staged for deletion and reports it unresolved', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  gitChecked(workspace, ['rm', '-q', CITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [CITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /docs\/sandcastle\/waves\.html/);
+  assert.match(result.stdout, /ERROR citation-unresolved/);
+  assert.match(result.stdout, /does not exist in the tree/);
+});
+
+test('--staged selects no page for a staged edit to a file no page cites', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  write(workspace, UNCITED_FILE, 'export const other = 2;\n');
+  gitChecked(workspace, ['add', UNCITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [UNCITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, /Design hygiene: 0 error\(s\), 0 warning\(s\)/);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/waves\.html/);
+});
+
+test('--staged does not check a cited file that changed only in the working tree', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  // The same move as the first --staged test, left unstaged: nothing is in the
+  // index, so nothing is selected and the stale anchor is not reported.
+  write(workspace, CITED_FILE, MOVED_CITED_FILE);
+  assert.deepEqual(indexChanges(workspace), []);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 0, result.stdout);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/waves\.html/);
+});
+
+test('--staged reads pages from the working tree, so a citation removed only there does not select its page', (t) => {
+  // Documented limitation, not a feature: selection uses the index's view of the
+  // file list, but the page's citations are read from the working copy. A page
+  // whose citation was removed only in the working tree is not selected, even
+  // though its committed version still cites the staged file.
+  const workspace = committedCitingWorkspace(t);
+  write(workspace, CITING_PAGE, housePage('waves'));
+  write(workspace, CITED_FILE, MOVED_CITED_FILE);
+  gitChecked(workspace, ['add', CITED_FILE]);
+  assert.deepEqual(indexChanges(workspace), [CITED_FILE]);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 0, result.stdout);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/waves\.html/);
+});
+
+test('--staged still checks a staged roster page that has its own defect', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  write(
+    workspace,
+    'docs/sandcastle/gates.html',
+    housePage('gates').replace(
+      '<svg viewBox="0 0 10 10" role="img" aria-label="Diagram"></svg>',
+      '<svg viewBox="0 0 10 10" role="img"><title>Gates</title></svg>',
+    ),
+  );
+  gitChecked(workspace, ['add', 'docs/sandcastle/gates.html']);
+  assert.deepEqual(indexChanges(workspace), ['docs/sandcastle/gates.html']);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /docs\/sandcastle\/gates\.html/);
+  assert.match(result.stdout, /ERROR svg-title-tooltip/);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/waves\.html/);
+});
+
+test('--staged accepts the staged deletion of a roster page without inspecting it; CI --all reports page-missing', (t) => {
+  const workspace = committedCitingWorkspace(t);
+  gitChecked(workspace, ['rm', '-q', 'docs/sandcastle/gates.html']);
+  assert.deepEqual(indexChanges(workspace), ['docs/sandcastle/gates.html']);
+
+  const result = run(workspace, '--staged');
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /docs\/sandcastle\/gates\.html/);
+});

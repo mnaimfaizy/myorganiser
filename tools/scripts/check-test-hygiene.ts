@@ -23,6 +23,29 @@
  *     or node:assert/strict as; console.assert() and other member .assert()
  *     calls never count. The Jest rules above do not apply — jest.mock(),
  *     beforeAll(), and expect() are not part of node --test.
+ *   - Every file above, Jest or Contract Suite: no random-looking fixture
+ *     (`random-looking-fixture`). GitGuardian's Generic High Entropy Secret
+ *     detector fails a Pull Request on a value that looks random and is bound
+ *     to a secret-sounding name, keyword or not: `const HEX_TOKEN =
+ *     'a3f9c2…'` failed PR #1513. This rule asserts the one direction that bit:
+ *     a literal of 16+ characters from the base64/hex alphabet, bound by `=`
+ *     or `:` to a name carrying a secret word. It passes only an allow-list of
+ *     visibly non-random shapes (one character repeated, a mostly
+ *     sequential run, a one-case word block of 12 or fewer repeated, or base64
+ *     of words of 12 letters or fewer and numbers of 6 digits or fewer joined
+ *     by separators), so any other shape fails closed, because nothing in a
+ *     fixture is a secret (ADR 0122). It is a lint against an accidental
+ *     random-looking fixture, not a security boundary, and it does not assert
+ *     the other direction. A random value bound to a neutral name, built at
+ *     runtime, passed through a call (`Buffer.from('…', 'hex')`), written with
+ *     a character outside the alphabet (a raw hyphenated UUID,
+ *     `Bearer <token>`), or base64 of short random words joined by separators
+ *     is not caught, so this rule does not replace GitGuardian. It reads the
+ *     raw text, comments included, and a secret word inside a longer name
+ *     (`monkey`) counts: both err toward a false alarm, never a miss. A
+ *     multi-character block repeated is not on the allow-list: GitGuardian
+ *     flagged `'0f1e2d3c'` written out four times as a 32-character literal on
+ *     PR #1517.
  *   - apps/web-e2e specs: not asserted here at all. Their structural rules
  *     are a judgment call TestReviewer makes by reading the file against
  *     .agents/skills/playwright-e2e-workflow/references/e2e-patterns.md.
@@ -64,6 +87,8 @@ rules above do not run against it. It is still required to assert something:
 a Contract Suite with no node:assert or t.assert… call fails. An assert call
 counts only under the name the file imports node:assert as, so console.assert()
 does not count.
+Every file checked, Jest or Contract Suite, also fails on a random-looking
+literal bound to a secret-sounding name (random-looking-fixture).
 `;
 
 const TEST_PATHS = [
@@ -301,6 +326,94 @@ function checkVacuousAssertions(
   }
 }
 
+const SECRET_WORD_RE =
+  /token|secret|key|passw|pwd|auth|credential|bearer|cookie|session|signature|salt|nonce|hmac/i;
+/** `name = 'value'` or `name: 'value'` (quoted key too), value one opaque blob. */
+const BOUND_LITERAL_RE =
+  /([A-Za-z_$][\w$]*)['"]?\s*[:=]\s*(['"`])([A-Za-z0-9+/]{16,}={0,2})\2/g;
+
+/**
+ * Repeats a block of 8 characters or fewer, like `0f1e2d3c0f1e2d3c`. Trailing
+ * base64 padding is ignored, so `AAAAAAAAAAAAAAAAAAAAAA==` counts.
+ */
+function isPeriodic(padded: string, maxPeriod = 8): boolean {
+  const value = padded.replace(/=+$/, '');
+  for (let period = 1; period <= maxPeriod; period++) {
+    let repeats = true;
+    for (let i = period; i < value.length && repeats; i++) {
+      repeats = value[i] === value[i - period];
+    }
+    if (repeats) return true;
+  }
+  return false;
+}
+
+/** Steps up by one code point at three quarters or more of its positions. */
+function isSequential(value: string): boolean {
+  let steps = 0;
+  for (let i = 1; i < value.length; i++) {
+    if (value.charCodeAt(i) - value.charCodeAt(i - 1) === 1) steps++;
+  }
+  return steps / (value.length - 1) >= 0.75;
+}
+
+/**
+ * Decoded text that passes as readable: words of 12 letters or fewer and
+ * numbers of 6 digits or fewer, joined by separators, such as
+ * `address-ct-123`. An allow-list, so a piece mixing letters and digits
+ * (`a3f9c2d8`), a long random run, or one unseparated run is not readable.
+ */
+const READABLE_TEXT_RE =
+  /^(?:[A-Za-z]{1,12}|\d{1,6})(?:[\s\-_.:/]+(?:[A-Za-z]{1,12}|\d{1,6}))+$/;
+
+/** Canonical base64 of readable text, like `YWRkcmVzcy1jdC0xMjM=`. */
+function isReadableBase64(value: string): boolean {
+  if (value.length % 4 !== 0) return false;
+  const decoded = Buffer.from(value, 'base64').toString('latin1');
+  return (
+    READABLE_TEXT_RE.test(decoded) &&
+    Buffer.from(decoded, 'latin1').toString('base64') === value
+  );
+}
+
+/**
+ * Letters of one case repeating a block of 12 or fewer, like
+ * `WRAPPEDKEYWRAPPEDKEY`. A random one-case run does not repeat, so it fails.
+ */
+function isRepeatedWord(value: string): boolean {
+  return /^(?:[a-z]+|[A-Z]+)$/.test(value) && isPeriodic(value, 12);
+}
+
+/**
+ * 16+ characters of the base64/hex alphabet that are not on the allow-list of
+ * visibly non-random shapes: one character repeated (`AAAA…==`), sequential,
+ * a repeated one-case word
+ * (`WRAPPEDKEYWRAPPEDKEY`), or base64 of readable text. Everything
+ * else counts as random, so a new encoding fails closed.
+ */
+function looksRandom(value: string): boolean {
+  return (
+    /^[A-Za-z0-9+/]{16,}={0,2}$/.test(value) &&
+    !isRepeatedWord(value) &&
+    !isPeriodic(value, 1) &&
+    !isSequential(value) &&
+    !isReadableBase64(value)
+  );
+}
+
+function checkRandomLookingFixtures(raw: string, findings: Finding[]) {
+  for (const match of raw.matchAll(BOUND_LITERAL_RE)) {
+    const [, name, , value] = match;
+    if (!SECRET_WORD_RE.test(name) || !looksRandom(value)) continue;
+    findings.push({
+      level: 'error',
+      rule: 'random-looking-fixture',
+      line: lineOf(raw, match.index),
+      message: `${name} is bound to a random-looking literal. GitGuardian fails a Pull Request on that shape even in a test. Use a value that is visibly not random — a readable sentinel such as 'SYNTH-TOKEN-1', or a value built at runtime such as '0f1e2d3c'.repeat(4) — see docs/testing/README.md#credentials-in-test-fixtures.`,
+    });
+  }
+}
+
 const CHECKS = [
   checkMockOrdering,
   checkBeforeAllMocks,
@@ -458,6 +571,7 @@ async function inspect(file: string): Promise<Finding[]> {
   const code = maskNonCode(raw);
   const findings: Finding[] = [];
   for (const check of CHECKS) check(code, raw, findings);
+  checkRandomLookingFixtures(raw, findings);
   const total = await countAssertions(file, raw, code, expectPattern);
   checkVacuousAssertions(code, raw, findings, total);
   findings.sort((a, b) => a.line - b.line);
@@ -499,16 +613,18 @@ const contractSuitePattern: AssertionPattern = (raw) => {
 async function inspectContractSuite(file: string): Promise<Finding[]> {
   const raw = normalize(await fs.readFile(file, 'utf8'));
   const code = maskNonCode(raw);
+  const findings: Finding[] = [];
+  checkRandomLookingFixtures(raw, findings);
   const total = await countAssertions(file, raw, code, contractSuitePattern);
-  if (total > 0) return [];
-  return [
-    {
+  if (total === 0) {
+    findings.push({
       level: 'error',
       rule: 'no-assertions',
       line: 1,
       message: `No assert()/assert.<method>()/t.assert… call found in ${file}. A Contract Suite (ADR 0135) asserts with node:assert, not expect() — add at least one assertion.`,
-    },
-  ];
+    });
+  }
+  return findings;
 }
 
 function isE2E(file: string) {

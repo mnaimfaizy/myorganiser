@@ -713,7 +713,7 @@ describe('bare tokens and opaque keys', () => {
 });
 
 describe('every = splits a parameter, and only short identifiers print', () => {
-  const HEX_TOKEN = 'a3f9c2d8e1b74f6a9c0d2e5f8a1b3c4d';
+  const HEX_TOKEN = '0f1e2d3c'.repeat(4);
 
   test('a credential pair after a second = withholds the whole segment, raw or encoded, and its value is absent', () => {
     const cases: [string, string][] = [

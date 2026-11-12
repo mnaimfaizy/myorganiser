@@ -233,10 +233,14 @@ cannot be written within the rule, stop and say so rather than improvising.
 > instead, not to work around the scanner.
 
 GitGuardian also scans every Pull Request, and it is wider than the hook. It flags a random-looking
-literal with no credential keyword near it as a `Generic High Entropy Secret`. A 32-character
-random hex `HEX_TOKEN` in a redactor test failed Pull Request #1513 this way. When a test needs a
-value shaped like a token, write one that is visibly not random: a repeated or sequential run such
-as `0123456789abcdef0123456789abcdef`, or a readable sentinel. Nothing in a fixture is a secret, so
-nothing in it should look like one
+literal bound to a secret-sounding name as a `Generic High Entropy Secret`, keyword or not. A
+32-character random hex `HEX_TOKEN` in a redactor test failed Pull Request #1513 this way. When a
+test needs a value shaped like a token, write one that is visibly not random: a readable sentinel
+such as `SYNTH-TOKEN-1`, a sequential run such as `0123456789abcdef`, or a short block repeated at
+runtime (`'0f1e2d3c'.repeat(4)`). Do not write the repeated block out in full: GitGuardian flagged
+that 32-character literal on Pull Request #1517, and the rule fails it too. Nothing in a fixture is a secret, so nothing in it
+should look like one
 ([ADR 0122](../adr/0122-a-qa-accounts-credentials-are-public-fixtures-in-tracked-source.md)).
-There is no local check for this rule, so the scaffold has to keep it.
+`yarn test:hygiene` enforces this as `random-looking-fixture` on every staged test file. It reads
+only a literal bound by `=` or `:` to a name with a secret word in it, so a random value under a
+neutral name, or one built at runtime, still reaches GitGuardian unchecked.
