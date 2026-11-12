@@ -1,4 +1,8 @@
-import { mergeRecordsById, type IdentifiedRecord } from './mergeVaultRecords';
+import {
+  hasMergeableId,
+  mergeRecordsById,
+  type IdentifiedRecord,
+} from './mergeVaultRecords';
 import type { VaultBlobEnvelope } from './vaultBlobEnvelope';
 
 interface TestRecord extends IdentifiedRecord {
@@ -424,5 +428,26 @@ describe('mergeRecordsById', () => {
         at: '2026-01-02T00:00:00.000Z',
       });
     });
+  });
+});
+
+describe('hasMergeableId', () => {
+  test.each([
+    {
+      name: 'an object with a non-empty string id',
+      entry: { id: 'a' },
+      expected: true,
+    },
+    { name: 'null', entry: null, expected: false },
+    { name: 'a string', entry: 'a', expected: false },
+    {
+      name: 'an object with no id',
+      entry: { title: 'no id' },
+      expected: false,
+    },
+    { name: 'an object with an empty id', entry: { id: '' }, expected: false },
+    { name: 'an object with a numeric id', entry: { id: 1 }, expected: false },
+  ])('is $expected for $name', ({ entry, expected }) => {
+    expect(hasMergeableId(entry)).toBe(expected);
   });
 });

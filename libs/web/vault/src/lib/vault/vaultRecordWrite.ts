@@ -1,5 +1,6 @@
 import {
   deleteVaultRecord,
+  hasMergeableId,
   toVaultBlobEnvelope,
   mergeDeletionLogs,
   readDeletionLog,
@@ -127,11 +128,12 @@ async function writeMergingOnContention<TPayload>(
  * number, or a record a pre-id client wrote) is dropped before normalizing.
  * Normalizing would mint it a fresh `randomId()`, and the page's own write-back
  * mints another, so the merge would keep two copies. The merge already drops
- * an entry it cannot match by `id` (`mergeRecordsById`). A legacy entry the
- * page loaded survives: the page's write-back carries its normalized copy,
- * with an id. One the page never loaded is dropped, by decision (ADR 0143):
- * only a pre-id client writing after the page loaded could leave one. Only the
- * stored side is filtered, never the save's own envelope.
+ * an entry it cannot match by `id` (`hasMergeableId`, the test
+ * `mergeRecordsById` applies). A legacy entry the page loaded survives: the
+ * page's write-back carries its normalized copy, with an id. One the page
+ * never loaded is dropped, by decision (ADR 0143): only a pre-id client
+ * writing after the page loaded could leave one. Only the stored side is
+ * filtered, never the save's own envelope.
  */
 function readStored(
   type: VaultRecordType,
@@ -141,19 +143,9 @@ function readStored(
   const normalize = STORED_RECORD_NORMALIZERS[type];
   if (normalize === null) return envelope;
   const records = Array.isArray(envelope.records)
-    ? envelope.records.filter(hasUsableId)
+    ? envelope.records.filter(hasMergeableId)
     : envelope.records;
   return { ...envelope, records: normalize(records) };
-}
-
-/**
- * The identity a merge matches on: the same test `mergeRecordsById` applies
- * to each side's entries (`toRecordArray` in `mergeVaultRecords.ts`).
- */
-function hasUsableId(entry: unknown): boolean {
-  if (typeof entry !== 'object' || entry === null) return false;
-  const id = (entry as { id?: unknown }).id;
-  return typeof id === 'string' && id.length > 0;
 }
 
 /** A deletion to write down in the same save. */

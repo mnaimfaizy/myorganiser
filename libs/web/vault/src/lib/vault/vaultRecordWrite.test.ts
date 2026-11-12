@@ -510,6 +510,93 @@ describe('vaultRecordWrite', () => {
         });
       },
     );
+
+    /**
+     * The #1501 two-tab add, for the types the per-type case above does not
+     * cover in this shape. Tab A wrote record A, which is stored. This page's
+     * stale list holds only record B, which A never saw. No contention: one
+     * save, writing both. Both records go through the real normalizer, so the
+     * expected records are exactly what a page would hold.
+     */
+    test.each([
+      {
+        type: 'addresses' as const,
+        normalize: (payload: unknown) => normalizeAddresses(payload).value,
+        tabA: {
+          id: 'AD-A',
+          label: 'Home',
+          status: 'current',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+        tabB: {
+          id: 'AD-B',
+          label: 'Work',
+          status: 'current',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: LATER,
+        },
+      },
+      {
+        type: 'mobileNumbers' as const,
+        normalize: (payload: unknown) => normalizeMobileNumbers(payload).value,
+        tabA: {
+          id: 'MN-A',
+          label: 'Work',
+          mobileNumber: '0411',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+        tabB: {
+          id: 'MN-B',
+          label: 'Personal',
+          mobileNumber: '0422',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: LATER,
+        },
+      },
+      {
+        type: 'subscriptions' as const,
+        normalize: (payload: unknown) => normalizeSubscriptions(payload).value,
+        tabA: {
+          id: 'SB-A',
+          name: 'Streamer',
+          startDate: RECORD_CREATED_AT,
+          status: 'active',
+          updatedAt: EARLIER,
+        },
+        tabB: {
+          id: 'SB-B',
+          name: 'Cloud Storage',
+          startDate: RECORD_CREATED_AT,
+          status: 'active',
+          updatedAt: LATER,
+        },
+      },
+    ])(
+      'a stale $type list adds its new record beside the stored record another tab wrote, in one save, and resolves with both',
+      async ({ type, normalize, tabA, tabB }) => {
+        const storedA = normalize([tabA])[0];
+        const addedB = normalize([tabB])[0];
+        loadWithCiphertextMock.mockResolvedValue(
+          holding({ records: [storedA], deletions: {} }),
+        );
+
+        const result = await saveVaultRecords(store, type, [addedB]);
+
+        expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+        expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+          type,
+          value: { records: [storedA, addedB], deletions: {} },
+          expectedCiphertext: STORED,
+        });
+        expect(result).toEqual([storedA, addedB]);
+      },
+    );
   });
 
   describe('legacy stored entries with no usable id (#1501)', () => {

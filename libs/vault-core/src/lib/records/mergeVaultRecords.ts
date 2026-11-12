@@ -101,11 +101,20 @@ function toRecordArray<TRecord extends IdentifiedRecord>(
   value: unknown,
 ): TRecord[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (record): record is TRecord =>
-      typeof record === 'object' &&
-      record !== null &&
-      typeof (record as IdentifiedRecord).id === 'string' &&
-      (record as IdentifiedRecord).id.length > 0,
+  return value.filter((record): record is TRecord => hasMergeableId(record));
+}
+
+/**
+ * Whether an entry has the identity a merge unions on: an object whose `id` is
+ * a non-empty string. Anything else is dropped by `mergeRecordsById`, and a
+ * caller that pre-filters a side before merging uses this so the two never
+ * disagree on what counts as an identity.
+ */
+export function hasMergeableId(entry: unknown): entry is IdentifiedRecord {
+  return (
+    typeof entry === 'object' &&
+    entry !== null &&
+    typeof (entry as IdentifiedRecord).id === 'string' &&
+    (entry as IdentifiedRecord).id.length > 0
   );
 }
