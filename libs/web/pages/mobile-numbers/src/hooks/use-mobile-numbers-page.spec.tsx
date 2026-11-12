@@ -457,6 +457,35 @@ describe('useMobileNumbersPage', () => {
       ]);
     });
 
+    it('saves its own list in one call and renders the records the save resolves with, including one another tab stored', async () => {
+      // Another tab stored WORK after this page loaded, so the list the hook holds is [PERSONAL] alone.
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          WORK,
+        ]);
+
+      const { result } = await renderLoaded([PERSONAL]);
+
+      await act(async () => {
+        await result.current.addMobileNumber(mobileValues({ label: 'Travel' }));
+      });
+
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+      expect(saveVaultRecords).toHaveBeenCalledWith(
+        handle,
+        'mobileNumbers',
+        [expect.objectContaining({ label: 'Travel' }), PERSONAL],
+        undefined,
+      );
+      expect(result.current.items).toEqual([
+        expect.objectContaining({ label: 'Travel' }),
+        PERSONAL,
+        WORK,
+      ]);
+    });
+
     it('rejects to the caller, toasts the message, and keeps the items when an add or update save fails', async () => {
       jest.mocked(saveVaultRecords).mockRejectedValue(new Error('disk full'));
 

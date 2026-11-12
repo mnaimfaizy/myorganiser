@@ -12,9 +12,9 @@ import {
 export interface TasksVaultAdapter {
   loadTasks(): Promise<Task[] | null>;
   /**
-   * Saves `tasks` as the whole list, keeping the stored Deletion Log. Returns
-   * the tasks written, which after a contended save include what another
-   * writer stored meanwhile (ADR 0143).
+   * Merges `tasks` into what is stored, keeping the stored Deletion Log.
+   * Returns the tasks written, which include every stored task `tasks` left
+   * out, such as one another tab added since this list was read (ADR 0143).
    */
   saveTasks(tasks: Task[]): Promise<Task[]>;
   /**

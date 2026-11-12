@@ -4,10 +4,15 @@ import type {
 } from '@myorganiser/vault-core';
 
 import {
+  normalizeAddresses,
+  normalizeMobileNumbers,
+} from './contactRecordNormalization';
+import {
   sameStoredCiphertext,
   VaultWriteContendedError,
 } from './localVaultAccess';
 import type { EncryptedBlob, VaultRecordType } from './localVaultStorage';
+import { normalizeSubscriptions } from './subscriptionRecordNormalization';
 import {
   type EditableVaultRecordType,
   type VaultRecordStore,
@@ -25,6 +30,25 @@ const OTHER: EncryptedBlob = { iv: 'iv-other', ciphertext: 'ct-other' };
 /** What `loadDecryptedDataWithCiphertext` answers for a stored value. */
 function holding(value: unknown) {
   return { value, ciphertext: value === null ? null : STORED };
+}
+
+const TASK_CREATED_AT = '2026-01-01T00:00:00.000Z';
+
+/**
+ * A Task in the exact shape the Task normalizer returns for it. A stored copy
+ * is normalized before a merge, so a fixture already in that shape comes back
+ * equal to what the test wrote.
+ */
+function validTask(id: string, title: string, updatedAt: string) {
+  return {
+    id,
+    title,
+    status: 'pending' as const,
+    priority: 'medium' as const,
+    archived: false,
+    createdAt: TASK_CREATED_AT,
+    updatedAt,
+  };
 }
 
 describe('vaultRecordWrite', () => {
@@ -45,12 +69,13 @@ describe('vaultRecordWrite', () => {
     const type: EditableVaultRecordType = 'tasks';
 
     test('should save envelope with deletions from stored payload', async () => {
-      const record1 = { id: 'task-1', title: 'Task 1' };
-      const record2 = { id: 'task-2', title: 'Task 2' };
+      const oldTask = validTask('old-task', 'Old', '2026-01-01T09:00:00.000Z');
+      const record1 = validTask('task-1', 'Task 1', '2026-01-01T10:00:00.000Z');
+      const record2 = validTask('task-2', 'Task 2', '2026-01-01T10:00:00.000Z');
       const records = [record1, record2];
 
       const storedEnvelope: VaultBlobEnvelope<unknown> = {
-        records: [{ id: 'old-task', title: 'Old' }],
+        records: [oldTask],
         deletions: { 'deleted-task': '2026-01-01T10:00:00.000Z' },
       };
       loadWithCiphertextMock.mockResolvedValue(holding(storedEnvelope));
@@ -64,7 +89,7 @@ describe('vaultRecordWrite', () => {
       expect(saveEncryptedDataMock).toHaveBeenCalledWith({
         type,
         value: {
-          records,
+          records: [oldTask, record1, record2],
           deletions: { 'deleted-task': '2026-01-01T10:00:00.000Z' },
         },
         expectedCiphertext: STORED,
@@ -72,12 +97,17 @@ describe('vaultRecordWrite', () => {
     });
 
     test('should save envelope with empty deletions from bare legacy array', async () => {
+      const legacyTask = validTask(
+        'old-task',
+        'Old',
+        '2026-01-01T09:00:00.000Z',
+      );
       const records = [
-        { id: 'task-1', title: 'Task 1' },
-        { id: 'task-2', title: 'Task 2' },
+        validTask('task-1', 'Task 1', '2026-01-01T10:00:00.000Z'),
+        validTask('task-2', 'Task 2', '2026-01-01T10:00:00.000Z'),
       ];
 
-      const legacyPayload = [{ id: 'old-task', title: 'Old' }];
+      const legacyPayload = [legacyTask];
       loadWithCiphertextMock.mockResolvedValue(holding(legacyPayload));
 
       await saveVaultRecords(store, type, records);
@@ -85,7 +115,7 @@ describe('vaultRecordWrite', () => {
       expect(saveEncryptedDataMock).toHaveBeenCalledWith({
         type,
         value: {
-          records,
+          records: [legacyTask, ...records],
           deletions: {},
         },
         expectedCiphertext: STORED,
@@ -207,6 +237,278 @@ describe('vaultRecordWrite', () => {
       expect(envelope.records).toEqual([record2]);
       expect(envelope.deletions['task-1']).toBe(now.toISOString());
     });
+  });
+
+  describe('merge into stored records on every save (ADR 0143 decision 3, #1501)', () => {
+    const type: EditableVaultRecordType = 'tasks';
+    const EARLIER = '2026-01-01T09:00:00.000Z';
+    const LATER = '2026-01-01T10:00:00.000Z';
+
+    test('a stale list that omits a record another tab added keeps that record in the write and the result', async () => {
+      const tabOne = validTask('A', 'Added in tab one', EARLIER);
+      const tabTwo = validTask('B', 'Added in tab two', LATER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [tabOne], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, type, [tabTwo]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [tabOne, tabTwo], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+      expect(result).toEqual([tabOne, tabTwo]);
+    });
+
+    test('a stale copy of a record loses to the newer copy stored', async () => {
+      const newer = validTask('X', 'Newer', LATER);
+      const older = validTask('X', 'Older', EARLIER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [newer], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, type, [older]);
+
+      expect(result).toEqual([newer]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [newer], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('a newer copy of a record from the page replaces the stored copy', async () => {
+      const stored = validTask('X', 'Stored', EARLIER);
+      const edited = validTask('X', 'Edited', LATER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [stored], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, type, [edited]);
+
+      expect(result).toEqual([edited]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [edited], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('a deletion from a stale tab removes the record from the write and records it in the log', async () => {
+      const x = validTask('X', 'Deleted here', EARLIER);
+      const y = validTask('Y', 'Kept', EARLIER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [x, y], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, type, [y], {
+        deletedId: 'X',
+        deletedAt: LATER,
+      });
+
+      expect(result).toEqual([y]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [y], deletions: { X: LATER } },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('a stored deletion is not undone by a stale list that still holds the record', async () => {
+      const staleX = validTask('X', 'Stale copy', EARLIER);
+      const y = validTask('Y', 'Kept', EARLIER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [y], deletions: { X: LATER } }),
+      );
+
+      const result = await saveVaultRecords(store, type, [staleX, y]);
+
+      expect(result).toEqual([y]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [y], deletions: { X: LATER } },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('a record the page leaves out is kept, and no deletion is recorded for it', async () => {
+      const x = validTask('X', 'Stored', EARLIER);
+      const y = validTask('Y', 'Kept', EARLIER);
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [x, y], deletions: {} }),
+      );
+
+      const result = await saveVaultRecords(store, type, [y]);
+
+      expect(result).toEqual([x, y]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [x, y], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('a first save with nothing stored writes its records with an empty Deletion Log, and resolves with them', async () => {
+      const records = [
+        validTask('A', 'First', EARLIER),
+        validTask('B', 'Second', LATER),
+      ];
+      loadWithCiphertextMock.mockResolvedValue(holding(null));
+
+      const result = await saveVaultRecords(store, type, records);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records, deletions: {} },
+        expectedCiphertext: null,
+      });
+      expect(result).toEqual(records);
+    });
+
+    test('an envelope key this build does not know is carried through an uncontended save', async () => {
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({
+          records: [],
+          deletions: {},
+          futureEnvelopeKey: { schema: 2 },
+        }),
+      );
+
+      await saveVaultRecords(store, type, [validTask('A', 'Mine', EARLIER)]);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: {
+          futureEnvelopeKey: { schema: 2 },
+          records: [validTask('A', 'Mine', EARLIER)],
+          deletions: {},
+        },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    test('the stored side is normalized before the merge, so a raw stored copy and a record the normalizer drops do not come back', async () => {
+      // A raw stored copy: untrimmed title and an invalid status. The page
+      // loaded it, normalized it, and saves the normalized copy with the same
+      // updatedAt. A malformed record with no title is dropped by the page.
+      const rawStored = {
+        id: 'T1',
+        title: '  Pay rent  ',
+        status: 'bogus',
+        priority: 'medium',
+        archived: false,
+        createdAt: TASK_CREATED_AT,
+        updatedAt: EARLIER,
+      };
+      const malformed = { id: 'T2', updatedAt: EARLIER };
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({ records: [rawStored, malformed], deletions: {} }),
+      );
+      const normalizedPage = validTask('T1', 'Pay rent', EARLIER);
+
+      const result = await saveVaultRecords(store, type, [normalizedPage]);
+
+      expect(result).toEqual([normalizedPage]);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type,
+        value: { records: [normalizedPage], deletions: {} },
+        expectedCiphertext: STORED,
+      });
+    });
+
+    const RECORD_CREATED_AT = '2026-01-01T00:00:00.000Z';
+
+    /**
+     * One case per editable type whose normalizer repairs a stored field. The
+     * page copy is what the page holds after its load-time normalization; the
+     * stored copy has the same id and updatedAt but the raw field. `dropped` is
+     * a non-object entry, the only kind these three normalizers drop.
+     */
+    test.each([
+      {
+        type: 'addresses' as const,
+        normalize: (payload: unknown) => normalizeAddresses(payload).value,
+        stored: {
+          id: 'AD1',
+          label: '  Home  ',
+          status: 'banana',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+        repaired: { label: 'Home', status: 'current' },
+        omitted: {
+          id: 'AD2',
+          label: 'Kept',
+          status: 'current',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+      },
+      {
+        type: 'mobileNumbers' as const,
+        normalize: (payload: unknown) => normalizeMobileNumbers(payload).value,
+        stored: {
+          id: 'MN1',
+          label: '  Work ',
+          mobileNumber: ' 0400 ',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+        repaired: { label: 'Work', mobileNumber: '0400' },
+        omitted: {
+          id: 'MN2',
+          label: 'Kept',
+          mobileNumber: '0411',
+          usageLocations: [],
+          createdAt: RECORD_CREATED_AT,
+          updatedAt: EARLIER,
+        },
+      },
+      {
+        type: 'subscriptions' as const,
+        normalize: (payload: unknown) => normalizeSubscriptions(payload).value,
+        stored: {
+          id: 'SB1',
+          name: '  Streamer  ',
+          startDate: RECORD_CREATED_AT,
+          status: 'bogus',
+          updatedAt: EARLIER,
+        },
+        repaired: { name: 'Streamer', status: 'active' },
+        omitted: {
+          id: 'SB2',
+          name: 'Kept',
+          startDate: RECORD_CREATED_AT,
+          status: 'active',
+          updatedAt: EARLIER,
+        },
+      },
+    ])(
+      'a stored $type copy the normalizer repairs is merged in its normalized form, a dropped entry does not come back, and a record the page leaves out is kept',
+      async ({ type, normalize, stored, repaired, omitted }) => {
+        const pageCopy = normalize([stored])[0];
+        expect(pageCopy).toMatchObject(repaired);
+        const omittedCopy = normalize([omitted])[0];
+        loadWithCiphertextMock.mockResolvedValue(
+          holding({ records: [stored, omitted, null], deletions: {} }),
+        );
+
+        const result = await saveVaultRecords(store, type, [pageCopy]);
+
+        expect(result).toEqual([pageCopy, omittedCopy]);
+        expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+          type,
+          value: { records: [pageCopy, omittedCopy], deletions: {} },
+          expectedCiphertext: STORED,
+        });
+      },
+    );
   });
 
   describe('unknown envelope keys (ADR 0114 decision 3)', () => {
@@ -466,6 +768,25 @@ describe('vaultRecordWrite', () => {
         expectedCiphertext: STORED,
       });
     });
+
+    test('an uncontended first save writes the payload as composed, even when the stored lists are not in it (out of #1501 scope)', async () => {
+      const payload: GroceriesVaultPayload = { catalog: [], lists: [] };
+      loadWithCiphertextMock.mockResolvedValue(
+        holding({
+          records: { catalog: [], lists: [{ id: 'list-stored' }] },
+          deletions: {},
+        }),
+      );
+
+      await saveGroceriesPayload(store, payload);
+
+      expect(saveEncryptedDataMock).toHaveBeenCalledTimes(1);
+      expect(saveEncryptedDataMock).toHaveBeenCalledWith({
+        type: 'groceries',
+        value: { records: payload, deletions: {} },
+        expectedCiphertext: STORED,
+      });
+    });
   });
 
   describe('contended saves (ADR 0143)', () => {
@@ -529,27 +850,15 @@ describe('vaultRecordWrite', () => {
     }
 
     test('a pull and a User edit made during a save: the stored newer record survives, a pulled record is kept, and the newer User edit wins', async () => {
-      const pulledRecord = {
-        id: 'R',
-        title: 'Pulled',
-        updatedAt: '2026-01-01T11:00:00.000Z',
-      };
-      const pulledNew = {
-        id: 'P',
-        title: 'Added by pull',
-        updatedAt: '2026-01-01T11:30:00.000Z',
-      };
-      const userEdit = {
-        id: 'E',
-        title: 'User edit',
-        updatedAt: '2026-01-01T12:00:00.000Z',
-      };
+      const pulledRecord = validTask('R', 'Pulled', '2026-01-01T11:00:00.000Z');
+      const pulledNew = validTask(
+        'P',
+        'Added by pull',
+        '2026-01-01T11:30:00.000Z',
+      );
+      const userEdit = validTask('E', 'User edit', '2026-01-01T12:00:00.000Z');
       const userRecords = [
-        {
-          id: 'R',
-          title: 'Before pull',
-          updatedAt: '2026-01-01T10:00:00.000Z',
-        },
+        validTask('R', 'Before pull', '2026-01-01T10:00:00.000Z'),
         userEdit,
       ];
       const { store, written } = contendedStore(
@@ -560,11 +869,7 @@ describe('vaultRecordWrite', () => {
               records: [
                 pulledRecord,
                 pulledNew,
-                {
-                  id: 'E',
-                  title: 'Old',
-                  updatedAt: '2026-01-01T09:00:00.000Z',
-                },
+                validTask('E', 'Old', '2026-01-01T09:00:00.000Z'),
               ],
               deletions: {},
             },
@@ -609,16 +914,12 @@ describe('vaultRecordWrite', () => {
     });
 
     test('one contended write: the first write is conditioned on what was read, the retry on the other writer Ciphertext, and the save resolves with the merged records', async () => {
-      const otherRecord = {
-        id: 'X',
-        title: 'Other tab',
-        updatedAt: '2026-01-01T09:00:00.000Z',
-      };
-      const mine = {
-        id: 'M',
-        title: 'Mine',
-        updatedAt: '2026-01-01T10:00:00.000Z',
-      };
+      const otherRecord = validTask(
+        'X',
+        'Other tab',
+        '2026-01-01T09:00:00.000Z',
+      );
+      const mine = validTask('M', 'Mine', '2026-01-01T10:00:00.000Z');
       const { store, attempts, written } = contendedStore(
         { records: [], deletions: {} },
         [
@@ -663,11 +964,11 @@ describe('vaultRecordWrite', () => {
     });
 
     test('two contended attempts and a third that succeeds: three attempts, one write, and the result is the merge made on the third attempt', async () => {
-      const otherRecord = {
-        id: 'X',
-        title: 'Other writer',
-        updatedAt: '2026-01-01T09:00:00.000Z',
-      };
+      const otherRecord = validTask(
+        'X',
+        'Other writer',
+        '2026-01-01T09:00:00.000Z',
+      );
       const mine = {
         id: 'M',
         title: 'Mine',
@@ -713,25 +1014,22 @@ describe('vaultRecordWrite', () => {
         records,
       );
       expect(written).toHaveLength(1);
+      expect(written[0].value).toEqual({ records, deletions: {} });
     });
 
     test('deleteVaultRecordAndSave contended: resolves the merged records, records the deletion, and the deleted record stays absent even where the other writer still holds it', async () => {
       const deletedAt = '2026-01-01T12:00:00.000Z';
-      const stillHeldElsewhere = {
-        id: 't1',
-        title: 'Held by other writer',
-        updatedAt: '2026-01-01T09:00:00.000Z',
-      };
-      const kept = {
-        id: 't2',
-        title: 'Kept',
-        updatedAt: '2026-01-01T09:30:00.000Z',
-      };
-      const addedByPull = {
-        id: 't3',
-        title: 'Added by pull',
-        updatedAt: '2026-01-01T11:00:00.000Z',
-      };
+      const stillHeldElsewhere = validTask(
+        't1',
+        'Held by other writer',
+        '2026-01-01T09:00:00.000Z',
+      );
+      const kept = validTask('t2', 'Kept', '2026-01-01T09:30:00.000Z');
+      const addedByPull = validTask(
+        't3',
+        'Added by pull',
+        '2026-01-01T11:00:00.000Z',
+      );
       const { store, written } = contendedStore(
         { records: [], deletions: {} },
         [

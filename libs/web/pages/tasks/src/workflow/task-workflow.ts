@@ -92,8 +92,8 @@ async function persistTasks(
 ): Promise<{ tasks: Task[]; error: TaskWorkflowError | null }> {
   const sorted = sortTasks(next);
   try {
-    // What was written, not `sorted`: a contended save merges in what another
-    // writer stored meanwhile (ADR 0143).
+    // What was written, not `sorted`: the save merges into what is stored,
+    // keeping what another tab wrote since this list was read (ADR 0143).
     return { tasks: sortTasks(await adapter.saveTasks(sorted)), error: null };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
