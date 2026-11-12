@@ -14,6 +14,13 @@ import {
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import {
+  GATE_LOG_DIR,
+  formatGateHandoff,
+  formatGateSkipNote,
+  gateLogFileName,
+  teeRunnerArgs,
+} from '../tools/scripts/lib/sandcastle-gate-log.ts';
+import {
   MAX_QUOTA_WAITS,
   SLICE_DISPOSITIONS,
   formatWaitWindow,
@@ -2103,16 +2110,64 @@ function stopGateDatabase(db: GateDatabase): void {
   dockerCmd(['network', 'rm', db.network]);
 }
 
+/**
+ * Where this gate run's log goes: `.sandcastle/logs/gate/<label>--<timestamp>.log`.
+ * Creates the directory. Undefined (after one warning) when it cannot be created:
+ * a log is a convenience, so logging never changes a verdict.
+ */
+function gateLogPathFor(label: string): string | undefined {
+  try {
+    const dir = join(process.cwd(), GATE_LOG_DIR);
+    mkdirSync(dir, { recursive: true });
+    return join(dir, gateLogFileName(label, new Date()));
+  } catch (error) {
+    console.error(
+      `  [${label}] gate: not saving the gate log (${error instanceof Error ? error.message : String(error)}) — continuing.`,
+    );
+    return undefined;
+  }
+}
+
+/**
+ * A verdict reached before any container ran leaves a one-line log, so a missing
+ * file is never ambiguous. Silent on failure, like the log of a run that did start.
+ */
+function noteGateWithoutContainer(
+  label: string,
+  logPath: string | undefined,
+  reason: string,
+): void {
+  if (!logPath) return;
+  try {
+    writeFileSync(logPath, formatGateSkipNote(reason));
+    console.log(`  [${label}] gate: log ${logPath}`);
+  } catch {
+    /* the log is a convenience, not a dependency */
+  }
+}
+
+/** The saved gate log's text, or '' when there is none to read. */
+function readGateLog(logPath: string | undefined): string {
+  if (!logPath) return '';
+  try {
+    return readFileSync(logPath, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
 function runGate(
   label: string,
   base: string,
   head: string,
   handoffIssue?: number,
 ): boolean {
+  const logPath = gateLogPathFor(label);
   if ((process.env.SLICE_GATE ?? '').toLowerCase() === 'off') {
     console.log(
       `  [${label}] gate disabled (SLICE_GATE=off) — integrating without verification.`,
     );
+    noteGateWithoutContainer(label, logPath, 'SLICE_GATE=off');
     return true;
   }
 
@@ -2133,6 +2188,7 @@ function runGate(
   const changed = changedProjects(base, head);
   if (changed.length === 0) {
     console.log(`  [${label}] gate: no project files changed — pass.`);
+    noteGateWithoutContainer(label, logPath, 'no project files changed — pass');
     return true;
   }
 
@@ -2143,6 +2199,11 @@ function runGate(
       console.error(
         `  [${label}] gate: could not resolve the affected project graph for ` +
           `'${crossProjectTargets.join(' ')}' — failing closed.`,
+      );
+      noteGateWithoutContainer(
+        label,
+        logPath,
+        'could not resolve the affected project graph — failed closed',
       );
       return false;
     }
@@ -2180,6 +2241,11 @@ function runGate(
     console.log(
       `  [${label}] gate: no targets resolved to any project — pass.`,
     );
+    noteGateWithoutContainer(
+      label,
+      logPath,
+      'no targets resolved to any project — pass',
+    );
     return true;
   }
 
@@ -2210,6 +2276,11 @@ function runGate(
     console.error(
       `  [${label}] gate: could not create gate worktree — failing closed.\n${add.stderr}`,
     );
+    noteGateWithoutContainer(
+      label,
+      logPath,
+      'could not create the gate worktree — failed closed',
+    );
     return false;
   }
 
@@ -2224,7 +2295,10 @@ function runGate(
         `  [${label}] gate: will run '${run.targets.join(' ')}' on ${run.projects.join(', ')}`,
       );
     }
-    console.log(`  [${label}] gate: installing + running ...`);
+    console.log(
+      `  [${label}] gate: installing + running ...` +
+        (logPath ? ` (output also saved to ${logPath})` : ''),
+    );
     // Database, decided per run. An operator-supplied SLICE_GATE_DATABASE_URL wins
     // and is used as-is. Otherwise, when backend:test is in scope, the gate brings
     // up the same Postgres CI's `Prisma Migration Gate` job has, and runs
@@ -2245,15 +2319,23 @@ function runGate(
           `  [${label}] gate: no database for backend:test — failing closed. ` +
             'This is an environment failure, not a verdict on the code.',
         );
+        noteGateWithoutContainer(
+          label,
+          logPath,
+          'no database for backend:test — failed closed (environment failure)',
+        );
         return false;
       }
     }
     const gateDatabaseUrl =
       operatorDatabaseUrl || database?.url || GATE_PLACEHOLDER_DATABASE_URL;
     try {
+      // Through the tee runner: the output still streams live to this terminal and
+      // the same bytes are appended to the gate log. Exit status and timeout are
+      // the runner's, which are docker's.
       const gate = spawnSync(
-        'docker',
-        [
+        process.execPath,
+        teeRunnerArgs(logPath, 'docker', [
           'run',
           '--rm',
           ...(database ? ['--network', database.network] : []),
@@ -2296,7 +2378,7 @@ function runGate(
                 `node node_modules/.bin/nx run-many -t ${run.targets.join(' ')} --projects=${run.projects.join(',')} --skip-nx-cache${run.args.map((a) => ` ${a}`).join('')}`,
             ),
           ].join(' && '),
-        ],
+        ]),
         {
           encoding: 'utf8',
           stdio: 'inherit',
@@ -2316,9 +2398,12 @@ function runGate(
       if (handoffIssue !== undefined)
         appendHandoffToSliceLog(
           handoffIssue,
-          ok
-            ? `gate PASS (${targets})`
-            : `gate FAILED (${targets}) — the agent's work was committed; the HOST GATE rejected it`,
+          formatGateHandoff({
+            ok,
+            targets,
+            logPath,
+            output: ok ? undefined : readGateLog(logPath),
+          }),
         );
       return ok;
     } finally {

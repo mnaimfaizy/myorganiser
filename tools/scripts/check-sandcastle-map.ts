@@ -57,6 +57,7 @@ const MAIN = '.sandcastle/main.mts';
 const WAVES = '.sandcastle/dispatch-waves.mts';
 const CI = '.github/workflows/ci.yml';
 const SELECTION = 'tools/scripts/lib/sandcastle-slice-selection.ts';
+const GATE_LOG = 'tools/scripts/lib/sandcastle-gate-log.ts';
 
 const PAGES = [
   ['docs/sandcastle/dispatch-map.html', 'sandcastle-dispatch-manifest'],
@@ -82,6 +83,7 @@ for (const f of [
   WAVES,
   CI,
   SELECTION,
+  GATE_LOG,
 ]) {
   if (!existsSync(f)) fail(`${f} not found`);
 }
@@ -92,6 +94,7 @@ for (const [page] of PAGES) {
 const mainSrc = readFileSync(MAIN, 'utf8');
 const wavesSrc = readFileSync(WAVES, 'utf8');
 const selectionSrc = readFileSync(SELECTION, 'utf8');
+const gateLogSrc = readFileSync(GATE_LOG, 'utf8');
 const ciSrc = readFileSync(CI, 'utf8');
 const policy = JSON.parse(readFileSync(POLICY, 'utf8'));
 const pkg = JSON.parse(readFileSync(PKG, 'utf8'));
@@ -287,7 +290,12 @@ const EXPORT_RESOLVERS: Record<string, () => unknown> = {
 // fact is genuinely written more than once and every occurrence must produce the same
 // value; a new copy that disagrees — or simply a new copy — is a finding.
 
-const src = { main: mainSrc, waves: wavesSrc, selection: selectionSrc };
+const src = {
+  main: mainSrc,
+  waves: wavesSrc,
+  selection: selectionSrc,
+  gatelog: gateLogSrc,
+};
 const first = (m: RegExpMatchArray) => m[1];
 const num = (m: RegExpMatchArray) => Number(m[1]);
 
@@ -495,15 +503,17 @@ const SOURCE_ASSERTIONS: Record<string, SourceAssertion> = {
     in: 'main',
     re: /^const gateOnly = process\.argv\.includes\('(--gate-only)'\);$/gm,
   },
+  // The handoff text moved out of main.mts with the gate log (#1474); main.mts calls
+  // formatGateHandoff, which owns both markers.
   gateHandoffPassMarker: {
-    file: MAIN,
-    in: 'main',
-    re: /^\s*\? `(gate PASS) \(\$\{targets\}\)`$/gm,
+    file: GATE_LOG,
+    in: 'gatelog',
+    re: /^\s*if \(ok\) return `(gate PASS) \(\$\{targets\}\)\$\{where\}`;$/gm,
   },
   gateHandoffFailMarker: {
-    file: MAIN,
-    in: 'main',
-    re: /^\s*: `(gate FAILED) \(\$\{targets\}\)[^`]*`,$/gm,
+    file: GATE_LOG,
+    in: 'gatelog',
+    re: /^\s*`(gate FAILED) \(\$\{targets\}\) — the agent's work was committed; ` \+$/gm,
   },
   gateTierLabels: {
     file: MAIN,
