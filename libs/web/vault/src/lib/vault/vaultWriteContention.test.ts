@@ -280,9 +280,14 @@ describe('Local Vault write contention (ADR 0143)', () => {
     const handle = await openVault();
     const tab = await otherTab();
     const hold = holdEncryptionOf('funnel-record');
+    // Task-shaped, because the stored side is normalized before the merge.
     const theirs = {
       id: 'tab-record',
       title: 'Written in another tab',
+      status: 'pending',
+      priority: 'medium',
+      archived: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T09:00:00.000Z',
     };
     const mine = {

@@ -473,6 +473,35 @@ describe('useAddressesPage', () => {
       ]);
     });
 
+    it('saves its own list in one call and renders the records the save resolves with, including one another tab stored', async () => {
+      // Another tab stored OTHER after this page loaded, so the list the hook holds is [HOME] alone.
+      jest
+        .mocked(saveVaultRecords)
+        .mockImplementation(async (_store, _type, records) => [
+          ...records,
+          OTHER,
+        ]);
+
+      const { result } = await renderLoaded([HOME]);
+
+      await act(async () => {
+        await result.current.addAddress(addressValues({ label: 'Work' }));
+      });
+
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+      expect(saveVaultRecords).toHaveBeenCalledWith(
+        handle,
+        'addresses',
+        [expect.objectContaining({ label: 'Work' }), HOME],
+        undefined,
+      );
+      expect(result.current.items).toEqual([
+        expect.objectContaining({ label: 'Work' }),
+        HOME,
+        OTHER,
+      ]);
+    });
+
     it('rejects to the caller, toasts the message, and keeps the items when a save fails', async () => {
       jest.mocked(saveVaultRecords).mockRejectedValue(new Error('disk full'));
 

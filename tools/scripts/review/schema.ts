@@ -418,8 +418,22 @@ export const SpecSourceSchema = z
       .min(1)
       .optional(),
     text: z.array(z.enum(SPEC_TEXT_PARTS)).min(1).optional(),
+    // A `none` spec that found an issue and judged the change its design
+    // record (ADR 0149). Display only, like `also`.
+    designRecordFor: z
+      .string()
+      .regex(/^#\d+$/, 'an issue reference like #123')
+      .optional(),
+    reason: nonEmpty.optional(),
   })
   .superRefine((s, ctx) => {
+    if ((s.designRecordFor || s.reason) && s.kind !== 'none') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'only a none spec names the issue it is a design record for',
+        path: ['designRecordFor'],
+      });
+    }
     if (s.also) {
       if (s.kind !== 'issue') {
         ctx.addIssue({

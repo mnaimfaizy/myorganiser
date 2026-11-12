@@ -118,7 +118,7 @@ export function useMobileNumbersPage(
             'mobileNumbers',
             normalized.value,
           );
-          // A contended write-back merged in what another writer stored.
+          // The write-back merged into what another writer stored.
           if (isActive) setItems(written);
         }
       })
@@ -146,8 +146,8 @@ export function useMobileNumbersPage(
           next,
           deletedId === undefined ? undefined : { deletedId },
         );
-        // What was written, not `next`: a contended save merges in what
-        // another writer stored meanwhile (ADR 0143).
+        // What was written, not `next`: the save merges into what is stored,
+        // keeping what another tab wrote since this list was read (ADR 0143).
         setItems(written);
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
