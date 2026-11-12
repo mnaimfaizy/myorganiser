@@ -9,7 +9,7 @@ Take finished Standalone Runs from `ready-for-human` to Pull Requests that have 
 
 GitHub holds the state, so a new session can run this Skill at any point. There is no progress file.
 
-**Never** merge, change an issue's labels, or switch the Maintainer's checkout.
+**Never** merge by hand, change an issue's labels, or switch the Maintainer's checkout. The one merge this skill starts is the `--auto` pass in the Closing report, which the train alone decides, and the comments that pass writes are the train's own ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)).
 
 ## The worktree
 
@@ -186,4 +186,10 @@ Then recommend a merge order. Number the Pull Requests, and give each a one-line
 3. **Then risk.** Documentation-only and tooling changes go first, then narrow fixes, then changes to a shared library (`libs/web/ui`, `libs/auth`, `libs/app-api-client`) or to a backend contract.
 4. **Keep related branches next to each other.** For example, two branches that move the same feature to the generated client merge one after the other.
 
-End with the one command that merges them, in that order: `yarn merge:train <pr> <pr> …`, leaving out every Pull Request held back by rule 1. Each QA Report was run on its branch alone, so the train brings each branch up to date with `main` and waits for its required checks before merging it, and stops at the first red one. Do not tell the Maintainer to merge by hand or with the admin bypass: a merge behind `main` lands a tree no check ran on ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
+End with the train. Leave out every Pull Request held back by rule 1: list it after the others with what it waits on, and give it no command. Run `yarn merge:train --auto <pr> <pr> …` with the rest in merge order ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Read its output for each Pull Request: merged, would merge, or held with a reason.
+
+The mode setting in ADR 0148 (`off`, `shadow`, `on`) decides whether that pass merges anything. It ships as `shadow`, which merges nothing, so until the setting is `on` the Maintainer still merges the whole batch.
+
+Give the Maintainer one command for every Pull Request the pass did not merge, in merge order: `yarn merge:train <pr> <pr> …`, with no `--auto`, and the train's reason beside each held one. If the pass merged them all, give no command.
+
+Do not tell the Maintainer to merge by hand or with the admin bypass: a merge behind `main` lands a tree no check ran on ([ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
