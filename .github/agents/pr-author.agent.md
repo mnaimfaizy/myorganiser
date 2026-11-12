@@ -68,9 +68,21 @@ NO_BRANCH_COMMITS: No commits found between <base> and HEAD. Nothing to describe
    - **Auth / Sessions** — `libs/auth`, session middleware
    - **API contract** — `feat`/`fix` touching `apps/backend/src/controllers` or `libs/app-api-client`
 9. Skip generated noise in Surfaces (`libs/app-api-client` unless the contract itself changed; `libs/design-tokens/src/generated/`).
-10. Infer a test plan from test files in the diff (`*.test.ts`, `*.spec.ts`, `*.spec.tsx`) plus the behavior a reviewer should check. Do not claim tests were run unless the commits themselves record that.
-11. Infer Surface Labels from the **combined diff**. Read kind and area names from `tools/config/github-labels.json` — do not invent names, and do not copy Issue Orchestration Labels (`ready-for-agent`, `type:*`, `gate:*`, `complexity:*`, `status:*`, `prd`). Linked-issue Surface Labels are hints, kept only if the diff still justifies them. Be stingy: typically one kind plus the areas the diff actually touches. Omit `LABELS:` when nothing fits. See ADR 0025.
-12. **Fact-check the finished draft against its sources.** Read the title and body one claim at a time. A claim is any statement of what a file, section, or commit changed, left unchanged, or now says, and every quoted string, count, and command. For each claim, find its source: the hunk, the commit message, the issue text, or the caller's own words for a caller-supplied fact. Then:
+10. Decide whether the change has a **shape** a reviewer would grasp faster as a picture than as bullets. If it does, open Changes with one fenced visual, drawn from the diff:
+    - a `diff` over a call tree, component tree, or file tree, when the surrounding structure already exists and the point is what moved;
+    - pseudocode, when the point is new logic or control flow;
+    - a Mermaid `sequenceDiagram` or `flowchart`, when the point is how parts talk to each other.
+
+    Use one visual, two at most. Show only the calls, files, components, and states the change touches, plus the parents that place them. Every name in the visual is a claim: it must appear in the diff or the tree, and step 14 checks it like any other. Skip the visual for wording-only, config-only, or one-hunk changes — a picture that restates one bullet is noise.
+
+11. Infer a test plan from test files in the diff (`*.test.ts`, `*.spec.ts`, `*.spec.tsx`) plus the behavior a reviewer should check. Do not claim tests were run unless the commits themselves record that.
+12. Judge the **merge danger** from the diff:
+    - **Door** is `one-way` when merging leaves something a revert does not undo: a Prisma migration under `apps/backend/src/prisma/migrations` that drops, renames, or rewrites data; a change to the ciphertext or encrypted-blob format the server stores; a removed or renamed field in a public API Contract that a shipped client reads; or anything the branch deletes outside the repo. Otherwise it is `two-way`.
+    - **Blast radius** is one word for who or what breaks if the change is wrong — `none`, `local`, `web`, `mobile`, `backend`, `api-consumers`, `stored-data`, `ci`, `agents`, or a better single word — followed by at most two sentences naming what could break.
+    - A one-way door names the irreversible part in one sentence. Do not call a door one-way, or a radius wide, on a guess: the same rule as for bugs and risks applies, so state only what the diff shows.
+
+13. Infer Surface Labels from the **combined diff**. Read kind and area names from `tools/config/github-labels.json` — do not invent names, and do not copy Issue Orchestration Labels (`ready-for-agent`, `type:*`, `gate:*`, `complexity:*`, `status:*`, `prd`). Linked-issue Surface Labels are hints, kept only if the diff still justifies them. Be stingy: typically one kind plus the areas the diff actually touches. Omit `LABELS:` when nothing fits. See ADR 0025.
+14. **Fact-check the finished draft against its sources.** Read the title and body one claim at a time. A claim is any statement of what a file, section, or commit changed, left unchanged, or now says, and every quoted string, count, and command. For each claim, find its source: the hunk, the commit message, the issue text, or the caller's own words for a caller-supplied fact. Then:
     - A claim whose source says something narrower or different is reworded to what the source shows. A quoted string is copied from the hunk character for character.
     - A claim with no source is deleted. "Other wording is tightened" on a file whose diff holds two edits you have already listed is such a claim.
     - A claim about the whole branch ("wording only", "no behaviour change", "meaning unchanged") stands only when every hunk supports it. Otherwise state it as the intent ("no change of meaning is intended") or leave it out.
@@ -100,6 +112,7 @@ MERGE-BASE: <full SHA from step 3>
 <1–3 sentences from the linked issue and the actual diff>
 
 ## Changes
+<optional: one fenced visual from step 10, then one sentence on what it shows>
 - Grouped by area / Nx project, written from the diff — not a dump of commit subjects
 
 ## Surfaces
@@ -112,12 +125,18 @@ MERGE-BASE: <full SHA from step 3>
 
 ## Test plan
 - Verification already performed, as the exact command and its result
+- For a fix, the test that failed before the change and passes after it, when the branch adds one
 - Then, under a separate `Still to check:` line, anything a reviewer must confirm that no command covered
+
+## Merge danger
+**Door:** <one-way or two-way> — <for one-way: the part a revert does not undo>
+**Blast radius:** <one word> — <optional: at most two sentences on what could break>
 ```
 
 Rules:
 
-- Omit any section that would be empty.
+- Omit any section that would be empty. `## Merge danger` is never empty: every body carries it.
+- A visual in Changes is fenced with a language tag (`diff`, `text`, or `mermaid`). It is the only fenced block the body may contain besides commands in Test plan.
 - `TITLE:` is required, one line, no surrounding quotes, conventional-commit style preferred (`feat(scope): …`, `fix(scope): …`).
 - `LABELS:` is optional. When present it is one line, comma-separated Surface Labels from `tools/config/github-labels.json`, no surrounding quotes.
 - `MERGE-BASE:` is required, one line, the SHA `git merge-base` printed in step 3. It sits above the first `##` heading so the caller strips it with the other header lines and it never reaches the published PR body. Never guess, abbreviate below seven characters, or copy a SHA out of the prompt.
