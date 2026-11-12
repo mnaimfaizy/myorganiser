@@ -1,6 +1,6 @@
 # Backend REST API
 
-This is the backend REST API for MyOrganiser application, built with Express.js, TypeScript, and Prisma ORM.
+The MyOrganiser backend is a REST API built with Express.js, TypeScript, and Prisma ORM.
 
 ## Table of Contents
 
@@ -19,11 +19,11 @@ This is the backend REST API for MyOrganiser application, built with Express.js,
 
 ## Overview
 
-The backend API provides a RESTful interface for the MyOrganiser application. It handles user authentication, vault ciphertext, and other core functionalities. The API is built with TypeScript for type safety and uses Prisma as the ORM for database operations.
+The backend API is the REST interface for MyOrganiser. It handles user authentication, vault ciphertext, and other core functions. It is written in TypeScript for type safety and uses Prisma as its ORM.
 
 ## Technologies
 
-This backend application is built with the following technologies:
+The backend uses these technologies:
 
 ### Core Framework & Runtime
 
@@ -34,7 +34,7 @@ This backend application is built with the following technologies:
 ### Database & ORM
 
 - **PostgreSQL** - Relational database
-- **Prisma** - Next-generation ORM for Node.js
+- **Prisma** - ORM for Node.js
   - Type-safe database client
   - Automated migrations
   - Schema management
@@ -75,7 +75,7 @@ This backend application is built with the following technologies:
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+Install the following before you begin:
 
 - **Node.js** (see [TECH_STACK.md](../../TECH_STACK.md) for required version)
 - **Yarn** (package manager)
@@ -100,7 +100,7 @@ Note: The repo sets `package.json.engines.node` to `>=22.18.0`.
    ```
 
 3. **Set up the database**:
-   - You can use Docker Compose to run PostgreSQL locally:
+   - Run PostgreSQL locally with Docker Compose:
      ```bash
      docker-compose up -d
      ```
@@ -177,9 +177,9 @@ Note: The repo sets `package.json.engines.node` to `>=22.18.0`.
    ```
 
    **Important Notes:**
-   - `yarn start:backend:prod` runs with `NODE_ENV=production` (and will fail fast if required env vars are missing)
+   - `yarn start:backend:prod` runs with `NODE_ENV=production` (and fails fast if required env vars are missing)
    - If you are behind a reverse proxy (common in production), set `TRUST_PROXY` so secure cookies and request IP/proto are detected correctly
-   - If you enable `ENABLE_GLOBAL_RATE_LIMIT=true`, the backend will apply a global rate limiter to API routes
+   - If you enable `ENABLE_GLOBAL_RATE_LIMIT=true`, the backend applies a global rate limiter to API routes
    - Generate strong, random secrets for JWT tokens in production
    - Update database credentials if not using default values
    - Configure SMTP settings for email functionality (MailHog is recommended for local dev)
@@ -206,11 +206,11 @@ Then run:
 yarn start:backend:prod
 ```
 
-If you want to test registration/password-reset flows locally, also configure email-related variables (`DEFAULT_EMAIL_PROVIDER`, `MAIL_HOST`/`MAIL_PORT` or Gmail/SMTP creds, and `EMAIL_SENDER`) plus `APP_FRONTEND_URL`.
+To test registration/password-reset flows locally, also configure email-related variables (`DEFAULT_EMAIL_PROVIDER`, `MAIL_HOST`/`MAIL_PORT` or Gmail/SMTP creds, and `EMAIL_SENDER`) plus `APP_FRONTEND_URL`.
 
 ## Database Setup
 
-The application uses Prisma ORM for database management. Follow these steps to set up your database:
+The backend manages the database with Prisma ORM. To set up the database:
 
 ### 1. Ensure Database is Running
 
@@ -228,7 +228,7 @@ docker ps | grep myorganiser_db
 
 ### 2. Generate Prisma Client
 
-Generate the Prisma client based on your schema:
+Generate the Prisma client from your schema:
 
 ```bash
 # Using Nx
@@ -273,7 +273,7 @@ npx prisma db seed
 
 ### Prisma Schema Location
 
-The Prisma schema files are located in:
+The Prisma schema files are in:
 
 ```
 apps/backend/src/prisma/schema/
@@ -320,7 +320,7 @@ nx serve backend
 # The server will start at http://localhost:3000
 ```
 
-The development server features:
+The development server has:
 
 - **Hot reload** - Automatically restarts when you save changes
 - **TypeScript compilation** - Compiles TypeScript on the fly
@@ -328,7 +328,7 @@ The development server features:
 
 ### API Endpoints
 
-Once the server is running, you can access:
+With the server running, these URLs are available:
 
 - **API Base URL**: `http://localhost:3000/api/v1`
 - **API Documentation**: `http://localhost:3000/docs` (Swagger UI)
@@ -336,7 +336,7 @@ Once the server is running, you can access:
 
 ### Generating API Documentation
 
-The API documentation is automatically generated using TSOA from TypeScript controllers:
+TSOA generates the API documentation from the TypeScript controllers:
 
 ```bash
 # Generate JSON Swagger spec
@@ -535,7 +535,7 @@ Once the server is running, visit:
 http://localhost:3000/docs
 ```
 
-This provides an interactive API documentation where you can:
+This is interactive API documentation where you can:
 
 - Explore all available endpoints
 - View request/response schemas
@@ -590,7 +590,7 @@ nx test backend --coverage
 
 ### Test Structure
 
-Tests are located alongside the source files with `.test.ts` or `.spec.ts` extensions:
+Tests are alongside the source files with `.test.ts` or `.spec.ts` extensions:
 
 - `main.test.ts` - Main application tests
 - `controllers/*.test.ts` - Controller tests
@@ -655,7 +655,7 @@ node main.js
 
 ### Production Environment Variables
 
-Ensure all required environment variables are set:
+Set every required environment variable:
 
 - `NODE_ENV=production`
 - `DATABASE_URL` pointing to production database
