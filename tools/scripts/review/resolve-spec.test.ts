@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { DiscoveredSpec } from './resolve-spec.ts';
 import {
+  applyDesignRecordRule,
   discoverSpec,
   isPullRequest,
   specTextOf,
@@ -207,5 +209,202 @@ test('a closing keyword still counts in mid-sentence, as GitHub closes on it', (
       commits: ['subject', 'This change fixes #12 by retrying.'],
     }),
     { kind: 'issue', ref: '#12', foundBy: 'commits' },
+  );
+});
+
+// ADR 0149. The #1475 shape: a docs/ branch whose only change is a design
+// record for #1405, an enhancement. The rule turns the Spec axis off for it
+// rather than checking the record against an implementation it never was.
+const issueSpec = (
+  foundBy: 'branch' | 'commits' = 'branch',
+  also?: string[],
+): DiscoveredSpec => ({
+  kind: 'issue',
+  ref: '#1405',
+  foundBy,
+  ...(also ? { also } : {}),
+});
+
+const designRecord = {
+  headRef: 'docs/1405-local-vault-conditional-write',
+  changedFiles: ['docs/adr/0143-x.md'],
+  labels: ['enhancement', 'web-app'],
+};
+
+test('a docs-only design record for an enhancement resolves none, naming the issue', () => {
+  const resolved = applyDesignRecordRule({
+    spec: issueSpec('branch'),
+    ...designRecord,
+  });
+  assert.equal(resolved.kind, 'none');
+  assert.equal(resolved.foundBy, 'none');
+  assert.equal(resolved.kind === 'none' && resolved.designRecordFor, '#1405');
+  assert.match(
+    resolved.kind === 'none' ? (resolved.reason ?? '') : '',
+    /#1405/,
+  );
+});
+
+test('the same design record resolves none when the issue was found in a commit', () => {
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec('commits'),
+      ...designRecord,
+    }).kind,
+    'none',
+  );
+});
+
+test('a documentation or research issue keeps its spec, as its docs branch is its implementation', () => {
+  for (const labels of [['documentation', 'web-app'], ['research']]) {
+    assert.deepEqual(
+      applyDesignRecordRule({
+        spec: issueSpec(),
+        ...designRecord,
+        labels,
+      }),
+      issueSpec(),
+      labels.join(', '),
+    );
+  }
+});
+
+test('the first kind label in branch-type table order decides, not the label order on the issue', () => {
+  for (const labels of [
+    ['tooling', 'research'],
+    ['research', 'tooling'],
+    ['documentation', 'bug'],
+    ['documentation', 'enhancement'],
+  ]) {
+    assert.equal(
+      applyDesignRecordRule({
+        spec: issueSpec(),
+        ...designRecord,
+        labels,
+      }).kind,
+      'none',
+      labels.join(', '),
+    );
+  }
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      labels: ['research', 'documentation'],
+    }),
+    issueSpec(),
+  );
+});
+
+test('a change touching anything outside documentation keeps its spec', () => {
+  for (const changedFiles of [
+    ['docs/adr/0143-x.md', 'libs/x.ts'],
+    ['libs/x.ts'],
+  ]) {
+    assert.deepEqual(
+      applyDesignRecordRule({
+        spec: issueSpec(),
+        ...designRecord,
+        changedFiles,
+      }),
+      issueSpec(),
+      changedFiles.join(', '),
+    );
+  }
+});
+
+test('CONTEXT.md at the root is documentation, and a CONTEXT.md nested elsewhere is not', () => {
+  assert.equal(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      changedFiles: ['CONTEXT.md'],
+    }).kind,
+    'none',
+  );
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      changedFiles: ['libs/x/CONTEXT.md'],
+    }),
+    issueSpec(),
+  );
+});
+
+test('an issue with no kind label, only an area label, keeps its spec', () => {
+  for (const labels of [['web-app'], []]) {
+    assert.deepEqual(
+      applyDesignRecordRule({
+        spec: issueSpec(),
+        ...designRecord,
+        labels,
+      }),
+      issueSpec(),
+      labels.join(', ') || '(no labels)',
+    );
+  }
+});
+
+test('the rule applies only to a docs/ branch', () => {
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      headRef: 'feat/1405-local-vault-conditional-write',
+    }),
+    issueSpec(),
+  );
+});
+
+test('labels that could not be read keep the spec', () => {
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      labels: undefined,
+    }),
+    issueSpec(),
+  );
+});
+
+test('a change with no files keeps the spec', () => {
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: issueSpec(),
+      ...designRecord,
+      changedFiles: [],
+    }),
+    issueSpec(),
+  );
+});
+
+test('a none spec passes through unchanged', () => {
+  const none: DiscoveredSpec = { kind: 'none', foundBy: 'none' };
+  assert.deepEqual(
+    applyDesignRecordRule({ spec: none, ...designRecord }),
+    none,
+  );
+});
+
+test('further issues are kept when the spec is kept, and dropped when it becomes a design record', () => {
+  const kept = issueSpec('branch', ['#1406']);
+  assert.deepEqual(
+    applyDesignRecordRule({
+      spec: kept,
+      ...designRecord,
+      labels: ['documentation'],
+    }),
+    kept,
+  );
+  const resolved = applyDesignRecordRule({
+    spec: kept,
+    ...designRecord,
+  });
+  assert.equal(resolved.kind, 'none');
+  assert.equal(
+    Object.hasOwn(resolved, 'also'),
+    false,
+    'a none spec names no further issues',
   );
 });

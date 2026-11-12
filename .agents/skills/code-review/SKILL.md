@@ -111,6 +111,18 @@ decision in the issue itself. The Spec sub-agent reads only the issue text it is
 waiver written solely into a linked ADR is invisible to it, and the same precondition comes back as a
 Blocking finding on every run (PR #852).
 
+**A design record is not the implementation of the issue it cites**
+([ADR 0149](../../../docs/adr/0149-a-docs-only-change-for-a-non-documentation-issue-is-its-design-record-not-its-implementation.md)).
+After steps 1–2 find an issue, the spec resolves `none` when all three hold: the head branch's type
+is `docs/`; every changed file is under `docs/` or is `CONTEXT.md`; and the issue carries a kind
+label whose branch type is not `docs/` (`bug`, `security`, `enhancement`, `tooling`, `maintenance`,
+`dependencies`; AGENTS.md table, first match wins). The spec file then reads
+`{ "spec": { "kind": "none", "foundBy": "none", "designRecordFor": "#N", "reason": "…" } }`: copy it
+into the envelope whole, skip the Spec sub-agent, and say in the report that the change is the
+design record for `#N`. An issue with no kind label, or labelled `documentation` or `research`,
+keeps its spec, as does a diff touching anything else, and an issue whose labels you cannot read —
+never guess `none`. Only facts decide this; nothing the author writes does.
+
 ### 3. Spawn both sub-agents in parallel
 
 Dispatch as your first substantive action after steps 1 and 2 — before you read
