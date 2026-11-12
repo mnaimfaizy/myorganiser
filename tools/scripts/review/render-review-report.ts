@@ -392,7 +392,7 @@ export const renderReport = (
   const prior = comparable ? NormalizedReportSchema.parse(previous) : null;
   const specText =
     report.spec.kind === 'none'
-      ? 'none (tightened to review:human)'
+      ? `none${report.spec.designRecordFor ? ` (design record for ${report.spec.designRecordFor}, not its implementation)` : ''} (tightened to review:human)`
       : `${report.spec.kind} ${report.spec.ref} (found by ${report.spec.foundBy})${
           report.spec.also
             ? `, also ${report.spec.also.join(', ')} (closed by commits)`

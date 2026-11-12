@@ -40,6 +40,11 @@
 // issue number — `feat/<prd-slug>`, `claude/…`, `copilot/…` — carry it in
 // their first commit instead, which the commit step below already reads.
 //
+// A docs-only change on a `docs/` branch for an issue whose kind label is not
+// documentation or research is that issue's design record, not its
+// implementation: it resolves `none`, with `designRecordFor` and `reason`
+// naming the issue (ADR 0149).
+//
 // Exit 0 = written (a `none` spec is a valid result). Exit 2 = could not run.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -57,7 +62,13 @@ import {
 
 /** The spec source a review was handed, as `spec.json` records it. */
 export type DiscoveredSpec =
-  | { kind: 'none'; foundBy: 'none' }
+  | {
+      kind: 'none';
+      foundBy: 'none';
+      /** Set when an issue was found and the change is its design record. */
+      designRecordFor?: string;
+      reason?: string;
+    }
   | {
       kind: 'issue';
       ref: string;
@@ -73,6 +84,7 @@ interface IssueView {
   state?: string;
   url?: string;
   comments?: IssueComment[];
+  labels?: { name: string }[];
 }
 
 /** One issue's text as `spec.json` records it. */
@@ -163,6 +175,65 @@ export const discoverSpec = ({
 };
 
 /**
+ * The branch type each kind Surface Label maps to: AGENTS.md, Branch naming,
+ * in the table's order, where the first match wins (ADR 0149). Keep it in step
+ * with the kind labels in `tools/config/github-labels.json`.
+ */
+export const KIND_LABEL_BRANCH_TYPES = [
+  ['bug', 'fix'],
+  ['security', 'fix'],
+  ['enhancement', 'feat'],
+  ['documentation', 'docs'],
+  ['tooling', 'chore'],
+  ['maintenance', 'chore'],
+  ['dependencies', 'chore'],
+  ['research', 'docs'],
+] as const;
+
+/** A file is documentation when it sits under one of these or is one of them. */
+const DOCUMENTATION_DIRECTORIES = ['docs/'] as const;
+const DOCUMENTATION_FILES = ['CONTEXT.md'] as const;
+
+const isDocumentationFile = (file: string) =>
+  DOCUMENTATION_FILES.some((name) => name === file) ||
+  DOCUMENTATION_DIRECTORIES.some((dir) => file.startsWith(dir));
+
+/**
+ * Pure: the kind-mismatch rule (ADR 0149). A change on a `docs/` branch that
+ * touches documentation only, and whose found issue is labelled with a kind
+ * whose branch type is not `docs/`, is that issue's design record, not its
+ * implementation: it resolves `none`, naming the issue and why. Every other
+ * input resolves as discovered. Labels that could not be read (`undefined`)
+ * never produce `none`.
+ */
+export const applyDesignRecordRule = ({
+  spec,
+  headRef,
+  changedFiles,
+  labels,
+}: {
+  spec: DiscoveredSpec;
+  headRef?: string | null;
+  changedFiles: string[];
+  labels?: string[];
+}): DiscoveredSpec => {
+  if (spec.kind !== 'issue' || !labels) return spec;
+  if (headRef?.split('/')[0] !== 'docs') return spec;
+  if (changedFiles.length === 0 || !changedFiles.every(isDocumentationFile))
+    return spec;
+  const kindLabel = KIND_LABEL_BRANCH_TYPES.find(([label]) =>
+    labels.includes(label),
+  );
+  if (!kindLabel || kindLabel[1] === 'docs') return spec;
+  return {
+    kind: 'none',
+    foundBy: 'none',
+    designRecordFor: spec.ref,
+    reason: `design record: a docs-only change on a docs/ branch for ${spec.ref} (kind label: ${kindLabel[0]}), so it is not that issue's implementation`,
+  };
+};
+
+/**
  * Pure: what one fetched issue contributes. `gh issue view` answers for a
  * pull request number too, and a pull request's body is its author's summary
  * of the diff — not a spec source (ADR 0076 item 7).
@@ -221,20 +292,53 @@ export const main = (argv: string[]): void => {
         ref.slice(1),
         ...repoArgs,
         '--json',
-        'title,body,state,url,comments',
+        'title,body,state,url,comments,labels',
       ]) as IssueView;
     } catch (err) {
       return bail(`cannot fetch ${ref}: ${errorMessage(err)}`);
     }
   };
+  // Only a `docs/` branch can be a design record, so only it lists the diff.
+  // A diff that cannot be listed leaves the list empty, which keeps the spec.
+  // `--no-renames` lists the old path of a move, so code moved into `docs/`
+  // still counts as code.
+  const listChangedFiles = (): string[] => {
+    try {
+      return execFileSync(
+        'git',
+        [
+          'diff',
+          '--name-only',
+          '--no-renames',
+          `${flags.base}...${flags.head}`,
+        ],
+        { encoding: 'utf8' },
+      )
+        .split('\n')
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+  const primaryIssue =
+    found.kind === 'issue' ? fetchIssue(found.ref) : undefined;
+  const resolved = applyDesignRecordRule({
+    spec: found,
+    headRef: flags['head-ref'],
+    changedFiles:
+      found.kind === 'issue' && flags['head-ref']?.startsWith('docs/')
+        ? listChangedFiles()
+        : [],
+    labels: primaryIssue?.labels?.map((label) => label.name),
+  });
   const { also: alsoRefs = [], ...primary } =
-    found.kind === 'issue' ? found : { ...found, also: undefined };
+    resolved.kind === 'issue' ? resolved : { ...resolved, also: undefined };
   let result: {
     spec: DiscoveredSpec;
     also?: ({ ref: string } & SpecText)[];
   } & Partial<SpecText> = { spec: primary };
-  if (primary.kind === 'issue') {
-    const primaryText = specTextOf(fetchIssue(primary.ref));
+  if (primary.kind === 'issue' && primaryIssue) {
+    const primaryText = specTextOf(primaryIssue);
     Object.assign(result, primaryText);
     result.spec = { ...primary, text: specTextParts(primaryText) };
     // A closing reference to a pull request is dropped, not fetched as spec:
@@ -265,7 +369,7 @@ export const main = (argv: string[]): void => {
       ? `${spec.ref} (found by ${spec.foundBy})${
           spec.also ? `, also ${spec.also.join(', ')}` : ''
         }`
-      : 'none';
+      : `none${spec.designRecordFor ? ` (design record for ${spec.designRecordFor})` : ''}`;
   console.log(`review-spec: ${named} → ${out}`);
 };
 
