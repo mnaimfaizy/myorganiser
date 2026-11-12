@@ -73,6 +73,7 @@ const userWithPhone: AdminUserIdentity = {
   phone: '+1-555-0100',
   role: 'user',
   disabled: true,
+  disabledAt: null,
   emailVerified: false,
   youtubeAccess: false,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -87,6 +88,7 @@ const userWithoutPhone: AdminUserIdentity = {
   lastName: 'Lovelace',
   role: 'platform_admin',
   disabled: false,
+  disabledAt: null,
   emailVerified: true,
   youtubeAccess: false,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -191,7 +193,7 @@ describe('UserDetailPageClient', () => {
     });
 
     expect(screen.getByText(/grace@example\.com/)).toHaveTextContent(
-      /^grace@example\.com · \+1-555-0100 · Joined .+ · Never active$/,
+      /^grace@example\.com · \+1-555-0100 · Joined .+ · Never active · Disabled$/,
     );
     expect(screen.getByRole('link', { name: 'All users' })).toHaveAttribute(
       'href',

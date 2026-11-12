@@ -54,6 +54,7 @@ export function buildAdminUsers(count: number): AdminUserIdentity[] {
       youtubeAccess: false,
       createdAt: new Date(Date.UTC(2026, 0, n)).toISOString(),
       lastActiveAt: null,
+      disabledAt: null,
     };
   });
 }

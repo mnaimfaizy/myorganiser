@@ -81,6 +81,7 @@ function userFixture(
     lastName: 'Last',
     role: 'user',
     disabled: false,
+    disabledAt: null,
     emailVerified: true,
     youtubeAccess: false,
     createdAt: JOINED_AT,
@@ -103,6 +104,7 @@ const directoryFixture: AdminUserIdentity[] = [
     name: 'Grace Hopper',
     email: 'grace@example.com',
     disabled: true,
+    disabledAt: null,
     emailVerified: false,
   }),
   userFixture({
@@ -469,6 +471,39 @@ describe('UserDirectoryPageClient', () => {
       expect(
         within(ada).getByText('Admin · Joined 15 Oct'),
       ).toBeInTheDocument();
+    });
+
+    it('shows the disabled day as the meta line of a Disabled row', async () => {
+      const today = new Date();
+      const disabledThreeDaysAgo = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() - 3,
+        12,
+      ).toISOString();
+      mockListUsers.mockResolvedValue(
+        listResponse(
+          [
+            userFixture({
+              id: 'u-grace',
+              name: 'Grace Hopper',
+              email: 'grace@example.com',
+              disabled: true,
+              disabledAt: disabledThreeDaysAgo,
+              emailVerified: false,
+            }),
+          ],
+          1,
+        ),
+      );
+
+      renderDirectory();
+
+      const grace = await screen.findByRole('link', { name: /Grace Hopper/ });
+      expect(
+        within(grace).getByText('Disabled 3 days ago'),
+      ).toBeInTheDocument();
+      expect(within(grace).getByText('Disabled')).toBeInTheDocument();
     });
 
     it('fetches admins only when the Admins chip is pressed, with no status filter', async () => {

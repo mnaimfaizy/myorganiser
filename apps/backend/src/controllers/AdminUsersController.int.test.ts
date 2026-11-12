@@ -256,6 +256,7 @@ describe('AdminUsersController (HTTP integration)', () => {
             lastName: 'Example',
             role: 'user',
             disabled: false,
+            disabledAt: null,
             emailVerified: true,
             youtubeAccess: false,
             createdAt: '2024-01-01T00:00:00.000Z',
@@ -368,6 +369,7 @@ describe('AdminUsersController (HTTP integration)', () => {
         [
           'createdAt',
           'disabled',
+          'disabledAt',
           'email',
           'emailVerified',
           'firstName',
@@ -382,6 +384,33 @@ describe('AdminUsersController (HTTP integration)', () => {
       for (const field of sensitiveFields) {
         expect(item).not.toHaveProperty(field);
       }
+    });
+
+    test('returns disabledAt as an ISO string for a disabled User and null for an enabled or pre-column User', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.listIdentityUsers.mockResolvedValueOnce({
+        users: [
+          identityRow,
+          {
+            ...identityRow,
+            id: 'u2',
+            disabled: true,
+            disabled_at: new Date('2026-11-02T08:15:00.000Z'),
+          },
+          { ...identityRow, id: 'u3', disabled: true, disabled_at: null },
+        ],
+        total: 3,
+      });
+
+      const res = await request(app)
+        .get('/admin/users')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(
+        res.body.users.map((user: { disabledAt: unknown }) => user.disabledAt),
+      ).toEqual([null, '2026-11-02T08:15:00.000Z', null]);
     });
 
     test.each([
@@ -449,6 +478,7 @@ describe('AdminUsersController (HTTP integration)', () => {
         lastName: 'Example',
         role: 'user',
         disabled: false,
+        disabledAt: null,
         emailVerified: true,
         youtubeAccess: false,
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -457,6 +487,24 @@ describe('AdminUsersController (HTTP integration)', () => {
       for (const field of sensitiveFields) {
         expect(res.body).not.toHaveProperty(field);
       }
+    });
+
+    test('returns disabledAt as an ISO string for a disabled User', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.getIdentityById.mockResolvedValueOnce({
+        ...identityRow,
+        disabled: true,
+        disabled_at: new Date('2026-11-02T08:15:00.000Z'),
+      });
+
+      const res = await request(app)
+        .get('/admin/users/u1')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(res.body.disabled).toBe(true);
+      expect(res.body.disabledAt).toBe('2026-11-02T08:15:00.000Z');
     });
 
     test('returns 404 when user not found', async () => {

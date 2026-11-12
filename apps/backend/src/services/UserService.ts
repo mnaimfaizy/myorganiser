@@ -43,6 +43,7 @@ const ADMIN_IDENTITY_SELECT = {
   email: true,
   role: true,
   disabled: true,
+  disabled_at: true,
   email_verification_timestamp: true,
   youtube_access: true,
   created_at: true,
@@ -292,6 +293,11 @@ class UserService {
     await this.requireIdentityUser(targetUserId);
 
     return this.prisma.$transaction(async (tx) => {
+      // Conditional write: a repeated disable keeps the first disabled_at (issue #1445).
+      await tx.user.updateMany({
+        where: { id: targetUserId, disabled: false },
+        data: { disabled: true, disabled_at: new Date() },
+      });
       const updated = await tx.user.update({
         where: { id: targetUserId },
         data: {
@@ -318,7 +324,7 @@ class UserService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.user.update({
         where: { id: targetUserId },
-        data: { disabled: false },
+        data: { disabled: false, disabled_at: null },
         select: ADMIN_IDENTITY_SELECT,
       });
       await this.writeAdminAuditLog(tx, actorUserId, targetUserId, 'enable');

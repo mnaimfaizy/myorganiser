@@ -1326,6 +1326,12 @@ components:
           $ref: "#/components/schemas/UserRole"
         disabled:
           type: boolean
+        disabledAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "When a Platform Admin disabled this User; null while enabled and
+            for Users disabled before the column existed (issue #1445)."
         emailVerified:
           type: boolean
         youtubeAccess:
@@ -1350,6 +1356,7 @@ components:
         - lastName
         - role
         - disabled
+        - disabledAt
         - emailVerified
         - youtubeAccess
         - createdAt
