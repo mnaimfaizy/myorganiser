@@ -29,6 +29,7 @@ function userFixture(id: string): AdminUserIdentity {
     lastName: 'Last',
     role: 'user',
     disabled: false,
+    disabledAt: null,
     emailVerified: true,
     youtubeAccess: false,
     createdAt: '2026-10-15T12:00:00.000Z',

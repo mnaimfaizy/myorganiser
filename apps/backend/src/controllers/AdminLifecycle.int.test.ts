@@ -200,6 +200,7 @@ const expectedIdentityDto = {
   lastName: 'Example',
   role: 'user',
   disabled: false,
+  disabledAt: null,
   emailVerified: true,
   youtubeAccess: false,
   lastActiveAt: null,
@@ -251,6 +252,27 @@ describe('Admin lifecycle mutations (HTTP integration)', () => {
       expect(res.status).toBe(200);
       expect(userService.disableUser).toHaveBeenCalledWith('admin-1', 'u1');
       expect(res.body).toEqual(expectedIdentityDto);
+    });
+
+    test('returns disabledAt as an ISO string for the disabled User', async () => {
+      const userService = require('../services/UserService').default;
+
+      userService.disableUser.mockResolvedValueOnce({
+        ...identityRow,
+        disabled: true,
+        disabled_at: new Date('2026-11-02T08:15:00.000Z'),
+      });
+
+      const res = await request(app)
+        .post('/admin/users/u1/disable')
+        .set('Authorization', 'Bearer admin');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        ...expectedIdentityDto,
+        disabled: true,
+        disabledAt: '2026-11-02T08:15:00.000Z',
+      });
     });
 
     test('returns 404 when user not found', async () => {

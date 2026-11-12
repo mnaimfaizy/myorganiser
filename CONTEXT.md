@@ -41,7 +41,7 @@ A User with elevated privilege to manage other Users' account metadata across th
 _Avoid_: Admin, superuser, staff, operator, system admin
 
 **Disabled User**:
-A User blocked from authenticating. Disabling also ends their existing Sessions; re-enabling restores the ability to sign in but does not bring those Sessions back. Their Vault Ciphertext and profile remain until separately deleted or purged.
+A User blocked from authenticating. Disabling also ends their existing Sessions; re-enabling restores the ability to sign in but does not bring those Sessions back. The time a Platform Admin disabled them is kept while they are disabled, is not moved by a repeated disable, and is cleared on re-enable; Users disabled before it was recorded have none. Their Vault Ciphertext and profile remain until separately deleted or purged.
 _Avoid_: Banned user, suspended user, deactivated account, soft-deleted user
 
 **User Deletion**:

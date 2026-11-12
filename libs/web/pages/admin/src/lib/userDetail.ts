@@ -5,7 +5,11 @@ import type {
   YouTubeAccessUsageResponse,
 } from '@myorganiser/app-api-client';
 
-import { formatJoinedDate, formatLastActivePhrase } from './userDirectory';
+import {
+  formatDisabledPhrase,
+  formatJoinedDate,
+  formatLastActivePhrase,
+} from './userDirectory';
 
 /** Audit entries the Recent activity card shows. The full log is one link away. */
 export const RECENT_ACTIVITY_LIMIT = 5;
@@ -222,8 +226,10 @@ function formatDayMonthYear(date: Date): string {
 
 /**
  * The identity meta line: email, phone when set, the join date, then the
- * last-active day ("Last active today", or "Never active"). Desktop always
- * states the join year. Phone states it only when it is not this year.
+ * last-active day ("Last active today", or "Never active"). A Disabled User
+ * also ends with the disabled day ("Disabled 3 days ago", or "Disabled").
+ * Desktop always states the join year. Phone states it only when it is not
+ * this year.
  */
 export function identityMeta(
   user: AdminUserIdentity,
@@ -238,5 +244,8 @@ export function identityMeta(
   const parts = user.phone
     ? [user.email, user.phone, joined, lastActive]
     : [user.email, joined, lastActive];
+  if (user.disabled) {
+    parts.push(formatDisabledPhrase(user.disabledAt, now));
+  }
   return parts.join(' · ');
 }

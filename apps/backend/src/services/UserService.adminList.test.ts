@@ -286,6 +286,17 @@ describe('UserService.listIdentityUsers', () => {
       }
     });
 
+    test('findMany selects disabled_at so the identity can carry when a User was disabled', async () => {
+      await userService.listIdentityUsers({
+        sort: 'newest',
+        page: 1,
+        pageSize: 25,
+      });
+
+      const select = findManyArgs().select as Record<string, unknown>;
+      expect(select.disabled_at).toBe(true);
+    });
+
     test('count receives only where, with no paging, ordering, or select', async () => {
       await userService.listIdentityUsers({
         q: 'ali',

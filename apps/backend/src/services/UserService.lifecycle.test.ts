@@ -157,6 +157,81 @@ describe('UserService lifecycle', () => {
       });
     });
 
+    test('stamps disabled_at through a write that only matches Users not yet disabled', async () => {
+      mockIdentityLookup();
+      mockPrisma.user.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({
+        ...identityUser,
+        disabled: true,
+      });
+      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+
+      await userService.disableUser(ACTOR_ID, TARGET_ID);
+
+      expect(mockPrisma.user.updateMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: TARGET_ID, disabled: false },
+        data: { disabled: true, disabled_at: expect.any(Date) },
+      });
+    });
+
+    test('selects disabled_at on the returned identity', async () => {
+      mockIdentityLookup();
+      mockPrisma.user.update.mockResolvedValue({
+        ...identityUser,
+        disabled: true,
+      });
+      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+
+      await userService.disableUser(ACTOR_ID, TARGET_ID);
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ disabled_at: true }),
+        }),
+      );
+    });
+
+    test('a repeated disable keeps disabled_at out of the update, still bumps sessions_invalidated_at, and writes its own audit entry', async () => {
+      mockIdentityLookup({ ...identityUser, disabled: true });
+      // The guarded write matches no row for an already-disabled User.
+      mockPrisma.user.updateMany.mockResolvedValueOnce({ count: 0 });
+      mockPrisma.user.update.mockResolvedValue({
+        ...identityUser,
+        disabled: true,
+      });
+      mockPrisma.adminAuditLog.create.mockResolvedValue({});
+
+      await userService.disableUser(ACTOR_ID, TARGET_ID);
+
+      expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: TARGET_ID, disabled: false },
+        data: { disabled: true, disabled_at: expect.any(Date) },
+      });
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: TARGET_ID },
+        data: {
+          disabled: true,
+          sessions_invalidated_at: expect.any(Date),
+        },
+        select: expect.objectContaining({ id: true, disabled: true }),
+      });
+      expect(
+        (
+          mockPrisma.user.update.mock.calls[0][0] as {
+            data: Record<string, unknown>;
+          }
+        ).data,
+      ).not.toHaveProperty('disabled_at');
+      expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledWith({
+        data: {
+          actor_user_id: ACTOR_ID,
+          target_user_id: TARGET_ID,
+          action: 'disable',
+        },
+      });
+    });
+
     test('refuses self-disable (so the last Platform Admin can no longer be disabled) with no update and no audit entry', async () => {
       await expect(userService.disableUser(ACTOR_ID, ACTOR_ID)).rejects.toThrow(
         SelfLifecycleActionError,
@@ -178,7 +253,7 @@ describe('UserService lifecycle', () => {
   });
 
   describe('enableUser', () => {
-    test('clears disabled flag without touching sessions_invalidated_at', async () => {
+    test('clears disabled flag and disabled_at without touching sessions_invalidated_at', async () => {
       mockIdentityLookup({ ...identityUser, disabled: true });
       const updated = { ...identityUser, disabled: false };
       mockPrisma.user.update.mockResolvedValue(updated);
@@ -189,7 +264,7 @@ describe('UserService lifecycle', () => {
       expect(result).toEqual(updated);
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: TARGET_ID },
-        data: { disabled: false },
+        data: { disabled: false, disabled_at: null },
         select: expect.objectContaining({ id: true, disabled: true }),
       });
       expect(mockPrisma.adminAuditLog.create).toHaveBeenCalledWith({

@@ -59,6 +59,7 @@ describe('toAdminUserIdentity', () => {
       phone: undefined,
       role: 'user',
       disabled: false,
+      disabledAt: null,
       emailVerified: true,
       youtubeAccess: false,
       lastActiveAt: null,
@@ -109,6 +110,36 @@ describe('toAdminUserIdentity', () => {
     expect(toAdminUserIdentity(base).lastActiveAt).toBeNull();
     expect(
       toAdminUserIdentity({ ...base, last_active_at: null }).lastActiveAt,
+    ).toBeNull();
+  });
+
+  test('passes disabled_at through as disabledAt for a disabled User', () => {
+    const disabledAt = new Date('2026-11-02T08:15:00.000Z');
+
+    const result = toAdminUserIdentity({
+      id: 'u6',
+      name: 'Frank',
+      email: 'frank@example.com',
+      disabled: true,
+      disabled_at: disabledAt,
+    });
+
+    expect(result.disabled).toBe(true);
+    expect(result.disabledAt).toBe(disabledAt);
+  });
+
+  test('maps a missing or null disabled_at to null disabledAt', () => {
+    const base = {
+      id: 'u7',
+      name: 'Gina',
+      email: 'gina@example.com',
+      disabled: false,
+    };
+
+    expect(toAdminUserIdentity(base).disabledAt).toBeNull();
+    expect(
+      toAdminUserIdentity({ ...base, disabled: true, disabled_at: null })
+        .disabledAt,
     ).toBeNull();
   });
 });

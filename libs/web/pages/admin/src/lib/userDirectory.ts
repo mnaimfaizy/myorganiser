@@ -253,15 +253,34 @@ export function avatarFillFor(userId: string): string {
 }
 
 /**
- * The phone row's second line: "Active 3 days ago" once the User has a
- * last-active day, otherwise the join date. Platform admins take an "Admin ·"
- * prefix in either case.
+ * "Disabled today", "Disabled 3 days ago", "Disabled last month"; plain
+ * "Disabled" when there is no disabled day (a User disabled before the column
+ * existed) or it does not parse. Reuses lastActiveAgo's relative-day phrasing,
+ * so the day count gives way to weeks and months exactly as it does for
+ * "Active …".
+ */
+export function formatDisabledPhrase(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  const ago = lastActiveAgo(iso, now);
+  return ago === undefined ? 'Disabled' : `Disabled ${ago}`;
+}
+
+/**
+ * The phone row's second line: "Disabled 3 days ago" for a Disabled User,
+ * "Active 3 days ago" once the User has a last-active day, otherwise the join
+ * date. Platform admins take an "Admin ·" prefix in every case.
  */
 export function phoneUserMeta(
   user: AdminUserIdentity,
   now: Date = new Date(),
 ): string {
   const isAdmin = user.role === 'platform_admin';
+  if (user.disabled) {
+    const disabled = formatDisabledPhrase(user.disabledAt, now);
+    return isAdmin ? `Admin · ${disabled}` : disabled;
+  }
   const ago = lastActiveAgo(user.lastActiveAt, now);
   if (ago === undefined) {
     const joined = `Joined ${formatJoinedDate(user.createdAt, now)}`;

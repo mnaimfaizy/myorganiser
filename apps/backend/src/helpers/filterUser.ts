@@ -43,6 +43,7 @@ export function toAdminUserIdentity(
     youtube_access?: boolean;
     created_at: Date;
     last_active_at?: Date | null;
+    disabled_at?: Date | null;
   };
   const firstName = (record.first_name ?? '').trim();
   const lastName = (record.last_name ?? '').trim();
@@ -60,6 +61,7 @@ export function toAdminUserIdentity(
     phone,
     role: resolveRole(record),
     disabled: resolveDisabled(record),
+    disabledAt: record.disabled_at ?? null,
     emailVerified,
     youtubeAccess: record.youtube_access === true,
     createdAt: record.created_at,

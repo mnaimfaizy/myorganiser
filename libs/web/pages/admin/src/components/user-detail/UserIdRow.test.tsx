@@ -27,6 +27,7 @@ const user: AdminUserIdentity = {
   phone: '+1-555-0100',
   role: 'user',
   disabled: false,
+  disabledAt: null,
   emailVerified: true,
   youtubeAccess: false,
   createdAt: '2026-01-01T00:00:00.000Z',

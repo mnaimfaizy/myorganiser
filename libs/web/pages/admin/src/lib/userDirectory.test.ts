@@ -4,6 +4,7 @@ import {
   USER_AVATAR_FILLS,
   avatarFillFor,
   formatAccountsSummary,
+  formatDisabledPhrase,
   formatJoinedDate,
   formatLastActive,
   formatLastActivePhrase,
@@ -26,6 +27,7 @@ function userFixture(
     lastName: 'Costa',
     role: 'user',
     disabled: false,
+    disabledAt: null,
     emailVerified: true,
     youtubeAccess: false,
     createdAt: new Date(2026, 9, 15, 12).toISOString(),
@@ -205,10 +207,71 @@ describe('phoneUserMeta', () => {
   });
 });
 
+describe('phoneUserMeta for a Disabled User', () => {
+  const now = new Date(2026, 10, 4, 9);
+
+  it.each([
+    [
+      'the disabled day, in relative days',
+      { disabledAt: lastActiveOn(3) },
+      'Disabled 3 days ago',
+    ],
+    ['the same local day', { disabledAt: lastActiveOn(0) }, 'Disabled today'],
+    ['the previous day', { disabledAt: lastActiveOn(1) }, 'Disabled yesterday'],
+    ['no disabled day', { disabledAt: null }, 'Disabled'],
+    [
+      'no disabled day, even with a last-active day (never Active)',
+      { disabledAt: null, lastActiveAt: lastActiveOn(3) },
+      'Disabled',
+    ],
+    [
+      'a disabled day, even with a last-active day (never Active)',
+      { disabledAt: lastActiveOn(3), lastActiveAt: lastActiveOn(1) },
+      'Disabled 3 days ago',
+    ],
+  ] as const)('gives %s as %s', (_label, overrides, expected) => {
+    expect(
+      phoneUserMeta(userFixture({ disabled: true, ...overrides }), now),
+    ).toBe(expected);
+  });
+
+  it.each([
+    [
+      'a disabled platform admin',
+      lastActiveOn(3),
+      'Admin · Disabled 3 days ago',
+    ],
+    [
+      'a disabled platform admin with no disabled day',
+      null,
+      'Admin · Disabled',
+    ],
+  ] as const)('prefixes Admin for %s', (_label, disabledAt, expected) => {
+    const admin = userFixture({
+      role: 'platform_admin',
+      disabled: true,
+      disabledAt,
+    });
+    expect(phoneUserMeta(admin, now)).toBe(expected);
+  });
+});
+
 /** The ISO instant at noon, `days` calendar days before 4 Nov 2026 (negative: after). */
 function lastActiveOn(days: number): string {
   return new Date(2026, 10, 4 - days, 12).toISOString();
 }
+
+describe('formatDisabledPhrase', () => {
+  const now = new Date(2026, 10, 4, 9);
+
+  it.each([
+    ['a valid disabled day', lastActiveOn(3), 'Disabled 3 days ago'],
+    ['no disabled day', null, 'Disabled'],
+    ['an unparseable disabled day', 'not a date', 'Disabled'],
+  ] as const)('gives %s as %s', (_label, iso, expected) => {
+    expect(formatDisabledPhrase(iso, now)).toBe(expected);
+  });
+});
 
 describe('formatLastActive', () => {
   const now = new Date(2026, 10, 4, 9);

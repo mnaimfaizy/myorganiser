@@ -31,6 +31,7 @@ function userFixture(
     lastName: 'Costa',
     role: 'user',
     disabled: false,
+    disabledAt: null,
     emailVerified: true,
     youtubeAccess: false,
     createdAt: new Date(2026, 9, 16, 12).toISOString(),
@@ -160,6 +161,36 @@ describe('identityMeta', () => {
       'Joined 16 Oct 2026',
       'Never active',
     ]);
+  });
+});
+
+describe('identityMeta for a Disabled User', () => {
+  const disabledThreeDaysAgo = new Date(2026, 9, 19, 12).toISOString();
+
+  it.each(['desktop', 'phone'] as const)(
+    'ends with the disabled day after Last active on %s',
+    (variant) => {
+      const user = userFixture({
+        phone: '+44 20 7946 0018',
+        disabled: true,
+        disabledAt: disabledThreeDaysAgo,
+        lastActiveAt: new Date(2026, 9, 22, 8).toISOString(),
+      });
+      expect(identityMeta(user, variant, NOW).split(' · ')).toEqual([
+        'ana@example.com',
+        '+44 20 7946 0018',
+        variant === 'desktop' ? 'Joined 16 Oct 2026' : 'Joined 16 Oct',
+        'Last active today',
+        'Disabled 3 days ago',
+      ]);
+    },
+  );
+
+  it('ends with plain Disabled when the User has no disabled day', () => {
+    const user = userFixture({ disabled: true, disabledAt: null });
+    expect(identityMeta(user, 'desktop', NOW)).toBe(
+      'ana@example.com · Joined 16 Oct 2026 · Never active · Disabled',
+    );
   });
 });
 

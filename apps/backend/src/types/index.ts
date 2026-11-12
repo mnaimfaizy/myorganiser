@@ -50,6 +50,8 @@ export interface AdminUserIdentity {
   phone?: string;
   role: UserRole;
   disabled: boolean;
+  /** When a Platform Admin disabled this User; null while enabled and for Users disabled before the column existed (issue #1445). */
+  disabledAt: Date | null;
   emailVerified: boolean;
   /** Whether a Platform Admin currently grants this User YouTube Access (ADR 0129). */
   youtubeAccess: boolean;

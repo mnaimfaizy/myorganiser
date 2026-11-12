@@ -114,6 +114,7 @@ const anaUser: AdminUserIdentity = {
   lastName: 'Costa',
   role: 'user',
   disabled: false,
+  disabledAt: null,
   emailVerified: true,
   youtubeAccess: false,
   createdAt: todayAt(8, 0),

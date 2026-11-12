@@ -33,6 +33,8 @@ model User {
   blacklisted_tokens              String[]
   role                            UserRole  @default(user)
   disabled                        Boolean   @default(false)
+  /// When a Platform Admin disabled this User (issue #1445). Set by the disable and cleared by the re-enable, in the same transaction as the `disabled` change; a repeated disable keeps the first time. Null for an enabled User and for Users disabled before this column existed (no backfill). Not derived from the Admin Audit Log.
+  disabled_at                     DateTime?
   /// When set, refresh/access tokens with iat before this timestamp are rejected.
   sessions_invalidated_at         DateTime?
   /// Whether a Platform Admin currently grants this User YouTube Access.
