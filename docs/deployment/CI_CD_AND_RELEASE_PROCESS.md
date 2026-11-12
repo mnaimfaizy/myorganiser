@@ -28,7 +28,7 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
   - CI runs on every push.
   - A production deploy **run** starts automatically when the branch is created (see `dispatch-production-deploy.yml`), and can also be started by hand.
   - **No production deploy proceeds without approval.** The `production` Environment carries a required-reviewer rule, so every run pauses until a maintainer approves it. The approval — not the dispatch — is the ship decision. See [ADR 0028](../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md).
-  - Both frontend and backend are deployed to **cPanel shared hosting** via FTP/FTPS.
+  - Both frontend and backend deploy to **cPanel shared hosting** via FTP/FTPS.
 
 ## Workflows
 
@@ -39,12 +39,12 @@ Move the pin to `ubuntu-26.04` only after Playwright supports that image, and be
   - **Build Storybook** runs `yarn build-storybook` on every run, so a story that no longer compiles fails CI. Play functions (`test-storybook`) are not run in CI. See [ADR 0139](../adr/0139-chromatic-is-retired-storybooks-ci-checks-stand-alone.md).
   - Triggers on PRs to `main` / `release/*` and on pushes to `main` / `release/*`.
   - **Caching.** Two caches, both `actions/cache` with no write mode and no `pull_request_target` anywhere: the dependency cache (`<os>-node-22-deps-<lockfile digest>`, restored by exact key) and the Nx computation cache (`<os>-nx-22-<target>-<commit>`, restored through a `<os>-nx-22-<target>-` prefix). A pull request writes only into its own `refs/pull/<n>/merge` scope and reads `main`'s as a fallback, which is GitHub's own scoping and not something the workflow arranges.
-  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. What it buys is that a `main` run already under way always finishes and saves its full baseline; GitHub still keeps only one run pending per concurrency group, so a third push cancels the run queued behind the one in progress and that commit is covered by the next run rather than by its own. Superseded entries are pruned afterwards by `cache-cleanup.yml` instead.
+  - **`cancel-in-progress` is on for every ref except `main`.** A cancelled run saves no cache — `actions/cache` writes in a job's post step — so a `main` that cancelled itself under a burst of merges left pull requests restoring from an old Cache Baseline. In return, a `main` run already under way always finishes and saves its full baseline. GitHub still keeps only one run pending per concurrency group, so a third push cancels the run queued behind the one in progress and that commit is covered by the next run rather than by its own. `cache-cleanup.yml` prunes superseded entries afterwards instead.
 
 - `.github/workflows/cache-cleanup.yml` (name: `Cache Cleanup`)
   - Deletes the Actions cache entries nothing can restore from, so the repository stays under GitHub's 10 GB cache limit (past which useful entries are evicted within days).
   - Fires on `pull_request: closed` (that pull request's whole `refs/pull/<n>/merge` scope), on `workflow_run` when `CI` completes on `main` (the superseded dependency keys and the superseded Nx baseline for each target), and on `workflow_dispatch` with a `dry_run` input.
-  - Selection is pure in `tools/scripts/lib/actions-cache-cleanup.ts` and never selects the newest entry of a Cache Family; `tools/scripts/ci/prune-actions-caches.ts` lists, deletes and reports. A read-only token — a fork's or Dependabot's on a closed pull request — is a warning, not a failure, because `pull_request_target` is deliberately not used.
+  - Selection is pure in `tools/scripts/lib/actions-cache-cleanup.ts` and never selects the newest entry of a Cache Family; `tools/scripts/ci/prune-actions-caches.ts` lists, deletes and reports. A read-only token — a fork's or Dependabot's on a closed pull request — is a warning, not a failure, because the workflow deliberately does not use `pull_request_target`.
 
 - `.github/workflows/pr-ci-duration-watch.yml` (name: `PR CI Duration Watch`)
   - Watches the five-minute PR CI target (PRD #1387): runs `yarn ci:duration:measure` over the last fortnight on a weekly schedule (Monday 09:23 UTC) and on `workflow_dispatch`.
@@ -87,7 +87,7 @@ Configure these in GitHub:
 - At the **repository** level, define shared secrets used across all workflows (for example, build or tooling tokens).
 - At the **environment** level, define deployment-specific secrets used only for that environment.
 
-The exact secrets required for each environment are documented in the sections below:
+The sections below list the exact secrets each environment requires:
 
 - **Repository (CI tooling)**
 - **Staging (main)**
@@ -106,7 +106,7 @@ This repo uses two GitHub **Environments**:
 - `staging`
 - `production`
 
-The deploy workflows are already configured to use them:
+The deploy workflows already use them:
 
 - Staging workflow uses `environment: staging`.
 - Production workflow uses `environment: production`.
@@ -306,7 +306,7 @@ Two of those names extend the eight the PRD originally listed, because eight
 left two holes. `COUNTERPART_APP_ROOT` is what makes the `APP_ROOT` guard mean
 anything: a job scoped to `environment: staging` cannot read `production`'s
 secrets to compare the two roots, so each environment carries the other's pin
-and refuses to run when they match — without it the guard could only catch an
+and refuses to run when they match. Without it, the guard could only catch an
 `APP_ROOT` that was unset, and a shared hosting account would let a Staging run
 migrate Production. `SSH_KNOWN_HOSTS` replaces `StrictHostKeyChecking=accept-new`:
 the runner is ephemeral and remembers nothing, so trust-on-first-use would have
@@ -328,7 +328,7 @@ someone dispatches `Deploy Staging`. SSH shell access on the hosting account is
 a manual toggle that reverts, so an apply chained to the upload would go red on
 every night the shell happened to be off — and a red apply nobody reads is how
 unapplied migrations shipped in the first place. This amends PRD #565 user
-story 3; it means an uploaded Staging bundle is not a migrated Staging backend
+story 3. An uploaded Staging bundle is not a migrated Staging backend
 until you say so. A scheduled upload writes a "Backend uploaded by the
 schedule, not applied" notice to its job summary so a green run does not read
 as a finished deploy. To apply it, dispatch `Deploy Staging` in full, not with
@@ -388,11 +388,11 @@ When every commit since the last tag is `docs:`, `ci:`, or `chore:`, there is no
 `VersionBump` agent reports `NO_RELEASE`. That is advice, not a veto — cut anyway if you have a
 reason, such as republishing a failed deploy.
 
-Classify on the commit **type**, never on the word "deps". `fix(deps):` is how shipped security
-advisories are remediated in this repo and counts as a PATCH; `chore(deps):` and `ci: bump …` never
+Classify on the commit **type**, never on the word "deps". This repo remediates shipped security
+advisories with `fix(deps):`, which counts as a PATCH; `chore(deps):` and `ci: bump …` never
 reach the deployed app.
 
-The agent-facing version of this process lives in
+The agent-facing version of this process is in
 [`.agents/skills/release-and-deploy-workflow/SKILL.md`](../../.agents/skills/release-and-deploy-workflow/SKILL.md).
 
 ### Release branch naming
@@ -475,7 +475,7 @@ What this does:
 - If it went red, do not hand-fix on the host — the sequence is fail-closed and left it as it was. Fix the cause and re-run with `apply_only`; the bundle is already uploaded. [Runbook](HOST_APPLY_OPERATOR_SETUP.md#step-8--production).
 - `yarn release:tag --version vX.Y.Z --push`
 
-`release:tag` writes no files and creates no commits — the `CHANGELOG.md` entry was already committed by `release:cut`. The tag must name the exact commit that deployed.
+`release:tag` writes no files and creates no commits — `release:cut` already committed the `CHANGELOG.md` entry. The tag must name the exact commit that deployed.
 
 The tag is a receipt: `vX.Y.Z` existing means that version is live in production with Host Apply verified.
 
@@ -484,7 +484,7 @@ Optional: write a rolling notes file
 - `--notes-file` (no value) writes to `RELEASE_NOTES.md`
 - `--notes-file <path>` writes to the provided path
 
-Note: We intentionally avoid generating per-version `release-notes-v*.md` files since `CHANGELOG.md` is the source of truth.
+Note: We deliberately do not generate per-version `release-notes-v*.md` files, because `CHANGELOG.md` is the source of truth.
 
 ### Release PR automation
 
@@ -495,21 +495,21 @@ Note: We intentionally avoid generating per-version `release-notes-v*.md` files 
 
 Auto-merge is the only optional part: it needs repository settings to allow auto-merge, and branch
 protection rules that do not require manual approvals. If either is missing the workflow logs a
-warning and the PR simply waits to be merged by hand.
+warning and the PR waits for someone to merge it by hand.
 
 Notes:
 
-- If you need to skip bumping `package.json` version for any reason, pass `--no-version-bump`.
+- To skip bumping the `package.json` version, pass `--no-version-bump`.
 - The scripts enforce strict `vX.Y.Z` (no prerelease strings).
 
 ### Release script notes
 
-The script lives at `tools/scripts/release.ts` and automates the git steps.
+The script is at `tools/scripts/release.ts` and automates the git steps.
 
 - It enforces `vX.Y.Z` format (no prerelease strings).
 - It requires a clean working tree.
 - `release:cut` requires you to be on `main` and up-to-date with `origin/main`.
-- `release:cut` then refuses unless Staging holds that commit, Host Applied: the latest successful Staging `deploy-backend` uploaded it, and a green `host-apply` at that commit started after the upload landed, with no upload of another commit in between. An `apply_only` retry counts when the upload it applies was a dispatched one. The uploaded commit is read from each run's name (`run-name` in `deploy-staging.yml`). A dispatched run names its commit; a scheduled run names none, because the commit it deploys is chosen inside the run. The guard refuses an upload that names no commit, so a scheduled upload cannot be Cut — with or without an `apply_only` dispatch after it — until a full dispatch uploads and applies the commit ([ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md)). A run from before `run-name` existed can only refuse, for the same reason. It reads the recent `Deploy Staging` runs with `gh api`, so the GitHub CLI must be installed and authenticated. There is no flag to skip it — a break-glass SSH apply is invisible to CI, so it cannot satisfy the check ([ADR 0056 amendment](../adr/0056-ci-owns-host-apply-without-describing-the-jail.md#amendment-2026-09-14)). `--dry-run` runs the check too.
+- `release:cut` then refuses unless Staging holds that commit, Host Applied: the latest successful Staging `deploy-backend` uploaded it, and a green `host-apply` at that commit started after the upload landed, with no upload of another commit in between. An `apply_only` retry counts when the upload it applies was a dispatched one. The guard reads the uploaded commit from each run's name (`run-name` in `deploy-staging.yml`). A dispatched run names its commit; a scheduled run names none, because the commit it deploys is chosen inside the run. The guard refuses an upload that names no commit, so a scheduled upload cannot be Cut — with or without an `apply_only` dispatch after it — until a full dispatch uploads and applies the commit ([ADR 0128](../adr/0128-the-web-app-is-hosted-on-the-same-site-as-its-api-and-staging-deploys-daily.md)). A run from before `run-name` existed can only refuse, for the same reason. It reads the recent `Deploy Staging` runs with `gh api`, so the GitHub CLI must be installed and authenticated. There is no flag to skip it — a break-glass SSH apply is invisible to CI, so it cannot satisfy the check ([ADR 0056 amendment](../adr/0056-ci-owns-host-apply-without-describing-the-jail.md#amendment-2026-09-14)). `--dry-run` runs the check too.
 - It does **not** dispatch or approve any deploy. Pushing the release branch is what dispatches a production run (via `dispatch-production-deploy.yml`), and that run still waits for approval.
 - `release:cut` **cannot** create a tag. Tagging is a separate command, run only after Production Host Apply succeeds — the tag is a receipt, not a trigger. See [ADR 0028](../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md) and [ADR 0056](../adr/0056-ci-owns-host-apply-without-describing-the-jail.md).
 
