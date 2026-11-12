@@ -1,6 +1,6 @@
 # Development Guide - MyOrganiser Monorepo
 
-This guide provides comprehensive documentation for developing in the MyOrganiser monorepo. Whether you're a new contributor or a seasoned developer, this guide will help you get started and navigate the development workflow.
+This guide covers development in the MyOrganiser monorepo.
 
 ## Table of Contents
 
@@ -55,7 +55,7 @@ MyOrganiser is a full-stack web application built as an Nx monorepo. It consists
 
 ### Prerequisites
 
-Before you begin, ensure you have the following installed on your system:
+Install the following before you begin:
 
 - **Node.js** - [Download](https://nodejs.org/)
 - **Corepack-managed Yarn** - Use `corepack yarn ...` directly, or enable Corepack shims if your installation permits it
@@ -88,7 +88,7 @@ Before you begin, ensure you have the following installed on your system:
    cp .env.example .env
    ```
 
-   Edit the `.env` file and configure the environment variables. Key variables include:
+   Edit the `.env` file and set the environment variables. The main ones are:
 
    ```env
    # Application
@@ -133,7 +133,7 @@ Before you begin, ensure you have the following installed on your system:
    NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api/v1
    ```
 
-   **Note**: For production, generate secure random secrets using:
+   **Note**: For production, generate secure random secrets with:
 
    ```bash
    node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
@@ -164,13 +164,13 @@ Before you begin, ensure you have the following installed on your system:
    yarn nx graph
    ```
 
-   This opens a visual representation of your project structure and dependencies.
+   This opens a graph of the projects and their dependencies.
 
 ## Starting Local Development Dependencies and Services
 
 ### Starting Dependencies (Docker)
 
-The application uses Docker Compose to run local development dependencies:
+Docker Compose runs the local development dependencies:
 
 ```bash
 # Start all services
@@ -216,7 +216,7 @@ yarn nx serve backend
 # The backend API will be available at http://localhost:3000
 ```
 
-The development server features:
+The development server has:
 
 - Hot reload on file changes
 - Automatic TypeScript compilation
@@ -234,15 +234,14 @@ yarn nx dev web
 # The frontend will be available at http://localhost:4200
 ```
 
-The development server features:
+The development server has:
 
 - Fast refresh for React components
 - Hot module replacement
-- Next.js development features
 
 ### Starting Both Backend and Frontend
 
-For the best development experience, run these in separate terminal windows:
+Run these in separate terminal windows:
 
 **Terminal 1 - Backend:**
 
@@ -258,7 +257,7 @@ yarn start:web
 
 ### Starting the Mobile App (iOS)
 
-iOS builds require macOS. The JavaScript half of the app is managed by Yarn, but the native half is managed by CocoaPods, which is a Ruby program: `apps/mobile/ios/Podfile` is Ruby source that `pod install` evaluates, and it shells out to Node to locate React Native's autolinking script. A working iOS setup therefore needs both toolchains. Android and web need none of this.
+iOS builds require macOS. Yarn manages the JavaScript half of the app. CocoaPods manages the native half, and CocoaPods is a Ruby program: `apps/mobile/ios/Podfile` is Ruby source that `pod install` evaluates, and it shells out to Node to locate React Native's autolinking script. A working iOS setup therefore needs both toolchains. Android and web need none of this.
 
 #### One-time Ruby setup
 
@@ -306,7 +305,7 @@ Always go through `bundle exec`, never a bare `pod`. The Gemfile pins CocoaPods 
 yarn nx run-ios mobile
 ```
 
-Metro can be started on its own when you only need the bundler:
+Start Metro on its own when you only need the bundler:
 
 ```bash
 yarn nx start mobile
@@ -341,7 +340,7 @@ If you change native dependencies from a machine without macOS, say so in the pu
 
 ### Starting Storybook
 
-Storybook allows you to develop and test UI components in isolation:
+Storybook runs UI components in isolation, for developing and testing them:
 
 ```bash
 yarn storybook
@@ -349,11 +348,11 @@ yarn storybook
 # This will open Storybook at http://localhost:6006
 ```
 
-For more information, see [docs/storybook/README.md](docs/storybook/README.md).
+See [docs/storybook/README.md](docs/storybook/README.md).
 
 ### Accessing Services
 
-Once everything is running, you can access:
+With everything running, the services are at:
 
 | Service     | URL                          | Description              |
 | ----------- | ---------------------------- | ------------------------ |
@@ -386,7 +385,7 @@ For more than one line on a project, read the `AGENTS.md` (and, where one exists
 
 ## Frontend Architecture (Web Page Libraries)
 
-MyOrganiser enforces a simple rule for the Next.js App Router:
+MyOrganiser enforces this rule for the Next.js App Router:
 
 - Files under `apps/web/src/app/**` are **thin route wrappers** only.
 - All page/domain logic lives in Nx libraries under `libs/web/pages/<route>/`.
@@ -427,15 +426,17 @@ Examples of existing page libraries:
 1. **Create a Feature Branch**
 
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feat/123-your-feature-name
    ```
 
-   Branch naming conventions:
-   - `feature/` - New features
-   - `fix/` - Bug fixes
-   - `docs/` - Documentation updates
-   - `refactor/` - Code refactoring
-   - `test/` - Test additions/updates
+   Name the branch `<type>/<issue-number>-<short-slug>`, where `123` above is the issue number. Omit the number only when there is no issue. The type comes from what the work does:
+   - `feat/` - New features
+   - `fix/` - Bug and security fixes
+   - `docs/` - Documentation
+   - `chore/` - Tooling, maintenance, and dependencies
+   - `ci/` - CI and workflow changes only
+
+   [AGENTS.md](AGENTS.md#branch-naming) holds the full rules, including how issue labels map to a type and which prefixes are reserved.
 
 2. **Make Your Changes**
    - Follow the existing code style
@@ -475,7 +476,7 @@ Examples of existing page libraries:
 5. **Push Your Branch**
 
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 ### Working with the Database
@@ -500,7 +501,7 @@ npx prisma migrate reset
 
 #### Using Prisma Studio
 
-Prisma Studio provides a GUI to view and edit database data:
+Prisma Studio is a GUI for viewing and editing database data:
 
 ```bash
 cd apps/backend/src
@@ -511,7 +512,7 @@ This opens Prisma Studio at http://localhost:5555.
 
 #### Schema Management
 
-Prisma schemas are located in `apps/backend/src/prisma/schema/`:
+The Prisma schemas are in `apps/backend/src/prisma/schema/`:
 
 - `schema.prisma` - Main configuration
 - `user.prisma` - User model
@@ -619,20 +620,20 @@ do the generators. Aliases added by hand stay wherever they were typed unless yo
 #### Type Checking
 
 Every project that carries one of the recognised tsconfig names gets a cacheable `typecheck`
-target, inferred by the local Nx plugin at `tools/scripts/nx/typecheck-plugin.ts`
+target. The local Nx plugin at `tools/scripts/nx/typecheck-plugin.ts` infers it
 ([ADR 0141](docs/adr/0141-typecheck-is-a-cached-per-project-inferred-target.md)), with no
-per-project wiring — a newly generated project included. It compiles each project's lib, app, web,
-and spec tsconfig, wherever one exists; a project with no lib, app, or web config, such as the
-Next.js app, is compiled from its `tsconfig.json`.
+per-project wiring — a newly generated project included. The target compiles each project's lib,
+app, web, and spec tsconfig, wherever one exists. For a project with no lib, app, or web config,
+such as the Next.js app, it compiles the project's `tsconfig.json`.
 
 A project with none of those configs gets no target, and `yarn nx run <project>:typecheck` does not
 resolve for it: `api-specs` and `app-api-client` are generated and synced outputs with no tsconfig
 of their own.
 
 `yarn typecheck:check` is the whole-tree command: `nx run-many -t typecheck` plus
-`tools/scripts/tsconfig.json`, which is a fixed job because `tools/scripts` carries no
-`project.json` on purpose ([ADR 0135](docs/adr/0135-tooling-scripts-are-typescript-run-by-node-and-tested-by-node-test.md))
-and the plugin keys inference on that file.
+`tools/scripts/tsconfig.json`. That tsconfig is a fixed job because the plugin keys inference on
+`project.json`, and `tools/scripts` carries no `project.json` on purpose
+([ADR 0135](docs/adr/0135-tooling-scripts-are-typescript-run-by-node-and-tested-by-node-test.md)).
 CI runs `nx affected -t typecheck` on a pull request and the whole tree on a push to `main`, with
 the fixed job as its own path-gated step, `yarn typecheck:tools-scripts`.
 
@@ -653,7 +654,7 @@ yarn nx affected -t typecheck
 
 ### Creating an Issue
 
-Good issues help maintainers understand and address problems quickly. Here's how to create effective issues:
+To create an issue:
 
 1. **Navigate to the Repository**
 
@@ -723,11 +724,10 @@ Good issues help maintainers understand and address problems quickly. Here's how
 2. **Create a Feature Branch**
 
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feat/123-your-feature-name
    ```
 
 3. **Make Your Changes**
-   - Write clean, readable code
    - Follow existing code style
    - Add tests for new features
    - Update documentation
@@ -772,7 +772,7 @@ Good issues help maintainers understand and address problems quickly. Here's how
 7. **Push Your Branch**
 
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 8. **Create the Pull Request**
@@ -835,7 +835,7 @@ Good issues help maintainers understand and address problems quickly. Here's how
    # Make requested changes
    # Stage the specific files for this change (never git add .)
    corepack yarn ai:commit --message "fix: address review feedback"
-   git push origin feature/your-feature-name
+   git push origin feat/123-your-feature-name
    ```
 
 4. **Approval and Merge**
@@ -870,7 +870,7 @@ yarn nx test backend --coverage
 
 #### Writing Tests
 
-Tests are located next to the source files with `.spec.ts` or `.test.ts` extensions.
+Tests are next to the source files, with `.spec.ts` or `.test.ts` extensions.
 
 For generated or delegated suites, require focused tests, deterministic mocks, duplicate `describe`/helper checks, the full affected run, and linting before accepting the change.
 
@@ -926,7 +926,7 @@ describe('Button', () => {
 
 ### E2E Testing
 
-End-to-end tests use Playwright and are located in `apps/web-e2e`.
+End-to-end tests use Playwright and are in `apps/web-e2e`.
 
 ```bash
 # Run E2E tests
@@ -1332,7 +1332,7 @@ yarn husky install
 
 ### Getting Help
 
-If you encounter issues not covered in this guide:
+For a problem this guide does not cover:
 
 1. Check existing [GitHub Issues](https://github.com/mnaimfaizy/myorganiser/issues)
 2. Search the documentation
@@ -1340,7 +1340,5 @@ If you encounter issues not covered in this guide:
 4. Create a new issue with detailed information
 
 ---
-
-**Happy coding!** 🚀
 
 If you have questions or suggestions for improving this guide, please open an issue or submit a pull request.
