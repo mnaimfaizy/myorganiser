@@ -31,21 +31,20 @@ import {
   SHADOW_COMMENT_MARKER,
   SHADOW_HELD,
   SHADOW_WOULD_MERGE,
-  UNREAD_AGENT_VERDICT,
-  UNREAD_QA_REPORT,
-  UNREAD_REVIEW_TIER,
   agentVerdictFrom,
   agentVerdictFromView,
   autoMergeHolds,
   changedFilesFromGh,
   checksOnCurrentHead,
   decideAutoMerge,
+  fetchOnce,
   mainCiFromRuns,
   onMainFromCompare,
   parseAutoMergeMode,
   pathGuardFrom,
   prCommitsFromGh,
   qaReportFromView,
+  readAutoMergeModeFromGit,
   readPathMapFromGit,
   readDoor,
   renderAutoTrainResult,
@@ -117,6 +116,20 @@ const snapshot = (
 });
 
 // ------------------------------------------------------------- fixtures
+
+/** Facts with no reader yet. Each one holds the merge with its reason. */
+const UNREAD_REVIEW_TIER: ReviewTierFact = {
+  status: 'missing',
+  reason: 'the Review Tier is not read yet (no per-head record)',
+};
+const UNREAD_AGENT_VERDICT: AgentVerdictFact = {
+  status: 'missing',
+  reason: 'the Agent Verdict is not read yet',
+};
+const UNREAD_QA_REPORT: QaReportFact = {
+  status: 'missing',
+  reason: 'the QA Report is not read yet',
+};
 
 /** The reason a fact that has no reader yet holds the merge with. */
 function missingReason(fact: MissingFact | { status: 'read' }): string {
@@ -2080,24 +2093,27 @@ describe('changedFilesFromGh: the changed files as gh api lists them', () => {
   });
 });
 
+// The reads of `main` share one fake git: `fetch` and `show` answer as scripted,
+// and every call is recorded.
+const FETCH = ['fetch', '--quiet', 'origin', 'main'];
+const OK_FETCH: GitResult = { status: 0, stdout: '' };
+
+/** A fake git: answers each subcommand as scripted, and records every call. */
+const fakeGit = (answers: { fetch: GitResult; show: GitResult }) => {
+  const calls: string[][] = [];
+  const git = (args: string[]): GitResult => {
+    calls.push(args);
+    return args[0] === 'fetch' ? answers.fetch : answers.show;
+  };
+  return { git, calls };
+};
+
 describe("readPathMapFromGit: main's path map through a counting fake git", () => {
   const committed = readFileSync(
     join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG),
     'utf8',
   );
-  const FETCH = ['fetch', '--quiet', 'origin', 'main'];
   const SHOW = ['show', 'origin/main:tools/config/review-tier-paths.json'];
-
-  /** A fake git: answers each subcommand as scripted, and records every call. */
-  const fakeGit = (answers: { fetch: GitResult; show: GitResult }) => {
-    const calls: string[][] = [];
-    const git = (args: string[]): GitResult => {
-      calls.push(args);
-      return args[0] === 'fetch' ? answers.fetch : answers.show;
-    };
-    return { git, calls };
-  };
-  const OK_FETCH: GitResult = { status: 0, stdout: '' };
 
   test('a successful fetch and show read the committed map, with exactly those two calls', () => {
     const { git, calls } = fakeGit({
@@ -2166,6 +2182,125 @@ describe("readPathMapFromGit: main's path map through a counting fake git", () =
       show: { status: 0, stdout: '{"schemaVersion":2,"rules":[]}' },
     });
     assert.equal(readPathMapFromGit(git), null);
+  });
+});
+
+describe('readAutoMergeModeFromGit: the mode as main has it, through a counting fake git', () => {
+  const SHOW = ['show', `origin/main:${AUTO_MERGE_MODE_PATH}`];
+  const shownMode = (stdout: string | null): GitResult => ({
+    status: 0,
+    stdout,
+  });
+
+  test('main holds shadow, so a branch that says on still reads shadow, from origin/main only', () => {
+    const calls: string[][] = [];
+    // Only main's copy is served: the branch-local file is never an input,
+    // and any other git call fails the test. The function takes git alone, so
+    // it has no filesystem read to make.
+    const git = (args: string[]): GitResult => {
+      calls.push(args);
+      if (args[0] === 'fetch') return OK_FETCH;
+      if (args.join(' ') === SHOW.join(' '))
+        return shownMode('{"mode":"shadow"}');
+      throw new Error(`unexpected git call: ${args.join(' ')}`);
+    };
+    assert.equal(readAutoMergeModeFromGit(git), 'shadow');
+    assert.deepEqual(calls, [FETCH, SHOW]);
+    assert.equal(calls[1][1], `origin/main:${AUTO_MERGE_MODE_PATH}`);
+  });
+
+  test('main holds on, so the mode is on', () => {
+    const { git, calls } = fakeGit({
+      fetch: OK_FETCH,
+      show: shownMode('{"mode":"on"}'),
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'on');
+    assert.deepEqual(calls, [FETCH, SHOW]);
+  });
+
+  test('a failed fetch is off, and no show is run', () => {
+    const { git, calls } = fakeGit({
+      fetch: { status: 1, stdout: '' },
+      show: shownMode('{"mode":"on"}'),
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'off');
+    assert.deepEqual(calls, [FETCH]);
+  });
+
+  test('a null fetch status is off, and no show is run', () => {
+    const { git, calls } = fakeGit({
+      fetch: { status: null, stdout: null },
+      show: shownMode('{"mode":"on"}'),
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'off');
+    assert.deepEqual(calls, [FETCH]);
+  });
+
+  test('a failed show (no setting file on main) is off', () => {
+    const { git, calls } = fakeGit({
+      fetch: OK_FETCH,
+      show: { status: 128, stdout: '' },
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'off');
+    assert.deepEqual(calls, [FETCH, SHOW]);
+  });
+
+  test('a show that is not JSON is off', () => {
+    const { git } = fakeGit({
+      fetch: OK_FETCH,
+      show: shownMode('not json'),
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'off');
+  });
+
+  test('a mode outside off, shadow and on is off', () => {
+    const { git } = fakeGit({
+      fetch: OK_FETCH,
+      show: shownMode('{"mode":"maybe"}'),
+    });
+    assert.equal(readAutoMergeModeFromGit(git), 'off');
+  });
+});
+
+describe('fetchOnce: one fetch shared by the reads of main in one pass', () => {
+  const committed = readFileSync(
+    join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG),
+    'utf8',
+  );
+  const PATH_SHOW = ['show', `origin/main:${REVIEW_TIER_PATHS_CONFIG}`];
+  const MODE_SHOW = ['show', `origin/main:${AUTO_MERGE_MODE_PATH}`];
+
+  test('both reads share one fetch, and each file is shown once', () => {
+    const calls: string[][] = [];
+    const git = (args: string[]): GitResult => {
+      calls.push(args);
+      if (args[0] === 'fetch') return OK_FETCH;
+      if (args.join(' ') === PATH_SHOW.join(' ')) {
+        return { status: 0, stdout: committed };
+      }
+      if (args.join(' ') === MODE_SHOW.join(' ')) {
+        return { status: 0, stdout: '{"mode":"on"}' };
+      }
+      throw new Error(`unexpected git call: ${args.join(' ')}`);
+    };
+    const shared = fetchOnce(git);
+    assert.deepEqual(
+      readPathMapFromGit(shared),
+      loadPathMap(join(REPO_ROOT, REVIEW_TIER_PATHS_CONFIG)),
+    );
+    assert.equal(readAutoMergeModeFromGit(shared), 'on');
+    assert.deepEqual(calls, [FETCH, PATH_SHOW, MODE_SHOW]);
+  });
+
+  test('a failed fetch stays failed for both reads: no second fetch, no show', () => {
+    const { git, calls } = fakeGit({
+      fetch: { status: 1, stdout: '' },
+      show: { status: 0, stdout: '{"mode":"on"}' },
+    });
+    const shared = fetchOnce(git);
+    assert.equal(readPathMapFromGit(shared), null);
+    assert.equal(readAutoMergeModeFromGit(shared), 'off');
+    assert.deepEqual(calls, [FETCH]);
   });
 });
 

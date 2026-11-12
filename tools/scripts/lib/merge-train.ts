@@ -742,29 +742,59 @@ export interface GitResult {
   stdout: string | null;
 }
 
+/** A `git` call, injected so the reads from `main` are testable. */
+export type GitRunner = (args: string[]) => GitResult;
+
 /**
- * `main`'s path map, read from `main` itself and never from the working
- * tree: fetch, then `git show origin/main:<the map>`. A failed fetch (no show
- * is run), a failed show, or a map that does not validate is null, which
- * holds every candidate. `git` is injected so the branches are testable.
+ * `git`, with its `fetch` run once: every read of `main` in one pass shares
+ * one fetch, and a failed fetch stays failed for the whole pass.
  */
-export function readPathMapFromGit(
-  git: (args: string[]) => GitResult,
-): ReviewTierPathMap | null {
+export function fetchOnce(git: GitRunner): GitRunner {
+  let fetched: GitResult | undefined;
+  return (args) => {
+    if (args[0] !== 'fetch') return git(args);
+    fetched ??= git(args);
+    return fetched;
+  };
+}
+
+/**
+ * A file as `main` has it, never the working tree's: fetch, then
+ * `git show origin/main:<path>`. A failed fetch (no show is run) or a failed
+ * show is null.
+ */
+function readFromMain(git: GitRunner, path: string): string | null {
   const ok = (result: GitResult) => (result.status ?? 1) === 0;
   if (!ok(git(['fetch', '--quiet', 'origin', TRAIN_BASE]))) return null;
-  // The config constant is already repo-relative (git wants a posix path).
-  const path = REVIEW_TIER_PATHS_CONFIG.split(sep).join('/');
-  const shown = git(['show', `origin/${TRAIN_BASE}:${path}`]);
-  if (!ok(shown)) return null;
+  // The constants are already repo-relative (git wants a posix path).
+  const shown = git([
+    'show',
+    `origin/${TRAIN_BASE}:${path.split(sep).join('/')}`,
+  ]);
+  return ok(shown) ? (shown.stdout ?? '') : null;
+}
+
+/**
+ * `main`'s path map. A failed fetch or show, or a map that does not
+ * validate, is null, which holds every candidate.
+ */
+export function readPathMapFromGit(git: GitRunner): ReviewTierPathMap | null {
+  const text = readFromMain(git, REVIEW_TIER_PATHS_CONFIG);
+  if (text === null) return null;
   try {
-    return assertPathMap(
-      JSON.parse(shown.stdout ?? ''),
-      `origin/${TRAIN_BASE}`,
-    );
+    return assertPathMap(JSON.parse(text), `origin/${TRAIN_BASE}`);
   } catch {
     return null;
   }
+}
+
+/**
+ * The Auto-merge mode as `main` has it (ADR 0148 decision 4): a train started
+ * from a branch, or after a local edit, must not switch itself on. A failed
+ * fetch or show, a missing file or an invalid one reads as `off`.
+ */
+export function readAutoMergeModeFromGit(git: GitRunner): AutoMergeMode {
+  return parseAutoMergeMode(readFromMain(git, AUTO_MERGE_MODE_PATH));
 }
 
 /** GitHub lists at most this many files of a Pull Request. */
@@ -980,20 +1010,6 @@ export interface AutoMergeFacts {
 }
 
 export type AutoMergeFactName = Exclude<keyof AutoMergeFacts, 'headRefOid'>;
-
-/** Readers for the facts with no reader yet. Each one holds. */
-export const UNREAD_REVIEW_TIER: ReviewTierFact = {
-  status: 'missing',
-  reason: 'the Review Tier is not read yet (no per-head record)',
-};
-export const UNREAD_AGENT_VERDICT: AgentVerdictFact = {
-  status: 'missing',
-  reason: 'the Agent Verdict is not read yet',
-};
-export const UNREAD_QA_REPORT: QaReportFact = {
-  status: 'missing',
-  reason: 'the QA Report is not read yet',
-};
 
 /** The held reason a `**Door:**` line in any other form gets. */
 export const DOOR_UNREADABLE_REASON = 'Door line unreadable';

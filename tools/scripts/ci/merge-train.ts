@@ -30,23 +30,22 @@
 //
 // Not a gate: it changes GitHub, never the tree, and runs only by hand.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  AUTO_MERGE_MODE_PATH,
   SHADOW_COMMENT_MARKER,
   TRAIN_BASE,
   agentVerdictFromView,
   reviewTierFromView,
   changedFilesFromGh,
   readPathMapFromGit,
+  readAutoMergeModeFromGit,
+  fetchOnce,
   onMainFromCompare,
   prCommitsFromGh,
   qaReportFromView,
   mainCiFromRuns,
-  parseAutoMergeMode,
   parseTrainArgs,
   renderAutoTrainResult,
   renderTrainResult,
@@ -323,28 +322,21 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 /**
- * The path map as `main` has it, never the working tree's: a train started
- * from a feature branch must not judge with that branch's map. A failed
- * fetch, a missing file or a map that does not validate is null, which holds
- * every candidate.
+ * `git` in this checkout. One fetch of `main` serves the mode and the path
+ * map: both are read as `main` has them, never from the working tree, so a
+ * train started from a feature branch cannot judge with that branch's files.
  */
-const readMainPathMap = (): ReviewTierPathMap | null =>
-  readPathMapFromGit((args) => {
-    const result = spawnSync('git', args, {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return { status: result.status, stdout: result.stdout };
+const mainGit = fetchOnce((args) => {
+  const result = spawnSync('git', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
   });
+  return { status: result.status, stdout: result.stdout };
+});
 
-/** The Auto-merge mode; a missing or invalid setting reads as `off`. */
-const readAutoMergeMode = () => {
-  const path = join(REPO_ROOT, AUTO_MERGE_MODE_PATH);
-  return parseAutoMergeMode(
-    existsSync(path) ? readFileSync(path, 'utf8') : null,
-  );
-};
+const readMainPathMap = (): ReviewTierPathMap | null =>
+  readPathMapFromGit(mainGit);
 
 /** Flags that never take a value, so `--auto 12` keeps 12 a Pull Request. */
 const BOOLEAN_FLAGS = ['--auto', '--dry-run'];
@@ -362,7 +354,7 @@ async function main(argv: readonly string[]): Promise<number> {
   if (!repository) return bail('the repository could not be resolved');
 
   if (booleans.has('--auto')) {
-    const mode = readAutoMergeMode();
+    const mode = readAutoMergeModeFromGit(mainGit);
     const result = await runAutoTrain(
       { ...parsed, mode },
       githubAutoTrainIo(repository),
