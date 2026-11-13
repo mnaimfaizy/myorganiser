@@ -5,7 +5,8 @@
  * runner plays it in real Chromium on Before and After. This module is the
  * one place for:
  *
- *   - what a scenario script exports, and the check that refuses a bad one;
+ *   - the parse options a scenario script is checked with (the contract
+ *     itself is `qa-scenario.ts`);
  *   - the capture-keeping policy: every run records a video, a final
  *     screenshot and the backend calls, and keeps only what the scenario's
  *     `Capture:` line asks for, plus a failed run's recording, locally;
@@ -20,8 +21,6 @@
  */
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
-import type { Page } from '@playwright/test';
-
 import {
   type BeforeOutcome,
   type ChangeKind,
@@ -31,13 +30,16 @@ import {
   type ScenarioResult,
 } from './grade-scenarios.ts';
 import { readFlags } from './qa-cli.ts';
+import {
+  type Capture,
+  type ParseOptions,
+  RunInputError,
+  type Scenario,
+  stepNumber,
+} from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
 import { type ArtifactSide, isUploadEligible } from './upload-eligibility.ts';
-
-/** A scenario's `Capture:` line (ADR 0147 decision 4). */
-export const CAPTURES = ['video', 'screenshot', 'transcript', 'none'] as const;
-export type Capture = (typeof CAPTURES)[number];
 
 /** How one run of a scenario on one side ended. */
 export const RUN_OUTCOMES = ['pass', 'fail', 'cannot-run'] as const;
@@ -124,106 +126,24 @@ export const VIEWPORT = { width: 1280, height: 720 } as const;
 /** The longest a single scenario run may take before it is a failure. */
 export const SCENARIO_TIMEOUT_MS = 120_000;
 
-/** The id shape: it names files, so no separators or dots. */
-const SCENARIO_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-
-/** A refusal to run at all: a bad invocation or a malformed script, exit 2. */
-export class RunInputError extends Error {}
-
-/** Thrown by a scenario's `cannotRun`: the side cannot run this scenario. */
-export class CannotRunError extends Error {}
-
-/** A QA Account's sign-in values, so Before and After sign in alike. */
-export interface ScenarioAccount {
-  id: string;
-  email: string;
-  password: string;
-  vaultPassphrase: string;
-}
-
-/** What a scenario's `run` is given. */
-export interface ScenarioContext {
-  page: Page;
-  /** The QA stack's web origin. */
-  baseURL: string;
-  side: Side;
-  account(id: string): ScenarioAccount;
-  /** Ends this run as "cannot run" on this side. */
-  cannotRun(reason: string): never;
-}
-
-/** What a scenario script under `tmp/qa/` exports as its default. */
-export interface Scenario {
-  id: string;
-  /** The plan's `Capture:` line, copied. */
-  capture: Capture;
-  /** Resolves = pass; throws = fail; `cannotRun` = cannot run. */
-  run(context: ScenarioContext): Promise<void>;
-}
-
-function isOneOf<T extends string>(
-  allowed: readonly T[],
-  value: unknown,
-): value is T {
-  return (
-    typeof value === 'string' && (allowed as readonly string[]).includes(value)
-  );
-}
-
-/** Narrows a script's default export to a `Scenario`, naming the file on a refusal. */
-export function parseScenario(exported: unknown, file: string): Scenario {
-  if (typeof exported !== 'object' || exported === null) {
-    throw new RunInputError(
-      `${file}: the default export must be a scenario object`,
-    );
-  }
-  const { id, capture, run } = exported as Record<string, unknown>;
-  if (typeof id !== 'string' || !SCENARIO_ID.test(id)) {
-    throw new RunInputError(
-      `${file}: id must be letters, digits, "-" or "_" (it names files)`,
-    );
-  }
-  if (!isOneOf(CAPTURES, capture)) {
-    throw new RunInputError(
-      `${file}: capture must be one of ${CAPTURES.join(', ')} (the plan's Capture: line)`,
-    );
-  }
-  if (typeof run !== 'function') {
-    throw new RunInputError(`${file}: run must be a function`);
-  }
-  return exported as Scenario;
-}
-
-/** Refuses two scripts with the same id. */
-export function checkScenarioIds(scenarios: readonly Scenario[]): void {
-  if (scenarios.length === 0) {
-    throw new RunInputError('no scenario scripts (*.ts) in --scenarios');
-  }
-  const seen = new Set<string>();
-  for (const { id } of scenarios) {
-    if (seen.has(id))
-      throw new RunInputError(`scenario id "${id}" is used twice`);
-    seen.add(id);
-  }
-}
-
 /**
- * Whether a capture keeps a screenshot or video, so its Before/After pair is
- * combined with ffmpeg. A transcript or none never needs ffmpeg, so a run of
- * only those does not require it.
+ * Whether a capture's QA Artifact needs ffmpeg. A screen scenario's
+ * Storyboard is rendered in Chromium; only a video's Before/After pair is
+ * still combined into an MP4 and GIF by `qa:combine` (until #1549), so a run
+ * of screenshots, transcripts or none does not require ffmpeg.
  */
-export const COMBINED_CAPTURE = {
+export const FFMPEG_CAPTURE = {
   video: true,
-  screenshot: true,
+  screenshot: false,
   transcript: false,
   none: false,
 } as const satisfies Record<Capture, boolean>;
 
-/** True when some scenario's pair will be combined, so ffmpeg is needed. */
+/** True when some scenario's pair will be combined with ffmpeg. */
 export function needsFfmpeg(
   scenarios: readonly Pick<Scenario, 'capture'>[],
 ): boolean {
-  return scenarios.some(({ capture }) => COMBINED_CAPTURE[capture]);
+  return scenarios.some(({ capture }) => FFMPEG_CAPTURE[capture]);
 }
 
 export interface RunArgs {
@@ -321,6 +241,13 @@ export function stackStartArgs(args: RunArgs, beforeOnly: boolean): string[] {
   ];
 }
 
+/** What every scenario script is checked against for this run. */
+export function parseOptions(
+  args: Pick<RunArgs, 'changeKind' | 'withBefore'>,
+): ParseOptions {
+  return { runsBefore: args.changeKind === 'fix' || args.withBefore };
+}
+
 export function switchArgs(worktree: string, to: Side): string[] {
   return ['--worktree', worktree, '--to', to];
 }
@@ -389,6 +316,29 @@ export function combinedFiles(printed: string): string[] {
   return typeof made.gif === 'string'
     ? [made.combined, made.gif]
     : [made.combined];
+}
+
+/** The directory one side's step stills are kept in, relative to `--out`. */
+export function stepStillDir(id: string, side: Side): string {
+  return join('steps', id, side);
+}
+
+/**
+ * Where a step's still is kept, relative to `--out`, so a run directory can
+ * move and its step records still point at their stills.
+ */
+export function stepStillPath(id: string, side: Side, index: number): string {
+  return join(stepStillDir(id, side), `${stepNumber(index)}.png`);
+}
+
+/** Where a scenario's step records are saved under `--out`, for a re-render. */
+export function stepRecordsPath(out: string, id: string): string {
+  return join(out, 'steps', `${id}.json`);
+}
+
+/** Where a scenario's Storyboard PNG is made under `--out`. */
+export function storyboardPath(out: string, id: string): string {
+  return join(out, 'combined', `${id}.png`);
 }
 
 /** One call a scenario made to the QA backend, as the redactor reads it. Headers are never recorded. */

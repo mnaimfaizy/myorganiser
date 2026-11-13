@@ -8,15 +8,20 @@ import { describe, test } from 'node:test';
 
 import { FFMPEG_MISSING_MESSAGE } from './qa-combine-executor.ts';
 import {
-  type Capture,
   type RecordedCall,
   type RunManifest,
   type RunOutcome,
-  type Scenario,
 } from './qa-run.ts';
 import { type RecordedRun, type RunDeps, runQaRun } from './qa-run-executor.ts';
+import {
+  type Capture,
+  type Scenario,
+  type StepRecord,
+  SCREEN_CAPTURE,
+} from './qa-scenario.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
+import type { Storyboard } from './storyboard.ts';
 
 const REPO = '/repo';
 const WT = '/wt';
@@ -29,9 +34,12 @@ const HEAD = 'b'.repeat(40);
 interface Scripted {
   outcome: RunOutcome;
   message?: string;
+  observed?: string;
   video: boolean;
   screenshot: boolean;
   calls: RecordedCall[];
+  /** How many `step()` calls the run makes; each still is written in its work directory. */
+  steps: number;
   /** When set, the browser run rejects with this message instead of reporting. */
   throws?: string;
 }
@@ -41,6 +49,7 @@ const DEFAULT_RUN: Scripted = {
   video: true,
   screenshot: true,
   calls: [],
+  steps: 1,
 };
 
 interface Plan {
@@ -54,6 +63,8 @@ interface Plan {
   stack: (argv: readonly string[]) => ExitCode;
   switchStack: (argv: readonly string[]) => ExitCode;
   combine: (argv: readonly string[]) => { status: number; files: string[] };
+  /** Called with each Storyboard's PNG path; throwing makes the render reject. */
+  render: (pngPath: string) => void;
 }
 
 function fakeRun(options: Partial<Plan> = {}) {
@@ -66,6 +77,7 @@ function fakeRun(options: Partial<Plan> = {}) {
     stack: () => 0,
     switchStack: () => 0,
     combine: () => ({ status: 0, files: [] }),
+    render: () => undefined,
     ...options,
   };
   const log: string[] = [];
@@ -74,6 +86,14 @@ function fakeRun(options: Partial<Plan> = {}) {
   const out: string[] = [];
   const err: string[] = [];
   const removed: string[] = [];
+  /** Every disk move and removal, in call order. */
+  const ops: string[] = [];
+  /** Every Storyboard render, with the arguments the executor gave it. */
+  const renders: {
+    storyboard: Storyboard;
+    stillRoot: string;
+    pngPath: string;
+  }[] = [];
 
   const deps: RunDeps = {
     repoRoot: REPO,
@@ -106,18 +126,46 @@ function fakeRun(options: Partial<Plan> = {}) {
       const video = scripted.video ? `${workDir}/v.webm` : null;
       const screenshot = scripted.screenshot ? `${workDir}/s.png` : null;
       for (const path of [video, screenshot]) if (path) disk.add(path);
+      const steps: StepRecord[] = Array.from(
+        { length: scripted.steps },
+        (_, i) => {
+          const still = `${workDir}/${String(i + 1).padStart(2, '0')}.png`;
+          disk.add(still);
+          return {
+            side,
+            index: i + 1,
+            device: 'Desktop',
+            tab: '',
+            label: 'Device Desktop',
+            caption: `step ${i + 1}`,
+            still,
+            subject: null,
+            atMs: 0,
+          };
+        },
+      );
       const recorded: RecordedRun = {
         outcome: scripted.outcome,
+        steps,
         video,
         screenshot,
         calls: scripted.calls,
       };
       if (scripted.message !== undefined) recorded.message = scripted.message;
+      if (scripted.observed !== undefined)
+        recorded.observed = scripted.observed;
       return recorded;
+    },
+    async renderStoryboard(storyboard, stillRoot, pngPath) {
+      log.push(`render ${pngPath}`);
+      renders.push({ storyboard, stillRoot, pngPath });
+      plan.render(pngPath);
+      disk.add(pngPath);
     },
     makeDir: () => undefined,
     moveFile(from, to) {
       if (!disk.has(from)) throw new Error(`no file at ${from}`);
+      ops.push(`move ${from} ${to}`);
       disk.delete(from);
       disk.add(to);
     },
@@ -127,6 +175,7 @@ function fakeRun(options: Partial<Plan> = {}) {
     },
     removePath(path) {
       removed.push(path);
+      ops.push(`remove ${path}`);
       for (const existing of [...disk]) {
         if (existing === path || existing.startsWith(`${path}/`)) {
           disk.delete(existing);
@@ -136,14 +185,19 @@ function fakeRun(options: Partial<Plan> = {}) {
     out: (line) => out.push(line),
     err: (line) => err.push(line),
   };
-  return { deps, log, disk, files, out, err, removed };
+  return { deps, log, disk, files, out, err, removed, ops, renders };
 }
 
-const scenario = (id: string, capture: Capture): Scenario => ({
-  id,
-  capture,
-  run: async () => undefined,
-});
+/** A scenario script; a screen capture also declares its title and expected results. */
+const scenario = (id: string, capture: Capture): Scenario => {
+  const script: Scenario = { id, capture, run: async () => undefined };
+  if (!SCREEN_CAPTURE[capture]) return script;
+  return {
+    ...script,
+    title: `${id} scenario`,
+    expected: { before: 'the defect shows', after: 'the fix shows' },
+  };
+};
 
 /** The scenario scripts a run finds in SCENARIOS, keyed by their path. */
 function filesOf(...scenarios: Scenario[]): Record<string, unknown> {
@@ -198,7 +252,24 @@ function kept(fake: ReturnType<typeof fakeRun>): string[] {
   return [...fake.disk].sort();
 }
 
+/** The Storyboard PNG a screen run with both sides renders. */
+const storyboardPng = (id: string): string => `${OUT}/combined/${id}.png`;
+
+/** What a screen run keeps for its steps: the step records, then each side's step still. */
+function stepFiles(id: string, ...sides: Side[]): string[] {
+  return [
+    `${OUT}/steps/${id}.json`,
+    ...sides.map((side) => `${OUT}/steps/${id}/${side}/01.png`),
+  ];
+}
+
 const sorted = (paths: readonly string[]): string[] => [...paths].sort();
+
+/** Before is the defect, so it fails as expected; After is the fix, so it passes. */
+const reproduced = (_id: string, side: Side) =>
+  side === 'before'
+    ? { outcome: 'fail' as const, message: 'the defect shows here' }
+    : { observed: 'the fix shows here' };
 
 describe('a fix runs Before, switches, then runs After', () => {
   test('runs every scenario on Before, switches, runs every scenario on After, and never stops the stack', async () => {
@@ -398,7 +469,13 @@ describe('capture keeping', () => {
     await runQaRun(argvFor('fix'), fake.deps);
     assert.deepEqual(
       kept(fake),
-      sorted([RUN_JSON, `${OUT}/before/S.png`, `${OUT}/after/S.png`]),
+      sorted([
+        RUN_JSON,
+        `${OUT}/before/S.png`,
+        `${OUT}/after/S.png`,
+        storyboardPng('S'),
+        ...stepFiles('S', 'before', 'after'),
+      ]),
     );
   });
 
@@ -416,6 +493,8 @@ describe('capture keeping', () => {
         `${OUT}/after/S.png`,
         `${OUT}/local/S-before.webm`,
         `${OUT}/local/S-after.webm`,
+        storyboardPng('S'),
+        ...stepFiles('S', 'before', 'after'),
       ]),
     );
   });
@@ -461,7 +540,13 @@ describe('video captures', () => {
     assert.equal(exit, 0);
     assert.deepEqual(
       kept(fake),
-      sorted([RUN_JSON, `${OUT}/before/V.webm`, `${OUT}/after/V.webm`]),
+      sorted([
+        RUN_JSON,
+        `${OUT}/before/V.webm`,
+        `${OUT}/after/V.webm`,
+        storyboardPng('V'),
+        ...stepFiles('V', 'before', 'after'),
+      ]),
     );
     assert.deepEqual(
       fake.log.filter((line) => line.startsWith('combine ')),
@@ -479,7 +564,13 @@ describe('video captures', () => {
     await runQaRun(argvFor('fix'), fake.deps);
     assert.deepEqual(
       kept(fake),
-      sorted([RUN_JSON, `${OUT}/before/V.webm`, `${OUT}/after/V.webm`]),
+      sorted([
+        RUN_JSON,
+        `${OUT}/before/V.webm`,
+        `${OUT}/after/V.webm`,
+        storyboardPng('V'),
+        ...stepFiles('V', 'before', 'after'),
+      ]),
     );
     assert.equal(
       kept(fake).some((path) => path.includes('/local/')),
@@ -546,7 +637,13 @@ describe('a side that cannot run', () => {
     assert.equal(entry.runs.after?.outcome, 'cannot-run');
     assert.deepEqual(
       kept(fake),
-      sorted([RUN_JSON, `${OUT}/before/S.png`, `${OUT}/after/S.png`]),
+      sorted([
+        RUN_JSON,
+        `${OUT}/before/S.png`,
+        `${OUT}/after/S.png`,
+        storyboardPng('S'),
+        ...stepFiles('S', 'before', 'after'),
+      ]),
     );
   });
 });
@@ -557,7 +654,7 @@ describe('combining the kept Before and After captures', () => {
     files: [`${argv[argv.length - 1]}.png`],
   });
 
-  test('a fix screenshot pair is combined once from the kept Before and After files', async () => {
+  test('a fix screenshot pair is not combined with ffmpeg; its Storyboard is rendered from both sides', async () => {
     const fake = fakeRun({
       exports: filesOf(scenario('S', 'screenshot')),
       combine: combinedAs,
@@ -565,18 +662,17 @@ describe('combining the kept Before and After captures', () => {
     await runQaRun(argvFor('fix'), fake.deps);
     assert.deepEqual(
       fake.log.filter((line) => line.startsWith('combine ')),
-      [
-        `combine --before ${OUT}/before/S.png --after ${OUT}/after/S.png --out ${OUT}/combined/S`,
-      ],
+      [],
+    );
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('render ')),
+      [`render ${OUT}/combined/S.png`],
     );
   });
 
-  test('a combined file is offered for a PASS and withheld for a FAIL: regression', async () => {
+  test('a combined video file is offered for a PASS and withheld for a FAIL: regression', async () => {
     const fake = fakeRun({
-      exports: filesOf(
-        scenario('P', 'screenshot'),
-        scenario('R', 'screenshot'),
-      ),
+      exports: filesOf(scenario('P', 'video'), scenario('R', 'video')),
       runs: (id, side) => {
         if (id === 'P') return side === 'before' ? { outcome: 'fail' } : {};
         return side === 'after' ? { outcome: 'fail' } : {};
@@ -601,9 +697,38 @@ describe('combining the kept Before and After captures', () => {
     });
   });
 
+  test('a Storyboard is offered for a PASS and withheld for a FAIL: regression', async () => {
+    const fake = fakeRun({
+      exports: filesOf(
+        scenario('P', 'screenshot'),
+        scenario('R', 'screenshot'),
+      ),
+      runs: (id, side) => {
+        if (id === 'P') return side === 'before' ? { outcome: 'fail' } : {};
+        return side === 'after' ? { outcome: 'fail' } : {};
+      },
+    });
+    await runQaRun(argvFor('fix'), fake.deps);
+    const manifest = manifestOf(fake);
+    const storyboardOf = (id: string) =>
+      manifest.scenarios
+        .find((entry) => entry.id === id)
+        ?.files.find((file) => file.place === 'combined');
+    assert.deepEqual(storyboardOf('P'), {
+      path: `${OUT}/combined/P.png`,
+      place: 'combined',
+      uploadEligible: true,
+    });
+    assert.deepEqual(storyboardOf('R'), {
+      path: `${OUT}/combined/R.png`,
+      place: 'combined',
+      uploadEligible: false,
+    });
+  });
+
   test('a failed combine exits 1 and records the problem in run.json', async () => {
     const fake = fakeRun({
-      exports: filesOf(scenario('P', 'screenshot')),
+      exports: filesOf(scenario('P', 'video')),
       runs: (_id, side) => (side === 'before' ? { outcome: 'fail' } : {}),
       combine: () => ({ status: 1, files: [] }),
     });
@@ -614,9 +739,9 @@ describe('combining the kept Before and After captures', () => {
     assert.match(fake.err.join('\n'), /combining failed \(qa:combine exit 1\)/);
   });
 
-  test('a feature scenario that ran After only is not combined', async () => {
+  test('a feature video that ran After only is not combined', async () => {
     const fake = fakeRun({
-      exports: filesOf(scenario('S', 'screenshot')),
+      exports: filesOf(scenario('S', 'video')),
       combine: combinedAs,
     });
     const exit = await runQaRun(argvFor('feature'), fake.deps);
@@ -642,15 +767,15 @@ describe('preflight: Chromium and ffmpeg are checked before the stack starts', (
     assert.deepEqual(fake.err, [`qa:run: ${reason}`]);
   });
 
-  test('exits 2 with the ffmpeg message when a screenshot scenario needs ffmpeg, before any stack call', async () => {
+  test('a screenshot-only run starts without ffmpeg, since its Storyboard is rendered in Chromium', async () => {
     const fake = fakeRun({
       exports: filesOf(scenario('S', 'screenshot')),
       ffmpeg: true,
     });
-    const exit = await runQaRun(argvFor('fix'), fake.deps);
-    assert.equal(exit, 2);
-    assert.deepEqual(fake.log, []);
-    assert.deepEqual(fake.err, [`qa:run: ${FFMPEG_MISSING_MESSAGE}`]);
+    const exit = await runQaRun(argvFor('feature'), fake.deps);
+    assert.equal(exit, 0);
+    assert.equal(fake.log[0], startLine('feature'));
+    assert.equal(fake.err.includes(`qa:run: ${FFMPEG_MISSING_MESSAGE}`), false);
   });
 
   test('runs normally without ffmpeg when only transcript and none scenarios exist', async () => {
@@ -701,6 +826,374 @@ describe('bad input is refused before any stack call', () => {
     assert.match(
       fake.err.join('\n'),
       new RegExp(`${file}: capture must be one of`),
+    );
+  });
+});
+
+describe('a screen side with no step: the Storyboard is refused and no combined file is made', () => {
+  const NO_STEP = (side: Side) =>
+    `${side}: no step() was called, so no Storyboard was made`;
+  const noStep = (): Partial<Scripted> => ({ steps: 0 });
+
+  const REFUSED: {
+    name: string;
+    capture: Capture;
+    changeKind: 'fix' | 'feature';
+    runs: (id: string, side: Side) => Partial<Scripted> | undefined;
+    zeroSides: Side[];
+  }[] = [
+    {
+      name: 'a video fix where both sides take no step',
+      capture: 'video',
+      changeKind: 'fix',
+      runs: noStep,
+      zeroSides: ['before', 'after'],
+    },
+    {
+      name: 'a video fix where After cannot run with no step and Before takes one',
+      capture: 'video',
+      changeKind: 'fix',
+      runs: (_id, side) =>
+        side === 'after' ? { outcome: 'cannot-run', steps: 0 } : {},
+      zeroSides: ['after'],
+    },
+    {
+      name: 'a screenshot fix where both sides take no step',
+      capture: 'screenshot',
+      changeKind: 'fix',
+      runs: noStep,
+      zeroSides: ['before', 'after'],
+    },
+    {
+      name: 'a video feature, After only, with no step',
+      capture: 'video',
+      changeKind: 'feature',
+      runs: noStep,
+      zeroSides: ['after'],
+    },
+    {
+      name: 'a screenshot feature, After only, with no step',
+      capture: 'screenshot',
+      changeKind: 'feature',
+      runs: noStep,
+      zeroSides: ['after'],
+    },
+    {
+      name: 'a video fix where Before takes no step and After takes one',
+      capture: 'video',
+      changeKind: 'fix',
+      runs: (_id, side) => (side === 'before' ? noStep() : {}),
+      zeroSides: ['before'],
+    },
+  ];
+
+  for (const c of REFUSED) {
+    test(`${c.name} exits 1, names each side with no step, and makes no combine or render call`, async () => {
+      const fake = fakeRun({
+        exports: filesOf(scenario('X', c.capture)),
+        runs: c.runs,
+      });
+      const exit = await runQaRun(argvFor(c.changeKind), fake.deps);
+      assert.equal(exit, 1);
+      const entry = manifestOf(fake).scenarios[0];
+      assert.deepEqual(entry.problems, c.zeroSides.map(NO_STEP));
+      assert.deepEqual(
+        fake.log.filter((line) => /^(combine|render) /.test(line)),
+        [],
+      );
+      assert.equal(
+        entry.files.some(({ place }) => place === 'combined'),
+        false,
+      );
+    });
+  }
+
+  test('a fix screenshot whose Storyboard render rejects exits 1, records the reason, lists no combined file, and removes its PNG', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      render: () => {
+        throw new Error('Chromium crashed\nsecond line of the stack');
+      },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    const entry = manifestOf(fake).scenarios[0];
+    assert.deepEqual(entry.problems, [
+      'the Storyboard could not be rendered: Chromium crashed',
+    ]);
+    assert.equal(
+      entry.files.some(({ place }) => place === 'combined'),
+      false,
+    );
+    assert.ok(fake.removed.includes(`${OUT}/combined/S.png`));
+  });
+});
+
+describe('the Storyboard of a screen scenario that ran on both sides', () => {
+  test('a fix screenshot renders once to <out>/combined/<id>.png, from the kept steps, with the right arguments', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: reproduced,
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assert.equal(fake.renders.length, 1);
+    const [render] = fake.renders;
+    assert.equal(render.pngPath, storyboardPng('S'));
+    assert.equal(render.stillRoot, OUT);
+
+    const { storyboard } = render;
+    assert.equal(storyboard.band.result, 'PASS');
+    assert.deepEqual(storyboard.band.commits, {
+      before: MERGE_BASE,
+      after: HEAD,
+    });
+    assert.deepEqual(
+      storyboard.sides.map((card) => [card.side, card.mark]),
+      [
+        ['before', 'as-expected'],
+        ['after', 'as-expected'],
+      ],
+    );
+    assert.deepEqual(
+      storyboard.rows.map((row) => [
+        row.cells.before?.still,
+        row.cells.after?.still,
+      ]),
+      [['steps/S/before/01.png', 'steps/S/after/01.png']],
+    );
+
+    const png = manifestOf(fake).scenarios[0].files.find(
+      ({ path }) => path === storyboardPng('S'),
+    );
+    assert.deepEqual(png, {
+      path: storyboardPng('S'),
+      place: 'combined',
+      uploadEligible: true,
+    });
+    assert.ok(fake.disk.has(storyboardPng('S')), 'the PNG exists');
+  });
+
+  test('a Storyboard graded FAIL: regression is still listed, and is not offered for upload', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (_id, side) =>
+        side === 'before'
+          ? { outcome: 'pass', observed: 'the label is still there' }
+          : { outcome: 'fail', message: 'the label is gone' },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.equal(fake.renders[0].storyboard.band.result, 'FAIL: regression');
+    const png = manifestOf(fake).scenarios[0].files.find(
+      ({ path }) => path === storyboardPng('S'),
+    );
+    assert.deepEqual(png, {
+      path: storyboardPng('S'),
+      place: 'combined',
+      uploadEligible: false,
+    });
+  });
+
+  test('the step stills move out of the work directory, and the step records are written and listed locally', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: reproduced,
+    });
+    await runQaRun(argvFor('fix'), fake.deps);
+
+    for (const side of ['before', 'after'] as const) {
+      assert.ok(
+        fake.ops.includes(
+          `move ${OUT}/.work/${side}/S/01.png ${OUT}/steps/S/${side}/01.png`,
+        ),
+        `${side} still moved out of its work directory`,
+      );
+    }
+
+    const text = fake.files.get(`${OUT}/steps/S.json`);
+    assert.ok(text !== undefined, 'the step records were written');
+    const records = JSON.parse(text) as {
+      title: string;
+      expected: { before: string; after: string };
+      commits: { before: string; after: string };
+      sides: Record<
+        Side,
+        {
+          outcome: string;
+          message?: string;
+          observed?: string;
+          steps: { still: string }[];
+        }
+      >;
+    };
+    assert.equal(records.title, 'S scenario');
+    assert.deepEqual(records.expected, {
+      before: 'the defect shows',
+      after: 'the fix shows',
+    });
+    assert.deepEqual(records.commits, { before: MERGE_BASE, after: HEAD });
+    assert.equal(records.sides.before.outcome, 'fail');
+    assert.equal(records.sides.before.message, 'the defect shows here');
+    assert.equal(records.sides.before.observed, undefined);
+    assert.deepEqual(
+      records.sides.before.steps.map(({ still }) => still),
+      ['steps/S/before/01.png'],
+    );
+    assert.equal(records.sides.after.outcome, 'pass');
+    assert.equal(records.sides.after.observed, 'the fix shows here');
+    assert.deepEqual(
+      records.sides.after.steps.map(({ still }) => still),
+      ['steps/S/after/01.png'],
+    );
+
+    const listed = manifestOf(fake).scenarios[0].files.find(
+      ({ path }) => path === `${OUT}/steps/S.json`,
+    );
+    assert.deepEqual(listed, {
+      path: `${OUT}/steps/S.json`,
+      place: 'local',
+      uploadEligible: false,
+    });
+  });
+
+  test('a fix video renders the Storyboard and also runs the qa:combine call, and both are listed', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: reproduced,
+      combine: () => ({
+        status: 0,
+        files: [`${OUT}/combined/V.mp4`, `${OUT}/combined/V.gif`],
+      }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+    assert.deepEqual(
+      fake.renders.map(({ pngPath }) => pngPath),
+      [storyboardPng('V')],
+    );
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('combine ')),
+      [
+        `combine --before ${OUT}/before/V.webm --after ${OUT}/after/V.webm --out ${OUT}/combined/V`,
+      ],
+    );
+    assert.deepEqual(
+      manifestOf(fake)
+        .scenarios[0].files.filter(({ place }) => place === 'combined')
+        .map(({ path }) => path),
+      [storyboardPng('V'), `${OUT}/combined/V.mp4`, `${OUT}/combined/V.gif`],
+    );
+  });
+
+  test('a merge-base re-run of Before clears the earlier Before steps before its new stills move in', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('B', 'screenshot')),
+      runs: (_id, side) =>
+        side === 'after' ? { outcome: 'fail', message: 'broken' } : {},
+    });
+    await runQaRun(argvFor('feature'), fake.deps);
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('run B')),
+      ['run B after', 'run B before'],
+    );
+
+    const cleared = fake.ops.indexOf(`remove ${OUT}/steps/B/before`);
+    const moved = fake.ops.indexOf(
+      `move ${OUT}/.work/before/B/01.png ${OUT}/steps/B/before/01.png`,
+    );
+    assert.ok(cleared >= 0, 'the Before steps directory is cleared');
+    assert.ok(moved > cleared, 'the new Before still moves in after the clear');
+  });
+
+  test('a transcript writes no step records and renders no Storyboard', async () => {
+    const fake = fakeRun({ exports: filesOf(scenario('X', 'transcript')) });
+    const exit = await runQaRun(argvFor('feature'), fake.deps);
+    assert.equal(exit, 0);
+    assert.equal(fake.renders.length, 0);
+    assert.equal(fake.files.has(`${OUT}/steps/X.json`), false);
+    assert.equal(
+      fake.ops.some((op) => op.includes('/steps/')),
+      false,
+    );
+  });
+});
+
+describe('a Storyboard that is not drawn, or fails to draw', () => {
+  test('a fix video whose Storyboard render rejects gets no qa:combine call and no combined file, and its PNG is removed', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: reproduced,
+      render: () => {
+        throw new Error('Chromium crashed\nsecond line of the stack');
+      },
+      combine: () => ({
+        status: 0,
+        files: [`${OUT}/combined/V.mp4`, `${OUT}/combined/V.gif`],
+      }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+
+    const entry = manifestOf(fake).scenarios[0];
+    assert.deepEqual(entry.problems, [
+      'the Storyboard could not be rendered: Chromium crashed',
+    ]);
+    assert.equal(
+      fake.log.some((line) => line.startsWith('combine ')),
+      false,
+      'qa:combine is not called',
+    );
+    assert.equal(
+      entry.files.some(({ place }) => place === 'combined'),
+      false,
+      'no combined file is listed',
+    );
+    assert.ok(fake.removed.includes(`${OUT}/combined/V.png`));
+  });
+
+  test('a feature with no expected.before, After failing and re-run on Before, draws no Storyboard but keeps its step records', async () => {
+    // Pre-existing: Before also fails, so the headline is not a regression.
+    const plain = {
+      id: 'P',
+      capture: 'screenshot',
+      title: 'P scenario',
+      expected: { after: 'the fix shows' },
+      run: async () => undefined,
+    } satisfies Scenario;
+    const fake = fakeRun({
+      exports: filesOf(plain),
+      runs: (_id, side) =>
+        side === 'after'
+          ? { outcome: 'fail', message: 'still broken' }
+          : { outcome: 'fail', message: 'the defect is still there' },
+    });
+    const exit = await runQaRun(argvFor('feature'), fake.deps);
+    assert.equal(exit, 0, 'FAIL: pre-existing does not fail the headline');
+
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('run P')),
+      ['run P after', 'run P before'],
+    );
+    const manifest = manifestOf(fake);
+    assert.equal(manifest.scenarios[0].result, 'FAIL: pre-existing');
+    assert.equal(
+      manifest.headline,
+      'QA passed, not proven or pre-existing items listed',
+    );
+    assert.equal(fake.renders.length, 0, 'no Storyboard is rendered');
+    assert.deepEqual(manifest.scenarios[0].problems, []);
+    assert.ok(
+      manifest.scenarios[0].files.some(
+        ({ path, place }) =>
+          path === `${OUT}/steps/P.json` && place === 'local',
+      ),
+      'the step records are listed locally',
+    );
+    assert.equal(
+      manifest.scenarios[0].files.some(({ place }) => place === 'combined'),
+      false,
     );
   });
 });

@@ -2,13 +2,15 @@
  * The real browser behind `RunDeps.runScenario`, for `tools/qa/qa-run.ts`:
  * Chromium through the repository's existing `@playwright/test` dependency
  * (ADR 0147 decision 1). Kept apart from `qa-run-executor.ts` so a test of
- * the executor never loads it: no test launches a browser.
+ * the executor never loads it: no test plays a scenario in a browser.
  *
  * Each run gets a fresh browser and context at the fixed viewport, with video
- * recording always on, a screenshot of where the run ended, and the calls it
- * made to the QA backend. Only method, path (with its query), status and
- * JSON or text bodies are recorded; headers never are, so no cookie or
- * authorization header is ever written down.
+ * recording always on, a screenshot of where the run ended, the calls it
+ * made to the QA backend, each `step()`'s still and record
+ * (`qa-scenario-context.ts`), and what a passing run observed. Only method,
+ * path (with its query), status and JSON or text bodies are recorded;
+ * headers never are, so no cookie or authorization header is ever written
+ * down.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,14 +20,13 @@ import { type Response, chromium } from '@playwright/test';
 import { readQaAccounts } from '../../scripts/lib/qa-accounts.ts';
 import { firstLine } from './qa-cli.ts';
 import type { RecordedRun } from './qa-run-executor.ts';
+import { type RecordedCall, SCENARIO_TIMEOUT_MS, VIEWPORT } from './qa-run.ts';
 import {
   CannotRunError,
-  type RecordedCall,
-  SCENARIO_TIMEOUT_MS,
   type Scenario,
   type ScenarioAccount,
-  VIEWPORT,
-} from './qa-run.ts';
+} from './qa-scenario.ts';
+import { stepRecorder } from './qa-scenario-context.ts';
 import { QA_STACK } from './qa-stack.ts';
 import type { Side } from './qa-stack.ts';
 
@@ -108,6 +109,8 @@ export function chromiumRunner(
         baseURL: QA_WEB_ORIGIN,
         recordVideo: { dir: workDir, size: VIEWPORT },
       });
+      // Step times count from here, where the context's video starts.
+      const startedAt = Date.now();
       const page = await context.newPage();
       const pending: Promise<RecordedCall>[] = [];
       context.on('response', (response) => {
@@ -116,11 +119,13 @@ export function chromiumRunner(
         }
       });
 
+      const recorder = stepRecorder({ side, workDir, startedAt });
       let outcome: RecordedRun['outcome'] = 'pass';
       let message: string | undefined;
+      let returned: unknown;
       let timer: NodeJS.Timeout | undefined;
       try {
-        await Promise.race([
+        returned = await Promise.race([
           scenario.run({
             page,
             baseURL: QA_WEB_ORIGIN,
@@ -129,6 +134,8 @@ export function chromiumRunner(
             cannotRun(reason) {
               throw new CannotRunError(reason);
             },
+            step: recorder.step,
+            observed: recorder.observed,
           }),
           new Promise((_, reject) => {
             timer = setTimeout(
@@ -161,9 +168,17 @@ export function chromiumRunner(
       await context.close();
       const videoPath = video ? await video.path().catch(() => null) : null;
 
+      const observed =
+        outcome !== 'pass'
+          ? undefined
+          : typeof returned === 'string'
+            ? returned
+            : recorder.observation();
       return {
         outcome,
         ...(message === undefined ? {} : { message }),
+        ...(observed === undefined ? {} : { observed }),
+        steps: [...recorder.steps],
         video: videoPath !== null && existsSync(videoPath) ? videoPath : null,
         screenshot,
         calls,

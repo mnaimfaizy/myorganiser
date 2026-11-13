@@ -1204,7 +1204,7 @@
           <code>Lint</code>, <code>Test</code>, <code>Typecheck</code>,
           <code>Tool Suites</code>, <code>Prisma Migration Gate</code>,
           <code>E2E Report</code>
-          (<code>ci.yml:41, :160, :438, :588, :651, :827, :915, :1023, :1216</code>).
+          (<code>ci.yml:41, :160, :438, :588, :651, :827, :915, :1032, :1225</code>).
           <code>Tool Suites</code> and <code>Prisma Migration Gate</code> are
           path-gated: when their triggers skip them they report as skipped,
           and a skipped job reads as passing. The
@@ -1212,7 +1212,7 @@
           Prisma config loading only (<code>ci.yml:662</code>); the
           path-gated <code>Prisma Migration Gate</code> job starts a
           throwaway Postgres service and runs migrate deploy/diff separately
-          (<code>ci.yml:1050</code>). Affected Jest runs against mocks without
+          (<code>ci.yml:1059</code>). Affected Jest runs against mocks without
           needing either service &mdash; which is why the Reviewer's
           <code>executed</code> evidence is feasible in CI, in the same
           environment.
@@ -1860,15 +1860,15 @@
         "file": ".github/workflows/ci.yml",
         "start": "name: Tool Suites"
       },
-      "ci.yml:1023": {
+      "ci.yml:1032": {
         "file": ".github/workflows/ci.yml",
         "start": "name: Prisma Migration Gate"
       },
-      "ci.yml:1216": {
+      "ci.yml:1225": {
         "file": ".github/workflows/ci.yml",
         "start": "name: E2E Report"
       },
-      "ci.yml:1050": {
+      "ci.yml:1059": {
         "file": ".github/workflows/ci.yml",
         "start": "DATABASE_URL: postgresql://postgres@localhost:5432/myorganiser"
       },

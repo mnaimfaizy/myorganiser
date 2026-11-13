@@ -1,7 +1,8 @@
 /**
  * Runs `yarn qa:run` (ADR 0147 decisions 1-5 and 7): starts the QA stack,
  * plays every scenario script on Before and After in Chromium, keeps what
- * each `Capture:` line asks for, then grades, combines and redacts.
+ * each `Capture:` line asks for, then grades, makes each screen scenario's
+ * Storyboard (PRD #1544), combines a video pair and redacts.
  *
  * Every rule lives in `qa-run.ts` and the modules it names; nothing here is
  * re-implemented. The stack, the switch, combining, grading and redaction are
@@ -12,7 +13,8 @@
  * Exit 0 = every scenario ran and graded, the headline is not QA failed, and
  * every kept file was made. 1 = QA failed, the stack or a switch failed
  * closed (no scenario starts on that side), or a kept file could not be made
- * (a recording missing, combining failed, a Request Transcript refused).
+ * (a recording missing, a Storyboard refused or not rendered, combining
+ * failed, a Request Transcript refused).
  * 2 = bad invocation, a malformed scenario script, or a missing Chromium or
  * (when a pair will be combined) ffmpeg, checked before the stack starts; a
  * stack start, switch or stop that itself exits 2 (a bad invocation or a
@@ -24,40 +26,60 @@ import { GradingInputError, gradeScenarios } from './grade-scenarios.ts';
 import { firstLine } from './qa-cli.ts';
 import { FFMPEG_MISSING_MESSAGE } from './qa-combine-executor.ts';
 import {
+  FFMPEG_CAPTURE,
   type RecordedCall,
   RECORDINGS,
   RUN_USAGE,
   type RunArgs,
-  RunInputError,
   type RunOutcome,
-  type Scenario,
   type ScenarioRecord,
   STACK_LEFT_UP,
-  COMBINED_CAPTURE,
   buildManifest,
-  checkScenarioIds,
   combineArgs,
   gradingInput,
   keptPath,
   keptRecordings,
   needsFfmpeg,
+  parseOptions,
   parseRunArgs,
-  parseScenario,
   rerunOnMergeBase,
   stackStartArgs,
+  stepRecordsPath,
+  stepStillDir,
+  stepStillPath,
+  storyboardPath,
   switchArgs,
   transcriptInput,
 } from './qa-run.ts';
+import {
+  RunInputError,
+  type Scenario,
+  type ScreenScenario,
+  type StepRecord,
+  checkScenarioIds,
+  isScreenScenario,
+  parseScenario,
+} from './qa-scenario.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
 import { planSides } from './qa-switch.ts';
 import { redactTranscript, renderTranscript } from './redact-transcript.ts';
+import type { ScenarioResult } from './grade-scenarios.ts';
+import {
+  type Storyboard,
+  type StoryboardSideInput,
+  buildStoryboard,
+} from './storyboard.ts';
 
 /** One run of one scenario on one side, as the browser reports it. */
 export interface RecordedRun {
   outcome: RunOutcome;
   /** First line of a failure's message. */
   message?: string;
+  /** What a passing run returned or passed to `observed`. */
+  observed?: string;
+  /** Each `step()`, its still inside the run's work directory. */
+  steps: StepRecord[];
   /** Files inside the run's work directory, or `null` if none was recorded. */
   video: string | null;
   screenshot: string | null;
@@ -72,6 +94,15 @@ export interface RunDeps {
   stack(argv: readonly string[]): Promise<ExitCode>;
   /** `runQaSwitch`. */
   switchStack(argv: readonly string[]): Promise<ExitCode>;
+  /**
+   * Renders a Storyboard to a PNG in Chromium, its stills' paths relative to
+   * `stillRoot`; rejects on failure, leaving no PNG behind.
+   */
+  renderStoryboard(
+    storyboard: Storyboard,
+    stillRoot: string,
+    pngPath: string,
+  ): Promise<void>;
   /** `runCombine`; on status 0, the files it made. */
   combine(argv: readonly string[]): { status: number; files: string[] };
   /** Why Chromium cannot be launched, or `null`. */
@@ -124,7 +155,7 @@ export async function runQaRun(
           `${file} could not be loaded: ${firstLine(error)}`,
         );
       }
-      scenarios.push(parseScenario(exported, file));
+      scenarios.push(parseScenario(exported, file, parseOptions(args)));
     }
     checkScenarioIds(scenarios);
   } catch (error) {
@@ -179,6 +210,40 @@ async function runScenarios(
   };
   const media = new Map<string, Partial<Record<Side, string>>>();
   const calls = new Map<string, Partial<Record<Side, RecordedCall[]>>>();
+  /** Each screen scenario's side runs, their step stills already kept under `--out`. */
+  const stepRuns = new Map<
+    string,
+    Partial<Record<Side, StoryboardSideInput>>
+  >();
+
+  /** Moves a screen run's step stills out of its work directory, before it is removed. */
+  function keepSteps(
+    scenario: Scenario,
+    side: Side,
+    recorded: RecordedRun,
+  ): void {
+    deps.removePath(join(args.out, stepStillDir(scenario.id, side)));
+    const steps = recorded.steps.map((step) => {
+      const still = stepStillPath(scenario.id, side, step.index);
+      const dest = join(args.out, still);
+      deps.makeDir(dirname(dest));
+      deps.moveFile(step.still, dest);
+      return { ...step, still };
+    });
+    stepRuns.set(scenario.id, {
+      ...stepRuns.get(scenario.id),
+      [side]: {
+        outcome: recorded.outcome,
+        ...(recorded.observed === undefined
+          ? {}
+          : { observed: recorded.observed }),
+        ...(recorded.message === undefined
+          ? {}
+          : { message: recorded.message }),
+        steps,
+      },
+    });
+  }
 
   async function runOne(scenario: Scenario, side: Side): Promise<void> {
     const record = recordOf(scenario.id);
@@ -218,9 +283,82 @@ async function runScenarios(
         media.set(scenario.id, { ...media.get(scenario.id), [side]: dest });
       }
     }
+    if (isScreenScenario(scenario)) keepSteps(scenario, side, recorded);
     // Whatever the line did not ask for goes with the work directory.
     deps.removePath(workDir);
     deps.out(`qa:run: ${scenario.id} on ${side}: ${recorded.outcome}`);
+  }
+
+  /** Each side's commit, as the step records and the band name them. */
+  const commits = { before: args.mergeBase, after: args.head };
+
+  /**
+   * Saves a screen scenario's step records, then checks its Storyboard and
+   * draws it. True when no combined file may be made for the scenario: the
+   * model reported a problem (zero steps today; #1546 adds more), which this
+   * refuses on without knowing what it is, or the render failed.
+   */
+  async function storyboardFor(
+    scenario: ScreenScenario,
+    record: ScenarioRecord,
+    result: ScenarioResult | undefined,
+  ): Promise<boolean> {
+    const sides = stepRuns.get(scenario.id) ?? {};
+    const recordsPath = stepRecordsPath(args.out, scenario.id);
+    deps.makeDir(dirname(recordsPath));
+    deps.writeFile(
+      recordsPath,
+      `${JSON.stringify(
+        {
+          id: scenario.id,
+          capture: scenario.capture,
+          title: scenario.title,
+          expected: scenario.expected,
+          commits,
+          sides,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    record.files.push({ path: recordsPath, place: 'local' });
+    if (result === undefined || (!sides.before && !sides.after)) return false;
+
+    const storyboard = buildStoryboard({
+      id: scenario.id,
+      title: scenario.title,
+      expected: scenario.expected,
+      result,
+      commits,
+      sides,
+    });
+    if (storyboard.problems.length > 0) {
+      record.problems.push(...storyboard.problems);
+      return true;
+    }
+    // Drawn only with both sides and both expected results in this slice; a
+    // run After only, or a merge-base re-run without expected.before, is
+    // #1546's one-column case and gets no Storyboard yet.
+    if (
+      !sides.before ||
+      !sides.after ||
+      scenario.expected.before === undefined
+    ) {
+      return false;
+    }
+    const png = storyboardPath(args.out, scenario.id);
+    deps.makeDir(dirname(png));
+    try {
+      await deps.renderStoryboard(storyboard, args.out, png);
+    } catch (error) {
+      deps.removePath(png);
+      record.problems.push(
+        `the Storyboard could not be rendered: ${firstLine(error)}`,
+      );
+      return true;
+    }
+    record.files.push({ path: png, place: 'combined' });
+    return false;
   }
 
   const sides = planSides({
@@ -292,7 +430,12 @@ async function runScenarios(
 
   for (const scenario of scenarios) {
     const record = recordOf(scenario.id);
-    if (COMBINED_CAPTURE[scenario.capture]) {
+    // A screen scenario whose Storyboard was refused or failed to render
+    // gets no combined file at all.
+    const screenRefused = isScreenScenario(scenario)
+      ? await storyboardFor(scenario, record, results.get(scenario.id))
+      : false;
+    if (FFMPEG_CAPTURE[scenario.capture] && !screenRefused) {
       const pair = media.get(scenario.id);
       if (pair?.before && pair.after) {
         const combined = deps.combine(
