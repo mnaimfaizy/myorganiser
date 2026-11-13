@@ -69,7 +69,7 @@ Report a blocked or crashed run and leave it alone. Sending it back to an agent 
 3. For each one in turn, compose the plan with `qa-plan` Issue mode at `tmp/QA-PLAN-issue-<n>.md`. Run it without asking for approval. If nothing is left to verify by hand, skip the run and post a report whose header is the `no manual QA needed` form.
 4. Schedule the plans as in [Scheduling QA sessions](#scheduling-qa-sessions), and give each one to its own QA session.
 5. Check each report against its plan before relying on it. On a failure, add it to one batched decision as in the Outcome Check. After a fix, re-run the affected scenarios plus any that share the changed code.
-6. `yarn qa:run` has already combined each Before/After pair into `tmp/qa/pr-<n>/combined/` (a feature graded After only has no pair, so nothing to combine; combine a pair made by hand with `yarn qa:combine`). Show the results and list each combined QA Artifact with its path and what it shows. Offer for upload only the files `tmp/qa/pr-<n>/run.json` marks `uploadEligible`, which follow [the upload rules](#uploading-qa-artifacts): a FAIL: regression's QA Artifact stays local. Ask which to upload; the default is none.
+6. `yarn qa:run` has already made each screen scenario's QA Artifact in `tmp/qa/pr-<n>/combined/`: a Storyboard PNG, plus an annotated MP4 for `Capture: video` (re-render one with `yarn qa:combine --run <folder> --scenario <id>`). Show the results and list each QA Artifact with its path and what it shows. Offer for upload only the files `tmp/qa/pr-<n>/run.json` marks `uploadEligible`, which follow [the upload rules](#uploading-qa-artifacts): a FAIL: regression's QA Artifact stays local. Ask which to upload; the default is none.
 7. Upload what was chosen, then post the QA Report. Fill in [the QA Report](#the-qa-report) template for each one. Never post a local working note as the report.
 8. Finish as in [Closing report](#closing-report).
 
@@ -119,9 +119,9 @@ A session's closing message may be cut short, so read the report file instead. O
 
 The repository is public, so an upload is public at once. Upload only what the Maintainer chose, and only media that shows QA Accounts. The default is none.
 
-Which files may be offered (ADR 0147 decisions 5 and 6, rule in `tools/qa/lib/upload-eligibility.ts`):
+Which files may be offered (ADR 0147 decision 6, rule in `tools/qa/lib/upload-eligibility.ts`):
 
-- Only a combined file, made by `yarn qa:combine`: a screenshot pair is one labelled side-by-side PNG, a video pair is one side-by-side MP4 plus a GIF preview. A lone Before or After is never offered.
+- Only a combined file: a scenario's Storyboard PNG, or its annotated MP4 for `Capture: video`. A lone Before or After is never offered.
 - A Before that shows the defect is not a failed run, so its combined file may be offered.
 - A FAIL: pre-existing's combined file may be offered, since it documents the filed issue.
 - A FAIL: regression's QA Artifact stays local. Do not offer it.
@@ -135,7 +135,7 @@ gh release view qa-evidence >/dev/null 2>&1 || \
 gh release upload qa-evidence tmp/qa/pr-<n>/pr-<n>-<sha>-<scenario>.png --clobber
 ```
 
-The asset URL is `https://github.com/mnaimfaizy/myorganiser/releases/download/qa-evidence/<asset>`. Images display with `![scenario](url)`; a video is a link.
+The asset URL is `https://github.com/mnaimfaizy/myorganiser/releases/download/qa-evidence/<asset>`. The Storyboard PNG displays inline with `![scenario](url)`; the MP4 is a link.
 
 ## The QA Report
 
