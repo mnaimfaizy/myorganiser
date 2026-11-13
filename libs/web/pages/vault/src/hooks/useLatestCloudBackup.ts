@@ -1,6 +1,9 @@
 'use client';
 
-import { createVaultBackupsApi } from '@myorganiser/web-vault';
+import {
+  createVaultBackupsApi,
+  type GetLatestBackupParams,
+} from '@myorganiser/web-vault';
 import { useCallback, useEffect, useState } from 'react';
 
 /**
@@ -25,11 +28,9 @@ export type LatestCloudBackupState =
   | { status: 'error'; record: null; error: unknown };
 
 export type LatestCloudBackupApiFactory = () => {
-  getLatestBackup: (req: {
-    status?: string;
-    source?: string;
-    event?: string;
-  }) => Promise<{ data: LatestBackupRecord | null }>;
+  getLatestBackup: (
+    req: Pick<GetLatestBackupParams, 'status' | 'source' | 'event'>,
+  ) => Promise<{ data: LatestBackupRecord | null }>;
 };
 
 /**
@@ -41,7 +42,7 @@ export type LatestCloudBackupApiFactory = () => {
  */
 export function useLatestCloudBackup(
   refreshKey = 0,
-  apiFactory: LatestCloudBackupApiFactory = createVaultBackupsApi as unknown as LatestCloudBackupApiFactory,
+  apiFactory: LatestCloudBackupApiFactory = createVaultBackupsApi,
 ): LatestCloudBackupState {
   const [state, setState] = useState<LatestCloudBackupState>({
     status: 'loading',
