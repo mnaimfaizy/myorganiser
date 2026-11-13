@@ -77,7 +77,8 @@ jest.mock('./ImportVaultReplaceDialog', () => ({
 }));
 
 import { CloudBackupLiveCard } from './CloudBackupLiveCard';
-import { useLatestCloudBackup } from '../hooks';
+import { useCloudBackup, useLatestCloudBackup } from '../hooks';
+import { createVaultBackupsApi } from '@myorganiser/web-vault';
 
 describe('CloudBackupLiveCard', () => {
   beforeEach(() => {
@@ -348,6 +349,66 @@ describe('CloudBackupLiveCard', () => {
       const summary = onSummaryChange.mock.lastCall?.[0];
       expect(summary.linked).toBe(false);
       expect(summary.newestCopyCreatedAt).toBeUndefined();
+    });
+  });
+
+  describe('getNewestCopyMs lookup', () => {
+    const CREATED_AT = '2026-01-02T03:04:05.000Z';
+
+    /** Renders the card and returns the getNewestCopyMs option it passed to useCloudBackup. */
+    function renderAndGetNewestCopyMs(): () => Promise<number | null> {
+      render(
+        <CloudBackupLiveCard
+          provider={{ connect: jest.fn() } as any}
+          handle={{ loadVault: jest.fn() } as any}
+        />,
+      );
+      return (useCloudBackup as jest.Mock).mock.lastCall?.[0].getNewestCopyMs;
+    }
+
+    afterEach(() => {
+      // Restore the default factory behaviour so other suites see the original stub.
+      (createVaultBackupsApi as jest.Mock).mockImplementation(() => ({
+        getLatestBackup: jest.fn().mockResolvedValue({}),
+      }));
+    });
+
+    test('D1: resolves null when the API returns a null body (no backup yet)', async () => {
+      const getLatestBackup = jest.fn().mockResolvedValue({ data: null });
+      (createVaultBackupsApi as jest.Mock).mockImplementation(() => ({
+        getLatestBackup,
+      }));
+
+      const getNewestCopyMs = renderAndGetNewestCopyMs();
+
+      await expect(getNewestCopyMs()).resolves.toBeNull();
+      expect(getLatestBackup).toHaveBeenCalledWith({
+        status: 'success',
+        source: 'google-drive',
+        event: 'export',
+      });
+    });
+
+    test('D2: resolves the epoch milliseconds of the newest copy createdAt', async () => {
+      (createVaultBackupsApi as jest.Mock).mockImplementation(() => ({
+        getLatestBackup: jest.fn().mockResolvedValue({
+          data: { createdAt: CREATED_AT },
+        }),
+      }));
+
+      const getNewestCopyMs = renderAndGetNewestCopyMs();
+
+      await expect(getNewestCopyMs()).resolves.toBe(Date.parse(CREATED_AT));
+    });
+
+    test('D3: resolves null when the lookup rejects', async () => {
+      (createVaultBackupsApi as jest.Mock).mockImplementation(() => ({
+        getLatestBackup: jest.fn().mockRejectedValue(new Error('network down')),
+      }));
+
+      const getNewestCopyMs = renderAndGetNewestCopyMs();
+
+      await expect(getNewestCopyMs()).resolves.toBeNull();
     });
   });
 });

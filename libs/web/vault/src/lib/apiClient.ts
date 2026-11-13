@@ -40,6 +40,11 @@ export function createSharedVaultApi(owner: string) {
   return shareInFlightVaultReads(createVaultApi(), owner);
 }
 
+/** Query parameters of `getLatestBackup`, as the generated client types them. */
+export type GetLatestBackupParams = NonNullable<
+  Parameters<VaultBackupsApi['getLatestBackup']>[0]
+>;
+
 export function createVaultBackupsApi(): VaultBackupsApi {
   return new VaultBackupsApi(
     createApiConfiguration(),

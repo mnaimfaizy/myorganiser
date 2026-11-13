@@ -56,7 +56,9 @@ export function CloudBackupLiveCard({
         source: 'google-drive',
         event: 'export',
       });
-      const created = response.data?.createdAt;
+      // 200 with a null body means no backup exists yet.
+      if (response.data === null) return null;
+      const created = response.data.createdAt;
       return created ? Date.parse(created) : null;
     } catch {
       return null;
