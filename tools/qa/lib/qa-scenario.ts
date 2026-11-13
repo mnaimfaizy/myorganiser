@@ -92,7 +92,14 @@ export interface StepOptions {
 
 /** What a scenario's `run` is given. */
 export interface ScenarioContext {
+  /** The default device and tab: device A, tab A. */
   page: Page;
+  /**
+   * A named device; `device(name).tab(name)` returns that tab's page, opening
+   * it on first use. Every tab is recorded and labelled, and every device is
+   * closed by the runner at the end.
+   */
+  device(name: string): { tab(name: string): Promise<Page> };
   /** The QA stack's web origin. */
   baseURL: string;
   side: Side;

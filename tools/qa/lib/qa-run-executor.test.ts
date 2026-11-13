@@ -42,6 +42,8 @@ interface Scripted {
   steps: number;
   /** When set, the browser run rejects with this message instead of reporting. */
   throws?: string;
+  /** Each other tab's recording; `path: null` when none was written. Absent when no other tab was opened. */
+  tabVideos?: { device: string; tab: string; path: string | null }[];
 }
 
 const DEFAULT_RUN: Scripted = {
@@ -126,6 +128,9 @@ function fakeRun(options: Partial<Plan> = {}) {
       const video = scripted.video ? `${workDir}/v.webm` : null;
       const screenshot = scripted.screenshot ? `${workDir}/s.png` : null;
       for (const path of [video, screenshot]) if (path) disk.add(path);
+      for (const tab of scripted.tabVideos ?? []) {
+        if (tab.path !== null) disk.add(tab.path);
+      }
       const steps: StepRecord[] = Array.from(
         { length: scripted.steps },
         (_, i) => {
@@ -151,6 +156,9 @@ function fakeRun(options: Partial<Plan> = {}) {
         screenshot,
         calls: scripted.calls,
       };
+      if (scripted.tabVideos !== undefined) {
+        recorded.tabVideos = scripted.tabVideos;
+      }
       if (scripted.message !== undefined) recorded.message = scripted.message;
       if (scripted.observed !== undefined)
         recorded.observed = scripted.observed;
@@ -1281,5 +1289,135 @@ describe("the run's printed output", () => {
     const printed = fake.out.join('\n');
     assert.match(printed, /still up/);
     assert.match(printed, /yarn qa:stack:stop/);
+  });
+});
+
+/** A tab's recording as the runner keeps it: under `local/`, numbered per run. */
+const tabLocal = (
+  id: string,
+  side: Side,
+  n: number,
+  device: string,
+  tab: string,
+): string => `${OUT}/local/${id}-${side}-tab${n}-${device}-${tab}.webm`;
+
+/** A tab's recording as the browser wrote it, in the side's work directory. */
+const tabWork = (id: string, side: Side, device: string, tab: string): string =>
+  `${OUT}/.work/${side}/${id}/${device}-${tab}.webm`;
+
+describe('a tab other than the default is recorded locally and never offered', () => {
+  const combinedWebm = (argv: readonly string[]) => ({
+    status: 0,
+    files: [`${argv[argv.length - 1]}.webm`],
+  });
+
+  test('every other tab is listed local and never offered, even when the combined file of a passing video is offered', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        tabVideos: [
+          { device: 'B', tab: 'B1', path: tabWork(id, side, 'B', 'B1') },
+          { device: 'B', tab: 'B2', path: tabWork(id, side, 'B', 'B2') },
+        ],
+      }),
+      combine: combinedWebm,
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.equal(entry?.result, 'PASS');
+    assert.deepEqual(
+      entry?.files.find(
+        (file) => file.place === 'combined' && file.path.endsWith('.webm'),
+      ),
+      {
+        path: `${OUT}/combined/V.webm`,
+        place: 'combined',
+        uploadEligible: true,
+      },
+    );
+    const tabFiles = entry?.files.filter((file) => file.path.includes('-tab'));
+    const expected = [
+      tabLocal('V', 'before', 1, 'B', 'B1'),
+      tabLocal('V', 'before', 2, 'B', 'B2'),
+      tabLocal('V', 'after', 1, 'B', 'B1'),
+      tabLocal('V', 'after', 2, 'B', 'B2'),
+    ];
+    assert.deepEqual(
+      tabFiles?.map((file) => file.path).sort(),
+      sorted(expected),
+    );
+    for (const file of tabFiles ?? []) {
+      assert.equal(file.place, 'local');
+      assert.equal(file.uploadEligible, false);
+    }
+    const onDisk = kept(fake);
+    for (const path of expected) assert.ok(onDisk.includes(path), path);
+    assert.equal(
+      onDisk.some((path) => path.includes('/.work/')),
+      false,
+      'each tab recording moved out of the work directory',
+    );
+  });
+
+  test('a tab with no recording is a problem: exits 1, names the tab, and keeps no file for it', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('N', 'none')),
+      runs: () => ({
+        tabVideos: [
+          { device: 'B', tab: 'B1', path: tabWork('N', 'after', 'B', 'B1') },
+          { device: 'B', tab: 'B2', path: null },
+        ],
+      }),
+    });
+    const exit = await runQaRun(argvFor('feature'), fake.deps);
+    assert.equal(exit, 1);
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.deepEqual(entry?.problems, [
+      'after: no video was recorded for device B, tab B2',
+    ]);
+    assert.match(
+      fake.err.join('\n'),
+      /qa:run: N: after: no video was recorded for device B, tab B2/,
+    );
+    assert.deepEqual(
+      entry?.files.filter((file) => file.path.includes('-tab')),
+      [
+        {
+          path: tabLocal('N', 'after', 1, 'B', 'B1'),
+          place: 'local',
+          uploadEligible: false,
+        },
+      ],
+      'the tab with a recording is still kept, and the missing one is not',
+    );
+    assert.ok(kept(fake).includes(tabLocal('N', 'after', 1, 'B', 'B1')));
+  });
+
+  test('a run with no other tab keeps only what its line asks for, plus its step records, and combines the same two files', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: reproduced,
+      combine: combinedWebm,
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.deepEqual(
+      entry?.files
+        .filter((file) => file.place === 'local')
+        .map((file) => file.path),
+      [`${OUT}/steps/V.json`],
+    );
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('combine ')),
+      [
+        `combine --before ${OUT}/before/V.webm --after ${OUT}/after/V.webm --out ${OUT}/combined/V`,
+      ],
+    );
   });
 });

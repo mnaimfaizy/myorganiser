@@ -60,6 +60,7 @@ import {
   isScreenScenario,
   parseScenario,
 } from './qa-scenario.ts';
+import type { TabRecording } from './qa-scenario-context.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
 import { planSides } from './qa-switch.ts';
@@ -84,6 +85,11 @@ export interface RecordedRun {
   video: string | null;
   screenshot: string | null;
   calls: RecordedCall[];
+  /**
+   * The recordings of every tab other than the default page, each listed
+   * `place: local` and never offered for upload. Absent when none was opened.
+   */
+  tabVideos?: TabRecording[];
 }
 
 /** The machine, as the runner sees it. The real one is in `tools/qa/qa-run.ts`. */
@@ -124,6 +130,22 @@ export interface RunDeps {
   removePath(path: string): void;
   out(line: string): void;
   err(line: string): void;
+}
+
+/** Where a non-default tab's recording is kept: local, numbered so odd names never collide. */
+export function tabVideoPath(
+  out: string,
+  id: string,
+  side: Side,
+  n: number,
+  tab: { device: string; tab: string },
+): string {
+  const safe = (text: string) => text.replace(/[^A-Za-z0-9_-]/g, '_');
+  return join(
+    out,
+    'local',
+    `${id}-${side}-tab${n}-${safe(tab.device)}-${safe(tab.tab)}.webm`,
+  );
 }
 
 const CLEAN_UP =
@@ -245,6 +267,27 @@ async function runScenarios(
     });
   }
 
+  /** Keeps every other tab's recording locally: never a QA Artifact, never offered. */
+  function keepTabVideos(
+    scenario: Scenario,
+    side: Side,
+    recorded: RecordedRun,
+    record: ScenarioRecord,
+  ): void {
+    for (const [n, tab] of (recorded.tabVideos ?? []).entries()) {
+      if (tab.path === null) {
+        record.problems.push(
+          `${side}: no video was recorded for device ${tab.device}, tab ${tab.tab}`,
+        );
+        continue;
+      }
+      const dest = tabVideoPath(args.out, scenario.id, side, n + 1, tab);
+      deps.makeDir(dirname(dest));
+      deps.moveFile(tab.path, dest);
+      record.files.push({ path: dest, place: 'local' });
+    }
+  }
+
   async function runOne(scenario: Scenario, side: Side): Promise<void> {
     const record = recordOf(scenario.id);
     const workDir = join(args.out, '.work', side, scenario.id);
@@ -283,6 +326,7 @@ async function runScenarios(
         media.set(scenario.id, { ...media.get(scenario.id), [side]: dest });
       }
     }
+    keepTabVideos(scenario, side, recorded, record);
     if (isScreenScenario(scenario)) keepSteps(scenario, side, recorded);
     // Whatever the line did not ask for goes with the work directory.
     deps.removePath(workDir);

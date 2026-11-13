@@ -4,18 +4,20 @@
  * (ADR 0147 decision 1). Kept apart from `qa-run-executor.ts` so a test of
  * the executor never loads it: no test plays a scenario in a browser.
  *
- * Each run gets a fresh browser and context at the fixed viewport, with video
- * recording always on, a screenshot of where the run ended, the calls it
- * made to the QA backend, each `step()`'s still and record
- * (`qa-scenario-context.ts`), and what a passing run observed. Only method,
- * path (with its query), status and JSON or text bodies are recorded;
- * headers never are, so no cookie or authorization header is ever written
- * down.
+ * Each run gets a fresh browser; every device a scenario opens (the default
+ * page's device A, and each `device(name)`) gets a context at the fixed
+ * viewport and baseURL, with video recording always on and its backend calls
+ * recorded, and is closed at the end even after a timeout or failure. A run
+ * has a screenshot of where the run ended, the calls it made to the QA
+ * backend, each `step()`'s still and record (`qa-scenario-context.ts`), and
+ * what a passing run observed. Only method, path (with its query), status and
+ * JSON or text bodies are recorded; headers never are, so no cookie or
+ * authorization header is ever written down.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { type Response, chromium } from '@playwright/test';
+import { type BrowserContext, type Response, chromium } from '@playwright/test';
 
 import { readQaAccounts } from '../../scripts/lib/qa-accounts.ts';
 import { firstLine } from './qa-cli.ts';
@@ -26,7 +28,14 @@ import {
   type Scenario,
   type ScenarioAccount,
 } from './qa-scenario.ts';
-import { stepRecorder } from './qa-scenario-context.ts';
+import {
+  DEFAULT_DEVICE,
+  DEFAULT_TAB,
+  deviceRegistry,
+  playScenario,
+  stepRecorder,
+  watchBackend,
+} from './qa-scenario-context.ts';
 import { QA_STACK } from './qa-stack.ts';
 import type { Side } from './qa-stack.ts';
 
@@ -104,30 +113,37 @@ export function chromiumRunner(
   return async (scenario, { side, workDir }) => {
     const browser = await chromium.launch();
     try {
-      const context = await browser.newContext({
-        viewport: VIEWPORT,
-        baseURL: QA_WEB_ORIGIN,
-        recordVideo: { dir: workDir, size: VIEWPORT },
-      });
+      const pending: Promise<RecordedCall>[] = [];
+      /** Every device is made alike, and its backend calls are recorded. */
+      const open = async (): Promise<BrowserContext> => {
+        const context = await browser.newContext({
+          viewport: VIEWPORT,
+          baseURL: QA_WEB_ORIGIN,
+          recordVideo: { dir: workDir, size: VIEWPORT },
+        });
+        watchBackend(context, QA_BACKEND_ORIGIN, recordCall, pending);
+        return context;
+      };
+      const ownContext = await open();
       // Step times count from here, where the context's video starts.
       const startedAt = Date.now();
-      const page = await context.newPage();
-      const pending: Promise<RecordedCall>[] = [];
-      context.on('response', (response) => {
-        if (new URL(response.url()).origin === QA_BACKEND_ORIGIN) {
-          pending.push(recordCall(response));
-        }
+      const page = await ownContext.newPage();
+      const registry = deviceRegistry({
+        open,
+        own: { context: ownContext, page },
       });
-
-      const recorder = stepRecorder({ side, workDir, startedAt });
-      let outcome: RecordedRun['outcome'] = 'pass';
-      let message: string | undefined;
-      let returned: unknown;
-      let timer: NodeJS.Timeout | undefined;
-      try {
-        returned = await Promise.race([
+      const recorder = stepRecorder({
+        side,
+        workDir,
+        startedAt,
+        lookup: registry.lookup,
+      });
+      let screenshot: string | null = null;
+      const played = await playScenario({
+        run: () =>
           scenario.run({
             page,
+            device: registry.device,
             baseURL: QA_WEB_ORIGIN,
             side,
             account,
@@ -137,36 +153,32 @@ export function chromiumRunner(
             step: recorder.step,
             observed: recorder.observed,
           }),
-          new Promise((_, reject) => {
-            timer = setTimeout(
-              () =>
-                reject(
-                  new Error(`timed out after ${SCENARIO_TIMEOUT_MS / 1000}s`),
-                ),
-              SCENARIO_TIMEOUT_MS,
-            );
-          }),
-        ]);
-      } catch (error) {
-        outcome = error instanceof CannotRunError ? 'cannot-run' : 'fail';
-        message = firstLine(error);
-      } finally {
-        clearTimeout(timer);
-      }
+        timeoutMs: SCENARIO_TIMEOUT_MS,
+        isCannotRun: (error) => error instanceof CannotRunError,
+        describe: firstLine,
+        registry,
+        async beforeClose() {
+          const path = join(workDir, 'final.png');
+          screenshot = await page
+            .screenshot({ path })
+            .then(() => path)
+            .catch(() => null);
+        },
+      });
+      const { outcome, message, returned, recordings } = played;
 
-      const screenshotPath = join(workDir, 'final.png');
-      const screenshot = await page
-        .screenshot({ path: screenshotPath })
-        .then(() => screenshotPath)
-        .catch(() => null);
       const settled = await Promise.allSettled(pending);
       const calls = settled.flatMap((result) =>
         result.status === 'fulfilled' ? [result.value] : [],
       );
-      const video = page.video();
-      // The video file is complete only once its context closes.
-      await context.close();
-      const videoPath = video ? await video.path().catch(() => null) : null;
+      const exists = (path: string | null): string | null =>
+        path !== null && existsSync(path) ? path : null;
+      const own = recordings.find(
+        (r) => r.device === DEFAULT_DEVICE && r.tab === DEFAULT_TAB,
+      );
+      const tabVideos = recordings
+        .filter((r) => r !== own)
+        .map((r) => ({ ...r, path: exists(r.path) }));
 
       const observed =
         outcome !== 'pass'
@@ -178,10 +190,15 @@ export function chromiumRunner(
         outcome,
         ...(message === undefined ? {} : { message }),
         ...(observed === undefined ? {} : { observed }),
-        steps: [...recorder.steps],
-        video: videoPath !== null && existsSync(videoPath) ? videoPath : null,
+        // A tab keeps one label for the whole run, from the tabs its device ended with.
+        steps: recorder.steps.map((step) => ({
+          ...step,
+          label: registry.finalLabel(step.device, step.tab),
+        })),
+        video: exists(own?.path ?? null),
         screenshot,
         calls,
+        ...(tabVideos.length === 0 ? {} : { tabVideos }),
       };
     } finally {
       await browser.close();
