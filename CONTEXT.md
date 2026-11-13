@@ -677,8 +677,12 @@ A QA Plan for a PRD Issue, published as a GitHub issue labelled `qa`. Scenarios 
 _Avoid_: QA ticket, test ticket, validation issue
 
 **QA Artifact**:
-A screenshot, video or Request Transcript captured while running a QA Plan, only where it shows something the written result cannot. For a fix it pairs what the code did before the change with what it does after, side by side. A screenshot or video stays private to the person it was captured for unless they choose to publish it.
+A screenshot, video or Request Transcript captured while running a QA Plan, only where it shows something the written result cannot. For a fix it pairs what the code did before the change with what it does after, side by side. It stands alone: someone holding only the file can tell which scenario it is, what was expected and what happened on each side, and the scenario's result. A screenshot or video stays private to the person it was captured for unless they choose to publish it.
 _Avoid_: Evidence (a Finding's term), QA proof, attachment
+
+**Storyboard**:
+The QA Artifact for a scenario with a screen: its numbered steps, each a still of the named device and tab cropped to what the step is about, Before beside After, under a band naming the scenario, what each side was expected to show and what it did, and the result. When both sides were expected to show the same thing and did, it has one column.
+_Avoid_: contact sheet, filmstrip, grid, combined image
 
 **Request Transcript**:
 The QA Artifact for a change with no screen to show: the API calls a QA Plan scenario made and what came back, before and after the change, with every credential and token withheld and Ciphertext shortened. It holds only QA Account data, so it is shown inside the QA Report rather than published separately.
