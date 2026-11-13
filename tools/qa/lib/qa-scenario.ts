@@ -162,7 +162,7 @@ export interface ParseOptions {
 }
 
 /** The id shape: it names files, so no separators or dots. */
-const SCENARIO_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+export const SCENARIO_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 function isOneOf<T extends string>(
   allowed: readonly T[],

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { FFMPEG_MISSING_MESSAGE } from './qa-combine-executor.ts';
+import { FFMPEG_MISSING_MESSAGE, runCombine } from './qa-combine-executor.ts';
 import type { AnnotatedVideoPlan } from './qa-combine.ts';
 import {
   type RecordedCall,
@@ -2193,5 +2193,227 @@ describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused
       assert.equal(text.includes(BEARER), false, 'the Bearer is in no output');
       assert.equal(text.includes(JWT), false, 'the JWT is in no output');
     }
+  });
+});
+
+describe('the step records a video scenario saves for its re-render (PRD #1550)', () => {
+  /** A value the browser reports as denied, held only in the run's memory. */
+  const SECRET = 'hunter2-fake';
+  const WITHHELD = '[withheld]';
+
+  /** The step records `qa:run` wrote for scenario `id`. */
+  function savedRecords(
+    fake: ReturnType<typeof fakeRun>,
+    id: string,
+  ): Record<string, unknown> {
+    const text = fake.files.get(`${OUT}/steps/${id}.json`);
+    assert.ok(text !== undefined, 'the step records were written');
+    return JSON.parse(text) as Record<string, unknown>;
+  }
+
+  /**
+   * Re-renders scenario `id` of the run `fake` made, with `runCombine` over
+   * copies of its disk and files. Each renderer's arguments are recorded.
+   */
+  async function reRenderFrom(fake: ReturnType<typeof fakeRun>, id: string) {
+    const disk = new Set(fake.disk);
+    const texts = new Map(fake.files);
+    const renders: {
+      storyboard: Storyboard;
+      stillRoot: string;
+      pngPath: string;
+    }[] = [];
+    const annotations: AnnotatedVideoPlan[] = [];
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await runCombine(['--run', OUT, '--scenario', id], {
+      run: () => ({ status: 0, stderr: '' }),
+      exists: (path) => disk.has(path) || texts.has(path),
+      makeDir: () => undefined,
+      removePath(path) {
+        disk.delete(path);
+        texts.delete(path);
+      },
+      readFile(path) {
+        const text = texts.get(path);
+        assert.ok(text !== undefined, `${path} was saved by qa:run`);
+        return text;
+      },
+      movePath(from, to) {
+        disk.delete(from);
+        disk.add(to);
+      },
+      async renderStoryboard(storyboard, stillRoot, pngPath) {
+        renders.push({ storyboard, stillRoot, pngPath });
+        disk.add(pngPath);
+      },
+      async annotateVideo(plan) {
+        annotations.push(plan);
+        disk.add(plan.output);
+      },
+      chromiumMissing: () => null,
+      out: (line) => out.push(line),
+      err: (line) => err.push(line),
+    });
+    return { code, renders, annotations, disk, out, err };
+  }
+
+  test("a video scenario saves a video block with each side's tab facts and no recording path", async () => {
+    const fake = fakeRun({
+      exports: filesOf({ ...scenario('V', 'video'), tab: 'B1' }),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        tabVideos: [
+          {
+            device: 'B',
+            tab: 'B1',
+            path: tabWork(id, side, 'B', 'B1'),
+            openedAtMs: 1200,
+          },
+        ],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    const records = savedRecords(fake, 'V');
+    assert.deepEqual(records.video, {
+      tab: 'B1',
+      sides: {
+        before: {
+          device: 'B',
+          tab: 'B1',
+          label: 'Device B · tab B1',
+          openedAtMs: 1200,
+        },
+        after: {
+          device: 'B',
+          tab: 'B1',
+          label: 'Device B · tab B1',
+          openedAtMs: 1200,
+        },
+      },
+    });
+    assert.equal(records.refused, undefined, 'nothing is refused');
+  });
+
+  test("a video on its default tab saves that tab's facts, and a screen scenario saves no video block", async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video'), scenario('S', 'screenshot')),
+      runs: reproduced,
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    const defaultTab = {
+      device: DEFAULT_TAB,
+      tab: DEFAULT_TAB,
+      label: 'Device A',
+      openedAtMs: 0,
+    };
+    assert.deepEqual(savedRecords(fake, 'V').video, {
+      tab: DEFAULT_TAB,
+      sides: { before: defaultTab, after: defaultTab },
+    });
+    assert.equal(
+      'video' in savedRecords(fake, 'S'),
+      false,
+      'a screen scenario saves no video block',
+    );
+  });
+
+  test("a tab label holding a denied value withholds the block's device, tab and label and the top-level tab, and names each label", async () => {
+    const tab = `B1-${SECRET}`;
+    const fake = fakeRun({
+      exports: filesOf({ ...scenario('V', 'video'), tab }),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        denied: [SECRET],
+        tabVideos: [
+          {
+            device: 'B',
+            tab,
+            path: tabWork(id, side, 'B', tab),
+            openedAtMs: 1200,
+          },
+        ],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 1);
+    const records = savedRecords(fake, 'V');
+    assert.deepEqual(records.refused, [
+      'V video before label',
+      'V video after label',
+    ]);
+    const withheld = {
+      device: WITHHELD,
+      tab: WITHHELD,
+      label: WITHHELD,
+      openedAtMs: 1200,
+    };
+    assert.deepEqual(records.video, {
+      tab: WITHHELD,
+      sides: { before: withheld, after: withheld },
+    });
+    const everything = [
+      ...fake.files.keys(),
+      ...fake.files.values(),
+      ...fake.out,
+      ...fake.err,
+    ];
+    for (const text of everything) {
+      assert.equal(text.includes(SECRET), false, 'the value is in no output');
+    }
+  });
+
+  test('a video re-render from the saved records hands the renderers the Storyboard and MP4 plan qa:run made', async () => {
+    const fake = fakeRun({
+      exports: filesOf({ ...scenario('V', 'video'), tab: 'B1' }),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        stepAtMs: [1500],
+        tabVideos: [
+          {
+            device: 'B',
+            tab: 'B1',
+            path: tabWork(id, side, 'B', 'B1'),
+            openedAtMs: 1200,
+          },
+        ],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    const re = await reRenderFrom(fake, 'V');
+    assert.deepEqual(re.err, []);
+    assert.equal(re.code, 0);
+    assert.deepEqual(
+      re.renders.map(({ storyboard }) => storyboard),
+      fake.renders.map(({ storyboard }) => storyboard),
+      'the same Storyboard',
+    );
+    assert.deepEqual(
+      re.annotations.map(({ band, sides }) => ({ band, sides })),
+      fake.annotations.map(({ band, sides }) => ({ band, sides })),
+      'the same band and sides',
+    );
+    assert.deepEqual(
+      re.renders.map(({ stillRoot, pngPath }) => [stillRoot, pngPath]),
+      [[OUT, `${OUT}/combined/.recombine-V.png`]],
+    );
+    assert.equal(re.annotations[0].output, `${OUT}/combined/.recombine-V.mp4`);
+    assert.equal(re.disk.has(storyboardPng('V')), true);
+    assert.equal(re.disk.has(`${OUT}/combined/V.mp4`), true);
+  });
+
+  test('a screenshot re-render from the saved records hands the renderer the Storyboard qa:run drew', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: reproduced,
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    const re = await reRenderFrom(fake, 'S');
+    assert.equal(re.code, 0);
+    assert.deepEqual(
+      re.renders.map(({ storyboard }) => storyboard),
+      fake.renders.map(({ storyboard }) => storyboard),
+    );
+    assert.deepEqual(re.annotations, []);
+    assert.equal(re.disk.has(storyboardPng('S')), true);
   });
 });

@@ -1,38 +1,26 @@
 // Contracts for the pure combine rules (ADR 0147 decision 5; PRD #1544's
-// annotated MP4): kind detection, height and output validation, the output
-// path, the side-by-side ffmpeg argument lists of a screenshot or video pair,
-// the caption windows of a `Capture: video` side, and the ffmpeg arguments of
-// its annotated MP4. Everything here is a pure function, so no process and no
-// file is touched; the executor is in qa-combine-executor.test.ts, the overlay
-// pages the MP4 reads are in video-overlay-html.test.ts, and the real ffmpeg
-// run is in its own suite.
+// annotated MP4; PRD #1550's re-render): reading a scenario's saved step
+// records and graded result, the caption windows of a `Capture: video` side,
+// and the ffmpeg arguments of its annotated MP4. Everything here is a pure
+// function, so no process and no file is touched; the executor is in
+// qa-combine-executor.test.ts, the overlay pages the MP4 reads are in
+// video-overlay-html.test.ts, and the real renders are in their own suites.
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
 
 import {
   type AnnotatedVideoPlan,
   type CaptionWindow,
-  type CombineFiles,
-  CombineInputError,
   type VideoOverlayFiles,
   type VideoSide,
   type VideoStep,
   buildAnnotatedVideoArgs,
-  buildImageArgs,
-  buildVideoArgs,
   captionWindows,
-  combineKind,
   enableExpression,
-  kindOf,
-  outputFor,
-  validateHeight,
+  parseStepRecords,
+  resultOf,
 } from './qa-combine.ts';
 import type { Band } from './storyboard.ts';
-
-const FILES: CombineFiles = {
-  before: '/in/before.png',
-  after: '/in/after.png',
-};
 
 /** The value following each `-i`, in argument order. */
 function inputsOf(args: readonly string[]): string[] {
@@ -119,180 +107,293 @@ const OVERLAYS: VideoOverlayFiles = {
   ],
 };
 
-describe('kindOf and combineKind', () => {
-  test('image extensions are an image; video extensions are a video', () => {
-    for (const path of ['a.png', 'a.jpg', 'a.jpeg']) {
-      assert.equal(kindOf(path), 'image', path);
-    }
-    for (const path of ['a.webm', 'a.mp4', 'a.mov']) {
-      assert.equal(kindOf(path), 'video', path);
-    }
-  });
+const RECORDS_FILE = '/run/steps/S.json';
 
-  test('the extension match is case-insensitive', () => {
-    assert.equal(kindOf('SHOT.PNG'), 'image');
-    assert.equal(kindOf('clip.MP4'), 'video');
-    assert.equal(combineKind('A.PNG', 'b.Jpeg'), 'image');
-    assert.equal(combineKind('A.MOV', 'b.WebM'), 'video');
-  });
+/** One step as `qa:run` saves it, still relative to the run folder. */
+function savedStep(side: 'before' | 'after') {
+  return {
+    side,
+    index: 1,
+    device: 'A',
+    tab: 'A',
+    label: 'Device A',
+    caption: 'open the form',
+    still: `steps/S/${side}/01.png`,
+    subject: null,
+    atMs: 0,
+  };
+}
 
-  test('an unknown or missing extension is not a kind', () => {
-    assert.equal(kindOf('notes.bmp'), null);
-    assert.equal(kindOf('notes.txt'), null);
-    assert.equal(kindOf('no-extension'), null);
+/** A screen scenario's step-records file, as `qa:run` writes it. */
+function recordsJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    id: 'S',
+    capture: 'screenshot',
+    title: 'Save an item',
+    expected: { before: 'the defect shows', after: 'the fix shows' },
+    commits: { before: 'abc1234', after: 'def5678' },
+    sides: {
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [savedStep('before')],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [savedStep('after')],
+      },
+    },
+    ...overrides,
   });
+}
 
-  test('a matching image pair and a matching video pair combine', () => {
-    assert.equal(combineKind('before.png', 'after.jpg'), 'image');
-    assert.equal(combineKind('before.webm', 'after.mp4'), 'video');
-  });
+/** Parses `text` as the records of scenario S, from `RECORDS_FILE`. */
+const parse = (text: string) => parseStepRecords(text, 'S', RECORDS_FILE);
 
-  test('a mixed image and video pair is a CombineInputError', () => {
-    assert.throws(
-      () => combineKind('before.png', 'after.mp4'),
-      (error: unknown) =>
-        error instanceof CombineInputError &&
-        /before is an image but after is a video/.test(error.message),
-    );
-    assert.throws(
-      () => combineKind('before.mov', 'after.jpg'),
-      CombineInputError,
-    );
-  });
-
-  test('an unknown extension on either side names that side', () => {
-    assert.throws(
-      () => combineKind('before.bmp', 'after.png'),
-      (error: unknown) =>
-        error instanceof CombineInputError &&
-        error.message.includes('before.bmp'),
-    );
-    assert.throws(
-      () => combineKind('before.png', 'after.txt'),
-      (error: unknown) =>
-        error instanceof CombineInputError &&
-        error.message.includes('after.txt'),
-    );
-  });
-});
-
-describe('validateHeight', () => {
-  test('an even integer of 2 or more is returned unchanged', () => {
-    assert.equal(validateHeight(2), 2);
-    assert.equal(validateHeight(48), 48);
-    assert.equal(validateHeight(720), 720);
-  });
-
-  for (const height of [
-    0,
-    -2,
-    1,
-    721,
-    48.5,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-  ]) {
-    test(`${height} is rejected`, () => {
-      assert.throws(() => validateHeight(height), CombineInputError);
+describe('parseStepRecords: a clean file is read', () => {
+  test('a screen scenario file is returned with its title, commits, expected results and steps', () => {
+    const records = parse(recordsJson());
+    assert.equal(records.id, 'S');
+    assert.equal(records.capture, 'screenshot');
+    assert.equal(records.title, 'Save an item');
+    assert.deepEqual(records.expected, {
+      before: 'the defect shows',
+      after: 'the fix shows',
     });
-  }
-});
-
-describe('outputFor', () => {
-  test('an image is written to one PNG, and a video to one MP4', () => {
-    assert.equal(outputFor('image', 'out/shot'), 'out/shot.png');
-    assert.equal(outputFor('video', 'out/clip'), 'out/clip.mp4');
+    assert.deepEqual(records.commits, { before: 'abc1234', after: 'def5678' });
+    assert.equal(records.sides.before?.steps[0].still, 'steps/S/before/01.png');
+    assert.equal(records.refused, undefined);
+    assert.equal(records.video, undefined);
   });
 
-  test('an --out that already carries an extension is rejected for both kinds', () => {
-    assert.throws(() => outputFor('image', 'out/shot.png'), CombineInputError);
-    assert.throws(() => outputFor('video', 'out/clip.mp4'), CombineInputError);
+  test('a video file keeps its video block, which holds no recording path', () => {
+    const records = parse(
+      recordsJson({
+        capture: 'video',
+        video: {
+          tab: 'B1',
+          sides: {
+            before: {
+              device: 'B',
+              tab: 'B1',
+              label: 'Device B · tab B1',
+              openedAtMs: 1200,
+            },
+          },
+        },
+      }),
+    );
+    assert.deepEqual(records.video, {
+      tab: 'B1',
+      sides: {
+        before: {
+          device: 'B',
+          tab: 'B1',
+          label: 'Device B · tab B1',
+          openedAtMs: 1200,
+        },
+      },
+    });
+  });
+
+  test('a side that did not run is absent and is not a problem', () => {
+    const records = parse(
+      recordsJson({
+        sides: { after: { outcome: 'pass', steps: [savedStep('after')] } },
+      }),
+    );
+    assert.equal(records.sides.before, undefined);
+    assert.equal(records.sides.after?.outcome, 'pass');
+  });
+
+  test('a refused list of field names is kept, so the caller can refuse the file', () => {
+    const records = parse(recordsJson({ refused: ['S after step 1 caption'] }));
+    assert.deepEqual(records.refused, ['S after step 1 caption']);
   });
 });
 
-describe('buildImageArgs', () => {
-  test('starts with the quiet, overwrite flags', () => {
-    const args = buildImageArgs(FILES, '/out/shot.png', 48);
-    assert.deepEqual(args.slice(0, 4), [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
+describe('parseStepRecords: a file that is not a step-records file is refused', () => {
+  const refuses = (text: string, reason: string) =>
+    assert.throws(() => parse(text), {
+      name: 'CombineInputError',
+      message: `${RECORDS_FILE} is not a step-records file: ${reason}`,
+    });
+
+  test('text that is not JSON', () => {
+    refuses('{"id": ', 'it is not JSON');
+  });
+
+  test('JSON that is not an object (an array, null)', () => {
+    refuses('[]', 'it is not an object');
+    refuses('null', 'it is not an object');
+  });
+
+  test("another scenario's file", () => {
+    refuses(recordsJson({ id: 'T' }), 'it is not scenario "S"');
+  });
+
+  test('a capture that is neither screenshot nor video', () => {
+    refuses(
+      recordsJson({ capture: 'transcript' }),
+      'its capture is not screenshot or video',
+    );
+  });
+
+  test('no title', () => {
+    refuses(recordsJson({ title: 3 }), 'no title');
+  });
+
+  test('no expected.after, or an expected.before that is not text', () => {
+    refuses(recordsJson({ expected: { before: 'x' } }), 'no expected.after');
+    refuses(
+      recordsJson({ expected: { after: 'x', before: 3 } }),
+      'expected.before is not text',
+    );
+  });
+
+  test('commits that do not name both sides', () => {
+    refuses(recordsJson({ commits: { before: 'abc1234' } }), 'no commits');
+  });
+
+  test('refused that is not a list of names', () => {
+    refuses(
+      recordsJson({ refused: 'S after step 1 caption' }),
+      'refused is not a list',
+    );
+  });
+
+  test('no sides object', () => {
+    refuses(recordsJson({ sides: undefined }), 'no sides');
+  });
+
+  test('a side with no outcome or no steps list', () => {
+    refuses(
+      recordsJson({ sides: { before: { steps: [] } } }),
+      'before has no outcome and steps',
+    );
+  });
+
+  test('a step missing a field it is drawn with', () => {
+    refuses(
+      recordsJson({
+        sides: {
+          before: {
+            outcome: 'fail',
+            steps: [{ ...savedStep('before'), caption: undefined }],
+          },
+        },
+      }),
+      'before has a malformed step',
+    );
+  });
+
+  test('a still that leaves the run folder, by a leading absolute path or by a parent segment', () => {
+    for (const still of [
+      '/etc/01.png',
+      '../01.png',
+      'steps/S/../../../01.png',
+    ]) {
+      refuses(
+        recordsJson({
+          sides: {
+            before: {
+              outcome: 'fail',
+              steps: [{ ...savedStep('before'), still }],
+            },
+          },
+        }),
+        'before step 1 names a still outside the run',
+      );
+    }
+  });
+
+  test('a video block whose tab is missing', () => {
+    refuses(
+      recordsJson({
+        capture: 'video',
+        video: { sides: {} },
+      }),
+      'its video block is malformed',
+    );
+  });
+
+  test('a video block that is not an object', () => {
+    refuses(
+      recordsJson({ capture: 'video', video: 'B1' }),
+      'its video block is malformed',
+    );
+  });
+
+  test('a video side whose device, tab or openedAtMs is the wrong type', () => {
+    const side = { device: 'A', tab: 'A', label: 'Device A', openedAtMs: 0 };
+    for (const wrong of [{ device: 3 }, { tab: null }, { openedAtMs: '0' }]) {
+      refuses(
+        recordsJson({
+          capture: 'video',
+          video: { tab: 'A', sides: { before: { ...side, ...wrong } } },
+        }),
+        'its video block is malformed',
+      );
+    }
+  });
+
+  test('a video side that lacks its label', () => {
+    refuses(
+      recordsJson({
+        capture: 'video',
+        video: {
+          tab: 'A',
+          sides: {
+            before: { device: 'A', tab: 'A', openedAtMs: 0 },
+          },
+        },
+      }),
+      'its video block is malformed',
+    );
+  });
+});
+
+describe('resultOf: the graded result of one scenario in the run manifest', () => {
+  const manifest = (scenarios: unknown) =>
+    JSON.stringify({ scenarios, headline: 'QA passed' });
+
+  test('the result of the scenario named, of each scenario in turn', () => {
+    const text = manifest([
+      { id: 'S', result: 'PASS' },
+      { id: 'T', result: 'FAIL: regression' },
     ]);
+    assert.equal(resultOf(text, 'S'), 'PASS');
+    assert.equal(resultOf(text, 'T'), 'FAIL: regression');
   });
 
-  test('the two inputs are the before side then the after side', () => {
-    const args = buildImageArgs(FILES, '/out/shot.png', 48);
-    assert.deepEqual(inputsOf(args), [FILES.before, FILES.after]);
+  test('null for a scenario the manifest does not name', () => {
+    assert.equal(resultOf(manifest([{ id: 'T', result: 'PASS' }]), 'S'), null);
   });
 
-  test('both sides are scaled to the requested height and stacked before-left, with no label overlay', () => {
-    const filter = valueAfter(
-      buildImageArgs(FILES, '/out/shot.png', 48),
-      '-filter_complex',
+  test('null for a result that is text but not a known scenario result', () => {
+    assert.equal(
+      resultOf(manifest([{ id: 'S', result: 'pass' }]), 'S'),
+      null,
+      'the result is matched exactly',
     );
     assert.equal(
-      filter,
-      '[0:v]scale=-2:48[b];[1:v]scale=-2:48[a];[b][a]hstack=inputs=2[v]',
+      resultOf(manifest([{ id: 'S', result: 'PASS; drop table' }]), 'S'),
+      null,
     );
   });
 
-  test('the height argument flows into the scale filter', () => {
-    const filter = valueAfter(
-      buildImageArgs(FILES, '/out/shot.png', 720),
-      '-filter_complex',
-    );
+  test('null for an entry whose result is not text', () => {
+    assert.equal(resultOf(manifest([{ id: 'S' }]), 'S'), null);
+    assert.equal(resultOf(manifest([{ id: 'S', result: 1 }]), 'S'), null);
+  });
+
+  test('null for a manifest that is not JSON, or has no scenarios list', () => {
+    assert.equal(resultOf('{"scenarios": [', 'S'), null);
     assert.equal(
-      filter,
-      '[0:v]scale=-2:720[b];[1:v]scale=-2:720[a];[b][a]hstack=inputs=2[v]',
+      resultOf(JSON.stringify({ headline: 'QA passed' }), 'S'),
+      null,
     );
-  });
-
-  test('a single frame is written, with no fps change and no video encoder', () => {
-    const args = buildImageArgs(FILES, '/out/shot.png', 48);
-    assert.equal(valueAfter(args, '-frames:v'), '1');
-    assert.equal(valueAfter(args, '-map'), '[v]');
-    assert.equal(args.includes('libx264'), false);
-    assert.equal(valueAfter(args, '-filter_complex').includes('fps='), false);
-    assert.equal(args.at(-1), '/out/shot.png');
-  });
-});
-
-describe('buildVideoArgs', () => {
-  test('starts with the quiet, overwrite flags', () => {
-    const args = buildVideoArgs(FILES, '/out/clip.mp4', 48);
-    assert.deepEqual(args.slice(0, 4), [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
-    ]);
-  });
-
-  test('the two inputs are the before side then the after side', () => {
-    const args = buildVideoArgs(FILES, '/out/clip.mp4', 48);
-    assert.deepEqual(inputsOf(args), [FILES.before, FILES.after]);
-  });
-
-  test('both sides are brought to VIDEO_FPS, scaled to the height and stacked before-left, with no label overlay', () => {
-    const filter = valueAfter(
-      buildVideoArgs(FILES, '/out/clip.mp4', 48),
-      '-filter_complex',
-    );
-    assert.equal(
-      filter,
-      '[0:v]fps=25,scale=-2:48[b];[1:v]fps=25,scale=-2:48[a];[b][a]hstack=inputs=2[v]',
-    );
-  });
-
-  test('the output is H.264 in yuv420p with no audio and a fast-start container', () => {
-    const args = buildVideoArgs(FILES, '/out/clip.mp4', 48);
-    assert.equal(valueAfter(args, '-c:v'), 'libx264');
-    assert.equal(valueAfter(args, '-pix_fmt'), 'yuv420p');
-    assert.ok(args.includes('-an'));
-    assert.equal(valueAfter(args, '-movflags'), '+faststart');
-    assert.equal(args.includes('-frames:v'), false);
-    assert.equal(args.at(-1), '/out/clip.mp4');
   });
 });
 

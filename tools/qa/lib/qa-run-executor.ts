@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path';
 import { GradingInputError, gradeScenarios } from './grade-scenarios.ts';
 import { firstLine } from './qa-cli.ts';
 import { FFMPEG_MISSING_MESSAGE } from './qa-combine-executor.ts';
-import type { AnnotatedVideoPlan, VideoSide } from './qa-combine.ts';
+import type { AnnotatedVideoPlan, StepRecordsVideo } from './qa-combine.ts';
 import {
   type Mp4TabChoice,
   type RecordedCall,
@@ -89,6 +89,11 @@ import {
 } from './caption-privacy.ts';
 import { redactTranscript, renderTranscript } from './redact-transcript.ts';
 import type { ScenarioResult } from './grade-scenarios.ts';
+import {
+  annotatedVideoSides,
+  renderStoryboardPng,
+  videoLabelFields,
+} from './qa-storyboard-files.ts';
 import {
   type Storyboard,
   type StoryboardInput,
@@ -457,6 +462,37 @@ async function runScenarios(
   const commits = { before: args.mergeBase, after: args.head };
 
   /**
+   * What the step-records file keeps of a `video` scenario's MP4 tabs: the
+   * facts a re-render needs, and no path. A label the caption check refused
+   * is withheld as the steps' fields are.
+   */
+  function videoRecord(
+    scenario: VideoScenario,
+    leaks: readonly string[],
+  ): StepRecordsVideo {
+    const sides: StepRecordsVideo['sides'] = {};
+    let anyRefused = false;
+    for (const side of SIDES) {
+      const choice = mp4Tabs.get(scenario.id)?.[side];
+      if (!choice?.ok || choice.label === undefined) continue;
+      const { device, tab, openedAtMs } = choice.recording;
+      // A label is built from its device and tab names, so a refused label
+      // withholds all three.
+      const refused = leaks.includes(`${scenario.id} video ${side} label`);
+      if (refused) anyRefused = true;
+      sides[side] = refused
+        ? {
+            device: WITHHELD_FIELD,
+            tab: WITHHELD_FIELD,
+            label: WITHHELD_FIELD,
+            openedAtMs,
+          }
+        : { device, tab, label: choice.label, openedAtMs };
+    }
+    return { tab: anyRefused ? WITHHELD_FIELD : scenario.tab, sides };
+  }
+
+  /**
    * Saves a screen scenario's step records, then checks its Storyboard and
    * draws it. Returns the Storyboard once its PNG is made, or `null` when no
    * combined file may be made for the scenario: a caption was refused, the
@@ -482,17 +518,7 @@ async function runScenarios(
     const secrets = [...(denied.get(scenario.id) ?? [])];
     // The MP4 shows its tab's label on each side, which no step need carry.
     const videoLabels: CheckedField[] = isVideoScenario(scenario)
-      ? SIDES.flatMap((side) => {
-          const mp4Tab = mp4Tabs.get(scenario.id)?.[side];
-          return mp4Tab?.ok && mp4Tab.label !== undefined
-            ? [
-                {
-                  field: `${scenario.id} video ${side} label`,
-                  text: mp4Tab.label,
-                },
-              ]
-            : [];
-        })
+      ? videoLabelFields(scenario.id, mp4Tabs.get(scenario.id) ?? {})
       : [];
     const leaks = findCaptionLeaks(input, secrets, videoLabels);
     const kept = leaks.length > 0 ? withholdLeaks(input, secrets) : input;
@@ -507,8 +533,11 @@ async function runScenarios(
           title: kept.title,
           expected: kept.expected,
           commits,
-          // Field names only. A later re-render (#1550) must refuse a file that lists any.
+          // Field names only. A re-render (`qa:combine`) refuses a file that lists any.
           ...(leaks.length > 0 ? { refused: leaks } : {}),
+          ...(isVideoScenario(scenario)
+            ? { video: videoRecord(scenario, leaks) }
+            : {}),
           sides: kept.sides,
         },
         null,
@@ -535,14 +564,9 @@ async function runScenarios(
       return null;
     }
     const png = storyboardPath(args.out, scenario.id);
-    deps.makeDir(dirname(png));
-    try {
-      await deps.renderStoryboard(storyboard, args.out, png);
-    } catch (error) {
-      deps.removePath(png);
-      record.problems.push(
-        `the Storyboard could not be rendered: ${firstLine(error)}`,
-      );
+    const failed = await renderStoryboardPng(deps, storyboard, args.out, png);
+    if (failed !== null) {
+      record.problems.push(failed);
       return null;
     }
     record.files.push({ path: png, place: 'combined' });
@@ -559,33 +583,11 @@ async function runScenarios(
     record: ScenarioRecord,
     storyboard: Storyboard,
   ): Promise<void> {
-    const ran = stepRuns.get(scenario.id) ?? {};
-    const choices = mp4Tabs.get(scenario.id) ?? {};
-    const sides: VideoSide[] = [];
-    const missing: string[] = [];
-    for (const side of SIDES) {
-      const run = ran[side];
-      if (!run) continue;
-      const choice = choices[side];
-      if (!choice?.ok) {
-        // Every side's reason is reported, not only the first.
-        missing.push(
-          choice?.problem ??
-            `${side}: no recording of tab "${scenario.tab}", so no MP4 was made`,
-        );
-        continue;
-      }
-      const { device, tab, path, openedAtMs } = choice.recording;
-      sides.push({
-        side,
-        video: path,
-        device,
-        tab,
-        label: choice.label ?? tabLabel(device, tab, 1),
-        openedAtMs,
-        steps: run.steps,
-      });
-    }
+    const { sides, missing } = annotatedVideoSides(
+      scenario.tab,
+      stepRuns.get(scenario.id) ?? {},
+      mp4Tabs.get(scenario.id) ?? {},
+    );
     if (missing.length > 0) {
       record.problems.push(...missing);
       return;

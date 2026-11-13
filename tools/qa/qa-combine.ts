@@ -1,24 +1,46 @@
 #!/usr/bin/env node
-// Stacks a Before and an After file side by side: interim until #1550, which
-// makes this command re-render a scenario's Storyboard and MP4 from a run's
-// saved step records and refuses a bare file pair.
+// Re-renders one scenario's QA Artifact from a `qa:run` output folder's saved
+// step records (PRD #1544, #1550), so presentation can be iterated on without
+// re-running Before and After.
 //
-//   node tools/qa/qa-combine.ts --before <file> --after <file> --out <path> [--height <px>]
+//   node tools/qa/qa-combine.ts --run <qa:run --out folder> --scenario <id>
 //
-// A screenshot pair (.png/.jpg) becomes `<out>.png`, a video pair
-// (.webm/.mp4/.mov) `<out>.mp4`, Before on the left, unlabelled (PRD
-// #1544). Both sides are scaled
-// to `--height` (default 720, even). Wraps the system ffmpeg; it is not an
-// npm dependency. `yarn qa:run` makes a video scenario's annotated MP4 itself.
+// Writes the scenario's Storyboard PNG, and its annotated MP4 for a `video`
+// scenario, to `<folder>/combined/`, from `<folder>/steps/<id>.json`, the
+// stills and the recordings `qa:run` kept; it calls the code `qa:run` does,
+// so the files are the same. A bare `--before/--after` file pair is refused.
+// Needs Playwright's Chromium, and the system ffmpeg for a `video` scenario.
+// Secrets are not saved with a run, so only the Bearer/JWT half of the
+// caption check is redone: an exact-secret check cannot be redone here.
 //
 // Combining is not uploading: only a combined file may be offered for upload
 // (tools/qa/lib/upload-eligibility.ts), and the Maintainer chooses.
 //
-// Exit 0 = combined (the file is printed as JSON), 1 = ffmpeg failed
-// (nothing is left behind), 2 = bad invocation, a missing input, or ffmpeg
-// not installed (never a result). The rules are tools/qa/lib/qa-combine.ts;
-// the steps run in lib/qa-combine-executor.ts.
-import { runCombine } from './lib/qa-combine-executor.ts';
-import { nodeCombineDeps } from './lib/qa-combine-node-deps.ts';
+// Exit 0 = rendered (the files are printed as JSON), 1 = the render failed
+// (nothing is rendered; the one move limit is in lib/qa-combine-executor.ts),
+// 2 = bad invocation, a missing input, a scenario
+// `qa:run` refused for caption privacy, or a missing dependency. The rules
+// are tools/qa/lib/qa-combine.ts; the steps run in lib/qa-combine-executor.ts.
+import { readFileSync, renameSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-process.exit(runCombine(process.argv.slice(2), nodeCombineDeps()));
+import { makeAnnotatedVideo, runCombine } from './lib/qa-combine-executor.ts';
+import { nodeCombineDeps } from './lib/qa-combine-node-deps.ts';
+import { chromiumMissing } from './lib/qa-run-browser.ts';
+import { storyboardRenderer } from './lib/storyboard-render.ts';
+import { nodeAnnotateDeps } from './lib/video-overlay-render.ts';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+process.exit(
+  await runCombine(process.argv.slice(2), {
+    ...nodeCombineDeps(),
+    readFile: (path) => readFileSync(path, 'utf8'),
+    movePath: (from, to) => renameSync(from, to),
+    renderStoryboard: storyboardRenderer(repoRoot),
+    annotateVideo: (plan) =>
+      makeAnnotatedVideo(plan, nodeAnnotateDeps(repoRoot)),
+    chromiumMissing,
+  }),
+);

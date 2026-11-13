@@ -8,33 +8,26 @@
  * `video-overlay-render.ts`); ffmpeg only scales, stacks and overlays them,
  * and never needs `drawtext`.
  *
- * The `qa:combine` file pair: until #1550 makes a bare pair a refusal, a
- * screenshot or video pair is still stacked side by side, Before on the
- * left, unlabelled.
- *
- * Pure: this module decides the kind, the output paths, the caption timing
- * and every ffmpeg argument list. `qa-combine-executor.ts` runs them. ffmpeg
+ * Pure: this module reads and checks a scenario's saved step records (what
+ * `qa:combine` re-renders from), and decides the caption timing and every
+ * ffmpeg argument list. `qa-combine-executor.ts` runs them. ffmpeg
  * is the system binary, not an npm dependency. A shorter video holds its last
  * frame while the longer one finishes.
  */
-import { extname } from 'node:path';
+import { isAbsolute, normalize } from 'node:path';
 
+import { SCENARIO_RESULTS, type ScenarioResult } from './grade-scenarios.ts';
 import { VIEWPORT } from './qa-run.ts';
-import type { StepRecord } from './qa-scenario.ts';
+import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
-import type { Band } from './storyboard.ts';
+import { SIDES } from './qa-switch.ts';
+import type { Band, StoryboardSideInput } from './storyboard.ts';
 
 export const FFMPEG = 'ffmpeg';
 
-export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg'] as const;
-export const VIDEO_EXTENSIONS = ['.webm', '.mp4', '.mov'] as const;
-
-export type CombineKind = 'image' | 'video';
-
-export const DEFAULT_HEIGHT = 720;
 export const VIDEO_FPS = 25;
 
-/** A request that cannot be combined: a bad invocation, exit 2. */
+/** A request that cannot be re-rendered: a bad invocation or a missing input, exit 2. */
 export class CombineInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -42,62 +35,147 @@ export class CombineInputError extends Error {
   }
 }
 
-export function kindOf(path: string): CombineKind | null {
-  const extension = extname(path).toLowerCase();
-  if ((IMAGE_EXTENSIONS as readonly string[]).includes(extension)) {
-    return 'image';
-  }
-  if ((VIDEO_EXTENSIONS as readonly string[]).includes(extension)) {
-    return 'video';
-  }
-  return null;
+/**
+ * What a `video` scenario's step-records file saves for its MP4, beyond the
+ * steps: the tab it follows and, per side, that tab's recording facts. No
+ * recording path (a re-render finds the recording in the run folder's layout).
+ */
+export interface StepRecordsVideo {
+  tab: string;
+  sides: Partial<
+    Record<
+      Side,
+      { device: string; tab: string; label: string; openedAtMs: number }
+    >
+  >;
 }
 
-/** Both sides must be the same kind of file; returns that kind. */
-export function combineKind(before: string, after: string): CombineKind {
-  const beforeKind = kindOf(before);
-  const afterKind = kindOf(after);
-  if (!beforeKind || !afterKind) {
-    throw new CombineInputError(
-      `cannot tell the kind of "${beforeKind ? after : before}": expected one of ${[...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS].join(' ')}`,
-    );
-  }
-  if (beforeKind !== afterKind) {
-    throw new CombineInputError(
-      `before is ${beforeKind === 'image' ? 'an image' : 'a video'} but after is ${afterKind === 'image' ? 'an image' : 'a video'}`,
-    );
-  }
-  return beforeKind;
+/** A scenario's step-records file, as `qa:run` saved it (`storyboardFor`). */
+export interface StepRecordsFile {
+  id: string;
+  capture: 'screenshot' | 'video';
+  title: string;
+  expected: ExpectedResults;
+  commits: Record<Side, string>;
+  /** Field names the caption check refused at `qa:run`; non-empty means no re-render. */
+  refused?: string[];
+  video?: StepRecordsVideo;
+  sides: Partial<Record<Side, StoryboardSideInput>>;
 }
 
-export function validateHeight(height: number): number {
-  if (!Number.isInteger(height) || height < 2 || height % 2 !== 0) {
-    throw new CombineInputError('height must be an even integer, 2 or more');
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/**
+ * Reads a step-records file's text, checking its shape. Throws a
+ * `CombineInputError` that names the file and the part that is wrong, and
+ * never quotes a value from it.
+ */
+export function parseStepRecords(
+  text: string,
+  id: string,
+  file: string,
+): StepRecordsFile {
+  const bad = (what: string): never => {
+    throw new CombineInputError(`${file} is not a step-records file: ${what}`);
+  };
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return bad('it is not JSON');
   }
-  return height;
-}
-
-/** `out` is a path without an extension; the extension is chosen from the kind. */
-export function outputFor(kind: CombineKind, out: string): string {
-  if (extname(out) !== '') {
-    throw new CombineInputError(
-      '--out is a path without an extension; the extension is chosen from the kind',
-    );
+  if (!isRecord(json)) return bad('it is not an object');
+  if (json.id !== id) return bad(`it is not scenario "${id}"`);
+  if (json.capture !== 'screenshot' && json.capture !== 'video') {
+    return bad('its capture is not screenshot or video');
   }
-  return `${out}${PAIR[kind].extension}`;
+  if (!isString(json.title)) return bad('no title');
+  const { expected, commits } = json;
+  if (!isRecord(expected) || !isString(expected.after)) {
+    return bad('no expected.after');
+  }
+  if (expected.before !== undefined && !isString(expected.before)) {
+    return bad('expected.before is not text');
+  }
+  if (!isRecord(commits) || !SIDES.every((side) => isString(commits[side]))) {
+    return bad('no commits');
+  }
+  if (
+    json.refused !== undefined &&
+    !(Array.isArray(json.refused) && json.refused.every(isString))
+  ) {
+    return bad('refused is not a list');
+  }
+  if (!isRecord(json.sides)) return bad('no sides');
+  for (const side of SIDES) {
+    const run = json.sides[side];
+    if (run === undefined) continue;
+    if (!isRecord(run) || !isString(run.outcome) || !Array.isArray(run.steps)) {
+      return bad(`${side} has no outcome and steps`);
+    }
+    for (const step of run.steps) {
+      if (
+        !isRecord(step) ||
+        !isString(step.caption) ||
+        !isString(step.label) ||
+        !isString(step.device) ||
+        !isString(step.tab) ||
+        !isString(step.still) ||
+        typeof step.index !== 'number' ||
+        typeof step.atMs !== 'number'
+      ) {
+        return bad(`${side} has a malformed step`);
+      }
+      const still = normalize(step.still);
+      if (isAbsolute(still) || still.split(/[\\/]/).includes('..')) {
+        return bad(`${side} step ${step.index} names a still outside the run`);
+      }
+    }
+  }
+  const video = json.video;
+  if (video !== undefined) {
+    const sides = isRecord(video) ? video.sides : undefined;
+    if (
+      !isRecord(video) ||
+      !isString(video.tab) ||
+      !isRecord(sides) ||
+      !SIDES.every((side) => {
+        const one = sides[side];
+        return (
+          one === undefined ||
+          (isRecord(one) &&
+            isString(one.device) &&
+            isString(one.tab) &&
+            isString(one.label) &&
+            typeof one.openedAtMs === 'number')
+        );
+      })
+    ) {
+      return bad('its video block is malformed');
+    }
+  }
+  return json as unknown as StepRecordsFile;
 }
 
-function sideBySideFilter(height: number, fps: boolean): string {
-  const prepare = (input: number, label: string): string =>
-    `[${input}:v]${fps ? `fps=${VIDEO_FPS},` : ''}scale=-2:${height}[${label}]`;
-  return [prepare(0, 'b'), prepare(1, 'a'), '[b][a]hstack=inputs=2[v]'].join(
-    ';',
-  );
-}
-
-export interface CombineFiles {
-  before: string;
-  after: string;
+/** A graded result, from the run manifest's scenario entry; `null` when it has none. */
+export function resultOf(
+  manifestText: string,
+  id: string,
+): ScenarioResult | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(manifestText);
+  } catch {
+    return null;
+  }
+  const scenarios = isRecord(json) ? json.scenarios : undefined;
+  if (!Array.isArray(scenarios)) return null;
+  const found = scenarios.find((s) => isRecord(s) && s.id === id);
+  const result = isRecord(found) ? found.result : undefined;
+  return SCENARIO_RESULTS.find((known) => known === result) ?? null;
 }
 
 const QUIET = ['-y', '-hide_banner', '-loglevel', 'error'] as const;
@@ -112,55 +190,6 @@ const MP4_OUTPUT = [
   '-movflags',
   '+faststart',
 ] as const;
-
-function inputArgs(files: CombineFiles): string[] {
-  return [...QUIET, '-i', files.before, '-i', files.after];
-}
-
-export function buildImageArgs(
-  files: CombineFiles,
-  output: string,
-  height: number,
-): string[] {
-  return [
-    ...inputArgs(files),
-    '-filter_complex',
-    sideBySideFilter(height, false),
-    '-map',
-    '[v]',
-    '-frames:v',
-    '1',
-    output,
-  ];
-}
-
-export function buildVideoArgs(
-  files: CombineFiles,
-  output: string,
-  height: number,
-): string[] {
-  return [
-    ...inputArgs(files),
-    '-filter_complex',
-    sideBySideFilter(height, true),
-    '-map',
-    '[v]',
-    ...MP4_OUTPUT,
-    output,
-  ];
-}
-
-/** Per kind, the pair's output extension and the arguments that combine it. */
-export const PAIR = {
-  image: { extension: '.png', build: buildImageArgs },
-  video: { extension: '.mp4', build: buildVideoArgs },
-} as const satisfies Record<
-  CombineKind,
-  {
-    extension: string;
-    build: (files: CombineFiles, output: string, height: number) => string[];
-  }
->;
 
 /** One side's recording panel in the MP4: the viewport every run uses, unscaled. */
 export const VIDEO_PANEL = VIEWPORT;
