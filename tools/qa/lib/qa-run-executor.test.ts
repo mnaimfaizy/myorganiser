@@ -44,6 +44,10 @@ interface Scripted {
   throws?: string;
   /** Each other tab's recording; `path: null` when none was written. Absent when no other tab was opened. */
   tabVideos?: { device: string; tab: string; path: string | null }[];
+  /** The values the browser reports as denied for the Storyboard; absent when none. */
+  denied?: string[];
+  /** Each step's caption by call order; a step past the list keeps `step N`. */
+  captions?: string[];
 }
 
 const DEFAULT_RUN: Scripted = {
@@ -142,7 +146,7 @@ function fakeRun(options: Partial<Plan> = {}) {
             device: 'Desktop',
             tab: '',
             label: 'Device Desktop',
-            caption: `step ${i + 1}`,
+            caption: scripted.captions?.[i] ?? `step ${i + 1}`,
             still,
             subject: null,
             atMs: 0,
@@ -162,6 +166,7 @@ function fakeRun(options: Partial<Plan> = {}) {
       if (scripted.message !== undefined) recorded.message = scripted.message;
       if (scripted.observed !== undefined)
         recorded.observed = scripted.observed;
+      if (scripted.denied !== undefined) recorded.denied = scripted.denied;
       return recorded;
     },
     async renderStoryboard(storyboard, stillRoot, pngPath) {
@@ -1530,5 +1535,197 @@ describe('a tab other than the default is recorded locally and never offered', (
         `combine --before ${OUT}/before/V.webm --after ${OUT}/after/V.webm --out ${OUT}/combined/V`,
       ],
     );
+  });
+});
+
+describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused', () => {
+  /** A value the browser reports as denied, such as a QA Account password. */
+  const DENIED = 'hunter2-fake';
+  const BEARER = 'Bearer qa-tok';
+  // A JWT shape built at runtime: a readable header prefix, two dotted segments.
+  const JWT = ['eyJ'.concat('a'.repeat(8)), 'b'.repeat(8), 'c2ln'].join('.');
+
+  interface StepRecordsFile {
+    refused?: string[];
+    sides: Record<string, { steps: { caption: string }[] }>;
+  }
+
+  /** Every text the run writes or prints, which a denied value must not reach. */
+  function everyOutput(fake: ReturnType<typeof fakeRun>): string[] {
+    return [...fake.files.values(), ...fake.out, ...fake.err];
+  }
+
+  function problemsOf(fake: ReturnType<typeof fakeRun>, id: string): string[] {
+    const entry = manifestOf(fake).scenarios.find((s) => s.id === id);
+    assert.ok(entry !== undefined, `${id} is in run.json`);
+    return entry.problems;
+  }
+
+  test('a caption holding a denied value refuses a screenshot: no PNG, the step records hold [withheld] and name the field, and run.json withholds the message', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (_id, side) =>
+        side === 'before'
+          ? {
+              outcome: 'fail',
+              message: 'the defect shows here',
+              denied: [DENIED],
+              captions: [`typed ${DENIED}`],
+            }
+          : { observed: 'the fix shows here', denied: [DENIED] },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.deepEqual(fake.renders, [], 'no Storyboard is rendered');
+
+    const recordsText = fake.files.get(`${OUT}/steps/S.json`);
+    assert.ok(recordsText !== undefined, 'the step records were written');
+    const records = JSON.parse(recordsText) as StepRecordsFile;
+    assert.deepEqual(records.refused, ['S before step 1 caption']);
+    assert.equal(records.sides.before?.steps[0].caption, '[withheld]');
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.equal(entry.runs.before?.message, '[withheld]');
+    assert.deepEqual(entry.problems, [
+      'the Storyboard was refused: a secret or credential is in S before step 1 caption',
+    ]);
+    assert.equal(
+      entry.files.some(({ place }) => place === 'combined'),
+      false,
+      'no combined file is listed',
+    );
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
+  });
+
+  test('a video whose after observed holds a denied value gets no PNG and no qa:combine call', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: (_id, side) =>
+        side === 'before'
+          ? {
+              outcome: 'fail',
+              message: 'the defect shows here',
+              denied: [DENIED],
+            }
+          : { observed: `the fix shows ${DENIED}`, denied: [DENIED] },
+      combine: () => ({
+        status: 0,
+        files: [`${OUT}/combined/V.mp4`, `${OUT}/combined/V.gif`],
+      }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.deepEqual(fake.renders, [], 'no Storyboard is rendered');
+    assert.equal(
+      fake.log.some((line) => line.startsWith('combine ')),
+      false,
+      'qa:combine is not called',
+    );
+    assert.equal(
+      manifestOf(fake).scenarios[0].files.some(
+        ({ place }) => place === 'combined',
+      ),
+      false,
+      'no combined file is listed',
+    );
+    assert.deepEqual(problemsOf(fake, 'V'), [
+      'the Storyboard was refused: a secret or credential is in V after observed',
+    ]);
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
+  });
+
+  test('a failure message holding a denied value is named, withheld from run.json, and kept out of every output', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (_id, side) =>
+        side === 'before'
+          ? { observed: 'the label is there', denied: [DENIED] }
+          : {
+              outcome: 'fail',
+              message: `the label is gone after ${DENIED}`,
+              denied: [DENIED],
+            },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.deepEqual(fake.renders, []);
+
+    const recordsText = fake.files.get(`${OUT}/steps/S.json`);
+    assert.ok(recordsText !== undefined, 'the step records were written');
+    assert.deepEqual((JSON.parse(recordsText) as StepRecordsFile).refused, [
+      'S after message',
+    ]);
+    const [entry] = manifestOf(fake).scenarios;
+    assert.equal(entry.runs.after?.message, '[withheld]');
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
+  });
+
+  test('a clean scenario beside a refused one still renders, keeps its unrefused message, and the denied value reaches no output', async () => {
+    const fake = fakeRun({
+      exports: filesOf(
+        scenario('P', 'screenshot'),
+        scenario('R', 'screenshot'),
+      ),
+      runs: (id, side) => {
+        const base = reproduced(id, side);
+        return id === 'R' && side === 'after'
+          ? { ...base, denied: [DENIED], captions: [`typed ${DENIED}`] }
+          : { ...base, denied: [DENIED] };
+      },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+
+    assert.deepEqual(
+      fake.renders.map(({ pngPath }) => pngPath),
+      [storyboardPng('P')],
+      'only the clean scenario renders',
+    );
+    const manifest = manifestOf(fake);
+    const passing = manifest.scenarios.find((s) => s.id === 'P');
+    assert.equal(passing?.runs.before?.message, 'the defect shows here');
+    assert.deepEqual(problemsOf(fake, 'P'), []);
+    assert.deepEqual(problemsOf(fake, 'R'), [
+      'the Storyboard was refused: a secret or credential is in R after step 1 caption',
+    ]);
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
+  });
+
+  test('a Bearer or a JWT refuses the Storyboard with no denied value supplied, and neither value is written', async () => {
+    const fake = fakeRun({
+      exports: filesOf(
+        scenario('B', 'screenshot'),
+        scenario('J', 'screenshot'),
+      ),
+      runs: (id, side) => {
+        if (side === 'before') {
+          return { outcome: 'fail', message: 'the defect shows here' };
+        }
+        return id === 'B'
+          ? { observed: 'the fix shows here', captions: [`sent ${BEARER}`] }
+          : { observed: `the fix sent ${JWT}` };
+      },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.deepEqual(fake.renders, []);
+    assert.deepEqual(problemsOf(fake, 'B'), [
+      'the Storyboard was refused: a secret or credential is in B after step 1 caption',
+    ]);
+    assert.deepEqual(problemsOf(fake, 'J'), [
+      'the Storyboard was refused: a secret or credential is in J after observed',
+    ]);
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(BEARER), false, 'the Bearer is in no output');
+      assert.equal(text.includes(JWT), false, 'the JWT is in no output');
+    }
   });
 });

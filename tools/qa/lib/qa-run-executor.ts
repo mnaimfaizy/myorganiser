@@ -63,11 +63,17 @@ import {
 import type { TabRecording } from './qa-scenario-context.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
-import { planSides } from './qa-switch.ts';
+import { SIDES, planSides } from './qa-switch.ts';
+import {
+  WITHHELD_FIELD,
+  findCaptionLeaks,
+  withholdLeaks,
+} from './caption-privacy.ts';
 import { redactTranscript, renderTranscript } from './redact-transcript.ts';
 import type { ScenarioResult } from './grade-scenarios.ts';
 import {
   type Storyboard,
+  type StoryboardInput,
   type StoryboardSideInput,
   buildStoryboard,
 } from './storyboard.ts';
@@ -79,6 +85,11 @@ export interface RecordedRun {
   message?: string;
   /** What a passing run returned or passed to `observed`. */
   observed?: string;
+  /**
+   * Values the Storyboard may not show (QA Account secrets, `secret()`).
+   * Held in memory only: never written to a file, the manifest or output.
+   */
+  denied?: string[];
   /** Each `step()`, its still inside the run's work directory. */
   steps: StepRecord[];
   /** Files inside the run's work directory, or `null` if none was recorded. */
@@ -232,6 +243,9 @@ async function runScenarios(
   };
   const media = new Map<string, Partial<Record<Side, string>>>();
   const calls = new Map<string, Partial<Record<Side, RecordedCall[]>>>();
+  /** Per scenario, the values its Storyboard may not show. In memory only. */
+  const denied = new Map<string, Set<string>>();
+
   /** Each screen scenario's side runs, their step stills already kept under `--out`. */
   const stepRuns = new Map<
     string,
@@ -295,6 +309,9 @@ async function runScenarios(
     deps.makeDir(workDir);
     const recorded = await deps.runScenario(scenario, { side, workDir });
     outcomes[side].set(scenario.id, recorded.outcome);
+    const values = denied.get(scenario.id) ?? new Set<string>();
+    for (const value of recorded.denied ?? []) values.add(value);
+    denied.set(scenario.id, values);
     record.runs[side] =
       recorded.message === undefined
         ? { outcome: recorded.outcome }
@@ -349,6 +366,18 @@ async function runScenarios(
     result: ScenarioResult | undefined,
   ): Promise<boolean> {
     const sides = stepRuns.get(scenario.id) ?? {};
+    const input: StoryboardInput = {
+      id: scenario.id,
+      title: scenario.title,
+      expected: scenario.expected,
+      // The check reads text only; an ungraded scenario returns before the model is built.
+      result: result ?? 'Not proven',
+      commits,
+      sides,
+    };
+    const secrets = [...(denied.get(scenario.id) ?? [])];
+    const leaks = findCaptionLeaks(input, secrets);
+    const kept = leaks.length > 0 ? withholdLeaks(input, secrets) : input;
     const recordsPath = stepRecordsPath(args.out, scenario.id);
     deps.makeDir(dirname(recordsPath));
     deps.writeFile(
@@ -357,26 +386,32 @@ async function runScenarios(
         {
           id: scenario.id,
           capture: scenario.capture,
-          title: scenario.title,
-          expected: scenario.expected,
+          title: kept.title,
+          expected: kept.expected,
           commits,
-          sides,
+          // Field names only. A later re-render (#1550) must refuse a file that lists any.
+          ...(leaks.length > 0 ? { refused: leaks } : {}),
+          sides: kept.sides,
         },
         null,
         2,
       )}\n`,
     );
     record.files.push({ path: recordsPath, place: 'local' });
+    if (leaks.length > 0) {
+      // The raw failure message must not reach run.json for a refused scenario.
+      for (const side of SIDES) {
+        const run = record.runs[side];
+        if (run?.message !== undefined) run.message = WITHHELD_FIELD;
+      }
+      record.problems.push(
+        `the Storyboard was refused: a secret or credential is in ${leaks.join('; ')}`,
+      );
+      return true;
+    }
     if (result === undefined || (!sides.before && !sides.after)) return false;
 
-    const storyboard = buildStoryboard({
-      id: scenario.id,
-      title: scenario.title,
-      expected: scenario.expected,
-      result,
-      commits,
-      sides,
-    });
+    const storyboard = buildStoryboard(input);
     if (storyboard.problems.length > 0) {
       record.problems.push(...storyboard.problems);
       return true;

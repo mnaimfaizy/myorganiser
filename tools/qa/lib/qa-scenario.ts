@@ -104,6 +104,12 @@ export interface ScenarioContext {
   baseURL: string;
   side: Side;
   account(id: string): ScenarioAccount;
+  /**
+   * Marks a value that must never appear in a Storyboard title, caption,
+   * expected or observed text. `account()` marks its password and vault
+   * passphrase already. Exact substrings only.
+   */
+  secret(value: string): void;
   /** Ends this run as "cannot run" on this side. */
   cannotRun(reason: string): never;
   /** Settles the page and takes one numbered still of it for the Storyboard. */

@@ -114,6 +114,8 @@ export function chromiumRunner(
     const browser = await chromium.launch();
     try {
       const pending: Promise<RecordedCall>[] = [];
+      /** Values the Storyboard may not show; they stay in memory. */
+      const denied = new Set<string>();
       /** Every device is made alike, and its backend calls are recorded. */
       const open = async (): Promise<BrowserContext> => {
         const context = await browser.newContext({
@@ -146,7 +148,15 @@ export function chromiumRunner(
             device: registry.device,
             baseURL: QA_WEB_ORIGIN,
             side,
-            account,
+            account(id) {
+              const found = account(id);
+              denied.add(found.password);
+              denied.add(found.vaultPassphrase);
+              return found;
+            },
+            secret(value) {
+              denied.add(value);
+            },
             cannotRun(reason) {
               throw new CannotRunError(reason);
             },
@@ -198,6 +208,7 @@ export function chromiumRunner(
         video: exists(own?.path ?? null),
         screenshot,
         calls,
+        denied: [...denied],
         ...(tabVideos.length === 0 ? {} : { tabVideos }),
       };
     } finally {

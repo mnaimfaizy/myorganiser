@@ -350,3 +350,61 @@ describe('what a run records of its calls and observation', () => {
     assert.equal(run.observed, undefined);
   });
 });
+
+describe('what a scenario marks as denied for its Storyboard', () => {
+  /** A QA Account lookup with obviously fake values, kept under the fixture length limit. */
+  const PASSWORD = 'hunter2-fake';
+  const PASSPHRASE = 'qa-fake-phrase';
+  const lookup = (id: string): ScenarioAccount => ({
+    id,
+    email: 'qa-fake@example.test',
+    password: PASSWORD,
+    vaultPassphrase: PASSPHRASE,
+  });
+
+  test('account(id) marks its password and vault passphrase, and secret(value) marks its value, all on the run', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async (context) => {
+        context.account('qa-primary');
+        context.secret('qa-fake-value');
+      }),
+      { side: 'after', workDir: WORK_DIR },
+    );
+
+    assert.equal(run.outcome, 'pass');
+    assert.deepEqual([...(run.denied ?? [])].sort(), [
+      'hunter2-fake',
+      'qa-fake-phrase',
+      'qa-fake-value',
+    ]);
+  });
+
+  test('a scenario that marks nothing reports an empty denied list', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async () => undefined),
+      { side: 'before', workDir: WORK_DIR },
+    );
+
+    assert.deepEqual(run.denied, []);
+  });
+
+  test('a scenario that marks its account and then throws still reports both values as denied, with outcome fail', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async (context) => {
+        context.account('qa-primary');
+        throw new Error(`typed ${PASSWORD}`);
+      }),
+      { side: 'before', workDir: WORK_DIR },
+    );
+
+    assert.equal(run.outcome, 'fail');
+    assert.ok(run.denied?.includes(PASSWORD), 'the password is denied');
+    assert.ok(run.denied?.includes(PASSPHRASE), 'the passphrase is denied');
+  });
+});
