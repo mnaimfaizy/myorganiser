@@ -1,19 +1,21 @@
 // One end-to-end check that the real command-line script and the real ffmpeg
-// agree (ADR 0147 decision 5). Fixtures are generated with ffmpeg, the CLI
-// runs as a subprocess, and the outputs are probed with ffprobe. Every other
-// suite stubs ffmpeg; this is the only one that runs it.
+// agree. Fixtures are generated with ffmpeg, the CLI runs as a subprocess, and
+// the outputs are probed with ffprobe. Every other suite stubs ffmpeg; this is
+// the only one that runs it.
+//
+// The CLI pair is interim (until #1550): it stacks a pair side by side, Before
+// on the left, unlabelled, and prints `{kind, combined}`. A video pair becomes
+// `<out>.mp4` and no GIF is written beside it.
 //
 // Without ffmpeg the test is skipped with a visible reason. Set
 // QA_REQUIRE_FFMPEG=1 (CI does) to make a missing ffmpeg a failure instead.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-
-import { GIF_SIZE_CAP_BYTES } from './lib/qa-combine.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'qa-combine.ts');
@@ -135,13 +137,18 @@ test(
       assert.equal(video.status, 0, video.stderr);
       const videoResult = JSON.parse(video.stdout);
       assert.equal(videoResult.kind, 'video');
+      assert.equal(videoResult.combined, join(dir, 'clip.mp4'));
       assert.deepEqual(probeSize(videoResult.combined), [160, 48]);
-      assert.equal(statSync(videoResult.gif).size, videoResult.gifBytes);
-      assert.ok(
-        videoResult.gifBytes <= GIF_SIZE_CAP_BYTES,
-        `GIF is ${videoResult.gifBytes} bytes, over the ${GIF_SIZE_CAP_BYTES} cap`,
+      assert.equal(
+        'gif' in videoResult,
+        false,
+        'the video result names no GIF',
       );
-      assert.deepEqual(probeSize(videoResult.gif), [160, 48]);
+      assert.equal(
+        existsSync(join(dir, 'clip.gif')),
+        false,
+        'no clip.gif is written beside the MP4',
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

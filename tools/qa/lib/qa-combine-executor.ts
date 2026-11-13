@@ -1,33 +1,38 @@
 /**
- * Runs `yarn qa:combine` (ADR 0147 decision 5): checks ffmpeg is there,
- * renders the labels, runs the argument lists `qa-combine.ts` builds, and
- * holds the GIF under its size cap.
+ * Runs the ffmpeg rules `qa-combine.ts` builds.
  *
- * Every machine fact goes through `CombineDeps`, so a test can stub it.
- * Exit 0 = combined, and the files are printed as JSON. Exit 1 = ffmpeg ran
- * and failed, or no GIF could be made under the cap; any output already
- * written is removed, so a half-made result is never left to be used. Exit 2
- * = bad invocation, an input that is missing, or ffmpeg not installed. No
- * exit reports a result without the combined file existing.
+ * `runCombine` is `yarn qa:combine`'s file pair, interim until #1550 makes a
+ * bare pair a refusal: it checks ffmpeg is there and stacks the pair side by
+ * side, Before on the left, unlabelled. Exit 0 = combined, and the file is
+ * printed as JSON. Exit 1 = ffmpeg ran and failed; the output is removed, so
+ * a half-made result is never left to be used. Exit 2 = bad invocation, an
+ * input that is missing, or ffmpeg not installed. No exit reports a result
+ * without the combined file existing.
+ *
+ * `makeAnnotatedVideo` makes a `Capture: video` scenario's annotated MP4
+ * (PRD #1544): it renders the overlay PNGs in Chromium into a temporary
+ * directory, runs ffmpeg once, and removes the directory whatever happened.
+ * It rejects on any failure, leaving no MP4 behind.
+ *
+ * Every machine fact goes through `CombineDeps` and `AnnotateDeps`, so a
+ * test can stub them.
  */
 import { dirname, join } from 'node:path';
 
 import {
+  type AnnotatedVideoPlan,
   type CombineKind,
-  type CombineOutputs,
   CombineInputError,
   DEFAULT_HEIGHT,
   FFMPEG,
-  GIF_LADDER,
-  GIF_SIZE_CAP_BYTES,
-  buildGifArgs,
-  buildImageArgs,
-  buildVideoArgs,
+  buildAnnotatedVideoArgs,
+  PAIR,
   combineKind,
-  outputsFor,
+  outputFor,
   validateHeight,
 } from './qa-combine.ts';
-import { labelScale, renderLabel } from './qa-label.ts';
+import { stepNumber } from './qa-scenario.ts';
+import { type OverlayPage, videoOverlayPages } from './video-overlay-html.ts';
 
 export interface CombineRun {
   /** `null` when the program could not be started (not installed). */
@@ -38,17 +43,14 @@ export interface CombineRun {
 export interface CombineDeps {
   run(argv: readonly string[]): CombineRun;
   exists(path: string): boolean;
-  fileSize(path: string): number | null;
-  makeTempDir(): string;
   makeDir(path: string): void;
-  writeFile(path: string, bytes: Buffer): void;
   removePath(path: string): void;
   out(line: string): void;
   err(line: string): void;
 }
 
 export const COMBINE_USAGE =
-  'usage: node tools/qa/qa-combine.ts --before <file> --after <file> --out <path without extension> [--height <even px, default 720>]';
+  'usage: node tools/qa/qa-combine.ts --before <file> --after <file> --out <path without extension> [--height <even px, default 720>] (interim until #1550: the pair is stacked unlabelled, Before on the left)';
 
 export const FFMPEG_MISSING_MESSAGE =
   'ffmpeg was not found on PATH, so nothing was combined. Install it (macOS: `brew install ffmpeg`; Debian/Ubuntu: `sudo apt-get install ffmpeg`) and run again.';
@@ -96,11 +98,11 @@ function firstLine(text: string): string {
 export function runCombine(args: readonly string[], deps: CombineDeps): number {
   let parsed: Parsed;
   let kind: CombineKind;
-  let outputs: CombineOutputs;
+  let output: string;
   try {
     parsed = parseArgs(args);
     kind = combineKind(parsed.before, parsed.after);
-    outputs = outputsFor(kind, parsed.out);
+    output = outputFor(kind, parsed.out);
   } catch (error) {
     if (error instanceof CombineInputError) {
       deps.err(`qa:combine: ${error.message}`);
@@ -119,72 +121,85 @@ export function runCombine(args: readonly string[], deps: CombineDeps): number {
     return 2;
   }
 
-  const temp = deps.makeTempDir();
-  const written: string[] = [];
-  const fail = (message: string): number => {
-    for (const path of written) deps.removePath(path);
-    deps.err(`qa:combine: ${message}`);
-    return 1;
-  };
-  try {
-    const scale = labelScale(parsed.height);
-    const beforeLabel = join(temp, 'before-label.png');
-    const afterLabel = join(temp, 'after-label.png');
-    deps.writeFile(beforeLabel, renderLabel('BEFORE', scale).png);
-    deps.writeFile(afterLabel, renderLabel('AFTER', scale).png);
-    const files = {
-      before: parsed.before,
-      after: parsed.after,
-      beforeLabel,
-      afterLabel,
-    };
-
-    deps.makeDir(dirname(outputs.primary));
-    written.push(outputs.primary);
-    const build = kind === 'image' ? buildImageArgs : buildVideoArgs;
-    const combined = deps.run([
-      FFMPEG,
-      ...build(files, outputs.primary, parsed.height),
-    ]);
-    if (combined.status !== 0 || !deps.exists(outputs.primary)) {
-      return fail(`ffmpeg failed to combine: ${firstLine(combined.stderr)}`);
-    }
-
-    let gifBytes: number | null = null;
-    if (outputs.gif) {
-      written.push(outputs.gif);
-      for (const rung of GIF_LADDER) {
-        const made = deps.run([
-          FFMPEG,
-          ...buildGifArgs(outputs.primary, outputs.gif, rung),
-        ]);
-        if (made.status !== 0) {
-          return fail(
-            `ffmpeg failed to make the GIF: ${firstLine(made.stderr)}`,
-          );
-        }
-        const size = deps.fileSize(outputs.gif);
-        if (size !== null && size <= GIF_SIZE_CAP_BYTES) {
-          gifBytes = size;
-          break;
-        }
-      }
-      if (gifBytes === null) {
-        const smallest = GIF_LADDER[GIF_LADDER.length - 1];
-        return fail(
-          `no GIF under ${GIF_SIZE_CAP_BYTES} bytes could be made from "${outputs.primary}" (smallest tried: ${smallest.width}px at ${smallest.fps} fps); trim the recording and run again`,
-        );
-      }
-    }
-
-    deps.out(
-      JSON.stringify(
-        { kind, combined: outputs.primary, gif: outputs.gif, gifBytes },
-        null,
-        2,
-      ),
+  deps.makeDir(dirname(output));
+  const combined = deps.run([
+    FFMPEG,
+    ...PAIR[kind].build(
+      { before: parsed.before, after: parsed.after },
+      output,
+      parsed.height,
+    ),
+  ]);
+  if (combined.status !== 0 || !deps.exists(output)) {
+    deps.removePath(output);
+    deps.err(
+      `qa:combine: ffmpeg failed to combine: ${firstLine(combined.stderr)}`,
     );
-    return 0;
+    return 1;
+  }
+  deps.out(JSON.stringify({ kind, combined: output }, null, 2));
+  return 0;
+}
+
+/** One overlay page to render, and where its PNG goes. */
+export interface OverlayPng extends OverlayPage {
+  path: string;
+}
+
+/** The machine behind an annotated MP4. The real one is `nodeAnnotateDeps`. */
+export interface AnnotateDeps extends Pick<
+  CombineDeps,
+  'run' | 'exists' | 'makeDir' | 'removePath'
+> {
+  makeTempDir(): string;
+  /** The design tokens' stylesheets, checked (`readTokenCss`). */
+  tokenCss(): string;
+  /** Renders each page to its PNG in Chromium; rejects on failure. */
+  renderPngs(pages: readonly OverlayPng[]): Promise<void>;
+}
+
+/**
+ * Makes one annotated MP4 at `plan.output`. Rejects with the reason on any
+ * failure, with no MP4 left behind; the overlay PNGs never outlive the call.
+ */
+export async function makeAnnotatedVideo(
+  plan: AnnotatedVideoPlan,
+  deps: AnnotateDeps,
+): Promise<void> {
+  const pages = videoOverlayPages(plan, deps.tokenCss());
+  const temp = deps.makeTempDir();
+  try {
+    const band: OverlayPng = { ...pages.band, path: join(temp, 'band.png') };
+    const sides = pages.sides.map(({ side, label, strips }) => ({
+      label: { ...label, path: join(temp, `${side}-label.png`) },
+      strips: strips.map((strip, n) => ({
+        ...strip,
+        path: join(temp, `${side}-strip-${stepNumber(n)}.png`),
+      })),
+    }));
+    await deps.renderPngs([
+      band,
+      ...sides.flatMap(({ label, strips }) => [label, ...strips]),
+    ]);
+    deps.makeDir(dirname(plan.output));
+    const made = deps.run([
+      FFMPEG,
+      ...buildAnnotatedVideoArgs(plan, {
+        band: band.path,
+        sides: sides.map(({ label, strips }) => ({
+          label: label.path,
+          strips: strips.map((strip) => strip.path),
+        })),
+      }),
+    ]);
+    if (made.status !== 0 || !deps.exists(plan.output)) {
+      throw new Error(
+        `ffmpeg failed to make the MP4: ${firstLine(made.stderr)}`,
+      );
+    }
+  } catch (error) {
+    deps.removePath(plan.output);
+    throw error;
   } finally {
     deps.removePath(temp);
   }

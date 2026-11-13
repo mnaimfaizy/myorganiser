@@ -133,6 +133,7 @@ export function chromiumRunner(
       const registry = deviceRegistry({
         open,
         own: { context: ownContext, page },
+        elapsedMs: () => Date.now() - startedAt,
       });
       const recorder = stepRecorder({
         side,

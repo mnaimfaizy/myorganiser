@@ -8,7 +8,8 @@
  * `title` and the result each side is expected to show, because its QA
  * Artifact, a Storyboard, stands alone: someone holding only the file can
  * tell which scenario it is and what each side was expected to do. A
- * `transcript` or `none` scenario needs neither.
+ * `video` scenario also declares `tab`, the tab its annotated MP4 follows. A
+ * `transcript` or `none` scenario needs none of these.
  *
  * Pure: types and a parser. The browser side of `step()` is
  * `qa-scenario-context.ts`; the runner's rules are `qa-run.ts`.
@@ -134,6 +135,11 @@ export interface Scenario {
   /** Required when the capture has a screen. */
   expected?: ExpectedResults;
   /**
+   * The tab the annotated MP4 follows, by its tab name (`'A'` is the default
+   * tab), matched across devices. Required when the capture is `video`.
+   */
+  tab?: string;
+  /**
    * Resolves = pass, with what it observed as a returned string (or through
    * `observed`); throws = fail, the message being what it observed;
    * `cannotRun` = cannot run.
@@ -146,6 +152,9 @@ export type ScreenScenario = Scenario & {
   title: string;
   expected: ExpectedResults;
 };
+
+/** A `video` scenario, once parsed: it also names the tab its MP4 follows. */
+export type VideoScenario = ScreenScenario & { capture: 'video'; tab: string };
 
 export interface ParseOptions {
   /** True when the run plays Before up front (a fix, or a feature `--with-before`). */
@@ -171,7 +180,8 @@ function isText(value: unknown): value is string {
 /**
  * Narrows a script's default export to a `Scenario`, naming the file on a
  * refusal. A screen scenario must declare `title` and `expected.after`, and
- * `expected.before` too when the run plays Before.
+ * `expected.before` too when the run plays Before. A `video` scenario must
+ * also declare `tab`, the tab its MP4 follows.
  */
 export function parseScenario(
   exported: unknown,
@@ -183,7 +193,7 @@ export function parseScenario(
       `${file}: the default export must be a scenario object`,
     );
   }
-  const { id, capture, run, title, expected } = exported as Record<
+  const { id, capture, run, title, expected, tab } = exported as Record<
     string,
     unknown
   >;
@@ -228,6 +238,11 @@ export function parseScenario(
       );
     }
   }
+  if (capture === 'video' && !isText(tab)) {
+    throw new RunInputError(
+      `${file}: a video scenario must declare tab (the tab its MP4 follows, e.g. 'A' for the default tab)`,
+    );
+  }
   return exported as Scenario;
 }
 
@@ -236,6 +251,11 @@ export function isScreenScenario(
   scenario: Scenario,
 ): scenario is ScreenScenario {
   return SCREEN_CAPTURE[scenario.capture];
+}
+
+/** True when the scenario is a `video` one, narrowing it to its parsed shape. */
+export function isVideoScenario(scenario: Scenario): scenario is VideoScenario {
+  return scenario.capture === 'video';
 }
 
 /** Refuses two scripts with the same id. */

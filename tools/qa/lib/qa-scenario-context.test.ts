@@ -375,7 +375,7 @@ describe('a one-page scenario runs unchanged', () => {
     assert.equal(own.state.closes, 1);
     assert.deepEqual(log, ['close A']);
     assert.deepEqual(played.recordings, [
-      { device: 'A', tab: 'A', path: '/work/A.webm' },
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
     ]);
   });
 });
@@ -486,6 +486,40 @@ describe('the device registry', () => {
       ['A/A', 'B/B1', 'B/B2'],
     );
   });
+  test('each tab is stamped with the run time at which its page opened, and the default tab with 0', async () => {
+    const log: string[] = [];
+    const own = fakeContext('A', log);
+    const b = fakeContext('B', log);
+    let now = 0;
+    const registry = deviceRegistry({
+      async open() {
+        return asContext(b);
+      },
+      own: { context: asContext(own), page: asPage(fakePage('A')) },
+      elapsedMs: () => now,
+    });
+    now = 1200;
+    await registry.device('B').tab('B1');
+    // The clock moves while the page opens: the stamp is taken after it exists.
+    b.newPage = async () => {
+      now = 3500;
+      return asPage(fakePage('B2'));
+    };
+    await registry.device('B').tab('B2');
+
+    assert.deepEqual(
+      (await registry.closeAll()).map(({ device, tab, openedAtMs }) => [
+        device,
+        tab,
+        openedAtMs,
+      ]),
+      [
+        ['A', 'A', 0],
+        ['B', 'B1', 1200],
+        ['B', 'B2', 3500],
+      ],
+    );
+  });
 });
 
 describe('closing while a device or tab is still opening', () => {
@@ -536,7 +570,7 @@ describe('closing while a device or tab is still opening', () => {
     assert.deepEqual([...log].sort(), ['close A', 'close B']);
     assert.deepEqual(
       played.recordings.find(({ device }) => device === 'B'),
-      { device: 'B', tab: 'B1', path: '/work/B1.webm' },
+      { device: 'B', tab: 'B1', path: '/work/B1.webm', openedAtMs: 0 },
     );
   });
 
@@ -584,9 +618,9 @@ describe('a tab with no recording', () => {
     await registry.device('B').tab('B2');
 
     assert.deepEqual(await registry.closeAll(), [
-      { device: 'A', tab: 'A', path: '/work/A.webm' },
-      { device: 'B', tab: 'B1', path: null },
-      { device: 'B', tab: 'B2', path: null },
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
+      { device: 'B', tab: 'B1', path: null, openedAtMs: 0 },
+      { device: 'B', tab: 'B2', path: null, openedAtMs: 0 },
     ]);
   });
 });
@@ -614,7 +648,7 @@ describe('a device that fails to open', () => {
     await assert.rejects(registry.device('B').tab('B1'), /out of memory/);
 
     assert.deepEqual(await registry.closeAll(), [
-      { device: 'A', tab: 'A', path: '/work/A.webm' },
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
     ]);
     assert.deepEqual(log, ['close A']);
   });
@@ -630,7 +664,7 @@ describe('a device that fails to open', () => {
 
     assert.equal(registry.tabs().length, 1, 'only device A has a tab');
     assert.deepEqual(await registry.closeAll(), [
-      { device: 'A', tab: 'A', path: '/work/A.webm' },
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
     ]);
     assert.deepEqual([...log].sort(), ['close A', 'close B']);
   });

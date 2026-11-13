@@ -37,6 +37,7 @@ import {
   type Scenario,
   stepNumber,
 } from './qa-scenario.ts';
+import type { TabRecording } from './qa-scenario-context.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
 import { type ArtifactSide, isUploadEligible } from './upload-eligibility.ts';
@@ -128,9 +129,9 @@ export const SCENARIO_TIMEOUT_MS = 120_000;
 
 /**
  * Whether a capture's QA Artifact needs ffmpeg. A screen scenario's
- * Storyboard is rendered in Chromium; only a video's Before/After pair is
- * still combined into an MP4 and GIF by `qa:combine` (until #1549), so a run
- * of screenshots, transcripts or none does not require ffmpeg.
+ * Storyboard is rendered in Chromium; only a `video` scenario's annotated MP4
+ * is made with ffmpeg, so a run of screenshots, transcripts or none does not
+ * require it.
  */
 export const FFMPEG_CAPTURE = {
   video: true,
@@ -139,7 +140,7 @@ export const FFMPEG_CAPTURE = {
   none: false,
 } as const satisfies Record<Capture, boolean>;
 
-/** True when some scenario's pair will be combined with ffmpeg. */
+/** True when some scenario needs ffmpeg: a `video` scenario, for its annotated MP4. */
 export function needsFfmpeg(
   scenarios: readonly Pick<Scenario, 'capture'>[],
 ): boolean {
@@ -287,35 +288,52 @@ export function gradingInput(
   };
 }
 
-/** The `qa:combine` arguments for a scenario whose two sides both kept a screenshot or video. */
-export function combineArgs(
-  out: string,
-  id: string,
-  before: string,
-  after: string,
-): string[] {
-  return [
-    '--before',
-    before,
-    '--after',
-    after,
-    '--out',
-    join(out, 'combined', id),
-  ];
+/** Where a `video` scenario's annotated MP4 is made under `--out`. */
+export function annotatedVideoPath(out: string, id: string): string {
+  return join(out, 'combined', `${id}.mp4`);
 }
 
+/** The recording an MP4 follows on one side, or why there is none. */
+/** One tab's recording on one side, the default tab included. */
+export type SideTabRecording = TabRecording;
+
+export type Mp4TabChoice =
+  | { ok: true; recording: SideTabRecording & { path: string } }
+  | { ok: false; problem: string };
+
 /**
- * The files `qa:combine` reports making, from the JSON it prints on success:
- * the combined image or MP4, then the GIF preview for a video.
+ * Picks the recording of the tab a `video` scenario's MP4 follows, by tab
+ * name across every device on that side. No tab of that name, one on two
+ * devices (ambiguous), or one with no recording is a problem naming the tab
+ * and the devices, and that side gives no MP4.
  */
-export function combinedFiles(printed: string): string[] {
-  const made = JSON.parse(printed) as { combined?: unknown; gif?: unknown };
-  if (typeof made.combined !== 'string') {
-    throw new Error('qa:combine printed no combined file');
+export function mp4TabOf(
+  tab: string,
+  side: Side,
+  recordings: readonly SideTabRecording[],
+): Mp4TabChoice {
+  const named = recordings.filter((recording) => recording.tab === tab);
+  const devices = [...new Set(named.map((recording) => recording.device))];
+  if (devices.length === 0) {
+    return {
+      ok: false,
+      problem: `${side}: no tab named "${tab}" was opened, so no MP4 was made`,
+    };
   }
-  return typeof made.gif === 'string'
-    ? [made.combined, made.gif]
-    : [made.combined];
+  if (devices.length > 1) {
+    return {
+      ok: false,
+      problem: `${side}: tab "${tab}" is open on devices ${devices.join(', ')}, so the tab the MP4 follows is ambiguous and no MP4 was made`,
+    };
+  }
+  const [recording] = named;
+  if (recording.path === null) {
+    return {
+      ok: false,
+      problem: `${side}: no video was recorded for device ${recording.device}, tab ${tab}, so no MP4 was made`,
+    };
+  }
+  return { ok: true, recording: { ...recording, path: recording.path } };
 }
 
 /** The directory one side's step stills are kept in, relative to `--out`. */

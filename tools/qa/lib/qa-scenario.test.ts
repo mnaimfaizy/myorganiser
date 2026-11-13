@@ -13,6 +13,7 @@ import {
   type Scenario,
   checkScenarioIds,
   isScreenScenario,
+  isVideoScenario,
   parseScenario,
   stepNumber,
 } from './qa-scenario.ts';
@@ -43,7 +44,7 @@ function omit(
   );
 }
 
-/** A complete screen scenario: a title, both expected results and a run. */
+/** A complete screen scenario: a title, both expected results and a run; a video also names its tab. */
 function screenScenario(
   capture: 'video' | 'screenshot',
 ): Record<string, unknown> {
@@ -53,6 +54,7 @@ function screenScenario(
     title: 'Save an item',
     expected: { before: 'The old label shows', after: 'The new label shows' },
     run: noop,
+    ...(capture === 'video' ? { tab: 'A' } : {}),
   };
 }
 
@@ -89,7 +91,7 @@ describe('parseScenario', () => {
     refusal(
       () =>
         parseScenario(
-          { id: 'S1', capture: 'gif', run: noop },
+          { id: 'S1', capture: 'film', run: noop },
           'scenarios/a.ts',
           FIX,
         ),
@@ -217,6 +219,42 @@ describe('parseScenario: the screen-scenario contract', () => {
         assert.equal(parseScenario(scenario, 'a.ts', options), scenario);
       }
     }
+  });
+});
+
+describe('parseScenario: the video tab', () => {
+  test('refuses a video scenario whose tab is absent, blank or not text, naming the file', () => {
+    for (const fixture of [
+      omit(screenScenario('video'), 'tab'),
+      { ...screenScenario('video'), tab: '' },
+      { ...screenScenario('video'), tab: '   ' },
+      { ...screenScenario('video'), tab: 3 },
+    ]) {
+      refusal(
+        () => parseScenario(fixture, 'scenarios/a.ts', FIX),
+        /scenarios\/a\.ts: a video scenario must declare tab/,
+      );
+    }
+  });
+
+  test('a screenshot, transcript or none scenario needs no tab', () => {
+    const scenarios: Record<string, unknown>[] = [
+      screenScenario('screenshot'),
+      { id: 'S1', capture: 'transcript', run: noop },
+      { id: 'S1', capture: 'none', run: noop },
+    ];
+    for (const scenario of scenarios) {
+      assert.equal(parseScenario(scenario, 'a.ts', FIX), scenario);
+    }
+  });
+});
+
+describe('isVideoScenario', () => {
+  test('is true only for a video capture', () => {
+    const video: Scenario = { id: 'S1', capture: 'video', tab: 'A', run: noop };
+    const screenshot: Scenario = { id: 'S1', capture: 'screenshot', run: noop };
+    assert.equal(isVideoScenario(video), true);
+    assert.equal(isVideoScenario(screenshot), false);
   });
 });
 

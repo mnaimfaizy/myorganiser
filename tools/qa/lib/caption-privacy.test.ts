@@ -5,7 +5,11 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { findCaptionLeaks, withholdLeaks } from './caption-privacy.ts';
+import {
+  type CheckedField,
+  findCaptionLeaks,
+  withholdLeaks,
+} from './caption-privacy.ts';
 import type { StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import type { StoryboardInput, StoryboardSideInput } from './storyboard.ts';
@@ -223,6 +227,47 @@ describe('what is denied', () => {
   test('a case-changed secret is not flagged: the check is an exact substring', () => {
     const input = { ...clean(), title: PASSWORD.toUpperCase() };
     assert.deepEqual(findCaptionLeaks(input, [PASSWORD]), []);
+  });
+});
+
+describe("findCaptionLeaks checks further fields the caller names, after the Storyboard's own", () => {
+  /** A field a caller adds, as a `video` scenario's MP4 tab label is. */
+  const label = (side: Side, text: string): CheckedField => ({
+    field: `S1 video ${side} label`,
+    text,
+  });
+
+  test('a leaking further field is reported by name, after the Storyboard fields', () => {
+    const input = { ...clean(), title: `Shows ${PASSWORD}` };
+    assert.deepEqual(
+      findCaptionLeaks(input, ALL_SECRETS, [
+        label('after', `Device B · tab ${PASSWORD}`),
+      ]),
+      ['S1 title', 'S1 video after label'],
+    );
+  });
+
+  test('a clean further field adds nothing to a clean Storyboard', () => {
+    assert.deepEqual(
+      findCaptionLeaks(clean(), ALL_SECRETS, [
+        label('before', 'Device B · tab B1'),
+        label('after', 'Device B · tab B1'),
+      ]),
+      [],
+    );
+  });
+
+  test('an empty list of further fields is the same check as the default', () => {
+    const input = patchStep(clean(), 'after', 3, {
+      caption: `Typed ${PASSWORD}`,
+    });
+    assert.deepEqual(findCaptionLeaks(input, ALL_SECRETS, []), [
+      'S1 after step 3 caption',
+    ]);
+    assert.deepEqual(
+      findCaptionLeaks(input, ALL_SECRETS, []),
+      findCaptionLeaks(input, ALL_SECRETS),
+    );
   });
 });
 

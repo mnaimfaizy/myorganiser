@@ -16,14 +16,15 @@ import {
   type RunArgs,
   type RunOutcome,
   type ScenarioRecord,
+  type SideTabRecording,
   STACK_LEFT_UP,
+  annotatedVideoPath,
   buildManifest,
-  combineArgs,
-  combinedFiles,
   gradingInput,
   keptPath,
   keptRecordings,
   manifestFile,
+  mp4TabOf,
   needsFfmpeg,
   parseOptions,
   parseRunArgs,
@@ -323,19 +324,9 @@ describe('gradingInput', () => {
   });
 });
 
-describe('combineArgs', () => {
-  test('combines the kept Before and After files into <out>/combined/<id>', () => {
-    assert.deepEqual(
-      combineArgs(OUT, 'S1', `${OUT}/before/S1.png`, `${OUT}/after/S1.png`),
-      [
-        '--before',
-        `${OUT}/before/S1.png`,
-        '--after',
-        `${OUT}/after/S1.png`,
-        '--out',
-        `${OUT}/combined/S1`,
-      ],
-    );
+describe('annotatedVideoPath', () => {
+  test("a video scenario's annotated MP4 is combined/<id>.mp4 under --out", () => {
+    assert.equal(annotatedVideoPath(OUT, 'S1'), `${OUT}/combined/S1.mp4`);
   });
 });
 
@@ -495,38 +486,54 @@ describe('buildManifest', () => {
   });
 });
 
-describe('combinedFiles: the files qa:combine reports making', () => {
-  test('an image combine reports only the combined image', () => {
-    assert.deepEqual(
-      combinedFiles(
-        '{"kind":"image","combined":"/o/c/S.png","gif":null,"gifBytes":null}',
-      ),
-      ['/o/c/S.png'],
-    );
+describe('mp4TabOf: the recording an annotated MP4 follows', () => {
+  test('follows the one recording of the named tab, with its device and start time', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
+      { device: 'B', tab: 'B1', path: '/work/B1.webm', openedAtMs: 1200 },
+    ];
+    assert.deepEqual(mp4TabOf('B1', 'after', recordings), {
+      ok: true,
+      recording: {
+        device: 'B',
+        tab: 'B1',
+        path: '/work/B1.webm',
+        openedAtMs: 1200,
+      },
+    });
   });
 
-  test('a video combine reports the MP4 then the GIF preview, in that order', () => {
-    assert.deepEqual(
-      combinedFiles(
-        '{"kind":"video","combined":"/o/c/V.mp4","gif":"/o/c/V.gif","gifBytes":1024}',
-      ),
-      ['/o/c/V.mp4', '/o/c/V.gif'],
-    );
+  test('a tab name no device opened is a problem naming the side and the tab', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
+    ];
+    assert.deepEqual(mp4TabOf('C1', 'before', recordings), {
+      ok: false,
+      problem: 'before: no tab named "C1" was opened, so no MP4 was made',
+    });
   });
 
-  test('JSON with no string combined field is refused', () => {
-    assert.throws(
-      () => combinedFiles('{"kind":"image","gif":null}'),
-      /printed no combined file/,
-    );
-    assert.throws(
-      () => combinedFiles('{"kind":"image","combined":42,"gif":null}'),
-      /printed no combined file/,
-    );
+  test('a tab name open on two devices is ambiguous, and the problem names both devices', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'B1', path: '/work/A-B1.webm', openedAtMs: 0 },
+      { device: 'B', tab: 'B1', path: '/work/B-B1.webm', openedAtMs: 1200 },
+    ];
+    assert.deepEqual(mp4TabOf('B1', 'after', recordings), {
+      ok: false,
+      problem:
+        'after: tab "B1" is open on devices A, B, so the tab the MP4 follows is ambiguous and no MP4 was made',
+    });
   });
 
-  test('output that is not JSON is refused', () => {
-    assert.throws(() => combinedFiles('ffmpeg: not found'), SyntaxError);
+  test('a tab with no recording is a problem naming the side, the device and the tab', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'C', tab: 'C1', path: null, openedAtMs: 300 },
+    ];
+    assert.deepEqual(mp4TabOf('C1', 'before', recordings), {
+      ok: false,
+      problem:
+        'before: no video was recorded for device C, tab C1, so no MP4 was made',
+    });
   });
 });
 

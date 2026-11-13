@@ -2,21 +2,29 @@
  * Runs `yarn qa:run` (ADR 0147 decisions 1-5 and 7): starts the QA stack,
  * plays every scenario script on Before and After in Chromium, keeps what
  * each `Capture:` line asks for, then grades, makes each screen scenario's
- * Storyboard (PRD #1544), combines a video pair and redacts.
+ * Storyboard (PRD #1544) and each `video` scenario's annotated MP4 of the
+ * tab it names, and redacts.
  *
  * Every rule lives in `qa-run.ts` and the modules it names; nothing here is
- * re-implemented. The stack, the switch, combining, grading and redaction are
- * the existing `runQaStack`, `runQaSwitch`, `runCombine`, `gradeScenarios` and
- * `redactTranscript`, reached through `RunDeps` so a test can stub the
- * browser, the stack and ffmpeg: no test starts any of them.
+ * re-implemented. The stack, the switch, the MP4, grading and redaction are
+ * the existing `runQaStack`, `runQaSwitch`, `makeAnnotatedVideo`,
+ * `gradeScenarios` and `redactTranscript`, reached through `RunDeps` so a
+ * test can stub the browser, the stack and ffmpeg: no test starts any of
+ * them.
+ *
+ * A caption refusal (`caption-privacy.ts`) refuses the scenario's combined
+ * files, the MP4 with the Storyboard: the MP4's overlays show the same
+ * title, captions and labels, and each side's MP4 tab label is passed to
+ * the same check as one more field, so the one check covers both.
  *
  * Exit 0 = every scenario ran and graded, the headline is not QA failed, and
  * every kept file was made. 1 = QA failed, the stack or a switch failed
  * closed (no scenario starts on that side), or a kept file could not be made
- * (a recording missing, a Storyboard refused or not rendered, combining
- * failed, a Request Transcript refused).
- * 2 = bad invocation, a malformed scenario script, or a missing Chromium or
- * (when a pair will be combined) ffmpeg, checked before the stack starts; a
+ * (a recording missing, a Storyboard refused or not rendered, the MP4's tab
+ * missing or ambiguous or its MP4 not made, a Request Transcript refused).
+ * 2 = bad invocation, a malformed scenario script (a `video` one without
+ * `tab` among them), or a missing Chromium or (when a `video` scenario will
+ * make an MP4) ffmpeg, checked before the stack starts; a
  * stack start, switch or stop that itself exits 2 (a bad invocation or a
  * missing dependency such as docker) passes its 2 through.
  */
@@ -25,8 +33,9 @@ import { dirname, join } from 'node:path';
 import { GradingInputError, gradeScenarios } from './grade-scenarios.ts';
 import { firstLine } from './qa-cli.ts';
 import { FFMPEG_MISSING_MESSAGE } from './qa-combine-executor.ts';
+import type { AnnotatedVideoPlan, VideoSide } from './qa-combine.ts';
 import {
-  FFMPEG_CAPTURE,
+  type Mp4TabChoice,
   type RecordedCall,
   RECORDINGS,
   RUN_USAGE,
@@ -34,11 +43,12 @@ import {
   type RunOutcome,
   type ScenarioRecord,
   STACK_LEFT_UP,
+  annotatedVideoPath,
   buildManifest,
-  combineArgs,
   gradingInput,
   keptPath,
   keptRecordings,
+  mp4TabOf,
   needsFfmpeg,
   parseOptions,
   parseRunArgs,
@@ -56,15 +66,23 @@ import {
   type Scenario,
   type ScreenScenario,
   type StepRecord,
+  type VideoScenario,
   checkScenarioIds,
   isScreenScenario,
+  isVideoScenario,
   parseScenario,
 } from './qa-scenario.ts';
-import type { TabRecording } from './qa-scenario-context.ts';
+import {
+  DEFAULT_DEVICE,
+  DEFAULT_TAB,
+  type TabRecording,
+  tabLabel,
+} from './qa-scenario-context.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES, planSides } from './qa-switch.ts';
 import {
+  type CheckedField,
   WITHHELD_FIELD,
   findCaptionLeaks,
   withholdLeaks,
@@ -97,8 +115,10 @@ export interface RecordedRun {
   screenshot: string | null;
   calls: RecordedCall[];
   /**
-   * The recordings of every tab other than the default page, each listed
-   * `place: local` and never offered for upload. Absent when none was opened.
+   * The recordings of every tab other than the default page. Absent when
+   * none was opened. Each is listed `place: local` and never offered for
+   * upload, except a `video` scenario's MP4 tab, which is kept as its side's
+   * recording and made into the MP4.
    */
   tabVideos?: TabRecording[];
 }
@@ -120,8 +140,11 @@ export interface RunDeps {
     stillRoot: string,
     pngPath: string,
   ): Promise<void>;
-  /** `runCombine`; on status 0, the files it made. */
-  combine(argv: readonly string[]): { status: number; files: string[] };
+  /**
+   * `makeAnnotatedVideo`: makes a `video` scenario's MP4 at `plan.output`;
+   * rejects on failure, leaving no MP4 behind.
+   */
+  annotateVideo(plan: AnnotatedVideoPlan): Promise<void>;
   /** Why Chromium cannot be launched, or `null`. */
   chromiumMissing(): string | null;
   ffmpegMissing(): boolean;
@@ -241,7 +264,6 @@ async function runScenarios(
     before: new Map(),
     after: new Map(),
   };
-  const media = new Map<string, Partial<Record<Side, string>>>();
   const calls = new Map<string, Partial<Record<Side, RecordedCall[]>>>();
   /** Per scenario, the values its Storyboard may not show. In memory only. */
   const denied = new Map<string, Set<string>>();
@@ -302,6 +324,84 @@ async function runScenarios(
     }
   }
 
+  /**
+   * Per `video` scenario and side, the kept recording its MP4 follows and
+   * that tab's label, or why there is none.
+   */
+  const mp4Tabs = new Map<
+    string,
+    Partial<Record<Side, Mp4TabChoice & { label?: string }>>
+  >();
+
+  /**
+   * Keeps a `video` scenario's recordings: the MP4 tab's as the side's
+   * recording (`<out>/<side>/<id>.webm`), which the MP4 is made from, and
+   * every other tab's locally, the default tab's too when the MP4 follows
+   * another.
+   */
+  function keepVideoTabs(
+    scenario: VideoScenario,
+    side: Side,
+    recorded: RecordedRun,
+    record: ScenarioRecord,
+  ): void {
+    const all: TabRecording[] = [
+      {
+        device: DEFAULT_DEVICE,
+        tab: DEFAULT_TAB,
+        path: recorded.video,
+        openedAtMs: 0,
+      },
+      ...(recorded.tabVideos ?? []),
+    ];
+    const choice = mp4TabOf(scenario.tab, side, all);
+    let tabNumber = 0;
+    for (const tab of all) {
+      const isDefault = tab === all[0];
+      const isMp4 =
+        choice.ok &&
+        tab.device === choice.recording.device &&
+        tab.tab === choice.recording.tab;
+      if (!isDefault) tabNumber++;
+      if (tab.path === null) {
+        // A missing recording of the MP4's tab is reported with the MP4 (mp4TabOf).
+        const reportedWithMp4 = tab.tab === scenario.tab;
+        if (!reportedWithMp4) {
+          record.problems.push(
+            isDefault
+              ? `${side}: no video was recorded`
+              : `${side}: no video was recorded for device ${tab.device}, tab ${tab.tab}`,
+          );
+        }
+        continue;
+      }
+      const dest = isMp4
+        ? keptPath(args.out, scenario.id, side, 'video', 'side')
+        : isDefault
+          ? keptPath(args.out, scenario.id, side, 'video', 'local')
+          : tabVideoPath(args.out, scenario.id, side, tabNumber, tab);
+      deps.makeDir(dirname(dest));
+      deps.moveFile(tab.path, dest);
+      record.files.push({ path: dest, place: isMp4 ? side : 'local' });
+    }
+    // Labelled from every tab its device ended with, as its steps are.
+    const mp4Tab = choice.ok
+      ? {
+          ok: true as const,
+          recording: {
+            ...choice.recording,
+            path: keptPath(args.out, scenario.id, side, 'video', 'side'),
+          },
+          label: tabLabel(
+            choice.recording.device,
+            choice.recording.tab,
+            all.filter((tab) => tab.device === choice.recording.device).length,
+          ),
+        }
+      : choice;
+    mp4Tabs.set(scenario.id, { ...mp4Tabs.get(scenario.id), [side]: mp4Tab });
+  }
+
   async function runOne(scenario: Scenario, side: Side): Promise<void> {
     const record = recordOf(scenario.id);
     const workDir = join(args.out, '.work', side, scenario.id);
@@ -320,6 +420,8 @@ async function runScenarios(
     for (const recording of RECORDINGS) {
       const place = keep[recording];
       if (!place) continue;
+      // A video scenario's recordings are kept by the tab its MP4 follows.
+      if (recording === 'video' && isVideoScenario(scenario)) continue;
       if (recording === 'calls') {
         calls.set(scenario.id, {
           ...calls.get(scenario.id),
@@ -339,11 +441,12 @@ async function runScenarios(
         path: dest,
         place: place === 'side' ? side : 'local',
       });
-      if (place === 'side') {
-        media.set(scenario.id, { ...media.get(scenario.id), [side]: dest });
-      }
     }
-    keepTabVideos(scenario, side, recorded, record);
+    if (isVideoScenario(scenario)) {
+      keepVideoTabs(scenario, side, recorded, record);
+    } else {
+      keepTabVideos(scenario, side, recorded, record);
+    }
     if (isScreenScenario(scenario)) keepSteps(scenario, side, recorded);
     // Whatever the line did not ask for goes with the work directory.
     deps.removePath(workDir);
@@ -355,16 +458,17 @@ async function runScenarios(
 
   /**
    * Saves a screen scenario's step records, then checks its Storyboard and
-   * draws it. True when no combined file may be made for the scenario: the
+   * draws it. Returns the Storyboard once its PNG is made, or `null` when no
+   * combined file may be made for the scenario: a caption was refused, the
    * model reported a problem (no steps, or a different step count on each
-   * side), which this
-   * refuses on without knowing what it is, or the render failed.
+   * side), which this refuses on without knowing what it is, the render
+   * failed, or nothing was graded or ran.
    */
   async function storyboardFor(
     scenario: ScreenScenario,
     record: ScenarioRecord,
     result: ScenarioResult | undefined,
-  ): Promise<boolean> {
+  ): Promise<Storyboard | null> {
     const sides = stepRuns.get(scenario.id) ?? {};
     const input: StoryboardInput = {
       id: scenario.id,
@@ -376,7 +480,21 @@ async function runScenarios(
       sides,
     };
     const secrets = [...(denied.get(scenario.id) ?? [])];
-    const leaks = findCaptionLeaks(input, secrets);
+    // The MP4 shows its tab's label on each side, which no step need carry.
+    const videoLabels: CheckedField[] = isVideoScenario(scenario)
+      ? SIDES.flatMap((side) => {
+          const mp4Tab = mp4Tabs.get(scenario.id)?.[side];
+          return mp4Tab?.ok && mp4Tab.label !== undefined
+            ? [
+                {
+                  field: `${scenario.id} video ${side} label`,
+                  text: mp4Tab.label,
+                },
+              ]
+            : [];
+        })
+      : [];
+    const leaks = findCaptionLeaks(input, secrets, videoLabels);
     const kept = leaks.length > 0 ? withholdLeaks(input, secrets) : input;
     const recordsPath = stepRecordsPath(args.out, scenario.id);
     deps.makeDir(dirname(recordsPath));
@@ -407,14 +525,14 @@ async function runScenarios(
       record.problems.push(
         `the Storyboard was refused: a secret or credential is in ${leaks.join('; ')}`,
       );
-      return true;
+      return null;
     }
-    if (result === undefined || (!sides.before && !sides.after)) return false;
+    if (result === undefined || (!sides.before && !sides.after)) return null;
 
     const storyboard = buildStoryboard(input);
     if (storyboard.problems.length > 0) {
       record.problems.push(...storyboard.problems);
-      return true;
+      return null;
     }
     const png = storyboardPath(args.out, scenario.id);
     deps.makeDir(dirname(png));
@@ -425,10 +543,62 @@ async function runScenarios(
       record.problems.push(
         `the Storyboard could not be rendered: ${firstLine(error)}`,
       );
-      return true;
+      return null;
     }
     record.files.push({ path: png, place: 'combined' });
-    return false;
+    return storyboard;
+  }
+
+  /**
+   * Makes a `video` scenario's annotated MP4 from its Storyboard's band and
+   * each side's steps, on the recording of the tab it names. Every side that
+   * ran must have that tab's recording, or there is no MP4.
+   */
+  async function videoFor(
+    scenario: VideoScenario,
+    record: ScenarioRecord,
+    storyboard: Storyboard,
+  ): Promise<void> {
+    const ran = stepRuns.get(scenario.id) ?? {};
+    const choices = mp4Tabs.get(scenario.id) ?? {};
+    const sides: VideoSide[] = [];
+    const missing: string[] = [];
+    for (const side of SIDES) {
+      const run = ran[side];
+      if (!run) continue;
+      const choice = choices[side];
+      if (!choice?.ok) {
+        // Every side's reason is reported, not only the first.
+        missing.push(
+          choice?.problem ??
+            `${side}: no recording of tab "${scenario.tab}", so no MP4 was made`,
+        );
+        continue;
+      }
+      const { device, tab, path, openedAtMs } = choice.recording;
+      sides.push({
+        side,
+        video: path,
+        device,
+        tab,
+        label: choice.label ?? tabLabel(device, tab, 1),
+        openedAtMs,
+        steps: run.steps,
+      });
+    }
+    if (missing.length > 0) {
+      record.problems.push(...missing);
+      return;
+    }
+    const output = annotatedVideoPath(args.out, scenario.id);
+    try {
+      await deps.annotateVideo({ band: storyboard.band, sides, output });
+    } catch (error) {
+      deps.removePath(output);
+      record.problems.push(`the MP4 could not be made: ${firstLine(error)}`);
+      return;
+    }
+    record.files.push({ path: output, place: 'combined' });
   }
 
   const sides = planSides({
@@ -501,26 +671,12 @@ async function runScenarios(
   for (const scenario of scenarios) {
     const record = recordOf(scenario.id);
     // A screen scenario whose Storyboard was refused or failed to render
-    // gets no combined file at all.
-    const screenRefused = isScreenScenario(scenario)
+    // gets no combined file at all: no MP4 either.
+    const storyboard = isScreenScenario(scenario)
       ? await storyboardFor(scenario, record, results.get(scenario.id))
-      : false;
-    if (FFMPEG_CAPTURE[scenario.capture] && !screenRefused) {
-      const pair = media.get(scenario.id);
-      if (pair?.before && pair.after) {
-        const combined = deps.combine(
-          combineArgs(args.out, scenario.id, pair.before, pair.after),
-        );
-        if (combined.status === 0) {
-          for (const path of combined.files) {
-            record.files.push({ path, place: 'combined' });
-          }
-        } else {
-          record.problems.push(
-            `combining failed (qa:combine exit ${combined.status})`,
-          );
-        }
-      }
+      : null;
+    if (storyboard && isVideoScenario(scenario)) {
+      await videoFor(scenario, record, storyboard);
     }
     if (scenario.capture === 'transcript') {
       const input = transcriptInput(scenario.id, calls.get(scenario.id) ?? {});

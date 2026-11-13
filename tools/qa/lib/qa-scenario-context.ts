@@ -58,6 +58,12 @@ export interface TabEntry {
   device: string;
   tab: string;
   page: Page;
+  /**
+   * Milliseconds from the run's start to when the tab's page opened, which is
+   * when its recording starts; the default tab's is 0. A step's `atMs` minus
+   * this is the step's moment in the tab's own video.
+   */
+  openedAtMs: number;
 }
 
 /** A tab's recording, once its device is closed; `path` is `null` when none was written. */
@@ -65,6 +71,8 @@ export interface TabRecording {
   device: string;
   tab: string;
   path: string | null;
+  /** When the tab's recording starts, in milliseconds from the run's start. */
+  openedAtMs: number;
 }
 
 export interface DeviceRegistry {
@@ -99,6 +107,8 @@ export function deviceRegistry(deps: {
   own: { context: BrowserContext; page: Page };
   /** How long closing waits for a tab or device still opening; defaults to 2s. */
   openGraceMs?: number;
+  /** Milliseconds since the run's start, stamped on each tab as it opens; defaults to 0. */
+  elapsedMs?: () => number;
 }): DeviceRegistry {
   let closed = false;
   const contexts = new Map<string, Promise<BrowserContext>>();
@@ -106,8 +116,14 @@ export function deviceRegistry(deps: {
   const entries: TabEntry[] = [];
   const byPage = new Map<Page, TabEntry>();
 
-  const register = (device: string, tab: string, page: Page): TabEntry => {
-    const entry = { device, tab, page };
+  const elapsedMs = deps.elapsedMs ?? (() => 0);
+  const register = (
+    device: string,
+    tab: string,
+    page: Page,
+    openedAtMs: number,
+  ): TabEntry => {
+    const entry = { device, tab, page, openedAtMs };
     entries.push(entry);
     byPage.set(page, entry);
     return entry;
@@ -118,7 +134,9 @@ export function deviceRegistry(deps: {
     new Map([
       [
         DEFAULT_TAB,
-        Promise.resolve(register(DEFAULT_DEVICE, DEFAULT_TAB, deps.own.page)),
+        Promise.resolve(
+          register(DEFAULT_DEVICE, DEFAULT_TAB, deps.own.page, 0),
+        ),
       ],
     ]),
   );
@@ -156,9 +174,10 @@ export function deviceRegistry(deps: {
           const known = tabsOf(device);
           let entry = known.get(tab);
           if (!entry) {
-            entry = contextOf(device).then(async (context) =>
-              register(device, tab, await context.newPage()),
-            );
+            entry = contextOf(device).then(async (context) => {
+              const opened = await context.newPage();
+              return register(device, tab, opened, elapsedMs());
+            });
             known.set(tab, entry);
           }
           return (await entry).page;
@@ -209,6 +228,7 @@ export function deviceRegistry(deps: {
           device: entry.device,
           tab: entry.tab,
           path: video ? await video.path().catch(() => null) : null,
+          openedAtMs: entry.openedAtMs,
         })),
       );
     },

@@ -27,6 +27,7 @@ import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
 import { cropFor } from './storyboard-crop.ts';
 import {
+  type Band,
   MARK_TEXT,
   type Mark,
   type SideCard,
@@ -94,10 +95,10 @@ export const STORYBOARD_VARIABLES: readonly string[] = [
 ];
 
 /** A Semantic Role as a CSS colour (a role is a bare HSL triple, ADR 0065). */
-const roleColour = (name: Colour): string => `hsl(var(--${name}))`;
+export const roleColour = (name: Colour): string => `hsl(var(--${name}))`;
 
 /** A type, spacing or radius token as a CSS value. */
-const token = (name: Token): string => `var(--${name})`;
+export const token = (name: Token): string => `var(--${name})`;
 
 /** The badge colours each graded result is shown in. */
 const RESULT_TONE = {
@@ -152,6 +153,11 @@ export const STORYBOARD_FOOTER =
 /** Shown on a still taken after settling timed out. */
 export const NOT_SETTLED = 'not settled';
 
+/** A stylesheet's text made safe inside a <style> element, which it cannot close. */
+export function inlineStylesheet(css: string): string {
+  return css.replaceAll('</', '<\\/');
+}
+
 export function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
@@ -168,7 +174,8 @@ function shortSha(sha: string): string {
 const pct = (part: number, whole: number): string =>
   `${((part / whole) * 100).toFixed(4)}%`;
 
-const STYLE = `
+/** The page's stylesheet; the MP4's band overlay (`video-overlay-html.ts`) reuses it. */
+export const STORYBOARD_STYLE = `
 *{box-sizing:border-box}
 body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:${roleColour('foreground')};font-family:${token('font-body')};font-size:${token('type-body-sm-size')};line-height:1.4}
 .band{background:${roleColour('navy')};color:${roleColour('navy-foreground')};padding:${token('space-md')} ${token('space-lg')}}
@@ -202,8 +209,9 @@ body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:$
 .foot{padding:${token('space-sm')} ${token('space-lg')} ${token('space-md')};color:${roleColour('foreground-supporting')};font-size:${token('type-label-caps-size')};border-top:1px solid ${roleColour('border')}}
 `;
 
-function bandHtml(storyboard: Storyboard): string {
-  const { id, title, result, commits, alike } = storyboard.band;
+/** The band: the scenario, its graded result and each side's commit. The MP4 shows it too. */
+export function bandHtml(band: Band): string {
+  const { id, title, result, commits, alike } = band;
   const tone = RESULT_TONE[result];
   const meta = SIDES.map(
     (side) =>
@@ -282,7 +290,6 @@ export function storyboardHtml(
   tokenCss: string,
 ): string {
   const { band, columns, sides, rows } = storyboard;
-  // A stylesheet's text cannot close its own <style> element.
-  const tokens = tokenCss.replaceAll('</', '<\\/');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(`${band.id} · ${band.title}`)}</title><style>${tokens}</style><style>${STYLE}</style></head><body style="--columns:${columns.length}">${bandHtml(storyboard)}<div class="cards">${sides.map(cardHtml).join('')}</div>${rows.map((row) => rowHtml(row, columns, band.alike !== undefined, stillUrl)).join('')}<footer class="foot">${escapeHtml(STORYBOARD_FOOTER)}</footer></body></html>`;
+  const tokens = inlineStylesheet(tokenCss);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(`${band.id} · ${band.title}`)}</title><style>${tokens}</style><style>${STORYBOARD_STYLE}</style></head><body style="--columns:${columns.length}">${bandHtml(band)}<div class="cards">${sides.map(cardHtml).join('')}</div>${rows.map((row) => rowHtml(row, columns, band.alike !== undefined, stillUrl)).join('')}<footer class="foot">${escapeHtml(STORYBOARD_FOOTER)}</footer></body></html>`;
 }

@@ -2,7 +2,9 @@
  * Caption privacy for a Storyboard (PRD #1544, #1548). A pure check over the
  * strings a scenario's author wrote that reach the Storyboard page or a video
  * overlay: the title, the expected results, each side's observed text and
- * failure message, and every step's caption and device/tab label.
+ * failure message, and every step's caption and device/tab label, plus any
+ * further field the caller names for the same check (a `video` scenario's
+ * MP4 tab label on each side, which a step need not carry).
  *
  * It is a DENY-list, not an allow-list. A string is refused when it contains,
  * as an exact substring, a known secret (the QA Account's password or vault
@@ -71,12 +73,17 @@ export function captionFields(input: StoryboardInput): CheckedField[] {
   return fields;
 }
 
-/** The names of the fields that leak, in reading order; empty when none does. */
+/**
+ * The names of the fields that leak, in reading order; empty when none does.
+ * `more` are further strings that reach a combined file, checked the same way
+ * after the Storyboard's own.
+ */
 export function findCaptionLeaks(
   input: StoryboardInput,
   secrets: readonly string[],
+  more: readonly CheckedField[] = [],
 ): string[] {
-  return captionFields(input)
+  return [...captionFields(input), ...more]
     .filter(({ text }) => leaks(text, secrets))
     .map(({ field }) => field);
 }

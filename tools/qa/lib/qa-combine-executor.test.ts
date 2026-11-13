@@ -1,22 +1,33 @@
-// Contracts for the combine executor (ADR 0147 decision 5), run through
-// `runCombine` with a stubbed CombineDeps. The file system, the temp dir and
-// every ffmpeg run are in-memory fakes here, so no process starts and no file
-// is written. The pure argument lists are tested in qa-combine.test.ts, and
-// the real ffmpeg run is in ../qa-combine.real-ffmpeg.test.ts.
+// Contracts for the combine executor (ADR 0147 decision 5; PRD #1544's
+// annotated MP4), run with stubbed deps: an in-memory disk, and every ffmpeg
+// run and Chromium render a fake, so no process starts and no file is written.
+// The pure argument lists are in qa-combine.test.ts, the overlay pages in
+// video-overlay-html.test.ts, and the real ffmpeg and Chromium runs in
+// ../qa-combine.real-ffmpeg.test.ts.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test, { describe } from 'node:test';
 
 import {
+  type AnnotateDeps,
   type CombineDeps,
   COMBINE_USAGE,
   FFMPEG_MISSING_MESSAGE,
+  makeAnnotatedVideo,
   runCombine,
 } from './qa-combine-executor.ts';
-import { GIF_LADDER, GIF_SIZE_CAP_BYTES } from './qa-combine.ts';
-import { renderLabel } from './qa-label.ts';
+import {
+  type AnnotatedVideoPlan,
+  type VideoStep,
+  VIDEO_BAND_HEIGHT,
+  VIDEO_LABEL_HEIGHT,
+  VIDEO_PANEL,
+  VIDEO_STRIP_HEIGHT,
+} from './qa-combine.ts';
+import type { Band } from './storyboard.ts';
 
 const TEMP = '/tmp/qa-combine-fake';
+const TOKENS = ':root{--qa-test-token:1}';
 const IMAGE_ARGS = [
   '--before',
   '/in/before.png',
@@ -34,40 +45,27 @@ const VIDEO_ARGS = [
   '/out/clip',
 ];
 const MP4_OUT = '/out/clip.mp4';
-const GIF_OUT = '/out/clip.gif';
 const PNG_OUT = '/out/shot.png';
-const BEFORE_LABEL = join(TEMP, 'before-label.png');
-const AFTER_LABEL = join(TEMP, 'after-label.png');
 
 interface FakeOptions {
   /** `null` = not installed; default 0. */
   ffmpegStatus?: number | null;
-  /** The primary (PNG or MP4) combine run; default 0. */
+  /** The combine run; default 0. */
   combineStatus?: number | null;
   combineStderr?: string;
   /** Whether a successful combine run leaves its output on disk; default true. */
   combineWritesOutput?: boolean;
-  /** Every GIF run; default 0. */
-  gifStatus?: number | null;
-  gifStderr?: string;
-  /** Size of the GIF each GIF run leaves, one per run; the last repeats. */
-  gifSizes?: readonly number[];
   /** Inputs that do not exist on disk. */
   absent?: readonly string[];
-  /** Indexes (0-based, per GIF run) whose GIF size cannot be read: fileSize is null. */
-  unsizedGifRuns?: readonly number[];
 }
 
 function fakeCombine(options: FakeOptions = {}) {
   const calls: string[][] = [];
-  const files = new Map<string, number>();
-  const labels = new Map<string, Buffer>();
+  const files = new Set<string>();
   const removed: string[] = [];
   const dirs: string[] = [];
   const out: string[] = [];
   const err: string[] = [];
-  let gifRuns = 0;
-  let lastGifUnsized = false;
 
   for (const input of [
     '/in/before.png',
@@ -75,68 +73,42 @@ function fakeCombine(options: FakeOptions = {}) {
     '/in/before.mp4',
     '/in/after.mp4',
   ]) {
-    if (!(options.absent ?? []).includes(input)) files.set(input, 1);
+    if (!(options.absent ?? []).includes(input)) files.add(input);
   }
 
   const deps: CombineDeps = {
     run(argv) {
       calls.push([...argv]);
-      const output = argv[argv.length - 1];
       if (argv.length === 2 && argv[1] === '-version') {
         const status =
           options.ffmpegStatus === undefined ? 0 : options.ffmpegStatus;
         return { status, stderr: status === 0 ? '' : 'spawn ffmpeg ENOENT' };
       }
-      if (argv.includes('-loop')) {
-        const status = options.gifStatus === undefined ? 0 : options.gifStatus;
-        if (status !== 0) {
-          return { status, stderr: options.gifStderr ?? '' };
-        }
-        const sizes = options.gifSizes ?? [1000];
-        files.set(output, sizes[Math.min(gifRuns, sizes.length - 1)]);
-        lastGifUnsized = (options.unsizedGifRuns ?? []).includes(gifRuns);
-        gifRuns++;
-        return { status: 0, stderr: '' };
-      }
       const status =
         options.combineStatus === undefined ? 0 : options.combineStatus;
       if (status === 0 && (options.combineWritesOutput ?? true)) {
-        files.set(output, output.endsWith('.png') ? 2000 : 5000);
+        files.add(argv[argv.length - 1]);
       }
       return { status, stderr: options.combineStderr ?? '' };
     },
     exists: (path) => files.has(path),
-    fileSize: (path) =>
-      path.endsWith('.gif') && lastGifUnsized
-        ? null
-        : (files.get(path) ?? null),
-    makeTempDir: () => TEMP,
     makeDir(path) {
       dirs.push(path);
     },
-    writeFile(path, bytes) {
-      files.set(path, bytes.length);
-      labels.set(path, bytes);
-    },
     removePath(path) {
       removed.push(path);
-      for (const key of [...files.keys()]) {
-        if (key === path || key.startsWith(`${path}/`)) files.delete(key);
-      }
+      files.delete(path);
     },
     out: (line) => out.push(line),
     err: (line) => err.push(line),
   };
 
-  return { deps, calls, dirs, files, labels, removed, out, err };
+  return { deps, calls, dirs, files, removed, out, err };
 }
 
+/** The ffmpeg runs that combine a pair, not the `-version` probe. */
 function combineRuns(calls: readonly string[][]): string[][] {
-  return calls.filter((c) => c[1] !== '-version' && !c.includes('-loop'));
-}
-
-function gifRuns(calls: readonly string[][]): string[][] {
-  return calls.filter((c) => c.includes('-loop'));
+  return calls.filter((c) => c[1] !== '-version');
 }
 
 function inputsOf(argv: readonly string[]): string[] {
@@ -162,7 +134,6 @@ describe('runCombine: ffmpeg not installed', () => {
       assert.deepEqual(result.out, []);
       assert.deepEqual(result.calls, [['ffmpeg', '-version']]);
       assert.equal(result.files.has(MP4_OUT), false);
-      assert.equal(result.files.has(GIF_OUT), false);
     });
   }
 });
@@ -205,7 +176,7 @@ describe('runCombine: a bad invocation exits 2 before any ffmpeg call', () => {
       'an unknown extension',
       [
         '--before',
-        '/in/before.gif',
+        '/in/before.bmp',
         '--after',
         '/in/after.png',
         '--out',
@@ -242,7 +213,7 @@ describe('runCombine: a missing input exits 2', () => {
 });
 
 describe('runCombine: an image pair', () => {
-  test('combines to one PNG, exits 0 and prints the files as JSON', () => {
+  test('combines to one PNG, exits 0, and prints only the kind and the file as JSON', () => {
     const result = run([...IMAGE_ARGS, '--height', '48']);
     assert.equal(result.code, 0);
     assert.deepEqual(result.err, []);
@@ -250,141 +221,41 @@ describe('runCombine: an image pair', () => {
     assert.deepEqual(JSON.parse(result.out[0]), {
       kind: 'image',
       combined: PNG_OUT,
-      gif: null,
-      gifBytes: null,
     });
     assert.equal(result.files.has(PNG_OUT), true);
   });
 
-  test('runs one image combine and no GIF', () => {
+  test('runs one ffmpeg combine with the two inputs and no overlay or label input', () => {
     const result = run([...IMAGE_ARGS, '--height', '48']);
     const combines = combineRuns(result.calls);
     assert.equal(combines.length, 1);
-    assert.ok(combines[0].includes('-frames:v'), 'single frame');
-    assert.equal(combines[0].at(-1), PNG_OUT);
-    assert.deepEqual(gifRuns(result.calls), []);
-  });
-
-  test('the label PNGs are written to the temp dir, match the height, and feed the combine', () => {
-    const result = run([...IMAGE_ARGS, '--height', '720']);
-    assert.deepEqual(
-      result.labels.get(BEFORE_LABEL),
-      renderLabel('BEFORE', 3).png,
-    );
-    assert.deepEqual(
-      result.labels.get(AFTER_LABEL),
-      renderLabel('AFTER', 3).png,
-    );
-    const [combine] = combineRuns(result.calls);
-    assert.deepEqual(inputsOf(combine), [
+    assert.deepEqual(inputsOf(combines[0]), [
       '/in/before.png',
       '/in/after.png',
-      BEFORE_LABEL,
-      AFTER_LABEL,
     ]);
-    assert.ok(valueAfter(combine, '-filter_complex').includes('scale=-2:720'));
+    assert.ok(combines[0].includes('-frames:v'), 'a single frame');
+    assert.equal(combines[0].at(-1), PNG_OUT);
   });
 });
 
 describe('runCombine: a video pair', () => {
-  test('combines to an MP4 and then makes the GIF from it on the first rung', () => {
+  test('combines to one MP4, exits 0, and prints only the kind and the file as JSON', () => {
     const result = run([...VIDEO_ARGS, '--height', '48']);
     assert.equal(result.code, 0);
     assert.deepEqual(result.dirs, ['/out']);
     assert.deepEqual(JSON.parse(result.out[0]), {
       kind: 'video',
       combined: MP4_OUT,
-      gif: GIF_OUT,
-      gifBytes: 1000,
     });
-    const [combine] = combineRuns(result.calls);
-    assert.equal(valueAfter(combine, '-c:v'), 'libx264');
-    assert.equal(combine.at(-1), MP4_OUT);
-
-    const [gif] = gifRuns(result.calls);
-    assert.deepEqual(inputsOf(gif), [MP4_OUT]);
-    assert.equal(gif.at(-1), GIF_OUT);
-    const filter = valueAfter(gif, '-filter_complex');
-    assert.ok(filter.includes(`fps=${GIF_LADDER[0].fps},`), filter);
-    assert.ok(filter.includes(`min(${GIF_LADDER[0].width},iw)`), filter);
-    assert.equal(gifRuns(result.calls).length, 1);
-  });
-
-  test('the MP4 combine runs before the GIF is made', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48']);
-    const order = result.calls.map((c) =>
-      c[1] === '-version' ? 'version' : c.includes('-loop') ? 'gif' : 'combine',
-    );
-    assert.deepEqual(order, ['version', 'combine', 'gif']);
+    const combines = combineRuns(result.calls);
+    assert.equal(combines.length, 1, 'one ffmpeg call');
+    assert.equal(valueAfter(combines[0], '-c:v'), 'libx264');
+    assert.equal(combines[0].at(-1), MP4_OUT);
   });
 });
 
-describe('runCombine: the GIF size cap', () => {
-  test('a GIF over the cap on the first rung falls to the next rung', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      gifSizes: [GIF_SIZE_CAP_BYTES + 1, GIF_SIZE_CAP_BYTES - 1],
-    });
-    assert.equal(result.code, 0);
-    const gifs = gifRuns(result.calls);
-    assert.equal(gifs.length, 2);
-    const second = gifs[1].join(' ');
-    assert.ok(second.includes(`fps=${GIF_LADDER[1].fps},`), second);
-    assert.ok(second.includes(`min(${GIF_LADDER[1].width},iw)`), second);
-    assert.equal(JSON.parse(result.out[0]).gifBytes, GIF_SIZE_CAP_BYTES - 1);
-    assert.equal(result.files.get(GIF_OUT), GIF_SIZE_CAP_BYTES - 1);
-  });
-
-  test('a GIF exactly at the cap is accepted on the first rung', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      gifSizes: [GIF_SIZE_CAP_BYTES],
-    });
-    assert.equal(result.code, 0);
-    assert.equal(gifRuns(result.calls).length, 1);
-    assert.equal(JSON.parse(result.out[0]).gifBytes, GIF_SIZE_CAP_BYTES);
-  });
-
-  test('a GIF over the cap on every rung exits 1 and removes both outputs', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      gifSizes: [GIF_SIZE_CAP_BYTES + 1],
-    });
-    assert.equal(result.code, 1);
-    assert.equal(gifRuns(result.calls).length, GIF_LADDER.length);
-    assert.equal(result.err.length, 1);
-    assert.ok(result.err[0].includes('no GIF under'), result.err[0]);
-    assert.deepEqual(result.out, []);
-    assert.equal(result.files.has(MP4_OUT), false);
-    assert.equal(result.files.has(GIF_OUT), false);
-  });
-
-  test('a GIF size that cannot be read on every rung exits 1 and removes both outputs', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      unsizedGifRuns: GIF_LADDER.map((_, i) => i),
-    });
-    assert.equal(result.code, 1);
-    assert.equal(gifRuns(result.calls).length, GIF_LADDER.length);
-    assert.equal(result.err.length, 1);
-    assert.ok(result.err[0].includes('no GIF under'), result.err[0]);
-    assert.deepEqual(result.out, []);
-    assert.equal(result.files.has(MP4_OUT), false);
-    assert.equal(result.files.has(GIF_OUT), false);
-  });
-
-  test('an unreadable GIF size on rung 1 moves on, and rung 2 that fits is kept', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      gifSizes: [1000, 2222],
-      unsizedGifRuns: [0],
-    });
-    assert.equal(result.code, 0);
-    assert.equal(gifRuns(result.calls).length, 2);
-    assert.ok(
-      gifRuns(result.calls)[1].join(' ').includes(`fps=${GIF_LADDER[1].fps},`),
-    );
-    assert.equal(JSON.parse(result.out[0]).gifBytes, 2222);
-  });
-});
-
-describe('runCombine: ffmpeg failures exit 1 and remove outputs', () => {
-  test('a non-zero primary combine exits 1, names the first line of stderr, and removes the output', () => {
+describe('runCombine: ffmpeg failures exit 1 and remove the output', () => {
+  test('a non-zero combine exits 1, names the first line of stderr, and removes the output', () => {
     const result = run([...VIDEO_ARGS, '--height', '48'], {
       combineStatus: 1,
       combineStderr: 'Invalid data found\nmore detail',
@@ -393,7 +264,7 @@ describe('runCombine: ffmpeg failures exit 1 and remove outputs', () => {
     assert.deepEqual(result.err, [
       'qa:combine: ffmpeg failed to combine: Invalid data found',
     ]);
-    assert.deepEqual(gifRuns(result.calls), []);
+    assert.deepEqual(result.out, []);
     assert.equal(result.files.has(MP4_OUT), false);
     assert.ok(result.removed.includes(MP4_OUT));
   });
@@ -403,59 +274,222 @@ describe('runCombine: ffmpeg failures exit 1 and remove outputs', () => {
       combineWritesOutput: false,
     });
     assert.equal(result.code, 1);
-    assert.ok(result.err[0].startsWith('qa:combine: ffmpeg failed to combine'));
+    assert.deepEqual(result.err, ['qa:combine: ffmpeg failed to combine: ']);
     assert.equal(result.files.has(PNG_OUT), false);
-  });
-
-  test('a non-zero GIF run exits 1 and removes the MP4 and the GIF', () => {
-    const result = run([...VIDEO_ARGS, '--height', '48'], {
-      gifStatus: 1,
-      gifStderr: 'palette failed',
-    });
-    assert.equal(result.code, 1);
-    assert.deepEqual(result.err, [
-      'qa:combine: ffmpeg failed to make the GIF: palette failed',
-    ]);
-    assert.deepEqual(result.out, []);
-    assert.equal(result.files.has(MP4_OUT), false);
-    assert.equal(result.files.has(GIF_OUT), false);
-    assert.ok(result.removed.includes(MP4_OUT));
-    assert.ok(result.removed.includes(GIF_OUT));
+    assert.ok(result.removed.includes(PNG_OUT));
   });
 });
 
-describe('runCombine: the temp dir is removed on every outcome', () => {
-  const outcomes: Array<[string, string[], FakeOptions]> = [
-    ['an image success', [...IMAGE_ARGS, '--height', '48'], {}],
-    ['a video success', [...VIDEO_ARGS, '--height', '48'], {}],
-    [
-      'a combine failure',
-      [...VIDEO_ARGS, '--height', '48'],
-      { combineStatus: 1 },
-    ],
-    [
-      'a GIF over the cap',
-      [...VIDEO_ARGS, '--height', '48'],
-      { gifSizes: [GIF_SIZE_CAP_BYTES + 1] },
-    ],
-    ['a GIF run failure', [...VIDEO_ARGS, '--height', '48'], { gifStatus: 1 }],
-    [
-      'a combine that exits 0 without output',
-      [...VIDEO_ARGS, '--height', '48'],
-      { combineWritesOutput: false },
-    ],
-    [
-      'a GIF size that cannot be read on every rung',
-      [...VIDEO_ARGS, '--height', '48'],
-      { unsizedGifRuns: GIF_LADDER.map((_, i) => i) },
-    ],
-  ];
-  for (const [label, args, options] of outcomes) {
-    test(`after ${label} the label files are gone and the temp dir is removed`, () => {
-      const result = run(args, options);
-      assert.ok(result.removed.includes(TEMP), 'temp dir removed');
-      assert.equal(result.files.has(BEFORE_LABEL), false);
-      assert.equal(result.files.has(AFTER_LABEL), false);
+// The overlay PNGs' paths and sizes come from the plan: a band across both
+// panels, then each side's label and one strip per caption window.
+const BAND_PNG = join(TEMP, 'band.png');
+const BEFORE_LABEL = join(TEMP, 'before-label.png');
+const AFTER_LABEL = join(TEMP, 'after-label.png');
+const BEFORE_STRIPS = [0, 1, 2].map((n) =>
+  join(TEMP, `before-strip-0${n}.png`),
+);
+const AFTER_STRIPS = [0, 1].map((n) => join(TEMP, `after-strip-0${n}.png`));
+const ANNOTATE_OUT = '/out/combined/S1.mp4';
+
+const BAND: Band = {
+  id: 'S1',
+  title: 'Save an item',
+  result: 'PASS',
+  commits: { before: 'abc1234', after: 'def5678' },
+};
+
+const step = (index: number, caption: string, atMs: number): VideoStep => ({
+  index,
+  caption,
+  atMs,
+  device: 'A',
+  tab: 'A',
+  label: 'Device A',
+});
+
+/** Before has three caption windows (opening, two steps); After has two. */
+const PLAN: AnnotatedVideoPlan = {
+  band: BAND,
+  sides: [
+    {
+      side: 'before',
+      video: '/work/before.webm',
+      device: 'A',
+      tab: 'A',
+      label: 'Device A',
+      openedAtMs: 0,
+      steps: [step(1, 'open the form', 1500), step(2, 'save the item', 4000)],
+    },
+    {
+      side: 'after',
+      video: '/work/after.webm',
+      device: 'A',
+      tab: 'A',
+      label: 'Device A',
+      openedAtMs: 2000,
+      steps: [step(1, 'open the form', 2500)],
+    },
+  ],
+  output: ANNOTATE_OUT,
+};
+
+interface AnnotateFakeOptions {
+  /** The ffmpeg run's status; default 0. */
+  status?: number;
+  stderr?: string;
+  /** Whether a successful ffmpeg run leaves the MP4 on disk; default true. */
+  writesOutput?: boolean;
+  /** When set, the Chromium render rejects with this error. */
+  renderError?: Error;
+}
+
+function fakeAnnotate(options: AnnotateFakeOptions = {}) {
+  const calls: string[][] = [];
+  const files = new Set<string>();
+  const removed: string[] = [];
+  const dirs: string[] = [];
+  const renders: {
+    path: string;
+    width: number;
+    height: number;
+    html: string;
+  }[][] = [];
+  /** Every effect in call order, so ordering can be asserted. */
+  const log: string[] = [];
+
+  const deps: AnnotateDeps = {
+    run(argv) {
+      log.push('run');
+      calls.push([...argv]);
+      const status = options.status ?? 0;
+      if (status === 0 && (options.writesOutput ?? true)) {
+        files.add(argv[argv.length - 1]);
+      }
+      return { status, stderr: options.stderr ?? '' };
+    },
+    exists: (path) => files.has(path),
+    makeTempDir() {
+      log.push('makeTempDir');
+      return TEMP;
+    },
+    makeDir(path) {
+      log.push(`makeDir ${path}`);
+      dirs.push(path);
+    },
+    removePath(path) {
+      log.push(`remove ${path}`);
+      removed.push(path);
+      files.delete(path);
+    },
+    tokenCss: () => TOKENS,
+    async renderPngs(pages) {
+      log.push('render');
+      renders.push(
+        pages.map(({ path, width, height, html }) => ({
+          path,
+          width,
+          height,
+          html,
+        })),
+      );
+      if (options.renderError !== undefined) throw options.renderError;
+    },
+  };
+
+  return { deps, calls, dirs, files, removed, renders, log };
+}
+
+describe('makeAnnotatedVideo: the overlay PNGs', () => {
+  test('renders the band, then each side label and its strips, in one call, at the page sizes the plan implies', async () => {
+    const fake = fakeAnnotate();
+    await makeAnnotatedVideo(PLAN, fake.deps);
+
+    assert.equal(fake.renders.length, 1, 'one render call');
+    const [pages] = fake.renders;
+    assert.deepEqual(
+      pages.map(({ path }) => path),
+      [BAND_PNG, BEFORE_LABEL, ...BEFORE_STRIPS, AFTER_LABEL, ...AFTER_STRIPS],
+    );
+    assert.deepEqual(
+      pages.map(({ width, height }) => [width, height]),
+      [
+        [VIDEO_PANEL.width * 2, VIDEO_BAND_HEIGHT],
+        [VIDEO_PANEL.width, VIDEO_LABEL_HEIGHT],
+        ...BEFORE_STRIPS.map(() => [VIDEO_PANEL.width, VIDEO_STRIP_HEIGHT]),
+        [VIDEO_PANEL.width, VIDEO_LABEL_HEIGHT],
+        ...AFTER_STRIPS.map(() => [VIDEO_PANEL.width, VIDEO_STRIP_HEIGHT]),
+      ],
+    );
+    assert.ok(
+      pages.every(({ html }) => html.includes(TOKENS)),
+      'each page carries the design tokens',
+    );
+  });
+
+  test('the overlay PNGs are rendered before ffmpeg runs, and the ffmpeg argv reads exactly those paths', async () => {
+    const fake = fakeAnnotate();
+    await makeAnnotatedVideo(PLAN, fake.deps);
+
+    assert.equal(fake.calls.length, 1, 'one ffmpeg run');
+    const [argv] = fake.calls;
+    assert.equal(argv[0], 'ffmpeg');
+    assert.deepEqual(inputsOf(argv), [
+      '/work/before.webm',
+      '/work/after.webm',
+      BAND_PNG,
+      BEFORE_LABEL,
+      ...BEFORE_STRIPS,
+      AFTER_LABEL,
+      ...AFTER_STRIPS,
+    ]);
+    assert.equal(argv.at(-1), ANNOTATE_OUT);
+    assert.deepEqual(fake.dirs, ['/out/combined']);
+    assert.ok(
+      fake.log.indexOf('render') < fake.log.indexOf('run'),
+      'the PNGs exist before ffmpeg reads them',
+    );
+  });
+});
+
+describe('makeAnnotatedVideo: outcomes', () => {
+  test('a successful make leaves the MP4 and removes only the temp dir', async () => {
+    const fake = fakeAnnotate();
+    await makeAnnotatedVideo(PLAN, fake.deps);
+    assert.equal(fake.files.has(ANNOTATE_OUT), true);
+    assert.deepEqual(fake.removed, [TEMP]);
+  });
+
+  test('a render that rejects makes no ffmpeg call, rejects with that error, and removes the MP4 and the temp dir', async () => {
+    const fake = fakeAnnotate({
+      renderError: new Error('Chromium crashed'),
     });
-  }
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message: 'Chromium crashed',
+    });
+    assert.equal(fake.calls.length, 0, 'ffmpeg never runs');
+    assert.deepEqual(fake.removed, [ANNOTATE_OUT, TEMP]);
+    assert.equal(fake.files.has(ANNOTATE_OUT), false);
+  });
+
+  test('a non-zero ffmpeg rejects with its first stderr line, and removes the MP4 and the temp dir', async () => {
+    const fake = fakeAnnotate({
+      status: 1,
+      stderr: 'Invalid data found\nmore detail',
+    });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message: 'ffmpeg failed to make the MP4: Invalid data found',
+    });
+    assert.equal(fake.calls.length, 1);
+    assert.deepEqual(fake.removed, [ANNOTATE_OUT, TEMP]);
+    assert.equal(fake.files.has(ANNOTATE_OUT), false);
+  });
+
+  test('an ffmpeg that exits 0 without writing the MP4 rejects, and removes the MP4 and the temp dir', async () => {
+    const fake = fakeAnnotate({ writesOutput: false });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message: 'ffmpeg failed to make the MP4: ',
+    });
+    assert.deepEqual(fake.removed, [ANNOTATE_OUT, TEMP]);
+    assert.equal(fake.files.has(ANNOTATE_OUT), false);
+  });
 });
