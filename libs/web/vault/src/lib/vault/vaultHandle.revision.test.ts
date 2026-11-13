@@ -86,6 +86,7 @@ import type { VaultStorageV1 } from './localVaultStorage';
 import { localVaultStorageKey } from './localVaultStorage';
 import { createLocalVaultRevision } from './localVaultRevision';
 import { createVaultHandle } from './vaultHandle';
+import { localToServerMeta } from './vaultShapes';
 
 const LS_KEY_USER_A = localVaultStorageKey('user-a');
 
@@ -538,6 +539,89 @@ describe('createVaultHandle with revision', () => {
 
       // Vault should still be removed
       expect(handle.hasVault()).toBe(false);
+    });
+  });
+
+  describe('adoptVaultMetaWrapping() bumps revision only when it writes', () => {
+    function makeVault(passphraseWrapping: {
+      iv: string;
+      ciphertext: string;
+    }): VaultStorageV1 {
+      return {
+        version: 1,
+        kdf: {
+          name: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 310000,
+          salt: 'c2FsdA==',
+        },
+        masterKeyWrappedWithPassphrase: passphraseWrapping,
+        masterKeyWrappedWithRecoveryKey: {
+          iv: 'aS1i',
+          ciphertext: 'Y3QtYg==',
+        },
+        data: {},
+      };
+    }
+
+    const localWrapping = { iv: 'bG9jYWwtaXY=', ciphertext: 'bG9jYWwtY3Q=' };
+    const remoteWrapping = { iv: 'cmVtb3RlLWl2', ciphertext: 'cmVtb3RlLWN0' };
+
+    it('adopted write bumps the revision once', () => {
+      const revision = createLocalVaultRevision();
+      const handle = createVaultHandle({ owner: 'user-a', revision });
+      handle.saveVault(makeVault(localWrapping));
+      const expectedMeta = localToServerMeta(makeVault(localWrapping));
+      const before = revision.current();
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: {
+          ...expectedMeta,
+          wrapped_mk_passphrase: { version: 1, ...remoteWrapping },
+        },
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('adopted');
+      expect(revision.current()).toBe(before + 1);
+    });
+
+    it('wrapping-moved refusal does not bump the revision', () => {
+      const revision = createLocalVaultRevision();
+      const handle = createVaultHandle({ owner: 'user-a', revision });
+      // Stored wrapping has moved on from the one the decision was made against.
+      handle.saveVault(makeVault({ iv: 'bmV3LWl2', ciphertext: 'bmV3LWN0' }));
+      const expectedMeta = localToServerMeta(makeVault(localWrapping));
+      const before = revision.current();
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: {
+          ...expectedMeta,
+          wrapped_mk_passphrase: { version: 1, ...remoteWrapping },
+        },
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('wrapping-moved');
+      expect(revision.current()).toBe(before);
+    });
+
+    it('no-local-vault refusal does not bump the revision', () => {
+      const revision = createLocalVaultRevision();
+      const handle = createVaultHandle({ owner: 'user-a', revision });
+      const expectedMeta = localToServerMeta(makeVault(localWrapping));
+      const before = revision.current();
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: {
+          ...expectedMeta,
+          wrapped_mk_passphrase: { version: 1, ...remoteWrapping },
+        },
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('no-local-vault');
+      expect(revision.current()).toBe(before);
     });
   });
 });

@@ -17,7 +17,14 @@ import {
   randomBytes,
   utf8ToBytes,
 } from './crypto';
+import type { VaultMetaV1 } from '@myorganiser/app-api-client';
+
 import { mintRecoveryKey, type MintedRecoveryKey } from './recoveryKeyMint';
+import { vaultMetaIdentity } from './vaultMetaConverge';
+import {
+  adoptServerMetaIntoLocalVault,
+  localToServerMeta,
+} from './vaultShapes';
 import type {
   EncryptedBlob,
   LocalVaultReadResult,
@@ -160,6 +167,15 @@ export class VaultLockedError extends Error {
   }
 }
 
+/**
+ * What an attempt to adopt a remote Vault Meta's wrapping did. Only `adopted`
+ * wrote anything.
+ */
+export type VaultMetaAdoptionWrite =
+  | 'adopted'
+  | 'wrapping-moved'
+  | 'no-local-vault';
+
 export type LocalVaultAccess = {
   /** Whether a Master Key is currently bound. */
   readonly isUnlocked: boolean;
@@ -191,6 +207,28 @@ export type LocalVaultAccess = {
    */
   loadUnclaimedVault(): VaultStorageV1 | null;
   saveVault(vault: VaultStorageV1): void;
+  /**
+   * Adopt a remote Vault Meta's wrapping into the Local Vault, and nothing
+   * else.
+   *
+   * The write is built from a Local Vault read synchronously here, with no
+   * await between that read and the write, and it replaces only the wrapping:
+   * every Vault Blob Type's Ciphertext is carried across from that same read.
+   * A Vault Meta adoption is decided after a prompt with no timeout, so a
+   * Local Vault read before it can be arbitrarily old, and writing it back
+   * would revert every type saved meanwhile ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
+   *
+   * `comparedLocalMeta` is the local wrapping the decision was made against. When
+   * the wrapping read here is a different one — another tab adopted or
+   * rotated it meanwhile — nothing is written and `wrapping-moved` comes back:
+   * a decision made against an older wrapping never overwrites a newer one.
+   * No Local Vault at all writes nothing either.
+   */
+  adoptVaultMetaWrapping(options: {
+    /** The server's Vault Meta, whose wrapping is adopted. */
+    remoteMeta: VaultMetaV1;
+    comparedLocalMeta: VaultMetaV1;
+  }): VaultMetaAdoptionWrite;
   /** Explicit Local Vault removal (ADR 0033). Locks this access afterward. */
   removeVault(): void;
 
@@ -596,6 +634,22 @@ export function createLocalVaultAccess(options: {
 
     saveVault(vault) {
       slot.write(vault);
+    },
+
+    adoptVaultMetaWrapping({ remoteMeta, comparedLocalMeta }) {
+      // Read, check and write with no await between them (ADR 0143).
+      const fresh = vaultOf(slot.read());
+      if (!fresh) return 'no-local-vault';
+      if (
+        vaultMetaIdentity(localToServerMeta(fresh)) !==
+        vaultMetaIdentity(comparedLocalMeta)
+      ) {
+        return 'wrapping-moved';
+      }
+      slot.write(
+        adoptServerMetaIntoLocalVault({ localVault: fresh, meta: remoteMeta }),
+      );
+      return 'adopted';
     },
 
     removeVault() {

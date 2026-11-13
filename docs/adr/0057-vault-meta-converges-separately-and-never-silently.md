@@ -4,6 +4,8 @@
 
 accepted
 
+Amended by [#1499](https://github.com/mnaimfaizy/myorganiser/issues/1499): decision 3 no longer returns adoption as a next Local Vault. The write is made from a fresh read and changes only the wrapping ([ADR 0143](0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
+
 ## Context
 
 Multi-device vault sync converges a User's Vault against the server's copy. A Vault has two
@@ -63,8 +65,10 @@ without the User saying so.**
 3. **The convergence module structurally cannot write.** `convergeVaultMeta` takes
    `Pick<VaultApi, 'getVaultMeta'>` and nothing else, so no answer given to it can push a local
    wrapping over the server's. `getServerVaultMeta` was narrowed to the same one method for the
-   same reason. Adoption is _returned_ as a next Local Vault for the caller to save, exactly as
-   Vault Reconcile returns one.
+   same reason. Adoption is _returned_ for the caller to write, as the wrapping to adopt and the
+   local wrapping it was decided against. Since [#1499](https://github.com/mnaimfaizy/myorganiser/issues/1499)
+   that write is made from a fresh Local Vault read and changes only the wrapping
+   ([ADR 0143](0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
 
 4. **The prompt is about the passphrase, not about the Vault.** "Your passphrase was changed on
    another device — start using it here?" It never presents the whole Vault as a single choice

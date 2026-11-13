@@ -594,15 +594,12 @@ describe('convergeVaultMeta', () => {
     expect(result.kind).toBe('adopted-remote');
     if (result.kind === 'adopted-remote') {
       expect(result.change).toBe('passphrase');
-      expect(result.nextLocalVault).toBeDefined();
-      // Remote wrapping is adopted but salt stays the same
-      expect(result.nextLocalVault.kdf.salt).toBe('salt-local');
-      expect(result.nextLocalVault.masterKeyWrappedWithPassphrase).toEqual({
-        iv: 'remote-iv',
-        ciphertext: 'remote-ct',
-      });
-      // Local data is preserved
-      expect(result.nextLocalVault.data).toEqual(localVault.data);
+      // Adoption hands back the wrapping to adopt, never a whole Local Vault:
+      // the write is made later, from a fresh read (ADR 0143).
+      expect(result).not.toHaveProperty('nextLocalVault');
+      expect(result.remoteMeta).toEqual(remoteWrapping);
+      // The local wrapping the decision was made against, as Vault Meta
+      expect(result.comparedLocalMeta).toEqual(makeServerMeta());
     }
 
     // Input was not mutated
@@ -639,11 +636,17 @@ describe('convergeVaultMeta', () => {
     expect(result.kind).toBe('adopted-remote');
     if (result.kind === 'adopted-remote') {
       expect(result.change).toBe('recovery-key');
-      expect(result.nextLocalVault.masterKeyWrappedWithRecoveryKey).toEqual({
+      expect(result).not.toHaveProperty('nextLocalVault');
+      expect(result.remoteMeta.wrapped_mk_recovery).toEqual({
+        version: 1,
         iv: 'remote-recovery-iv',
         ciphertext: 'remote-recovery-ct',
       });
-      expect(result.nextLocalVault.data).toEqual(localVault.data);
+      expect(result.comparedLocalMeta.wrapped_mk_recovery).toEqual({
+        version: 1,
+        iv: 'iv2-local',
+        ciphertext: 'ct2-local',
+      });
     }
   });
 

@@ -44,6 +44,7 @@ function createMockHandle(overrides?: Partial<VaultHandle>): VaultHandle {
     hasOwnedVault: jest.fn().mockReturnValue(true),
     loadVault: jest.fn().mockReturnValue(null),
     saveVault: jest.fn(),
+    adoptVaultMetaWrapping: jest.fn(),
     removeVault: jest.fn(),
     initialize: jest.fn(),
     unlockWithPassphrase: jest.fn(),

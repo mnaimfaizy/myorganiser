@@ -8,6 +8,8 @@ Builds on [ADR 0054](0054-a-vault-blob-converges-by-record-and-absence-is-record
 
 Amended by [#1501](https://github.com/mnaimfaizy/myorganiser/issues/1501): decision 3 used to merge only a contended save. It now merges every page save, including the first attempt. The filename keeps the old wording so that links keep working.
 
+Amended by [#1499](https://github.com/mnaimfaizy/myorganiser/issues/1499): Vault Meta adoption joins the whole-Local-Vault writes this ADR still allows, under the rule given after the decisions.
+
 ## Context
 
 Every web Local Vault write had the same shape. It read the whole Local Vault, awaited key import and encryption, and wrote the whole object back. Anything another writer put there during those awaits was reverted, and that included other Vault Blob Types.
@@ -29,6 +31,14 @@ The Local Vault Revision could not guard any of this. By definition an edit does
 6. **`takeRemote` stands down instead of retrying.** It writes the server's Ciphertext for its type only if that type's local Ciphertext is still the one convergence decided on. Otherwise a local edit landed, and convergence returns "superseded" and records no Sync Bookmark. The edit has already told the Vault Sync Sink, so the queue re-converges the type through the dirty path.
 
 Reconcile's download of the server wrapping (made only when no Local Vault exists) and Import (a replacement the User asked for, ordered by [ADR 0063](0063-a-restore-discards-the-evidence-it-holds-about-the-server.md)) stay whole-Local-Vault writes.
+
+Vault Meta adoption ([ADR 0057](0057-vault-meta-converges-separately-and-never-silently.md)) also writes the whole Local Vault, because the wrapping is not a Vault Blob Type. It changes only the wrapping, under these rules:
+
+- **Fresh read.** The write is built from a Local Vault read synchronously just before it, with no await between. The Local Vault read before the User was asked is never written back: the prompt has no timeout, so that read can be arbitrarily old.
+- **Wrapping only.** The adopted wrapping comes from the server's Vault Meta. Every Vault Blob Type's Ciphertext is carried across from the fresh read, so whatever was stored at the moment of the write is kept.
+- **No write when the wrapping moved.** If the wrapping just read is not the one convergence compared against, nothing is written. Another tab adopted or rotated it, and a decision made against an older wrapping must not overwrite a newer one. The Vault Meta settle runs again instead. No Local Vault at the moment of the write also writes nothing. A wrapping that moved is compared by Vault Meta identity, the same identity divergence and the Vault Meta Bookmark use.
+
+`convergeVaultMeta` still cannot write. It returns the wrapping to adopt and the local wrapping it was decided against, and `settleVaultMeta` makes the write through the Vault Handle.
 
 ## Considered Options
 

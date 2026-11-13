@@ -17,8 +17,12 @@
  *
  * This module structurally cannot write. It takes `getVaultMeta` and nothing
  * else, so no answer given to it can push a local wrapping over the server's
- * and undo a passphrase change made elsewhere. Adoption is returned as a next
- * Local Vault for the caller to save, exactly as Vault Reconcile returns one.
+ * and undo a passphrase change made elsewhere. Adoption is returned as the
+ * wrapping to adopt and the local wrapping it was decided against, never as a
+ * whole Local Vault: the answer can arrive arbitrarily late, and a Local Vault
+ * read before it would revert every Vault Blob saved meanwhile.
+ * `settleVaultMeta` performs the write from a fresh read
+ * ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
  */
 import { VaultApi, VaultMetaV1 } from '@myorganiser/app-api-client';
 
@@ -27,11 +31,7 @@ import { getHttpStatus } from '../http/getHttpStatus';
 import { VaultStorageV1 } from './localVaultStorage';
 import { getServerVaultMeta, type ServerVaultMeta } from './serverVaultSync';
 import { stableStringify } from './stableStringify';
-import {
-  adoptServerMetaIntoLocalVault,
-  localToServerMeta,
-  normalizeEncryptedBlobV1,
-} from './vaultShapes';
+import { localToServerMeta, normalizeEncryptedBlobV1 } from './vaultShapes';
 
 /**
  * Which wrapping in a Vault Meta moved, in the order divergence is reported —
@@ -250,8 +250,13 @@ export type VaultMetaConvergeResult =
   | ({
       kind: 'adopted-remote';
       change: VaultMetaChange;
-      /** The Local Vault to save: the remote wrapping over local Ciphertext. */
-      nextLocalVault: VaultStorageV1;
+      /** The server's Vault Meta, whose wrapping the User chose to adopt. */
+      remoteMeta: VaultMetaV1;
+      /**
+       * The local wrapping this decision was made against. Adoption writes
+       * nothing if the Local Vault no longer holds it when the write is made.
+       */
+      comparedLocalMeta: VaultMetaV1;
     } & ObservedIdentity);
 
 /**
@@ -316,8 +321,9 @@ export async function convergeVaultMeta(options: {
   // decides can make it untrue (ADR 0067's amendment, #691).
   options.onObserved({ identity: observedIdentity });
 
+  const comparedLocalMeta = localToServerMeta(localVault);
   const divergence = describeVaultMetaDivergence({
-    local: localToServerMeta(localVault),
+    local: comparedLocalMeta,
     remote: serverMeta.meta,
   });
 
@@ -362,9 +368,7 @@ export async function convergeVaultMeta(options: {
     kind: 'adopted-remote',
     change: divergence.change,
     observedIdentity,
-    nextLocalVault: adoptServerMetaIntoLocalVault({
-      localVault,
-      meta: serverMeta.meta,
-    }),
+    remoteMeta: serverMeta.meta,
+    comparedLocalMeta,
   };
 }

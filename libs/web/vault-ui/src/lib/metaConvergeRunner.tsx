@@ -317,11 +317,22 @@ export function VaultMetaConvergeRunner() {
             return;
           }
 
-          const converged = result.kind === 'converged' ? result.result : null;
+          // The User chose the server's wrapping, but the Local Vault had
+          // moved by the time it was written — another tab adopted or rotated
+          // it, or it was removed — so `settleVaultMeta` wrote nothing. No
+          // toast: telling the User their passphrase changed here would be a
+          // success for an adoption that did not happen, and nothing failed
+          // either. One coalesced follow-up pass re-reads the Local Vault and
+          // finds it in sync, or asks again about what is there now.
+          if (result.kind === 'adoption-superseded') {
+            pendingRecheck = true;
+            return;
+          }
 
-          if (converged?.kind === 'adopted-remote') {
-            currentHandle.saveVault(converged.nextLocalVault);
-            const adopted = VAULT_META_CHANGE_COPY[converged.change].adopt;
+          // Written by `settleVaultMeta` from a fresh read, wrapping only, so
+          // this runner never writes the Local Vault itself (ADR 0143).
+          if (result.kind === 'adopted-remote') {
+            const adopted = VAULT_META_CHANGE_COPY[result.change].adopt;
             // A change with no adopt copy is one the library refuses to adopt,
             // so reaching here with none would mean the dialog offered an
             // action the library would not carry out.

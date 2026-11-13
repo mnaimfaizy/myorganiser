@@ -22,6 +22,7 @@ export {
 export type {
   LocalVaultStatus,
   VaultHandle,
+  VaultMetaAdoptionWrite,
   VaultSyncSink,
 } from './lib/vault/vaultHandle';
 export * from './lib/vault/localVaultRevision';

@@ -485,7 +485,7 @@ Deciding what one Vault Blob Type's Ciphertext and the server's copy of it shoul
 _Avoid_: sync, resolve, merge (as the name of the whole act), two-way sync
 
 **Vault Meta Converge**:
-Deciding whether this device starts using a wrapping set on another device, and carrying that out. Separate from Vault Converge and never an input to it: a Vault Meta that diverges leaves every Vault Blob exactly as mergeable as it was. It is the one convergence that cannot check its own answer — a wrapping cannot be verified without the passphrase it was derived from — so it never replaces a local wrapping without the User saying so, and adopting one is returned for the caller to save rather than written where it was decided.
+Deciding whether this device starts using a wrapping set on another device, and carrying that out. Separate from Vault Converge and never an input to it: a Vault Meta that diverges leaves every Vault Blob exactly as mergeable as it was. It is the one convergence that cannot check its own answer — a wrapping cannot be verified without the passphrase it was derived from — so it never replaces a local wrapping without the User saying so. Adopting one is returned rather than written where it was decided, and the write that carries it out replaces only the wrapping, built from the Local Vault as it stands at that moment: Ciphertext stored while the User was deciding is kept, and nothing is written if the wrapping moved meanwhile.
 _Avoid_: meta sync, key sync, passphrase sync, vault meta reconcile
 
 **Vault Meta Change**:
