@@ -10,7 +10,8 @@
         "generator": "typescript-axios",
         "sourceSpecPathOrUrl": "libs/api-specs/src/api-specs.openapi.yaml",
         "additionalProperties": "useSingleRequestParameter=true --skip-validate-spec",
-        "globalProperties": "apiDocs=false,modelDocs=false"
+        "globalProperties": "apiDocs=false,modelDocs=false",
+        "typeMappings": "'GetLatestVaultBackupResponse=VaultBackupRecordDto | null'"
       }
     },
     "lint": {
