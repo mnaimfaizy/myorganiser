@@ -325,94 +325,212 @@ describe('VaultMetaConvergeRunner', () => {
     });
   });
 
-  test('should call saveVault and show success toast when adopted-remote with passphrase change', async () => {
+  test('should show the passphrase updated toast and save nothing when settle reports adopted-remote', async () => {
     const mockHandle = createMockHandle('user-a');
 
     (useOptionalVaultSession as jest.Mock).mockReturnValue({
       handle: mockHandle,
     });
 
-    const nextVault = {
-      version: 1,
-      kdf: {
-        name: 'PBKDF2' as const,
-        hash: 'SHA-256' as const,
-        iterations: 310_000,
-        salt: 'remote-salt',
-      },
-      masterKeyWrappedWithPassphrase: {
-        iv: 'remote-iv1',
-        ciphertext: 'remote-ct1',
-      },
-      masterKeyWrappedWithRecoveryKey: { iv: 'iv2', ciphertext: 'ct2' },
-      data: {},
-    };
-
+    // settleVaultMeta performs the adoption itself and reports that it wrote
+    // the Local Vault, so the runner has no Vault of its own to save.
     mockSettleVaultMeta.mockResolvedValue({
-      kind: 'converged' as const,
-      result: {
-        kind: 'adopted-remote' as const,
-        change: 'passphrase' as const,
-        nextLocalVault: nextVault,
-      },
+      kind: 'adopted-remote' as const,
+      change: 'passphrase' as const,
     });
 
     render(<VaultMetaConvergeRunner />);
 
     await waitFor(() => {
-      expect(mockHandle.saveVault).toHaveBeenCalledWith(nextVault);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Passphrase updated',
+          description:
+            'This device now uses the passphrase set on your other device.',
+        }),
+      );
     });
 
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Passphrase updated',
-      }),
-    );
+    expect(mockHandle.saveVault).not.toHaveBeenCalled();
   });
 
-  test('should show recovery key updated toast when adopted-remote with recovery-key change', async () => {
+  test('should show the recovery key updated toast and save nothing when settle reports adopted-remote', async () => {
     const mockHandle = createMockHandle('user-a');
 
     (useOptionalVaultSession as jest.Mock).mockReturnValue({
       handle: mockHandle,
     });
 
-    const nextVault = {
-      version: 1,
-      kdf: {
-        name: 'PBKDF2' as const,
-        hash: 'SHA-256' as const,
-        iterations: 310_000,
-        salt: 'salt',
-      },
-      masterKeyWrappedWithPassphrase: { iv: 'iv1', ciphertext: 'ct1' },
-      masterKeyWrappedWithRecoveryKey: {
-        iv: 'remote-recovery-iv',
-        ciphertext: 'remote-recovery-ct',
-      },
-      data: {},
-    };
-
     mockSettleVaultMeta.mockResolvedValue({
-      kind: 'converged' as const,
-      result: {
-        kind: 'adopted-remote' as const,
-        change: 'recovery-key' as const,
-        nextLocalVault: nextVault,
-      },
+      kind: 'adopted-remote' as const,
+      change: 'recovery-key' as const,
     });
 
     render(<VaultMetaConvergeRunner />);
 
     await waitFor(() => {
-      expect(mockHandle.saveVault).toHaveBeenCalledWith(nextVault);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Recovery key updated',
+          description:
+            'This device now uses the recovery key set on your other device.',
+        }),
+      );
     });
 
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Recovery key updated',
-      }),
+    expect(mockHandle.saveVault).not.toHaveBeenCalled();
+  });
+
+  test('should show no toast and run exactly one follow-up pass when the adoption was superseded by a moved wrapping', async () => {
+    const mockHandle = createMockHandle('user-a');
+
+    (useOptionalVaultSession as jest.Mock).mockReturnValue({
+      handle: mockHandle,
+    });
+
+    // The first pass finds the Local Vault had moved before the write; the
+    // follow-up pass finds it in sync with the server.
+    let passes = 0;
+    mockSettleVaultMeta.mockImplementation(async () => {
+      passes += 1;
+      if (passes === 1) {
+        return {
+          kind: 'adoption-superseded' as const,
+          change: 'passphrase' as const,
+          reason: 'wrapping-moved' as const,
+        };
+      }
+      return { kind: 'noop-already-in-sync' as const };
+    });
+
+    render(<VaultMetaConvergeRunner />);
+
+    // The mount-settle signal fires at the end of every pass, so reaching two
+    // means the follow-up has settled too.
+    await waitFor(() => {
+      expect(mockReportMountSettled).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockSettleVaultMeta).toHaveBeenCalledTimes(2);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockHandle.saveVault).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  test('should show no toast and run exactly one follow-up pass when the adoption was superseded by a missing Local Vault', async () => {
+    const mockHandle = createMockHandle('user-a');
+
+    (useOptionalVaultSession as jest.Mock).mockReturnValue({
+      handle: mockHandle,
+    });
+
+    let passes = 0;
+    mockSettleVaultMeta.mockImplementation(async () => {
+      passes += 1;
+      if (passes === 1) {
+        return {
+          kind: 'adoption-superseded' as const,
+          change: 'recovery-key' as const,
+          reason: 'no-local-vault' as const,
+        };
+      }
+      return { kind: 'skipped-no-local-vault' as const };
+    });
+
+    render(<VaultMetaConvergeRunner />);
+
+    await waitFor(() => {
+      expect(mockReportMountSettled).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockSettleVaultMeta).toHaveBeenCalledTimes(2);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockHandle.saveVault).not.toHaveBeenCalled();
+  });
+
+  test('should run no follow-up pass when unmounted while a pass that then reports adoption-superseded is still settling', async () => {
+    const mockHandle = createMockHandle('user-a');
+
+    (useOptionalVaultSession as jest.Mock).mockReturnValue({
+      handle: mockHandle,
+    });
+
+    let resolveFirstPass: ((value: unknown) => void) | undefined;
+    mockSettleVaultMeta.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstPass = resolve;
+        }),
     );
+
+    const { unmount } = render(<VaultMetaConvergeRunner />);
+
+    await waitFor(() => {
+      expect(mockSettleVaultMeta).toHaveBeenCalledTimes(1);
+    });
+
+    unmount();
+
+    resolveFirstPass?.({
+      kind: 'adoption-superseded',
+      change: 'passphrase',
+      reason: 'wrapping-moved',
+    });
+
+    await waitFor(() => {
+      expect(mockReportMountSettled).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockSettleVaultMeta).toHaveBeenCalledTimes(1);
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  test('should run no follow-up pass when a focus-requested recheck is pending and the component unmounts before the pass settles', async () => {
+    const mockHandle = createMockHandle('user-a');
+
+    (useOptionalVaultSession as jest.Mock).mockReturnValue({
+      handle: mockHandle,
+    });
+
+    // Only the first pass is held open, so the focus below lands while it is
+    // in flight and sets the pending recheck. Any later pass settles at once.
+    let resolveFirstPass: ((value: unknown) => void) | undefined;
+    let passes = 0;
+    mockSettleVaultMeta.mockImplementation(() => {
+      passes += 1;
+      if (passes === 1) {
+        return new Promise((resolve) => {
+          resolveFirstPass = resolve;
+        });
+      }
+      return Promise.resolve({ kind: 'noop-already-in-sync' as const });
+    });
+
+    const { unmount } = render(<VaultMetaConvergeRunner />);
+
+    await waitFor(() => {
+      expect(mockSettleVaultMeta).toHaveBeenCalledTimes(1);
+    });
+
+    // Coalesced into pendingRecheck: no second pass starts while one is in flight.
+    fireEvent.focus(window);
+    expect(mockSettleVaultMeta).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    resolveFirstPass?.({
+      kind: 'adoption-superseded',
+      change: 'passphrase',
+      reason: 'wrapping-moved',
+    });
+
+    await waitFor(() => {
+      expect(mockReportMountSettled).toHaveBeenCalledTimes(1);
+    });
+
+    // The guard in the finally block drops the pending recheck once cancelled.
+    expect(mockSettleVaultMeta).toHaveBeenCalledTimes(1);
+    expect(mockToast).not.toHaveBeenCalled();
   });
 
   test('should record durable refusal when keep-local is chosen and save nothing or toast nothing', async () => {

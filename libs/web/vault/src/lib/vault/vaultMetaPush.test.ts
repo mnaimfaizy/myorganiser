@@ -1160,4 +1160,156 @@ describe('settleVaultMeta', () => {
     // finishing early — and the deliberate hang stays inside this test.
     await expectStillPending(settlePromise);
   });
+
+  // ===== Cases 25-27: adoption is written from a fresh read, after the prompt (ADR 0143) =====
+
+  /**
+   * A prompt the test answers when it chooses. The pass is held open at the
+   * dialog until `answer` is called, which is how a User who has not yet
+   * decided is modelled.
+   */
+  function holdPrompt() {
+    const pending: { resolve?: (decision: VaultMetaDecision) => void } = {};
+    const prompt = jest.fn(
+      () =>
+        new Promise<VaultMetaDecision>((resolve) => {
+          pending.resolve = resolve;
+        }),
+    );
+    return {
+      prompt,
+      answer: (decision: VaultMetaDecision) => pending.resolve?.(decision),
+    };
+  }
+
+  /** Lets the converge pass reach the prompt, which is after a few microtasks. */
+  async function flushAsyncWork() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  /** Every key in localStorage and its raw value, for byte-level comparison. */
+  function storageSnapshot(): Record<string, string | null> {
+    return Object.fromEntries(
+      Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]),
+    );
+  }
+
+  /** The local meta with only its passphrase wrapping changed, same salt. */
+  function withRemotePassphraseWrapping(meta: VaultMetaV1): VaultMetaV1 {
+    return {
+      ...meta,
+      wrapped_mk_passphrase: {
+        version: 1,
+        iv: 'remote-iv',
+        ciphertext: 'remote-ct',
+      },
+    };
+  }
+
+  function serverHolds(api: jest.Mocked<VaultMetaApi>, meta: VaultMetaV1) {
+    api.getVaultMeta.mockResolvedValue({
+      data: { etag: 'etag-server', updatedAt: 't1', meta },
+    } as AxiosResponse);
+  }
+
+  test('25: adoption after the prompt keeps Ciphertext saved while the prompt was open and takes the server wrapping', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    await handle.saveEncryptedData({
+      type: 'addresses',
+      value: { label: 'saved before prompt' },
+    });
+    const savedBeforePrompt = handle.loadVault()!.data.addresses;
+
+    const api = createApiDouble();
+    const remoteMeta = withRemotePassphraseWrapping(
+      localToServerMeta(handle.loadVault()!),
+    );
+    serverHolds(api, remoteMeta);
+    const { prompt, answer } = holdPrompt();
+
+    const settled = settleVaultMeta({ api, handle, prompt });
+    await flushAsyncWork();
+    expect(prompt).toHaveBeenCalledTimes(1);
+
+    await handle.saveEncryptedData({
+      type: 'addresses',
+      value: { label: 'saved during prompt' },
+    });
+    const savedDuringPrompt = handle.loadVault()!.data.addresses;
+    expect(savedDuringPrompt).not.toEqual(savedBeforePrompt);
+
+    answer('adopt-remote');
+
+    await expect(settled).resolves.toEqual({
+      kind: 'adopted-remote',
+      change: 'passphrase',
+    });
+    const stored = handle.loadVault()!;
+    expect(stored.masterKeyWrappedWithPassphrase).toEqual({
+      iv: 'remote-iv',
+      ciphertext: 'remote-ct',
+    });
+    expect(stored.data.addresses).toEqual(savedDuringPrompt);
+    expect(
+      await handle.loadDecryptedData({ type: 'addresses', defaultValue: null }),
+    ).toEqual({ label: 'saved during prompt' });
+  });
+
+  test('26: adoption is superseded as wrapping-moved when the wrapping changed during the prompt, and writes nothing', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    const api = createApiDouble();
+    serverHolds(
+      api,
+      withRemotePassphraseWrapping(localToServerMeta(handle.loadVault()!)),
+    );
+    const { prompt, answer } = holdPrompt();
+
+    const settled = settleVaultMeta({ api, handle, prompt });
+    await flushAsyncWork();
+    expect(prompt).toHaveBeenCalledTimes(1);
+
+    // The passphrase is rewrapped while the dialog is open.
+    await handle.resetPassphrase({ newPassphrase: 'other-pass' });
+    const snapshotAtAnswer = storageSnapshot();
+
+    answer('adopt-remote');
+
+    await expect(settled).resolves.toEqual({
+      kind: 'adoption-superseded',
+      change: 'passphrase',
+      reason: 'wrapping-moved',
+    });
+    expect(handle.loadVault()!.masterKeyWrappedWithPassphrase).not.toEqual({
+      iv: 'remote-iv',
+      ciphertext: 'remote-ct',
+    });
+    expect(storageSnapshot()).toEqual(snapshotAtAnswer);
+  });
+
+  test('27: adoption is superseded as no-local-vault when the Local Vault is removed during the prompt, and writes nothing', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    const api = createApiDouble();
+    serverHolds(
+      api,
+      withRemotePassphraseWrapping(localToServerMeta(handle.loadVault()!)),
+    );
+    const { prompt, answer } = holdPrompt();
+
+    const settled = settleVaultMeta({ api, handle, prompt });
+    await flushAsyncWork();
+    expect(prompt).toHaveBeenCalledTimes(1);
+
+    handle.removeVault();
+    const snapshotAtAnswer = storageSnapshot();
+
+    answer('adopt-remote');
+
+    await expect(settled).resolves.toEqual({
+      kind: 'adoption-superseded',
+      change: 'passphrase',
+      reason: 'no-local-vault',
+    });
+    expect(handle.hasVault()).toBe(false);
+    expect(storageSnapshot()).toEqual(snapshotAtAnswer);
+  });
 });

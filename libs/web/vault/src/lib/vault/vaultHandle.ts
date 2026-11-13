@@ -42,6 +42,7 @@ export {
 // rather than letting either throw, so reaching one is a programming error
 // rather than a case the interface asks callers to handle.
 export type { LocalVaultStatus } from './localVaultStorage';
+export type { VaultMetaAdoptionWrite } from './localVaultAccess';
 
 /**
  * Where a Vault Handle reports that one Vault Blob Type's Ciphertext changed.
@@ -297,6 +298,14 @@ export function createVaultHandle(options: {
     saveVault: (vault) => {
       access.saveVault(vault);
       reportVaultReplaced();
+    },
+    // Told to the Local Vault Revision only when something was written, as
+    // `saveVault` is: a refused adoption leaves what is stored exactly as it
+    // was, so whoever is reading this Vault holds nothing stale.
+    adoptVaultMetaWrapping: (options) => {
+      const outcome = access.adoptVaultMetaWrapping(options);
+      if (outcome === 'adopted') reportVaultReplaced();
+      return outcome;
     },
     // Explicit Local Vault removal (ADR 0033) also removes this owner's Sync
     // Bookmarks, Vault Meta Bookmark and Observed Vault Identity (ADR 0058,

@@ -36,7 +36,7 @@ import {
   type ServerVaultMeta,
 } from './serverVaultSync';
 import { hashVaultMeta } from './syncBookmarkAccess';
-import type { VaultHandle } from './vaultHandle';
+import type { VaultHandle, VaultMetaAdoptionWrite } from './vaultHandle';
 import {
   describeVaultMetaDivergence,
   vaultMetaIdentity,
@@ -457,11 +457,31 @@ export type SettleVaultMetaResult =
   | { kind: 'pushed-local-wrapping' }
   | { kind: 'noop-already-in-sync' }
   /**
-   * Nothing was owed, or what was owed could not be pushed. The Vault Meta
-   * Converge result is carried verbatim: adoption still comes back as a next
-   * Local Vault for the caller to save, exactly as it always did.
+   * The User chose the server's wrapping, and the Local Vault now carries it
+   * over whatever Ciphertext was stored at the moment of the write.
    */
-  | { kind: 'converged'; result: VaultMetaConvergeResult };
+  | { kind: 'adopted-remote'; change: VaultMetaChange }
+  /**
+   * The User chose the server's wrapping and nothing was written: the Local
+   * Vault no longer held the wrapping the decision was made against, or no
+   * longer existed. The settle must run again — it is a decision about a
+   * state that is gone, not a failure, and not an adoption.
+   */
+  | {
+      kind: 'adoption-superseded';
+      change: VaultMetaChange;
+      reason: Exclude<VaultMetaAdoptionWrite, 'adopted'>;
+    }
+  /**
+   * Nothing was owed, or what was owed could not be pushed, and Vault Meta
+   * Converge decided something other than an adoption. Its result is carried
+   * verbatim. An adoption never comes back here: `settleVaultMeta` performs
+   * it, so no caller is ever left holding a write to make.
+   */
+  | {
+      kind: 'converged';
+      result: Exclude<VaultMetaConvergeResult, { kind: 'adopted-remote' }>;
+    };
 
 /**
  * Settle one User's Vault Meta with the server: push what this device owes,
@@ -539,5 +559,24 @@ export async function settleVaultMeta(options: {
     },
   });
 
-  return { kind: 'converged', result };
+  if (result.kind !== 'adopted-remote') return { kind: 'converged', result };
+
+  // The `localVault` read above is from before the prompt, which has no
+  // timeout, so it is never written back. The handle re-reads the Local Vault
+  // and writes the adopted wrapping over that read's Ciphertext with no await
+  // between, and writes nothing if the wrapping moved meanwhile (ADR 0143).
+  const write = handle.adoptVaultMetaWrapping({
+    remoteMeta: result.remoteMeta,
+    comparedLocalMeta: result.comparedLocalMeta,
+  });
+
+  if (write !== 'adopted') {
+    return {
+      kind: 'adoption-superseded',
+      change: result.change,
+      reason: write,
+    };
+  }
+
+  return { kind: 'adopted-remote', change: result.change };
 }

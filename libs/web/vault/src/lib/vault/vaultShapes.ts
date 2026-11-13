@@ -139,6 +139,11 @@ function serverBlobsToLocalData(
  * The wrapping still goes through `serverMetaToLocalVault`, so a meta missing
  * a wrapped key or carrying an unsupported KDF hash is rejected here rather
  * than saved and discovered at the next unlock.
+ *
+ * `localVault` must be a read taken immediately before the write, with no
+ * await between: its Ciphertext is what gets written back, so a Local Vault
+ * read any earlier reverts every Vault Blob saved since. The one writer is
+ * `LocalVaultAccess.adoptVaultMetaWrapping` ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
  */
 export function adoptServerMetaIntoLocalVault(options: {
   localVault: VaultStorageV1;

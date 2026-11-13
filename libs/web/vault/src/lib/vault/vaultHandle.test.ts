@@ -108,6 +108,7 @@ import {
   VaultLockedError,
   VaultSecretMismatchError,
 } from './vaultHandle';
+import { localToServerMeta } from './vaultShapes';
 
 // === Storage setup ===
 
@@ -421,6 +422,123 @@ describe('createVaultHandle (owner-bound Vault Handle)', () => {
       expect(
         JSON.parse(localStorage.getItem(LS_KEY_USER_B) || '{}'),
       ).toHaveProperty('owner', 'user-b');
+    });
+  });
+
+  describe('adoptVaultMetaWrapping — Vault Meta adoption write (ADR 0143)', () => {
+    function makeStoredVault(
+      overrides: Partial<VaultStorageV1> = {},
+    ): VaultStorageV1 {
+      return {
+        version: 1,
+        kdf: {
+          name: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 310000,
+          salt: 'c2FsdA==',
+        },
+        masterKeyWrappedWithPassphrase: {
+          iv: 'b2xkLWl2',
+          ciphertext: 'b2xkLWN0',
+        },
+        masterKeyWrappedWithRecoveryKey: {
+          iv: 'cmVjLWl2',
+          ciphertext: 'cmVjLWN0',
+        },
+        data: {
+          addresses: { iv: 'YWRkci1pdg==', ciphertext: 'YWRkci1jdA==' },
+        },
+        ...overrides,
+      };
+    }
+
+    test('adopted: writes the remote passphrase wrapping and keeps Ciphertext saved after the decision was made', () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      const decidedOn = makeStoredVault();
+      handle.saveVault(decidedOn);
+      const expectedMeta = localToServerMeta(decidedOn);
+      const remoteMeta = {
+        ...expectedMeta,
+        wrapped_mk_passphrase: {
+          version: 1,
+          iv: 'remote-iv',
+          ciphertext: 'remote-ct',
+        },
+      };
+
+      // A Vault Blob saved while the User was still deciding.
+      const savedMeanwhile = makeStoredVault({
+        data: {
+          addresses: decidedOn.data.addresses,
+          groceries: { iv: 'Z3JvY2Vy', ciphertext: 'Z3JvY2VyLWN0' },
+        },
+      });
+      handle.saveVault(savedMeanwhile);
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: remoteMeta,
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('adopted');
+      expect(handle.loadVault()).toEqual({
+        ...savedMeanwhile,
+        masterKeyWrappedWithPassphrase: {
+          iv: 'remote-iv',
+          ciphertext: 'remote-ct',
+        },
+      });
+    });
+
+    test('wrapping-moved: writes nothing when the Local Vault no longer holds the decided-on wrapping', () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      const expectedMeta = localToServerMeta(makeStoredVault());
+      // Another tab has already rewrapped the passphrase wrapping.
+      handle.saveVault(
+        makeStoredVault({
+          masterKeyWrappedWithPassphrase: {
+            iv: 'bmV3LWl2',
+            ciphertext: 'bmV3LWN0',
+          },
+        }),
+      );
+      const before = localStorage.getItem(LS_KEY_USER_A);
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: {
+          ...expectedMeta,
+          wrapped_mk_passphrase: {
+            version: 1,
+            iv: 'remote-iv',
+            ciphertext: 'remote-ct',
+          },
+        },
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('wrapping-moved');
+      expect(localStorage.getItem(LS_KEY_USER_A)).toBe(before);
+    });
+
+    test('no-local-vault: writes nothing and leaves the slot empty when no Local Vault exists', () => {
+      const handle = createVaultHandle({ owner: 'user-a' });
+      const expectedMeta = localToServerMeta(makeStoredVault());
+
+      const outcome = handle.adoptVaultMetaWrapping({
+        remoteMeta: {
+          ...expectedMeta,
+          wrapped_mk_passphrase: {
+            version: 1,
+            iv: 'remote-iv',
+            ciphertext: 'remote-ct',
+          },
+        },
+        comparedLocalMeta: expectedMeta,
+      });
+
+      expect(outcome).toBe('no-local-vault');
+      expect(localStorage.getItem(LS_KEY_USER_A)).toBeNull();
+      expect(handle.hasVault()).toBe(false);
     });
   });
 
