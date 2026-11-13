@@ -21,7 +21,7 @@ import {
 } from './qa-scenario.ts';
 import type { ExitCode } from './qa-stack-executor.ts';
 import type { Side } from './qa-stack.ts';
-import type { Storyboard } from './storyboard.ts';
+import { ALIKE_TEXT, NOT_DECLARED, type Storyboard } from './storyboard.ts';
 
 const REPO = '/repo';
 const WT = '/wt';
@@ -838,7 +838,7 @@ describe('bad input is refused before any stack call', () => {
   });
 });
 
-describe('a screen side with no step: the Storyboard is refused and no combined file is made', () => {
+describe('a screen side with no step, or sides with unequal steps: the Storyboard is refused and no combined file is made', () => {
   const NO_STEP = (side: Side) =>
     `${side}: no step() was called, so no Storyboard was made`;
   const noStep = (): Partial<Scripted> => ({ steps: 0 });
@@ -905,6 +905,32 @@ describe('a screen side with no step: the Storyboard is refused and no combined 
       assert.equal(exit, 1);
       const entry = manifestOf(fake).scenarios[0];
       assert.deepEqual(entry.problems, c.zeroSides.map(NO_STEP));
+      assert.deepEqual(
+        fake.log.filter((line) => /^(combine|render) /.test(line)),
+        [],
+      );
+      assert.equal(
+        entry.files.some(({ place }) => place === 'combined'),
+        false,
+      );
+    });
+  }
+
+  for (const capture of ['video', 'screenshot'] as const) {
+    test(`a ${capture} fix whose Before and After take different step counts exits 1, names both counts, and makes no combine or render call`, async () => {
+      const fake = fakeRun({
+        exports: filesOf(scenario('X', capture)),
+        runs: (id, side) => ({
+          ...reproduced(id, side),
+          steps: side === 'before' ? 1 : 2,
+        }),
+      });
+      const exit = await runQaRun(argvFor('fix'), fake.deps);
+      assert.equal(exit, 1);
+      const entry = manifestOf(fake).scenarios[0];
+      assert.deepEqual(entry.problems, [
+        'Before took 1 step(s) and After took 2; steps are matched by index, so no Storyboard was made',
+      ]);
       assert.deepEqual(
         fake.log.filter((line) => /^(combine|render) /.test(line)),
         [],
@@ -1160,8 +1186,78 @@ describe('a Storyboard that is not drawn, or fails to draw', () => {
     );
     assert.ok(fake.removed.includes(`${OUT}/combined/V.png`));
   });
+});
 
-  test('a feature with no expected.before, After failing and re-run on Before, draws no Storyboard but keeps its step records', async () => {
+describe('the Storyboard columns: one for a side run alone or alike sides, two for a re-run on the merge-base', () => {
+  test('a feature run After only is drawn as one After column, with no expected.before needed', async () => {
+    const solo = {
+      id: 'F',
+      capture: 'screenshot',
+      title: 'F scenario',
+      expected: { after: 'the fix shows' },
+      run: async () => undefined,
+    } satisfies Scenario;
+    const fake = fakeRun({
+      exports: filesOf(solo),
+      runs: () => ({ observed: 'the fix shows here' }),
+    });
+    const exit = await runQaRun(argvFor('feature'), fake.deps);
+    assert.equal(exit, 0);
+    assert.deepEqual(
+      fake.log.filter((line) => line.startsWith('run F')),
+      ['run F after'],
+    );
+    assert.equal(fake.renders.length, 1, 'the Storyboard is rendered');
+    const { storyboard } = fake.renders[0];
+    assert.deepEqual(storyboard.columns, ['after']);
+    assert.deepEqual(
+      storyboard.sides.map((card) => [card.side, card.mark]),
+      [['after', 'as-expected']],
+    );
+    assert.equal(storyboard.band.alike, undefined);
+    const entry = manifestOf(fake).scenarios[0];
+    assert.deepEqual(entry.problems, []);
+    assert.deepEqual(
+      entry.files.find(({ path }) => path === storyboardPng('F')),
+      { path: storyboardPng('F'), place: 'combined', uploadEligible: true },
+    );
+  });
+
+  test('identical expected results that both sides observed are drawn as one After column with the alike band text', async () => {
+    const guard = {
+      id: 'G',
+      capture: 'screenshot',
+      title: 'G scenario',
+      expected: { before: 'the same label', after: 'the same label' },
+      run: async () => undefined,
+    } satisfies Scenario;
+    const fake = fakeRun({
+      exports: filesOf(guard),
+      runs: () => ({ observed: 'the same label' }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+    assert.equal(manifestOf(fake).scenarios[0].result, 'Not proven');
+
+    assert.equal(fake.renders.length, 1, 'the Storyboard is rendered');
+    const { storyboard } = fake.renders[0];
+    assert.equal(storyboard.band.result, 'Not proven');
+    assert.equal(storyboard.band.alike, ALIKE_TEXT);
+    assert.deepEqual(storyboard.columns, ['after']);
+    assert.deepEqual(
+      storyboard.rows.map((row) => row.cells.before?.still),
+      ['steps/G/before/01.png'],
+      'the Before cell stays in the row as evidence',
+    );
+    assert.deepEqual(
+      manifestOf(fake).scenarios[0].files.find(
+        ({ path }) => path === storyboardPng('G'),
+      ),
+      { path: storyboardPng('G'), place: 'combined', uploadEligible: true },
+    );
+  });
+
+  test('a feature with no expected.before, After failing and re-run on Before, is drawn as two columns and keeps its step records', async () => {
     // Pre-existing: Before also fails, so the headline is not a regression.
     const plain = {
       id: 'P',
@@ -1190,18 +1286,33 @@ describe('a Storyboard that is not drawn, or fails to draw', () => {
       manifest.headline,
       'QA passed, not proven or pre-existing items listed',
     );
-    assert.equal(fake.renders.length, 0, 'no Storyboard is rendered');
     assert.deepEqual(manifest.scenarios[0].problems, []);
+
+    // Before was never told what to expect, so its card says so and its column
+    // stands beside After's.
+    assert.equal(fake.renders.length, 1, 'the Storyboard is rendered');
+    const { storyboard } = fake.renders[0];
+    assert.deepEqual(storyboard.columns, ['before', 'after']);
+    assert.deepEqual(
+      storyboard.sides.map((card) => [card.side, card.expected]),
+      [
+        ['before', NOT_DECLARED],
+        ['after', 'the fix shows'],
+      ],
+    );
+    assert.equal(storyboard.band.alike, undefined);
+    assert.deepEqual(
+      manifest.scenarios[0].files.find(
+        ({ path }) => path === storyboardPng('P'),
+      ),
+      { path: storyboardPng('P'), place: 'combined', uploadEligible: true },
+    );
     assert.ok(
       manifest.scenarios[0].files.some(
         ({ path, place }) =>
           path === `${OUT}/steps/P.json` && place === 'local',
       ),
       'the step records are listed locally',
-    );
-    assert.equal(
-      manifest.scenarios[0].files.some(({ place }) => place === 'combined'),
-      false,
     );
   });
 });

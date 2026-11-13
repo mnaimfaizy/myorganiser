@@ -9,7 +9,9 @@ import type { ScenarioResult } from './grade-scenarios.ts';
 import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import {
+  ALIKE_TEXT,
   MARK_TEXT,
+  NOT_DECLARED,
   NOTHING_OBSERVED,
   type StoryboardInput,
   type StoryboardSideInput,
@@ -384,5 +386,186 @@ describe('buildStoryboard: the columns and the mark words', () => {
       'as-expected': '✓ as expected',
       'not-as-expected': '✗ not as expected',
     });
+  });
+});
+
+describe('buildStoryboard: alike, when one column stands for both sides', () => {
+  const bothPass = (): Partial<Record<Side, StoryboardSideInput>> => ({
+    before: {
+      outcome: 'pass',
+      observed: 'the same label',
+      steps: [step('before', 1), step('before', 2)],
+    },
+    after: {
+      outcome: 'pass',
+      observed: 'the same label',
+      steps: [step('after', 1), step('after', 2)],
+    },
+  });
+
+  test('identical expected results that both sides observed give one After column, the alike band text, and the graded result', () => {
+    const storyboard = board(bothPass(), {
+      expected: SAME,
+      result: 'Not proven',
+    });
+    assert.deepEqual(storyboard.columns, ['after']);
+    assert.equal(storyboard.band.alike, ALIKE_TEXT);
+    assert.equal(storyboard.band.result, 'Not proven');
+    assert.deepEqual(storyboard.problems, []);
+  });
+
+  test('rows never collapse: each row keeps its Before cell beside the After one', () => {
+    const { rows } = board(bothPass(), { expected: SAME });
+    assert.deepEqual(
+      rows.map((row) => row.cells.before),
+      [step('before', 1), step('before', 2)],
+    );
+    assert.deepEqual(
+      rows.map((row) => row.cells.after),
+      [step('after', 1), step('after', 2)],
+    );
+  });
+
+  test('identical expected results where one side is not as expected give two columns and no alike band', () => {
+    const cases: [string, Partial<Record<Side, StoryboardSideInput>>, Side][] =
+      [
+        [
+          'Before fails where it is expected to pass',
+          {
+            before: {
+              outcome: 'fail',
+              message: 'the label is gone',
+              steps: [step('before', 1)],
+            },
+            after: {
+              outcome: 'pass',
+              observed: 'the same label',
+              steps: [step('after', 1)],
+            },
+          },
+          'before',
+        ],
+        [
+          'After fails',
+          {
+            before: {
+              outcome: 'pass',
+              observed: 'the same label',
+              steps: [step('before', 1)],
+            },
+            after: {
+              outcome: 'fail',
+              message: 'the label is gone',
+              steps: [step('after', 1)],
+            },
+          },
+          'after',
+        ],
+      ];
+    for (const [name, sides, side] of cases) {
+      const storyboard = board(sides, { expected: SAME });
+      assert.deepEqual(storyboard.columns, ['before', 'after'], name);
+      assert.equal(storyboard.band.alike, undefined, name);
+      assert.equal(markOf(storyboard, side), 'not-as-expected', name);
+    }
+  });
+
+  test('different expected results give two columns even when both sides are as expected', () => {
+    const storyboard = board({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [step('before', 1)],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [step('after', 1)],
+      },
+    });
+    assert.deepEqual(
+      storyboard.sides.map((card) => card.mark),
+      ['as-expected', 'as-expected'],
+    );
+    assert.deepEqual(storyboard.columns, ['before', 'after']);
+    assert.equal(storyboard.band.alike, undefined);
+  });
+
+  test('a Before and After with different step counts is a problem, even when their expected results are alike', () => {
+    const storyboard = board(
+      {
+        before: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('before', 1)],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      { expected: SAME },
+    );
+    assert.deepEqual(storyboard.problems, [
+      'Before took 1 step(s) and After took 2; steps are matched by index, so no Storyboard was made',
+    ]);
+  });
+});
+
+describe('buildStoryboard: a feature with one side or no expected.before', () => {
+  test('a feature run After only is one After column, needs no expected.before, and has no problem', () => {
+    const storyboard = board(
+      {
+        after: {
+          outcome: 'pass',
+          observed: 'the fix shows here',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      { expected: { after: 'the fix shows' } },
+    );
+    assert.deepEqual(storyboard.columns, ['after']);
+    assert.deepEqual(storyboard.sides, [
+      {
+        side: 'after',
+        expected: 'the fix shows',
+        observed: 'the fix shows here',
+        mark: 'as-expected',
+      },
+    ]);
+    assert.deepEqual(storyboard.problems, []);
+    assert.equal(storyboard.band.alike, undefined);
+    assert.deepEqual(
+      storyboard.rows.map((row) => row.cells.before),
+      [null, null],
+    );
+  });
+
+  test('a feature re-run on the merge-base with no expected.before gives two columns, Before expects nothing declared, and no alike band', () => {
+    const storyboard = board(
+      {
+        before: {
+          outcome: 'fail',
+          message: 'the defect is still there',
+          steps: [step('before', 1)],
+        },
+        after: {
+          outcome: 'fail',
+          message: 'still broken',
+          steps: [step('after', 1)],
+        },
+      },
+      { expected: { after: 'the fix shows' }, result: 'FAIL: pre-existing' },
+    );
+    assert.deepEqual(storyboard.columns, ['before', 'after']);
+    assert.deepEqual(
+      storyboard.sides.map((card) => [card.side, card.expected, card.mark]),
+      [
+        ['before', NOT_DECLARED, 'as-expected'],
+        ['after', 'the fix shows', 'not-as-expected'],
+      ],
+    );
+    assert.equal(storyboard.band.alike, undefined);
   });
 });

@@ -339,7 +339,8 @@ async function runScenarios(
   /**
    * Saves a screen scenario's step records, then checks its Storyboard and
    * draws it. True when no combined file may be made for the scenario: the
-   * model reported a problem (zero steps today; #1546 adds more), which this
+   * model reported a problem (no steps, or a different step count on each
+   * side), which this
    * refuses on without knowing what it is, or the render failed.
    */
   async function storyboardFor(
@@ -379,16 +380,6 @@ async function runScenarios(
     if (storyboard.problems.length > 0) {
       record.problems.push(...storyboard.problems);
       return true;
-    }
-    // Drawn only with both sides and both expected results in this slice; a
-    // run After only, or a merge-base re-run without expected.before, is
-    // #1546's one-column case and gets no Storyboard yet.
-    if (
-      !sides.before ||
-      !sides.after ||
-      scenario.expected.before === undefined
-    ) {
-      return false;
     }
     const png = storyboardPath(args.out, scenario.id);
     deps.makeDir(dirname(png));

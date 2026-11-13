@@ -198,17 +198,18 @@ body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:$
 .side-tag{position:absolute;right:${token('space-sm')};top:${token('space-sm')};background:${roleColour('navy')};color:${roleColour('navy-foreground')};font-size:${token('type-label-sm-size')};letter-spacing:${token('type-label-caps-tracking')}}
 .cell-caption{position:absolute;left:0;right:0;bottom:0;background:${roleColour('card')};color:${roleColour('foreground-supporting')};font-size:${token('type-caption-size')};padding:${token('space-xs')} ${token('space-sm')};border-top:1px solid ${roleColour('border')}}
 .no-step{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border:1px dashed ${roleColour('border-strong')};border-radius:${token('radius-md')};color:${roleColour('foreground-supporting')};font-size:${token('type-control-sm-size')};background:${roleColour('subtle')}}
+.before-note{grid-column:2;margin-top:${token('space-xs')};color:${roleColour('foreground-supporting')};font-size:${token('type-control-sm-size')}}
 .foot{padding:${token('space-sm')} ${token('space-lg')} ${token('space-md')};color:${roleColour('foreground-supporting')};font-size:${token('type-label-caps-size')};border-top:1px solid ${roleColour('border')}}
 `;
 
 function bandHtml(storyboard: Storyboard): string {
-  const { id, title, result, commits } = storyboard.band;
+  const { id, title, result, commits, alike } = storyboard.band;
   const tone = RESULT_TONE[result];
   const meta = SIDES.map(
     (side) =>
       `${SIDE_WORDS[side].name} ${escapeHtml(shortSha(commits[side]))} (${SIDE_WORDS[side].commit})`,
   ).join(' · ');
-  return `<header class="band"><div class="top"><h1>${escapeHtml(`${id} · ${title}`)}</h1><span class="result" style="background:${tone.background};color:${tone.color}">${escapeHtml(result)}</span></div><div class="meta">${meta}</div></header>`;
+  return `<header class="band"><div class="top"><h1>${escapeHtml(`${id} · ${title}`)}</h1><span class="result" style="background:${tone.background};color:${tone.color}">${escapeHtml(result)}</span></div><div class="meta">${alike ? `${escapeHtml(alike)} · ` : ''}${meta}</div></header>`;
 }
 
 function cardHtml(card: SideCard): string {
@@ -242,9 +243,23 @@ function stillHtml(
   return `<div class="still" data-side="${side}" style="aspect-ratio:${crop.width}/${crop.height}">${image}${box}<span class="tags"><span class="label">${escapeHtml(step.label)}</span>${unsettled}</span><span class="side-tag">${sideTag(side)}</span>${ownCaption}</div>`;
 }
 
+/** The Before line a "Before and After alike" row carries for its step. */
+export const BEFORE_SAME_STEP = 'Before: same step';
+
+function beforeNoteHtml(row: StoryboardRow, caption: string): string {
+  const before = row.cells.before;
+  // Unequal step counts are a model problem, so no page is drawn with a
+  // missing Before cell; this guard only keeps the type honest.
+  if (before === null) return '';
+  const text =
+    before.caption === caption ? BEFORE_SAME_STEP : `Before: ${before.caption}`;
+  return `<div class="before-note" data-side="before">${escapeHtml(text)}</div>`;
+}
+
 function rowHtml(
   row: StoryboardRow,
   columns: readonly Side[],
+  alike: boolean,
   stillUrl: (step: StepRecord) => string,
 ): string {
   const caption = (row.cells.after ?? row.cells.before)?.caption ?? '';
@@ -254,7 +269,7 @@ function rowHtml(
   const stills = columns
     .map((side) => stillHtml(side, row.cells[side], caption, stillUrl))
     .join('');
-  return `<section class="row${row.checked ? ' checked' : ''}"><div class="n">${row.index}</div><div class="caption">${escapeHtml(caption)}${checked}</div><div class="stills">${stills}</div></section>`;
+  return `<section class="row${row.checked ? ' checked' : ''}"><div class="n">${row.index}</div><div class="caption">${escapeHtml(caption)}${checked}</div><div class="stills">${stills}</div>${alike ? beforeNoteHtml(row, caption) : ''}</section>`;
 }
 
 /**
@@ -269,5 +284,5 @@ export function storyboardHtml(
   const { band, columns, sides, rows } = storyboard;
   // A stylesheet's text cannot close its own <style> element.
   const tokens = tokenCss.replaceAll('</', '<\\/');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(`${band.id} · ${band.title}`)}</title><style>${tokens}</style><style>${STYLE}</style></head><body style="--columns:${columns.length}">${bandHtml(storyboard)}<div class="cards">${sides.map(cardHtml).join('')}</div>${rows.map((row) => rowHtml(row, columns, stillUrl)).join('')}<footer class="foot">${escapeHtml(STORYBOARD_FOOTER)}</footer></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(`${band.id} · ${band.title}`)}</title><style>${tokens}</style><style>${STYLE}</style></head><body style="--columns:${columns.length}">${bandHtml(storyboard)}<div class="cards">${sides.map(cardHtml).join('')}</div>${rows.map((row) => rowHtml(row, columns, band.alike !== undefined, stillUrl)).join('')}<footer class="foot">${escapeHtml(STORYBOARD_FOOTER)}</footer></body></html>`;
 }

@@ -4,9 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import type { StepRecord } from './qa-scenario.ts';
+import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
-import { storyboardHtml } from './storyboard-html.ts';
+import { BEFORE_SAME_STEP, storyboardHtml } from './storyboard-html.ts';
 import { type StoryboardSideInput, buildStoryboard } from './storyboard.ts';
 
 const COMMITS = { before: 'a'.repeat(40), after: 'b'.repeat(40) };
@@ -42,16 +42,23 @@ function step(
   };
 }
 
+/** A fix: Before is expected to show the defect, After the fix. */
+const DIFFERENT_EXPECTED: ExpectedResults = {
+  before: 'the defect shows',
+  after: 'the fix shows',
+};
+
 function page(
   sides: Partial<Record<Side, StoryboardSideInput>>,
   tokenCss = TOKENS,
   title = 'Save an item',
+  expected: ExpectedResults = DIFFERENT_EXPECTED,
 ): string {
   return storyboardHtml(
     buildStoryboard({
       id: 'S1',
       title,
-      expected: { before: 'the defect shows', after: 'the fix shows' },
+      expected,
       result: 'PASS',
       commits: COMMITS,
       sides,
@@ -106,6 +113,179 @@ describe('storyboardHtml', () => {
     });
     assert.ok(html.includes('no step on BEFORE'));
     assert.equal(html.includes('no step on AFTER'), false);
+  });
+
+  test('identical expected results that both sides observed draw one After column, with the alike text leading the band meta', () => {
+    const html = page(
+      {
+        before: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('before', 1), step('before', 2)],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      { before: 'the same label', after: 'the same label' },
+    );
+    assert.ok(html.includes('<body style="--columns:1">'), 'one column');
+    assert.ok(
+      html.includes(
+        '<div class="meta">Before and After alike · Before aaaaaaa (merge-base)',
+      ),
+      'the alike text leads the band meta, before the commits',
+    );
+    assert.equal(countOf(html, 'Before and After alike'), 1);
+    assert.equal(countOf(html, '<div class="still" data-side="before"'), 0);
+    assert.equal(countOf(html, '<div class="still" data-side="after"'), 2);
+  });
+
+  test('alike with differing captions: each row carries a Before note naming the Before caption', () => {
+    const html = page(
+      {
+        before: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [
+            step('before', 1, 'the before caption'),
+            step('before', 2, 'the before caption two'),
+          ],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [
+            step('after', 1, 'the after caption'),
+            step('after', 2, 'the after caption two'),
+          ],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      { before: 'the same label', after: 'the same label' },
+    );
+    assert.equal(countOf(html, 'class="before-note"'), 2);
+    assert.ok(
+      html.includes(
+        '<div class="before-note" data-side="before">Before: the before caption</div>',
+      ),
+    );
+    assert.ok(
+      html.includes(
+        '<div class="before-note" data-side="before">Before: the before caption two</div>',
+      ),
+    );
+    // Each note sits inside its own row, after that row's stills.
+    const rows = html.split('<section class="row').slice(1);
+    assert.equal(rows.length, 2);
+    for (const row of rows) {
+      assert.equal(countOf(row, 'class="before-note"'), 1);
+    }
+  });
+
+  test('alike with matching captions: each row carries the "Before: same step" note', () => {
+    const html = page(
+      {
+        before: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('before', 1), step('before', 2)],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the same label',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      { before: 'the same label', after: 'the same label' },
+    );
+    assert.equal(BEFORE_SAME_STEP, 'Before: same step');
+    assert.equal(
+      countOf(
+        html,
+        `<div class="before-note" data-side="before">${BEFORE_SAME_STEP}</div>`,
+      ),
+      2,
+    );
+    assert.equal(countOf(html, 'class="before-note"'), 2);
+    assert.equal(html.includes('Before: step 1'), false);
+  });
+
+  test('a two-column or After-only Storyboard draws no Before note', () => {
+    const twoColumn = page({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [step('before', 1)],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [step('after', 1)],
+      },
+    });
+    const afterOnly = page(
+      {
+        after: {
+          outcome: 'pass',
+          observed: 'the fix shows here',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      { after: 'the fix shows' },
+    );
+    // Each page has rows drawn, so the absence is not an empty page.
+    assert.equal(countOf(twoColumn, 'class="row'), 1);
+    assert.equal(countOf(afterOnly, 'class="row'), 2);
+    for (const html of [twoColumn, afterOnly]) {
+      assert.equal(countOf(html, 'class="before-note"'), 0);
+      assert.equal(html.includes(BEFORE_SAME_STEP), false);
+    }
+  });
+
+  test('different expected results draw two columns and no alike text', () => {
+    const html = page({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [step('before', 1)],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [step('after', 1)],
+      },
+    });
+    assert.ok(html.includes('<body style="--columns:2">'), 'two columns');
+    assert.equal(html.includes('Before and After alike'), false);
+    assert.equal(countOf(html, '<div class="still" data-side="before"'), 1);
+  });
+
+  test('an After-only feature draws one column and no "no step on BEFORE" cell', () => {
+    const html = page(
+      {
+        after: {
+          outcome: 'pass',
+          observed: 'the fix shows here',
+          steps: [step('after', 1), step('after', 2)],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      { after: 'the fix shows' },
+    );
+    assert.ok(html.includes('<body style="--columns:1">'), 'one column');
+    assert.equal(html.includes('no step on BEFORE'), false);
+    assert.equal(countOf(html, '<div class="still" data-side="after"'), 2);
   });
 
   test('the token CSS is inlined, and a "</" in it cannot close the style element', () => {

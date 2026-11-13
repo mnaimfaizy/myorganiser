@@ -18,9 +18,10 @@
  *
  * Anything that stops a Storyboard being made is returned in `problems`, not
  * thrown; the executor refuses the combined file on any problem without
- * knowing what it is. The model has a column per side that ran; the
- * executor checks it whenever any side ran but draws it only when both did,
- * and the column rules are #1546's.
+ * knowing what it is. The model has a column per side that ran, except that
+ * one column (After's) stands for both when they are alike (`band.alike`):
+ * the expected results are identical and both sides showed them. A run After
+ * only has one column; a different step count between sides is a problem.
  *
  * Pure: nothing touches disk, a process or a browser. The page is drawn by
  * `storyboard-html.ts` and rendered by `storyboard-render.ts`.
@@ -56,6 +57,8 @@ export interface Band {
   title: string;
   result: ScenarioResult;
   commits: Record<Side, string>;
+  /** Set to `ALIKE_TEXT` when one column stands for both sides; else absent. */
+  alike?: typeof ALIKE_TEXT;
 }
 
 /** Whether a side showed the outcome it was expected to. */
@@ -93,6 +96,12 @@ export interface Storyboard {
   problems: string[];
 }
 
+/** The band's words when one column stands for Before and After alike. */
+export const ALIKE_TEXT = 'Before and After alike';
+
+/** Shown on a side card when the scenario declared no expected result for it. */
+export const NOT_DECLARED = '(no expected result declared for this side)';
+
 /** Shown when a passing run reported nothing it observed. */
 export const NOTHING_OBSERVED = '(the run reported nothing it observed)';
 
@@ -107,7 +116,12 @@ export function expectedOutcome(
   expected: ExpectedResults,
 ): RunOutcome {
   if (side === 'after') return 'pass';
-  return expected.before === expected.after ? 'pass' : 'fail';
+  return declaresSame(expected) ? 'pass' : 'fail';
+}
+
+/** Whether the scenario expects the same result on both sides. */
+function declaresSame(expected: ExpectedResults): boolean {
+  return expected.before === expected.after;
 }
 
 /** What a side observed: a passing run's report, or a failure's message. */
@@ -137,7 +151,7 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
     if (run.steps.length === 0) {
       problems.push(`${side}: no step() was called, so no Storyboard was made`);
     }
-    const expected = input.expected[side] ?? '';
+    const expected = input.expected[side] ?? NOT_DECLARED;
     sides.push({
       side,
       expected,
@@ -149,10 +163,26 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
     });
   }
 
-  const rowCount = Math.max(
-    0,
-    ...columns.map((side) => input.sides[side]?.steps.length ?? 0),
-  );
+  // Steps are matched across sides by index, so both sides must have taken
+  // the same number (a side with none already has its own problem). A ragged
+  // grid is never drawn silently.
+  const counts = columns.map((side) => input.sides[side]?.steps.length ?? 0);
+  if (!counts.includes(0) && new Set(counts).size > 1) {
+    problems.push(
+      `Before took ${input.sides.before?.steps.length ?? 0} step(s) and After took ${input.sides.after?.steps.length ?? 0}; steps are matched by index, so no Storyboard was made`,
+    );
+  }
+
+  // One column "Before and After alike" only when the scenario declares the
+  // same expected result for both sides and both observed it. Rows never
+  // collapse individually: the Before cells stay in each row as evidence.
+  const alike =
+    columns.length === 2 &&
+    declaresSame(input.expected) &&
+    sides.every((card) => card.mark === 'as-expected');
+  const shown: readonly Side[] = alike ? ['after'] : columns;
+
+  const rowCount = Math.max(0, ...counts);
   const rows: StoryboardRow[] = [];
   for (let i = 0; i < rowCount; i++) {
     rows.push({
@@ -168,8 +198,9 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
       title: input.title,
       result: input.result,
       commits: input.commits,
+      ...(alike ? { alike: ALIKE_TEXT } : {}),
     },
-    columns,
+    columns: shown,
     sides,
     rows,
     problems,
