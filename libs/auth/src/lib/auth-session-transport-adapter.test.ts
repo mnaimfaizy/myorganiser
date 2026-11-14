@@ -631,6 +631,7 @@ describe('createAuthSessionTransportAdapter', () => {
           expect(sessionEndedListener).toHaveBeenCalledTimes(1);
           expect(sessionEndedListener).toHaveBeenCalledWith({
             reason: 'refresh_rejected',
+            owner: 'user-1',
           });
           expect(mockAxiosInstance).not.toHaveBeenCalled();
         },
@@ -782,6 +783,7 @@ describe('createAuthSessionTransportAdapter', () => {
         expect(sessionEndedListener).toHaveBeenCalledTimes(1);
         expect(sessionEndedListener).toHaveBeenCalledWith({
           reason: 'refresh_rejected',
+          owner: 'user-1',
         });
       });
 
@@ -796,6 +798,50 @@ describe('createAuthSessionTransportAdapter', () => {
 
         expect(mockStorage.clearSession).not.toHaveBeenCalled();
         expect(sessionEndedListener).not.toHaveBeenCalled();
+      });
+
+      it('carries the User signed in before the clear when the refresh is rejected', async () => {
+        let currentUser: typeof mockUser | undefined = mockUser;
+        mockStorage.getCurrentUser.mockImplementation(() => currentUser);
+        mockStorage.clearSession.mockImplementation(() => {
+          currentUser = undefined;
+        });
+        refreshFailsWith(
+          Object.assign(new Error('Refresh rejected'), {
+            response: { status: 403 },
+          }),
+        );
+
+        await expect(onRejected(unauthorized('/todos'))).rejects.toThrow(
+          'Refresh rejected',
+        );
+
+        expect(mockStorage.clearSession).toHaveBeenCalledTimes(1);
+        expect(sessionEndedListener).toHaveBeenCalledTimes(1);
+        expect(sessionEndedListener).toHaveBeenCalledWith({
+          reason: 'refresh_rejected',
+          owner: 'user-1',
+        });
+      });
+
+      it('carries no owner when no User is stored', async () => {
+        mockStorage.getCurrentUser.mockReturnValue(undefined);
+        refreshFailsWith(
+          Object.assign(new Error('Refresh rejected'), {
+            response: { status: 401 },
+          }),
+        );
+
+        await expect(onRejected(unauthorized('/todos'))).rejects.toThrow(
+          'Refresh rejected',
+        );
+
+        expect(mockStorage.clearSession).toHaveBeenCalledTimes(1);
+        expect(sessionEndedListener).toHaveBeenCalledTimes(1);
+        expect(sessionEndedListener.mock.calls[0][0].reason).toBe(
+          'refresh_rejected',
+        );
+        expect(sessionEndedListener.mock.calls[0][0].owner).toBeUndefined();
       });
     });
   });

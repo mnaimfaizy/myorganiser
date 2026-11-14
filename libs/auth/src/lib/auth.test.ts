@@ -145,7 +145,10 @@ describe('onSessionEnded', () => {
         expect.stringContaining('/auth/refresh'),
       ]);
       expect(listener).toHaveBeenCalledTimes(1);
-      expect(listener).toHaveBeenCalledWith({ reason: 'refresh_rejected' });
+      expect(listener).toHaveBeenCalledWith({
+        reason: 'refresh_rejected',
+        owner: 'user-1',
+      });
       expect(getAccessToken()).toBeUndefined();
       expect(getCurrentUser()).toBeUndefined();
     } finally {

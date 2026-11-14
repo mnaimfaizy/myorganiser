@@ -13,6 +13,14 @@ export type SessionEndedReason = 'refresh_rejected' | 'signed_out_elsewhere';
 
 export interface SessionEndedEvent {
   reason: SessionEndedReason;
+  /**
+   * The id of the User whose Session ended, read before the Session was
+   * cleared. Set for `refresh_rejected` when a User was signed in; absent
+   * when none was. A subscriber that must act on that User's device-local
+   * records (the Passkey Unlock record) needs it, since the current-User
+   * entry is gone by the time the event fires.
+   */
+  owner?: string;
 }
 
 export type SessionEndedListener = (event: SessionEndedEvent) => void;

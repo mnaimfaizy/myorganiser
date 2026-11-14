@@ -4,6 +4,7 @@ import {
   InstallPromptCapture,
   ServiceWorkerRegistration,
 } from '@myorganiser/web-pages/offline';
+import { EndedSessionPasskeyCleanup } from '@myorganiser/web-vault-ui';
 
 import { SITE_URL } from './site-url';
 
@@ -135,6 +136,12 @@ export default function RootLayout({
        * [data-bottom-sheet] is in the document. See Toast.tsx and BottomSheet.tsx.
        */}
       <body>
+        {/*
+         * Before {children} so it is subscribed ahead of a route guard's
+         * cold-load restore. Removes the Passkey Unlock record of a Session
+         * the server ended (ADR 0136, decision 6).
+         */}
+        <EndedSessionPasskeyCleanup />
         {children}
         {/*
          * Registers the service worker in production builds only (ADR 0127).
