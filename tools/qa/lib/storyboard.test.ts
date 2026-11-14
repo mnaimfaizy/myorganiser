@@ -385,6 +385,7 @@ describe('buildStoryboard: the columns and the mark words', () => {
     assert.deepEqual(MARK_TEXT, {
       'as-expected': '✓ as expected',
       'not-as-expected': '✗ not as expected',
+      'not-judged': '– not judged: no expected result declared',
     });
   });
 });
@@ -562,10 +563,201 @@ describe('buildStoryboard: a feature with one side or no expected.before', () =>
     assert.deepEqual(
       storyboard.sides.map((card) => [card.side, card.expected, card.mark]),
       [
-        ['before', NOT_DECLARED, 'as-expected'],
+        ['before', NOT_DECLARED, 'not-judged'],
         ['after', 'the fix shows', 'not-as-expected'],
       ],
     );
     assert.equal(storyboard.band.alike, undefined);
+  });
+});
+
+describe('buildStoryboard: a side with no declared expected result is not judged', () => {
+  const mergeBase = { after: 'the fix shows' };
+
+  test('a feature re-run on the merge-base whose Before fails, with no expected.before, is not-judged', () => {
+    const storyboard = board(
+      {
+        before: {
+          outcome: 'fail',
+          message: 'the feature is missing',
+          steps: [step('before', 1)],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the feature shows',
+          steps: [step('after', 1)],
+        },
+      },
+      { expected: mergeBase },
+    );
+    assert.equal(markOf(storyboard, 'before'), 'not-judged');
+    assert.equal(
+      storyboard.sides.find((card) => card.side === 'before')?.expected,
+      NOT_DECLARED,
+    );
+  });
+
+  test('a feature re-run on the merge-base whose Before passes, with no expected.before, is also not-judged', () => {
+    const storyboard = board(
+      {
+        before: {
+          outcome: 'pass',
+          observed: 'the feature shows already',
+          steps: [step('before', 1)],
+        },
+        after: {
+          outcome: 'pass',
+          observed: 'the feature shows',
+          steps: [step('after', 1)],
+        },
+      },
+      { expected: mergeBase },
+    );
+    assert.equal(markOf(storyboard, 'before'), 'not-judged');
+    assert.equal(markOf(storyboard, 'after'), 'as-expected');
+  });
+
+  test('a not-judged mark does not change the band: the graded result is the one passed in, whatever the marks', () => {
+    for (const result of [
+      'PASS',
+      'FAIL: pre-existing',
+      'Not proven',
+    ] as const satisfies readonly ScenarioResult[]) {
+      const storyboard = board(
+        {
+          before: {
+            outcome: 'pass',
+            observed: 'shows',
+            steps: [step('before', 1)],
+          },
+          after: {
+            outcome: 'pass',
+            observed: 'shows',
+            steps: [step('after', 1)],
+          },
+        },
+        { expected: mergeBase, result },
+      );
+      assert.equal(markOf(storyboard, 'before'), 'not-judged');
+      assert.equal(storyboard.band.result, result, result);
+      assert.equal(storyboard.band.alike, undefined, result);
+      assert.deepEqual(storyboard.problems, [], result);
+    }
+  });
+});
+
+describe('buildStoryboard: a side that declares its expected result is judged as before', () => {
+  const one = (outcome: 'pass' | 'fail'): StoryboardSideInput =>
+    outcome === 'pass'
+      ? { outcome, observed: 'shows', steps: [step('after', 1)] }
+      : { outcome, message: 'does not show', steps: [step('after', 1)] };
+
+  test('a fix judges Before by failing and After by passing, a regression guard by the same result on both', () => {
+    const cases: [
+      string,
+      Partial<Record<Side, StoryboardSideInput>>,
+      ExpectedResults,
+      Side,
+      string,
+    ][] = [
+      [
+        'fix: Before fails',
+        { before: one('fail'), after: one('pass') },
+        DIFFERENT,
+        'before',
+        'as-expected',
+      ],
+      [
+        'fix: Before passes',
+        { before: one('pass'), after: one('pass') },
+        DIFFERENT,
+        'before',
+        'not-as-expected',
+      ],
+      [
+        'fix: After passes',
+        { before: one('fail'), after: one('pass') },
+        DIFFERENT,
+        'after',
+        'as-expected',
+      ],
+      [
+        'fix: After fails',
+        { before: one('fail'), after: one('fail') },
+        DIFFERENT,
+        'after',
+        'not-as-expected',
+      ],
+      [
+        'regression guard: Before passes',
+        { before: one('pass'), after: one('pass') },
+        SAME,
+        'before',
+        'as-expected',
+      ],
+      [
+        'regression guard: Before fails',
+        { before: one('fail'), after: one('pass') },
+        SAME,
+        'before',
+        'not-as-expected',
+      ],
+      [
+        'After only: passes',
+        { after: one('pass') },
+        { after: 'the fix shows' },
+        'after',
+        'as-expected',
+      ],
+      [
+        'After only: fails',
+        { after: one('fail') },
+        { after: 'the fix shows' },
+        'after',
+        'not-as-expected',
+      ],
+    ];
+    for (const [name, sides, expected, side, mark] of cases) {
+      assert.equal(markOf(board(sides, { expected }), side), mark, name);
+    }
+  });
+});
+
+describe('buildStoryboard: After is always judged against its declared expected result', () => {
+  test('After on a merge-base re-run is judged whatever its outcome, never not-judged', () => {
+    const cases: [
+      StoryboardSideInput['outcome'],
+      Partial<Record<Side, StoryboardSideInput>>,
+      string,
+    ][] = [
+      [
+        'pass',
+        {
+          after: { outcome: 'pass', observed: 'o', steps: [step('after', 1)] },
+        },
+        'as-expected',
+      ],
+      [
+        'fail',
+        { after: { outcome: 'fail', message: 'm', steps: [step('after', 1)] } },
+        'not-as-expected',
+      ],
+      [
+        'cannot-run',
+        {
+          after: {
+            outcome: 'cannot-run',
+            message: 'm',
+            steps: [step('after', 1)],
+          },
+        },
+        'not-as-expected',
+      ],
+    ];
+    for (const [outcome, sides, mark] of cases) {
+      const storyboard = board(sides, { expected: { after: 'the fix shows' } });
+      assert.equal(markOf(storyboard, 'after'), mark, outcome);
+      assert.notEqual(markOf(storyboard, 'after'), 'not-judged', outcome);
+    }
   });
 });

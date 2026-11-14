@@ -136,6 +136,10 @@ const MARK_TONE = {
     background: roleColour('destructive-soft'),
     color: roleColour('destructive-text'),
   },
+  'not-judged': {
+    background: roleColour('subtle'),
+    color: roleColour('foreground-supporting'),
+  },
 } as const satisfies Record<Mark, { background: string; color: string }>;
 
 /** How each side is named on the page, and which commit it ran on. */

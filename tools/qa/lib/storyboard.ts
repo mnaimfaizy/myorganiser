@@ -12,7 +12,8 @@
  *
  *   - A side's mark is judged against **that side's own** expected outcome
  *     (`expectedOutcome`), never the runner's pass or fail. For a fix, Before
- *     failing is the defect reproduced, so it is "as expected".
+ *     failing is the defect reproduced, so it is "as expected". A side with
+ *     no declared expected result is "not judged", never marked either way.
  *   - The band's result is the graded result, passed in. It is never derived
  *     from the side marks.
  *
@@ -61,14 +62,19 @@ export interface Band {
   alike?: typeof ALIKE_TEXT;
 }
 
-/** Whether a side showed the outcome it was expected to. */
-export const MARKS = ['as-expected', 'not-as-expected'] as const;
+/**
+ * Whether a side showed the outcome it was expected to; `not-judged` when the
+ * scenario declared no expected result for it (a feature re-run on the
+ * merge-base), since there is nothing to judge it against.
+ */
+export const MARKS = ['as-expected', 'not-as-expected', 'not-judged'] as const;
 export type Mark = (typeof MARKS)[number];
 
 /** The words each mark is shown with. */
 export const MARK_TEXT = {
   'as-expected': '✓ as expected',
   'not-as-expected': '✗ not as expected',
+  'not-judged': '– not judged: no expected result declared',
 } as const satisfies Record<Mark, string>;
 
 export interface SideCard {
@@ -124,6 +130,18 @@ function declaresSame(expected: ExpectedResults): boolean {
   return expected.before === expected.after;
 }
 
+/** A side's mark: against its own declared expectation, or none when it declared nothing. */
+function markOf(
+  side: Side,
+  run: StoryboardSideInput,
+  expected: ExpectedResults,
+): Mark {
+  if (expected[side] === undefined) return 'not-judged';
+  return run.outcome === expectedOutcome(side, expected)
+    ? 'as-expected'
+    : 'not-as-expected';
+}
+
 /** What a side observed: a passing run's report, or a failure's message. */
 function observedText(run: StoryboardSideInput): string {
   const text = run.outcome === 'pass' ? run.observed : run.message;
@@ -156,10 +174,7 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
       side,
       expected,
       observed: observedText(run),
-      mark:
-        run.outcome === expectedOutcome(side, input.expected)
-          ? 'as-expected'
-          : 'not-as-expected',
+      mark: markOf(side, run, input.expected),
     });
   }
 

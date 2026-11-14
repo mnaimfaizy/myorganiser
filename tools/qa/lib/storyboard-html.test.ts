@@ -6,8 +6,16 @@ import { describe, test } from 'node:test';
 
 import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
-import { BEFORE_SAME_STEP, storyboardHtml } from './storyboard-html.ts';
-import { type StoryboardSideInput, buildStoryboard } from './storyboard.ts';
+import {
+  BEFORE_SAME_STEP,
+  roleColour,
+  storyboardHtml,
+} from './storyboard-html.ts';
+import {
+  MARK_TEXT,
+  type StoryboardSideInput,
+  buildStoryboard,
+} from './storyboard.ts';
 
 const COMMITS = { before: 'a'.repeat(40), after: 'b'.repeat(40) };
 /** A token stylesheet with no hex colour, so the no-hex check reads the page alone. */
@@ -472,5 +480,104 @@ describe('storyboardHtml', () => {
         ),
     );
     assert.deepEqual(literal, []);
+  });
+});
+
+/** The mark badge on one side's card, as its markup. */
+function markOnCard(html: string, side: Side): string {
+  const card = html
+    .split('<section class="card" data-side="')
+    .find((part) => part.startsWith(`${side}"`));
+  const badge = /<span class="mark"[^>]*>[^<]*<\/span>/.exec(card ?? '');
+  assert.ok(badge, `the ${side} card has a mark`);
+  return badge[0];
+}
+
+describe('storyboardHtml: the mark badge on each card', () => {
+  // The neutral tone for a card that is not judged, and the two judged tones.
+  const NOT_JUDGED_TONE = [
+    `background:${roleColour('subtle')}`,
+    `color:${roleColour('foreground-supporting')}`,
+  ];
+  const AS_EXPECTED_TONE = [
+    `background:${roleColour('success-soft')}`,
+    `color:${roleColour('success-text')}`,
+  ];
+  const NOT_AS_EXPECTED_TONE = [
+    `background:${roleColour('destructive-soft')}`,
+    `color:${roleColour('destructive-text')}`,
+  ];
+
+  test('a not-judged card shows its words in the neutral tone, not the success or destructive colours', () => {
+    // A merge-base re-run: Before declares nothing, so it is not judged; After is.
+    const html = storyboardHtml(
+      buildStoryboard({
+        id: 'S1',
+        title: 'Save an item',
+        expected: { after: 'the fix shows' },
+        result: 'FAIL: pre-existing',
+        commits: COMMITS,
+        sides: {
+          before: {
+            outcome: 'fail',
+            message: 'the feature is missing',
+            steps: [step('before', 1)],
+          },
+          after: {
+            outcome: 'fail',
+            message: 'still broken',
+            steps: [step('after', 1)],
+          },
+        },
+      }),
+      stillUrl,
+      TOKENS,
+    );
+    const badge = markOnCard(html, 'before');
+    assert.ok(badge.includes('data-mark="not-judged"'), badge);
+    assert.ok(badge.includes(MARK_TEXT['not-judged']), badge);
+    for (const declaration of NOT_JUDGED_TONE) {
+      assert.ok(badge.includes(declaration), `${declaration} in ${badge}`);
+    }
+    for (const declaration of [...AS_EXPECTED_TONE, ...NOT_AS_EXPECTED_TONE]) {
+      assert.equal(badge.includes(declaration), false, declaration);
+    }
+    assert.ok(
+      markOnCard(html, 'after').includes('data-mark="not-as-expected"'),
+    );
+  });
+
+  test('a judged card keeps its own tone: as expected in success, not as expected in destructive', () => {
+    const html = page(
+      {
+        before: {
+          outcome: 'fail',
+          message: 'the defect shows here',
+          steps: [step('before', 1)],
+        },
+        after: {
+          outcome: 'fail',
+          message: 'still broken',
+          steps: [step('after', 1)],
+        },
+      },
+      TOKENS,
+      'Save an item',
+      DIFFERENT_EXPECTED,
+    );
+    const before = markOnCard(html, 'before');
+    const after = markOnCard(html, 'after');
+    assert.ok(before.includes('data-mark="as-expected"'), before);
+    for (const declaration of AS_EXPECTED_TONE) {
+      assert.ok(before.includes(declaration), declaration);
+    }
+    assert.ok(after.includes('data-mark="not-as-expected"'), after);
+    for (const declaration of NOT_AS_EXPECTED_TONE) {
+      assert.ok(after.includes(declaration), declaration);
+    }
+    for (const declaration of NOT_JUDGED_TONE) {
+      assert.equal(before.includes(declaration), false, declaration);
+      assert.equal(after.includes(declaration), false, declaration);
+    }
   });
 });
