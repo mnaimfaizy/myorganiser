@@ -1,4 +1,4 @@
-import type { Viewport } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import { SidebarInset, SidebarProvider, Toaster } from '@myorganiser/web-ui';
 
@@ -17,6 +17,14 @@ import {
  */
 export const viewport: Viewport = {
   viewportFit: 'cover',
+};
+
+/*
+ * Signed-in pages: the HTML a crawler gets is the same guard shell on every
+ * route, which Search Console reports as duplicates. Kept out of the index.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
 };
 
 /*
