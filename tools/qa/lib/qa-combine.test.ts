@@ -1,26 +1,41 @@
 // Contracts for the pure combine rules (ADR 0147 decision 5; PRD #1544's
 // annotated MP4; PRD #1550's re-render): reading a scenario's saved step
-// records and graded result, the caption windows of a `Capture: video` side,
-// and the ffmpeg arguments of its annotated MP4. Everything here is a pure
-// function, so no process and no file is touched; the executor is in
-// qa-combine-executor.test.ts, the overlay pages the MP4 reads are in
-// video-overlay-html.test.ts, and the real renders are in their own suites.
+// records and graded result, the paced timeline of a `Capture: video` MP4 and
+// the ffprobe reading that feeds it, and the ffmpeg arguments of that MP4.
+// Everything here is a pure function, so no process and no file is touched;
+// the executor is in qa-combine-executor.test.ts, the overlay pages the MP4
+// reads are in video-overlay-html.test.ts, and the real renders are in their
+// own suites.
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
 
 import {
   type AnnotatedVideoPlan,
   type CaptionWindow,
+  type PacedPiece,
+  type PacedSide,
   type VideoOverlayFiles,
   type VideoSide,
   type VideoStep,
+  VIDEO_BAND_HEIGHT,
+  VIDEO_FPS,
+  VIDEO_PANEL,
+  VIDEO_PLAYBACK_SPEED,
+  VIDEO_STEP_HOLD_SECONDS,
+  VIDEO_STRIP_HEIGHT,
   buildAnnotatedVideoArgs,
-  captionWindows,
+  durationFromPackets,
   enableExpression,
+  pacedTimeline,
   parseStepRecords,
+  probeDurationArgs,
   resultOf,
 } from './qa-combine.ts';
 import type { Band } from './storyboard.ts';
+
+const EPS = 1e-6;
+/** One frame of the paced MP4, in seconds. */
+const FRAME = 1 / VIDEO_FPS;
 
 /** The value following each `-i`, in argument order. */
 function inputsOf(args: readonly string[]): string[] {
@@ -32,6 +47,12 @@ function valueAfter(args: readonly string[], flag: string): string {
   assert.notEqual(at, -1, `missing ${flag}`);
   return args[at + 1];
 }
+
+/** Seconds to three decimals, as the ffmpeg arguments write them. */
+const s3 = (seconds: number): string => seconds.toFixed(3);
+
+/** A number to micro-seconds, so float sums compare as the plan means them. */
+const round6 = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** A step taken on `device`'s `tab`, `atMs` from the run's start. */
 function stepAt(
@@ -67,13 +88,33 @@ function sideOf(
   };
 }
 
-/** A window as its step's index (null for the opening strip), for comparison. */
-function windowOf(window: CaptionWindow) {
+/** A caption window with its times rounded, its step as its index (null for the opening strip). */
+function roundWindow(window: CaptionWindow) {
   return {
     step: window.step?.index ?? null,
-    start: window.start,
-    end: window.end,
+    start: round6(window.start),
+    end: window.end === null ? null : round6(window.end),
   };
+}
+
+/** Pieces with their times rounded, for comparison. */
+function roundPieces(pieces: readonly PacedPiece[]) {
+  return pieces.map(({ kind, srcStart, srcEnd, outStart, outEnd }) => ({
+    kind,
+    srcStart: round6(srcStart),
+    srcEnd: round6(srcEnd),
+    outStart: round6(outStart),
+    outEnd: round6(outEnd),
+  }));
+}
+
+/** The hold that starts at `at` on one side; the test fails when there is none. */
+function holdAt(side: PacedSide, at: number): PacedPiece {
+  const hold = side.pieces.find(
+    (piece) => piece.kind === 'hold' && Math.abs(piece.outStart - at) < EPS,
+  );
+  assert.ok(hold, `${side.side} holds from ${at}`);
+  return hold;
 }
 
 const BAND: Band = {
@@ -106,6 +147,36 @@ const OVERLAYS: VideoOverlayFiles = {
     },
   ],
 };
+
+/** Each side's recording length in seconds, in PLAN's order: Before is longer, so After holds its last frame. */
+const PLAN_LENGTHS = [6, 3];
+
+/** The paced timeline of each plan, with each side's recording length taken in plan order. */
+function timelineOf(plan: AnnotatedVideoPlan) {
+  return pacedTimeline(
+    plan.sides,
+    plan.sides.map((_, i) => PLAN_LENGTHS[i]),
+  );
+}
+
+const PLAN_TIMELINE = timelineOf(PLAN);
+
+/** PLAN's first hold: Before's 1.5 s lead, played at the playback speed. */
+const FIRST_HOLD = 1.5 / VIDEO_PLAYBACK_SPEED;
+/** PLAN's second hold: the first hold, its length, then the 2.5 s stretch between the steps (the same on both sides). */
+const SECOND_HOLD =
+  FIRST_HOLD + VIDEO_STEP_HOLD_SECONDS + 2.5 / VIDEO_PLAYBACK_SPEED;
+
+/**
+ * Both sides take two steps, Before's later. Between the steps Before has 2 s
+ * and After 1 s, so After's middle stretch is held; in the tail Before has 1 s
+ * and After 2 s, so Before's tail is held. Both recordings are 4 s.
+ */
+const UNEVEN: VideoSide[] = [
+  sideOf('before', 0, [stepAt(1, 1000), stepAt(2, 3000)]),
+  sideOf('after', 0, [stepAt(1, 1000), stepAt(2, 2000)]),
+];
+const UNEVEN_LENGTHS = [4, 4];
 
 const RECORDS_FILE = '/run/steps/S.json';
 
@@ -397,51 +468,420 @@ describe('resultOf: the graded result of one scenario in the run manifest', () =
   });
 });
 
-describe('captionWindows', () => {
-  test('the opening strip runs to the first step, each step runs to the next, and the last stays to the end', () => {
-    const windows = captionWindows(
-      sideOf('before', 0, [stepAt(1, 1500), stepAt(2, 4000)]),
+describe('pacedTimeline: each step holds on every side, from the same output time', () => {
+  test('each step holds on its frame for the hold length on every side, and the holds start together', () => {
+    const [before, after] = PLAN_TIMELINE.sides;
+    const [firstHold, secondHold] = PLAN_TIMELINE.holdStarts;
+    assert.equal(round6(firstHold), round6(FIRST_HOLD));
+    assert.equal(round6(secondHold), round6(SECOND_HOLD));
+    for (const side of PLAN_TIMELINE.sides) {
+      for (const at of PLAN_TIMELINE.holdStarts) {
+        const hold = holdAt(side, at);
+        assert.equal(
+          round6(hold.outEnd - hold.outStart),
+          round6(VIDEO_STEP_HOLD_SECONDS),
+          `${side.side} holds for the hold length`,
+        );
+      }
+    }
+    // Before's steps are at 1.5 s and 4 s; After's first at 0.5 s. After has no
+    // second step, so it holds its last frame (3 s less a frame) for the second hold.
+    assert.equal(round6(holdAt(before, firstHold).srcStart), 1.5);
+    assert.equal(round6(holdAt(before, secondHold).srcStart), 4);
+    assert.equal(round6(holdAt(after, firstHold).srcStart), 0.5);
+    assert.equal(
+      round6(holdAt(after, secondHold).srcStart),
+      round6(PLAN_LENGTHS[1] - FRAME),
     );
-    assert.deepEqual(windows.map(windowOf), [
-      { step: null, start: 0, end: 1.5 },
-      { step: 1, start: 1.5, end: 4 },
-      { step: 2, start: 4, end: null },
+  });
+
+  test('steps are matched by position, and each stretch between them plays at the playback speed', () => {
+    const [before] = PLAN_TIMELINE.sides;
+    assert.deepEqual(
+      before.pieces.map((piece) => piece.kind),
+      ['play', 'hold', 'play', 'hold', 'play'],
+    );
+    const plays = before.pieces.filter((piece) => piece.kind === 'play');
+    assert.deepEqual(
+      plays.map((piece) => [round6(piece.srcStart), round6(piece.srcEnd)]),
+      [
+        [0, 1.5],
+        [1.5, 4],
+        [4, 6],
+      ],
+    );
+    for (const play of plays) {
+      assert.equal(
+        round6(play.outEnd - play.outStart),
+        round6((play.srcEnd - play.srcStart) / VIDEO_PLAYBACK_SPEED),
+        'a play takes its recording time divided by the speed',
+      );
+    }
+  });
+
+  test('equal timestamps on both sides give identical pieces and windows, and every step keeps its hold', () => {
+    const steps = [stepAt(1, 1000), stepAt(2, 2000)];
+    const timeline = pacedTimeline(
+      [sideOf('before', 0, steps), sideOf('after', 0, steps)],
+      [4, 4],
+    );
+    const [before, after] = timeline.sides;
+    assert.deepEqual(roundPieces(after.pieces), roundPieces(before.pieces));
+    assert.deepEqual(
+      after.windows.map(roundWindow),
+      before.windows.map(roundWindow),
+    );
+    assert.equal(timeline.holdStarts.length, 2, 'both steps hold');
+    assert.ok(
+      timeline.holdStarts[1] - timeline.holdStarts[0] > VIDEO_STEP_HOLD_SECONDS,
+      'the second hold is after the first',
+    );
+  });
+
+  test('differing timestamps start each step at the same output time on both sides, and the shorter stretch holds its last frame', () => {
+    const timeline = pacedTimeline(UNEVEN, UNEVEN_LENGTHS);
+    const [before, after] = timeline.sides;
+    const starts = (side: PacedSide) =>
+      side.windows.map((window) => round6(window.start));
+    assert.deepEqual(starts(after), starts(before));
+    assert.deepEqual(starts(before), [
+      0,
+      round6(timeline.holdStarts[0]),
+      round6(timeline.holdStarts[1]),
+    ]);
+    // After's middle stretch is 1 s of recording, but the longer side's 2 s stretch
+    // sets its length, so After plays the 1 s slower and holds the last frame.
+    const middle = after.pieces.find(
+      (piece) => piece.kind === 'play' && piece.srcStart === 1,
+    );
+    assert.ok(middle, 'After plays its middle stretch');
+    assert.equal(round6(middle.srcEnd), 2);
+    assert.equal(
+      round6(middle.outEnd - middle.outStart),
+      round6(2 / VIDEO_PLAYBACK_SPEED),
+      "the stretch is as long as the longer side's",
+    );
+  });
+
+  test("the tail is as long as the longest side's, and the shorter side holds its last frame to the end", () => {
+    const timeline = pacedTimeline(UNEVEN, UNEVEN_LENGTHS);
+    const [before, after] = timeline.sides;
+    const tail = 2 / VIDEO_PLAYBACK_SPEED;
+    assert.equal(
+      round6(timeline.total),
+      round6(timeline.holdStarts[1] + VIDEO_STEP_HOLD_SECONDS + tail),
+    );
+    // Before's tail is 1 s of recording, so it is held for the 2 s stretch.
+    const beforeTail = before.pieces[before.pieces.length - 1];
+    assert.deepEqual(
+      [
+        beforeTail.kind,
+        round6(beforeTail.srcStart),
+        round6(beforeTail.srcEnd),
+        round6(beforeTail.outEnd - beforeTail.outStart),
+      ],
+      ['play', 3, 4, round6(tail)],
+    );
+    // After's tail is the full 2 s, so it is not held.
+    const afterTail = after.pieces[after.pieces.length - 1];
+    assert.deepEqual(
+      [
+        afterTail.kind,
+        round6(afterTail.srcStart),
+        round6(afterTail.srcEnd),
+        round6(afterTail.outEnd - afterTail.outStart),
+      ],
+      ['play', 2, 4, round6(tail)],
+    );
+  });
+
+  test("a side with fewer steps holds its last frame through the other side's holds and stretches", () => {
+    const [, after] = PLAN_TIMELINE.sides;
+    const last = after.pieces[after.pieces.length - 1];
+    assert.equal(last.kind, 'hold');
+    assert.equal(round6(last.srcStart), round6(PLAN_LENGTHS[1] - FRAME));
+    assert.equal(round6(last.outEnd), round6(PLAN_TIMELINE.total));
+    assert.deepEqual(after.windows.map(roundWindow), [
+      { step: null, start: 0, end: round6(FIRST_HOLD) },
+      { step: 1, start: round6(FIRST_HOLD), end: null },
     ]);
   });
 
-  test('a step taken before the tab opened clamps to 0, and the opening strip that would end at 0 is dropped', () => {
-    const windows = captionWindows(
-      sideOf('after', 1000, [stepAt(1, 400), stepAt(2, 2000)]),
+  test('a side with no steps plays its whole recording as its lead, and its one strip runs to the end', () => {
+    const timeline = pacedTimeline(
+      [sideOf('before', 0, [stepAt(1, 1000)]), sideOf('after', 0, [])],
+      [3, 5],
     );
-    assert.deepEqual(windows.map(windowOf), [
-      { step: 1, start: 0, end: 1 },
-      { step: 2, start: 1, end: null },
-    ]);
-  });
-
-  test('a first step at the moment the recording starts drops the opening strip', () => {
-    const windows = captionWindows(
-      sideOf('before', 0, [stepAt(1, 0), stepAt(2, 3000)]),
-    );
-    assert.deepEqual(windows.map(windowOf), [
-      { step: 1, start: 0, end: 3 },
-      { step: 2, start: 3, end: null },
-    ]);
-  });
-
-  test('of two steps at the same moment, the earlier one is dropped', () => {
-    const windows = captionWindows(
-      sideOf('before', 0, [stepAt(1, 2000), stepAt(2, 2000)]),
-    );
-    assert.deepEqual(windows.map(windowOf), [
-      { step: null, start: 0, end: 2 },
-      { step: 2, start: 2, end: null },
-    ]);
-  });
-
-  test('a side with no steps shows the opening strip to the end', () => {
-    assert.deepEqual(captionWindows(sideOf('before', 0, [])).map(windowOf), [
+    const [, after] = timeline.sides;
+    assert.deepEqual(roundPieces(after.pieces)[0], {
+      kind: 'play',
+      srcStart: 0,
+      srcEnd: 5,
+      outStart: 0,
+      outEnd: round6(5 / VIDEO_PLAYBACK_SPEED),
+    });
+    assert.deepEqual(after.windows.map(roundWindow), [
       { step: null, start: 0, end: null },
+    ]);
+  });
+
+  test('with no steps on either side, the longer recording sets the length and the shorter one holds its last frame', () => {
+    const timeline = pacedTimeline(
+      [sideOf('before', 0, []), sideOf('after', 0, [])],
+      [3, 5],
+    );
+    assert.deepEqual(timeline.holdStarts, []);
+    assert.equal(round6(timeline.total), round6(5 / VIDEO_PLAYBACK_SPEED));
+    assert.deepEqual(roundPieces(timeline.sides[0].pieces), [
+      {
+        kind: 'play',
+        srcStart: 0,
+        srcEnd: 3,
+        outStart: 0,
+        outEnd: round6(5 / VIDEO_PLAYBACK_SPEED),
+      },
+    ]);
+  });
+
+  /** A timeline's output as its numbers, with each side's pieces and windows rounded. */
+  const shapeOf = (timeline: ReturnType<typeof pacedTimeline>) => ({
+    holdStarts: timeline.holdStarts.map(round6),
+    total: round6(timeline.total),
+    sides: timeline.sides.map((side) => ({
+      side: side.side,
+      pieces: roundPieces(side.pieces),
+      windows: side.windows.map(roundWindow),
+    })),
+  });
+
+  test('a step taken before the recording opened is taken at its start', () => {
+    const early = pacedTimeline([sideOf('after', 2000, [stepAt(1, 400)])], [3]);
+    const atStart = pacedTimeline(
+      [sideOf('after', 2000, [stepAt(1, 2000)])],
+      [3],
+    );
+    assert.deepEqual(shapeOf(early), shapeOf(atStart));
+  });
+
+  test('a step past the end of the recording is held at its last frame, as a step at the end is', () => {
+    const past = pacedTimeline([sideOf('after', 0, [stepAt(1, 9000)])], [3]);
+    const atEnd = pacedTimeline([sideOf('after', 0, [stepAt(1, 3000)])], [3]);
+    assert.deepEqual(shapeOf(past), shapeOf(atEnd));
+    for (const piece of past.sides[0].pieces) {
+      assert.ok(piece.srcEnd <= 3 + EPS, 'no piece reads past the recording');
+    }
+  });
+
+  test('a step at 0 gives its side no play before its first hold, and its opening strip runs to that hold', () => {
+    const timeline = pacedTimeline(
+      [
+        sideOf('before', 0, [stepAt(1, 0), stepAt(2, 2000)]),
+        sideOf('after', 0, [stepAt(1, 1000)]),
+      ],
+      [5, 4],
+    );
+    const [before] = timeline.sides;
+    const [firstHold] = timeline.holdStarts;
+    assert.ok(firstHold > 0);
+    assert.equal(
+      before.pieces.some(
+        (piece) => piece.kind === 'play' && piece.outStart < firstHold - EPS,
+      ),
+      false,
+      'Before does not play before its first hold',
+    );
+    assert.deepEqual(roundWindow(before.windows[0]), {
+      step: null,
+      start: 0,
+      end: round6(firstHold),
+    });
+  });
+
+  test('a first step at 0 on both sides drops the opening strip, so the first hold starts the MP4', () => {
+    const timeline = pacedTimeline(
+      [
+        sideOf('before', 0, [stepAt(1, 0), stepAt(2, 2000)]),
+        sideOf('after', 0, [stepAt(1, 0)]),
+      ],
+      [5, 4],
+    );
+    assert.equal(timeline.holdStarts[0], 0);
+    for (const side of timeline.sides) {
+      assert.equal(
+        side.windows.some((window) => window.step === null),
+        false,
+        `${side.side} has no opening strip`,
+      );
+      assert.equal(side.windows[0].step?.index, 1);
+      assert.equal(side.windows[0].start, 0);
+    }
+  });
+});
+
+describe('pacedTimeline: caption windows, pieces and the shape of the MP4', () => {
+  test("each caption runs from its step's hold to the next step's hold, the last stays to the end, and the opening strip covers the lead", () => {
+    const [before, after] = PLAN_TIMELINE.sides;
+    assert.deepEqual(before.windows.map(roundWindow), [
+      { step: null, start: 0, end: round6(FIRST_HOLD) },
+      { step: 1, start: round6(FIRST_HOLD), end: round6(SECOND_HOLD) },
+      { step: 2, start: round6(SECOND_HOLD), end: null },
+    ]);
+    assert.deepEqual(after.windows.map(roundWindow), [
+      { step: null, start: 0, end: round6(FIRST_HOLD) },
+      { step: 1, start: round6(FIRST_HOLD), end: null },
+    ]);
+  });
+
+  test("each side's pieces tile the MP4 from 0 to its total, with no gap or overlap, and stay inside its recording", () => {
+    const shapes: [string, readonly VideoSide[], number[]][] = [
+      ['PLAN', PLAN.sides, PLAN_LENGTHS],
+      ['UNEVEN', UNEVEN, UNEVEN_LENGTHS],
+      [
+        'a step at 0',
+        [
+          sideOf('before', 0, [stepAt(1, 0), stepAt(2, 2000)]),
+          sideOf('after', 0, [stepAt(1, 0)]),
+        ],
+        [5, 4],
+      ],
+      ['no steps', [sideOf('before', 0, []), sideOf('after', 0, [])], [3, 5]],
+      ['one side, one step', [sideOf('after', 2000, [stepAt(1, 2500)])], [3]],
+    ];
+    for (const [name, sides, lengths] of shapes) {
+      const timeline = pacedTimeline(sides, lengths);
+      timeline.sides.forEach((side, i) => {
+        let at = 0;
+        for (const piece of side.pieces) {
+          assert.ok(
+            Math.abs(piece.outStart - at) < EPS,
+            `${name}, ${side.side}: a gap or overlap at ${at}`,
+          );
+          assert.ok(
+            piece.srcStart >= -EPS && piece.srcEnd <= lengths[i] + EPS,
+            `${name}, ${side.side}: a piece reads outside its recording`,
+          );
+          at = piece.outEnd;
+        }
+        assert.ok(
+          Math.abs(at - timeline.total) < EPS,
+          `${name}, ${side.side}: ends at ${at}, not ${timeline.total}`,
+        );
+      });
+    }
+  });
+
+  test("an After-only MP4 is timed from After's own recording alone", () => {
+    const timeline = pacedTimeline(
+      [sideOf('after', 2000, [stepAt(1, 2500)])],
+      [3],
+    );
+    assert.equal(timeline.sides.length, 1);
+    assert.equal(timeline.sides[0].side, 'after');
+    // Step 1 is 0.5 s into After's recording: the lead is slowed, then the hold,
+    // then the 2.5 s to the end, slowed.
+    const lead = 0.5 / VIDEO_PLAYBACK_SPEED;
+    const tail = 2.5 / VIDEO_PLAYBACK_SPEED;
+    assert.deepEqual(timeline.holdStarts.map(round6), [round6(lead)]);
+    assert.equal(
+      round6(timeline.total),
+      round6(lead + VIDEO_STEP_HOLD_SECONDS + tail),
+    );
+    assert.deepEqual(timeline.sides[0].windows.map(roundWindow), [
+      { step: null, start: 0, end: round6(lead) },
+      { step: 1, start: round6(lead), end: null },
+    ]);
+  });
+
+  test('the pacing constants are the values #1555 fixes: a 2.5 s hold and playback at 0.75', () => {
+    // #1555 fixes these values; a change to either is a change to the PRD's pacing.
+    assert.equal(VIDEO_STEP_HOLD_SECONDS, 2.5);
+    assert.equal(VIDEO_PLAYBACK_SPEED, 0.75);
+  });
+
+  test('a timeline needs one recording length per side, and every length must be more than 0', () => {
+    assert.throws(
+      () => pacedTimeline(PLAN.sides, [6]),
+      /one recording length is needed per side/,
+    );
+    assert.throws(
+      () => pacedTimeline([sideOf('after', 0, [])], [0]),
+      /after: the recording has no length/,
+    );
+    assert.throws(
+      () => pacedTimeline([sideOf('after', 0, [])], [Number.NaN]),
+      /after: the recording has no length/,
+    );
+  });
+});
+
+describe("durationFromPackets: a recording's length from its packet times", () => {
+  const assertSeconds = (actual: number | null, expected: number) => {
+    assert.notEqual(actual, null);
+    assert.ok(
+      Math.abs((actual ?? Number.NaN) - expected) < EPS,
+      `${actual} is not ${expected}`,
+    );
+  };
+
+  test('no packet time gives null: empty output, or only lines that are not a time', () => {
+    assert.equal(durationFromPackets(''), null);
+    assert.equal(durationFromPackets('N/A\nN/A\n'), null);
+  });
+
+  test('a single packet is one frame long', () => {
+    assertSeconds(durationFromPackets('0.000000'), FRAME);
+  });
+
+  test('a recording with about 200k packet lines (over two hours at 25 fps) reads last less first plus one frame, without throwing', () => {
+    const packets = 200_000;
+    const output = Array.from({ length: packets }, (_, n) =>
+      (n / VIDEO_FPS).toFixed(6),
+    ).join('\n');
+    assertSeconds(
+      durationFromPackets(output),
+      (packets - 1) / VIDEO_FPS + FRAME,
+    );
+  });
+
+  test('last less first, plus one frame, is the length, whatever order the lines come in', () => {
+    assertSeconds(
+      durationFromPackets('0.000000\n0.080000\n0.040000'),
+      0.08 + FRAME,
+    );
+  });
+
+  test('a trailing blank line adds nothing', () => {
+    assert.equal(
+      durationFromPackets('0.000000\n0.040000\n'),
+      durationFromPackets('0.000000\n0.040000'),
+    );
+    assertSeconds(durationFromPackets('0.000000\n0.040000\n'), 0.04 + FRAME);
+  });
+
+  test('a line that is not a time is skipped, and the times around it still count', () => {
+    // The first time is 0.04, so the length is last less first (0.04) plus a frame.
+    assertSeconds(durationFromPackets('N/A\n0.040000\n0.080000'), 0.04 + FRAME);
+  });
+
+  test('the length is last less first, plus a frame, so a recording that starts late is measured from its first packet', () => {
+    // 0.500000 and 0.540000 are one frame apart: last less first is one frame, plus one more.
+    assertSeconds(durationFromPackets('0.500000\n0.540000'), FRAME + FRAME);
+    assertSeconds(durationFromPackets('0.500000\n0.540000'), 0.08);
+  });
+});
+
+describe('probeDurationArgs: the ffprobe arguments that read the packet times', () => {
+  test("the first video stream's packet times, one per line, of the given file", () => {
+    assert.deepEqual(probeDurationArgs('/work/before.webm'), [
+      '-v',
+      'error',
+      '-select_streams',
+      'v:0',
+      '-show_entries',
+      'packet=pts_time',
+      '-of',
+      'csv=p=0',
+      '/work/before.webm',
     ]);
   });
 });
@@ -459,9 +899,43 @@ describe('enableExpression', () => {
   });
 });
 
+/** The filter chunks that cut one side's pieces, in the order the graph joins them. */
+function pieceChunks(args: readonly string[], sideIndex: number): string[] {
+  return valueAfter(args, '-filter_complex')
+    .split(';')
+    .filter((chunk) => chunk.startsWith(`[s${sideIndex}_`));
+}
+
+/** The `enable` expression of each caption strip overlay on one side, in order. */
+function enablesOf(args: readonly string[], sideIndex: number): string[] {
+  return valueAfter(args, '-filter_complex')
+    .split(';')
+    .filter(
+      (chunk) =>
+        chunk.startsWith(`[c${sideIndex}_`) && chunk.includes('enable='),
+    )
+    .map((chunk) => /enable='([^']*)'/.exec(chunk)?.[1] ?? '');
+}
+
+/** A single side with one step at 1 s and a 3 s recording: the smallest MP4 with a step. */
+const ONE_PLAN: AnnotatedVideoPlan = {
+  ...PLAN,
+  sides: [sideOf('before', 0, [stepAt(1, 1000)])],
+};
+const ONE_LENGTHS = [3];
+const ONE_OVERLAYS: VideoOverlayFiles = {
+  band: OVERLAYS.band,
+  sides: [
+    {
+      label: '/o/one-label.png',
+      strips: ['/o/one-0.png', '/o/one-1.png'],
+    },
+  ],
+};
+
 describe('buildAnnotatedVideoArgs', () => {
   test('the inputs are the recording of each side, then the band, then per side its label and its strips in window order', () => {
-    const args = buildAnnotatedVideoArgs(PLAN, OVERLAYS);
+    const args = buildAnnotatedVideoArgs(PLAN, OVERLAYS, PLAN_TIMELINE);
     assert.deepEqual(inputsOf(args), [
       '/work/before.webm',
       '/work/after.webm',
@@ -476,35 +950,106 @@ describe('buildAnnotatedVideoArgs', () => {
     ]);
   });
 
-  test('the graph fits, labels, times and stacks each side, then frames the stack under the band', () => {
-    const filter = valueAfter(
-      buildAnnotatedVideoArgs(PLAN, OVERLAYS),
-      '-filter_complex',
+  test('a single side with one step is exactly the graph its paced timeline calls for: cut, slowed, held, labelled, captioned, framed', () => {
+    const args = buildAnnotatedVideoArgs(
+      ONE_PLAN,
+      ONE_OVERLAYS,
+      pacedTimeline(ONE_PLAN.sides, ONE_LENGTHS),
     );
+    assert.deepEqual(inputsOf(args), [
+      '/work/before.webm',
+      '/o/band.png',
+      '/o/one-label.png',
+      '/o/one-0.png',
+      '/o/one-1.png',
+    ]);
+    // Lead 1 s, slowed; the step's hold; then the 2 s tail, slowed. The opening
+    // strip runs to the first hold, the step's strip to the end.
+    const lead = 1 / VIDEO_PLAYBACK_SPEED;
+    const tail = 2 / VIDEO_PLAYBACK_SPEED;
+    const hold = VIDEO_STEP_HOLD_SECONDS;
+    const slowed = `setpts=(PTS-STARTPTS)/${VIDEO_PLAYBACK_SPEED}`;
+    const { width, height } = VIDEO_PANEL;
     assert.equal(
-      filter,
+      valueAfter(args, '-filter_complex'),
       [
-        '[0:v]fps=25,scale=1280:720,setsar=1[p0]',
-        '[p0][3:v]overlay=0:0[l0]',
-        '[l0]pad=1280:776:0:0[c0_0]',
-        "[c0_0][4:v]overlay=0:720:enable='gte(t,0.000)*lt(t,1.500)'[c0_1]",
-        "[c0_1][5:v]overlay=0:720:enable='gte(t,1.500)*lt(t,4.000)'[c0_2]",
-        "[c0_2][6:v]overlay=0:720:enable='gte(t,4.000)'[c0_3]",
-        '[1:v]fps=25,scale=1280:720,setsar=1[p1]',
-        '[p1][7:v]overlay=0:0[l1]',
-        '[l1]pad=1280:776:0:0[c1_0]',
-        "[c1_0][8:v]overlay=0:720:enable='gte(t,0.000)*lt(t,0.500)'[c1_1]",
-        "[c1_1][9:v]overlay=0:720:enable='gte(t,0.500)'[c1_2]",
-        '[c0_3][c1_2]hstack=inputs=2[stack]',
-        '[stack]pad=iw:ih+96:0:96[framed]',
-        '[framed][2:v]overlay=0:0[v]',
+        `[0:v]fps=${VIDEO_FPS},scale=${width}:${height},setsar=1,split=3[s0_0][s0_1][s0_2]`,
+        `[s0_0]trim=start=0.000:end=1.000,${slowed},fps=${VIDEO_FPS},tpad=stop_mode=clone:stop_duration=${s3(lead)},trim=duration=${s3(lead)},setpts=PTS-STARTPTS[q0_0]`,
+        `[s0_1]trim=start=1.000:end=${s3(1 + FRAME)},setpts=PTS-STARTPTS,fps=${VIDEO_FPS},tpad=stop_mode=clone:stop_duration=${s3(hold)},trim=duration=${s3(hold)},setpts=PTS-STARTPTS[q0_1]`,
+        `[s0_2]trim=start=1.000:end=3.000,${slowed},fps=${VIDEO_FPS},tpad=stop_mode=clone:stop_duration=${s3(tail)},trim=duration=${s3(tail)},setpts=PTS-STARTPTS[q0_2]`,
+        '[q0_0][q0_1][q0_2]concat=n=3:v=1:a=0[p0]',
+        '[p0][2:v]overlay=0:0[l0]',
+        `[l0]pad=${width}:${height + VIDEO_STRIP_HEIGHT}:0:0[c0_0]`,
+        `[c0_0][3:v]overlay=0:${height}:enable='gte(t,0.000)*lt(t,${s3(lead)})'[c0_1]`,
+        `[c0_1][4:v]overlay=0:${height}:enable='gte(t,${s3(lead)})'[c0_2]`,
+        '[c0_2]null[stack]',
+        `[stack]pad=iw:ih+${VIDEO_BAND_HEIGHT}:0:${VIDEO_BAND_HEIGHT}[framed]`,
+        '[framed][1:v]overlay=0:0[v]',
       ].join(';'),
     );
   });
 
+  test('each side is cut into its paced pieces, in order: a play is slowed, a hold is one frame held for its length, and the pieces are joined', () => {
+    const args = buildAnnotatedVideoArgs(PLAN, OVERLAYS, PLAN_TIMELINE);
+    const graph = valueAfter(args, '-filter_complex');
+    PLAN_TIMELINE.sides.forEach(({ pieces }, sideIndex) => {
+      const chunks = pieceChunks(args, sideIndex);
+      assert.equal(chunks.length, pieces.length);
+      pieces.forEach((piece, n) => {
+        const length = s3(piece.outEnd - piece.outStart);
+        const retime =
+          piece.kind === 'play'
+            ? `setpts=(PTS-STARTPTS)/${VIDEO_PLAYBACK_SPEED}`
+            : 'setpts=PTS-STARTPTS';
+        assert.equal(
+          chunks[n],
+          `[s${sideIndex}_${n}]trim=start=${s3(piece.srcStart)}:end=${s3(piece.srcEnd)},${retime},fps=${VIDEO_FPS},tpad=stop_mode=clone:stop_duration=${length},trim=duration=${length},setpts=PTS-STARTPTS[q${sideIndex}_${n}]`,
+        );
+      });
+      const labels = pieces.map((_, n) => `[s${sideIndex}_${n}]`).join('');
+      const joins = pieces.map((_, n) => `[q${sideIndex}_${n}]`).join('');
+      assert.ok(
+        graph.includes(`split=${pieces.length}${labels}`),
+        `${sideIndex} is split into its pieces`,
+      );
+      assert.ok(
+        graph.includes(
+          `${joins}concat=n=${pieces.length}:v=1:a=0[p${sideIndex}]`,
+        ),
+        `${sideIndex}'s pieces are joined in order`,
+      );
+    });
+  });
+
+  test('the sides are stacked, then the stack is framed under the band', () => {
+    const graph = valueAfter(
+      buildAnnotatedVideoArgs(PLAN, OVERLAYS, PLAN_TIMELINE),
+      '-filter_complex',
+    ).split(';');
+    assert.ok(graph.includes('[c0_3][c1_2]hstack=inputs=2[stack]'));
+    assert.ok(
+      graph.includes(
+        `[stack]pad=iw:ih+${VIDEO_BAND_HEIGHT}:0:${VIDEO_BAND_HEIGHT}[framed]`,
+      ),
+    );
+  });
+
+  test("each caption strip is enabled on the paced timeline, from its step's hold to the next step's hold", () => {
+    const args = buildAnnotatedVideoArgs(PLAN, OVERLAYS, PLAN_TIMELINE);
+    assert.deepEqual(enablesOf(args, 0), [
+      `gte(t,0.000)*lt(t,${s3(FIRST_HOLD)})`,
+      `gte(t,${s3(FIRST_HOLD)})*lt(t,${s3(SECOND_HOLD)})`,
+      `gte(t,${s3(SECOND_HOLD)})`,
+    ]);
+    assert.deepEqual(enablesOf(args, 1), [
+      `gte(t,0.000)*lt(t,${s3(FIRST_HOLD)})`,
+      `gte(t,${s3(FIRST_HOLD)})`,
+    ]);
+  });
+
   test('the band is overlaid last with no enable, so it shows for the whole video', () => {
     const graph = valueAfter(
-      buildAnnotatedVideoArgs(PLAN, OVERLAYS),
+      buildAnnotatedVideoArgs(PLAN, OVERLAYS, PLAN_TIMELINE),
       '-filter_complex',
     ).split(';');
     const band = graph.at(-1) ?? '';
@@ -512,35 +1057,10 @@ describe('buildAnnotatedVideoArgs', () => {
     assert.equal(band.includes('enable'), false);
   });
 
-  test('a single side is not stacked: its panel goes straight to the band, which is then input 1', () => {
-    const plan = { ...PLAN, sides: [PLAN.sides[0]] };
-    const args = buildAnnotatedVideoArgs(plan, {
-      band: OVERLAYS.band,
-      sides: [OVERLAYS.sides[0]],
-    });
-    const graph = valueAfter(args, '-filter_complex').split(';');
-    assert.ok(graph.includes('[c0_3]null[stack]'), graph.join('\n'));
-    assert.equal(
-      graph.some((chunk) => chunk.includes('hstack')),
-      false,
-    );
-    assert.equal(graph.at(-1), '[framed][1:v]overlay=0:0[v]');
-    assert.deepEqual(inputsOf(args), [
-      '/work/before.webm',
-      '/o/band.png',
-      '/o/before-label.png',
-      '/o/before-0.png',
-      '/o/before-1.png',
-      '/o/before-2.png',
-    ]);
-  });
-
   test('the output is H.264 in yuv420p with no audio, written to the plan output, and the graph never draws text', () => {
-    for (const plan of [PLAN, { ...PLAN, sides: [PLAN.sides[0]] }]) {
-      const args = buildAnnotatedVideoArgs(plan, {
-        band: OVERLAYS.band,
-        sides: plan.sides.map((_, s) => OVERLAYS.sides[s]),
-      });
+    for (const plan of [PLAN, ONE_PLAN]) {
+      const overlays = plan === PLAN ? OVERLAYS : ONE_OVERLAYS;
+      const args = buildAnnotatedVideoArgs(plan, overlays, timelineOf(plan));
       assert.equal(valueAfter(args, '-map'), '[v]');
       assert.equal(valueAfter(args, '-c:v'), 'libx264');
       assert.equal(valueAfter(args, '-pix_fmt'), 'yuv420p');
@@ -558,6 +1078,7 @@ describe('buildAnnotatedVideoArgs', () => {
         buildAnnotatedVideoArgs(
           { ...PLAN, sides: [] },
           { band: OVERLAYS.band, sides: [] },
+          pacedTimeline([], []),
         ),
       /one or two sides/,
     );
@@ -572,6 +1093,7 @@ describe('buildAnnotatedVideoArgs', () => {
         buildAnnotatedVideoArgs(
           { ...PLAN, sides: threeSides },
           { band: OVERLAYS.band, sides: threeOverlays },
+          pacedTimeline(threeSides, [6, 3, 6]),
         ),
       /one or two sides/,
     );
@@ -580,22 +1102,39 @@ describe('buildAnnotatedVideoArgs', () => {
   test('overlays that do not match the sides, or the windows of a side, are refused', () => {
     assert.throws(
       () =>
-        buildAnnotatedVideoArgs(PLAN, {
-          band: OVERLAYS.band,
-          sides: [OVERLAYS.sides[0]],
-        }),
+        buildAnnotatedVideoArgs(
+          PLAN,
+          { band: OVERLAYS.band, sides: [OVERLAYS.sides[0]] },
+          PLAN_TIMELINE,
+        ),
       /one set of overlays is needed per side/,
     );
     assert.throws(
       () =>
-        buildAnnotatedVideoArgs(PLAN, {
-          band: OVERLAYS.band,
-          sides: [
-            OVERLAYS.sides[0],
-            { label: '/o/after-label.png', strips: ['/o/after-0.png'] },
-          ],
-        }),
+        buildAnnotatedVideoArgs(
+          PLAN,
+          {
+            band: OVERLAYS.band,
+            sides: [
+              OVERLAYS.sides[0],
+              { label: '/o/after-label.png', strips: ['/o/after-0.png'] },
+            ],
+          },
+          PLAN_TIMELINE,
+        ),
       /after: one strip is needed per caption window/,
+    );
+  });
+
+  test('a timeline that does not give one paced side per plan side is refused', () => {
+    assert.throws(
+      () =>
+        buildAnnotatedVideoArgs(
+          PLAN,
+          OVERLAYS,
+          pacedTimeline([PLAN.sides[0]], [6]),
+        ),
+      /one paced timeline is needed per side/,
     );
   });
 });

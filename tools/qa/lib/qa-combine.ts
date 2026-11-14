@@ -3,16 +3,18 @@
  *
  * A `Capture: video` scenario's annotated MP4: that scenario's tab, Before
  * beside After, with the Storyboard's band throughout, each step's caption
- * from the moment its step was taken, and the device and tab label on each
- * side. The overlays are PNGs rendered in Chromium (`video-overlay-html.ts`,
- * `video-overlay-render.ts`); ffmpeg only scales, stacks and overlays them,
+ * from its step's hold, and the device and tab label on each side. The MP4
+ * is paced so a viewer can follow it (`pacedTimeline`): each step holds on
+ * its frame, steps start at the same moment on both sides, and playback
+ * between steps is slower. The overlays are PNGs rendered in Chromium
+ * (`video-overlay-html.ts`, `video-overlay-render.ts`); ffmpeg only scales, stacks and overlays them,
  * and never needs `drawtext`.
  *
  * Pure: this module reads and checks a scenario's saved step records (what
  * `qa:combine` re-renders from), and decides the caption timing and every
  * ffmpeg argument list. `qa-combine-executor.ts` runs them. ffmpeg
- * is the system binary, not an npm dependency. A shorter video holds its last
- * frame while the longer one finishes.
+ * is the system binary, not an npm dependency. A shorter segment holds its
+ * last frame while the longer one finishes.
  */
 import { isAbsolute, normalize } from 'node:path';
 
@@ -26,6 +28,14 @@ import type { Band, StoryboardSideInput } from './storyboard.ts';
 export const FFMPEG = 'ffmpeg';
 
 export const VIDEO_FPS = 25;
+
+/** How long both sides hold on each step's frame, in output seconds. */
+export const VIDEO_STEP_HOLD_SECONDS = 2.5;
+
+/** The speed each side plays at between steps (1 is the recording's own speed). */
+export const VIDEO_PLAYBACK_SPEED = 0.75;
+
+export const FFPROBE = 'ffprobe';
 
 /** A request that cannot be re-rendered: a bad invocation or a missing input, exit 2. */
 export class CombineInputError extends Error {
@@ -234,9 +244,9 @@ export interface AnnotatedVideoPlan {
 }
 
 /**
- * One caption strip's time on screen, in seconds of the side's own video:
- * `step` is `null` for the strip shown before the first step, and `end` is
- * `null` for the last, which stays to the end.
+ * One caption strip's time on screen, in seconds of the paced MP4: `step`
+ * is `null` for the strip shown before the first step, and `end` is `null`
+ * for the last, which stays to the end.
  */
 export interface CaptionWindow {
   step: VideoStep | null;
@@ -244,28 +254,203 @@ export interface CaptionWindow {
   end: number | null;
 }
 
-/** A step's moment in a side's video: its time from the run's start, less the recording's. */
+/** One stretch of a side's output: its recording played slower, or one frame held. */
+export interface PacedPiece {
+  kind: 'play' | 'hold';
+  /** Seconds into the side's own recording. A hold shows the frame at `srcStart`. */
+  srcStart: number;
+  srcEnd: number;
+  /** Seconds into the paced MP4. A play shorter than this holds its last frame. */
+  outStart: number;
+  outEnd: number;
+}
+
+/** One side of the paced MP4: what it shows, in order, and its caption strips. */
+export interface PacedSide {
+  side: Side;
+  pieces: PacedPiece[];
+  windows: CaptionWindow[];
+}
+
+/** The MP4's time, worked out once and read by the ffmpeg arguments and the strips. */
+export interface PacedTimeline {
+  /** When each step's hold starts, by step position (the first step is `[0]`); the same on every side. */
+  holdStarts: number[];
+  /** The MP4's length in seconds. */
+  total: number;
+  sides: PacedSide[];
+}
+
+const EPSILON = 1e-6;
+const FRAME = 1 / VIDEO_FPS;
+
+/**
+ * A recording's length in seconds, from the `pts_time` of every video packet
+ * (one per line, as `ffprobe -show_entries packet=pts_time -of csv=p=0`
+ * prints them): the last packet's time less the first's, plus one frame. A live-written WebM
+ * has no length in its header, so the packets are what is read. `null` when
+ * there is no packet time.
+ */
+export function durationFromPackets(output: string): number | null {
+  const times = output
+    .split('\n')
+    .map((line) => Number.parseFloat(line.split(',')[0]))
+    .filter((time) => Number.isFinite(time));
+  if (times.length === 0) return null;
+  // One loop, not `Math.max(...times)`: a long recording has too many packets to spread.
+  // ffmpeg reads an input from its first packet, so the length is last less first, plus a frame.
+  let first = times[0];
+  let last = times[0];
+  for (const time of times) {
+    first = Math.min(first, time);
+    last = Math.max(last, time);
+  }
+  return last - first + FRAME;
+}
+
+/** The ffprobe arguments that `durationFromPackets` reads. */
+export function probeDurationArgs(video: string): string[] {
+  return [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'packet=pts_time',
+    '-of',
+    'csv=p=0',
+    video,
+  ];
+}
+
+/** A step's moment in a side's recording: its time from the run's start, less the recording's. */
 function secondsInto(side: VideoSide, step: VideoStep): number {
   return Math.max(0, step.atMs - side.openedAtMs) / 1000;
 }
 
 /**
- * Each strip a side shows and when: the opening strip until the first step,
- * then each step's caption from that step's moment until the next step's.
- * A step taken before the recording started shows from 0; a strip that
- * would never be on screen (its next step is at the same moment) is dropped.
+ * Where each step is on a side's recording, in seconds, kept in order and
+ * inside the recording, with the recording's start and end around them and a
+ * side that ran fewer steps than the most padded out with its end:
+ * `[0, step 1, … step n, … end, end]`, `count + 2` long. A side with no
+ * steps has its whole recording before "step 1".
  */
-export function captionWindows(side: VideoSide): CaptionWindow[] {
-  const starts = side.steps.map((step) => secondsInto(side, step));
-  const windows: CaptionWindow[] = [
-    { step: null, start: 0, end: starts[0] ?? null },
-    ...side.steps.map((step, i) => ({
-      step,
-      start: starts[i],
-      end: starts[i + 1] ?? null,
-    })),
-  ];
-  return windows.filter(({ start, end }) => end === null || end > start);
+function anchors(side: VideoSide, duration: number, count: number): number[] {
+  const marks = [0];
+  for (let n = 0; n < count; n++) {
+    const step = side.steps[n];
+    marks.push(
+      step === undefined
+        ? duration
+        : Math.min(duration, Math.max(marks[n], secondsInto(side, step))),
+    );
+  }
+  marks.push(duration);
+  return marks;
+}
+
+/**
+ * The paced timeline of an MP4 (PRD #1544, #1555). `durations` is each side's
+ * recording length, in `sides` order.
+ *
+ * Every side's steps are matched by position. Before step 1, between steps
+ * and after the last step each side plays at `VIDEO_PLAYBACK_SPEED`; a
+ * stretch lasts as long as the longest side's takes, and a side whose stretch
+ * is shorter holds its last frame until the longest has finished. At each
+ * step, every side holds on that step's frame for `VIDEO_STEP_HOLD_SECONDS`,
+ * all starting together. A side with fewer steps holds its last frame through
+ * the holds and stretches it did not take part in.
+ *
+ * Each step's caption shows from the start of its hold until the next step's
+ * hold (the last stays to the end); the strip before step 1 shows until the
+ * first hold, and is left out when that is the very start.
+ */
+export function pacedTimeline(
+  sides: readonly VideoSide[],
+  durations: readonly number[],
+): PacedTimeline {
+  if (durations.length !== sides.length) {
+    throw new Error('one recording length is needed per side');
+  }
+  durations.forEach((duration, i) => {
+    if (!(duration > 0)) {
+      throw new Error(`${sides[i].side}: the recording has no length`);
+    }
+  });
+  const count = Math.max(0, ...sides.map((side) => side.steps.length));
+  const marks = sides.map((side, i) => anchors(side, durations[i], count));
+  // Stretch n runs between mark n and mark n+1 (0 is before step 1, `count` is after the last).
+  const stretches = Array.from({ length: count + 1 }, (_, n) =>
+    Math.max(
+      0,
+      ...marks.map((side) => (side[n + 1] - side[n]) / VIDEO_PLAYBACK_SPEED),
+    ),
+  );
+  const holdStarts: number[] = [];
+  const stretchStarts: number[] = [];
+  let at = 0;
+  for (let n = 0; n <= count; n++) {
+    stretchStarts.push(at);
+    at += stretches[n];
+    if (n < count) {
+      holdStarts.push(at);
+      at += VIDEO_STEP_HOLD_SECONDS;
+    }
+  }
+  const total = at;
+
+  return {
+    holdStarts,
+    total,
+    sides: sides.map((side, i) => {
+      const edge = marks[i];
+      const pieces: PacedPiece[] = [];
+      const piece = (
+        kind: PacedPiece['kind'],
+        srcStart: number,
+        srcEnd: number,
+        outStart: number,
+        outEnd: number,
+      ): void => {
+        if (outEnd - outStart > EPSILON) {
+          pieces.push({ kind, srcStart, srcEnd, outStart, outEnd });
+        }
+      };
+      // One frame at `mark`, kept inside the recording.
+      const frame = (mark: number): [number, number] => {
+        const from = Math.max(0, Math.min(mark, durations[i] - FRAME));
+        return [from, from + FRAME];
+      };
+      for (let n = 0; n <= count; n++) {
+        const [from, to] = [edge[n], edge[n + 1]];
+        const outStart = stretchStarts[n];
+        const outEnd = outStart + stretches[n];
+        if (to - from > EPSILON) piece('play', from, to, outStart, outEnd);
+        else piece('hold', ...frame(from), outStart, outEnd);
+        if (n < count) {
+          piece(
+            'hold',
+            ...frame(edge[n + 1]),
+            holdStarts[n],
+            holdStarts[n] + VIDEO_STEP_HOLD_SECONDS,
+          );
+        }
+      }
+      const windows: CaptionWindow[] = [
+        {
+          step: null,
+          start: 0,
+          end: side.steps.length === 0 ? null : (holdStarts[0] ?? null),
+        },
+        ...side.steps.map((step, n) => ({
+          step,
+          start: holdStarts[n],
+          end: n + 1 < side.steps.length ? holdStarts[n + 1] : null,
+        })),
+      ].filter(({ start, end }) => end === null || end - start > EPSILON);
+      return { side: side.side, pieces, windows };
+    }),
+  };
 }
 
 /** The overlay PNGs an MP4 is made with, by the ffmpeg input they become. */
@@ -284,17 +469,36 @@ export function enableExpression(window: CaptionWindow): string {
     : `gte(t,${seconds(window.start)})*lt(t,${seconds(window.end)})`;
 }
 
+const trimmed = (from: number, to: number): string =>
+  `trim=start=${seconds(from)}:end=${seconds(to)}`;
+
+/** One piece of a side's output, as the filters that cut and time it. */
+function pieceFilters(piece: PacedPiece): string {
+  const length = seconds(piece.outEnd - piece.outStart);
+  const cut = trimmed(piece.srcStart, piece.srcEnd);
+  // A play is slowed by stretching its timestamps; both kinds are then
+  // padded with their last frame and cut to the piece's length.
+  const retime =
+    piece.kind === 'play'
+      ? `setpts=(PTS-STARTPTS)/${VIDEO_PLAYBACK_SPEED}`
+      : 'setpts=PTS-STARTPTS';
+  return `${cut},${retime},fps=${VIDEO_FPS},tpad=stop_mode=clone:stop_duration=${length},trim=duration=${length},setpts=PTS-STARTPTS`;
+}
+
 /**
- * The ffmpeg arguments for one annotated MP4. Inputs: each side's recording,
- * then the band, then per side its label and its strips, in
- * `captionWindows` order. Each side is scaled to the panel, labelled at the
- * top left and given a caption strip below, each strip enabled for its
- * window; the sides are stacked, and the band is overlaid across the top
+ * The ffmpeg arguments for one annotated MP4, laid out by `timeline`
+ * (`pacedTimeline`, from the same plan). Inputs: each side's recording,
+ * then the band, then per side its label and its strips, in the timeline's
+ * `windows` order. Each side is scaled to the panel, cut into its paced
+ * pieces (played slower, or one frame held) and joined; it is then labelled
+ * at the top left and given a caption strip below, each strip enabled for
+ * its window; the sides are stacked, and the band is overlaid across the top
  * with no `enable`, so it shows for the whole video.
  */
 export function buildAnnotatedVideoArgs(
   plan: AnnotatedVideoPlan,
   overlays: VideoOverlayFiles,
+  timeline: PacedTimeline,
 ): string[] {
   const { width, height } = VIDEO_PANEL;
   if (plan.sides.length < 1 || plan.sides.length > 2) {
@@ -303,19 +507,27 @@ export function buildAnnotatedVideoArgs(
   if (overlays.sides.length !== plan.sides.length) {
     throw new Error('one set of overlays is needed per side');
   }
+  if (timeline.sides.length !== plan.sides.length) {
+    throw new Error('one paced timeline is needed per side');
+  }
   const inputs: string[] = plan.sides.map((side) => side.video);
   const bandInput = inputs.push(overlays.band) - 1;
   const graph: string[] = [];
   const panels: string[] = [];
   plan.sides.forEach((side, sideIndex) => {
     const files = overlays.sides[sideIndex];
-    const windows = captionWindows(side);
+    const { pieces, windows } = timeline.sides[sideIndex];
     if (files.strips.length !== windows.length) {
       throw new Error(`${side.side}: one strip is needed per caption window`);
     }
     const labelInput = inputs.push(files.label) - 1;
+    const parts = pieces.map((_, n) => `[s${sideIndex}_${n}]`);
     graph.push(
-      `[${sideIndex}:v]fps=${VIDEO_FPS},scale=${width}:${height},setsar=1[p${sideIndex}]`,
+      `[${sideIndex}:v]fps=${VIDEO_FPS},scale=${width}:${height},setsar=1,split=${pieces.length}${parts.join('')}`,
+      ...pieces.map(
+        (piece, n) => `${parts[n]}${pieceFilters(piece)}[q${sideIndex}_${n}]`,
+      ),
+      `${pieces.map((_, n) => `[q${sideIndex}_${n}]`).join('')}concat=n=${pieces.length}:v=1:a=0[p${sideIndex}]`,
       `[p${sideIndex}][${labelInput}:v]overlay=0:0[l${sideIndex}]`,
       `[l${sideIndex}]pad=${width}:${height + VIDEO_STRIP_HEIGHT}:0:0[c${sideIndex}_0]`,
     );

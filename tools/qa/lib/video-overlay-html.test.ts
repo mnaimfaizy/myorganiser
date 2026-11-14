@@ -1,13 +1,19 @@
 // Contracts for the annotated MP4's overlay pages (PRD #1544), through
 // video-overlay-html.ts's public exports: the band, each side's label and its
-// caption strips, their sizes and transparency, what each strip says, and
-// that every string is escaped. The pages are only checked as HTML here; no
-// browser renders them, and the colours are asserted as the design tokens'
-// roles rather than resolved values. Pure: no process, no file, no browser.
+// caption strips (one per window of the paced timeline), their sizes and
+// transparency, what each strip says, and that every string is escaped. The
+// pages are only checked as HTML here; no browser renders them, and the colours
+// are asserted as the design tokens' roles rather than resolved values. Pure:
+// no process, no file, no browser.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import type { AnnotatedVideoPlan, VideoSide, VideoStep } from './qa-combine.ts';
+import {
+  type AnnotatedVideoPlan,
+  type VideoSide,
+  type VideoStep,
+  pacedTimeline,
+} from './qa-combine.ts';
 import {
   BEFORE_FIRST_STEP,
   CHECKED_HERE,
@@ -79,7 +85,18 @@ const PLAN: AnnotatedVideoPlan = {
   output: '/out/combined/S1.mp4',
 };
 
-const pages = videoOverlayPages(PLAN, TOKENS);
+/** Each side's recording length in seconds, in PLAN's order: Before is longer, so After holds its last frame. */
+const LENGTHS = [6, 4];
+
+/** The paced timeline of a plan, with each side's recording length taken in plan order. */
+function timelineOf(plan: AnnotatedVideoPlan) {
+  return pacedTimeline(
+    plan.sides,
+    plan.sides.map((_, i) => LENGTHS[i]),
+  );
+}
+
+const pages = videoOverlayPages(PLAN, TOKENS, timelineOf(PLAN));
 
 /** The pages' HTML, for checks that span every overlay. */
 function everyPageHtml(): string[] {
@@ -102,7 +119,8 @@ describe('the band overlay', () => {
     assert.ok(band.html.includes('S1 · Save &lt;an&gt; item &amp; more'));
     assert.match(band.html, /<span class="result"[^>]*>PASS<\/span>/);
 
-    const one = videoOverlayPages({ ...PLAN, sides: [BEFORE] }, TOKENS);
+    const onePlan = { ...PLAN, sides: [BEFORE] };
+    const one = videoOverlayPages(onePlan, TOKENS, timelineOf(onePlan));
     assert.equal(one.band.width, 1280);
   });
 });
@@ -118,27 +136,29 @@ describe('the label overlay', () => {
   });
 
   test('a side label and a step tab label are escaped, so markup in a tab name cannot reach the page', () => {
+    const hostilePlan: AnnotatedVideoPlan = {
+      ...PLAN,
+      sides: [
+        {
+          ...BEFORE,
+          label: 'Device A <i>x</i>',
+          steps: [
+            {
+              index: 1,
+              caption: 'confirm',
+              atMs: 2000,
+              device: 'B<b>',
+              tab: 'T"1',
+              label: 'Device B<b> · tab T"1',
+            },
+          ],
+        },
+      ],
+    };
     const hostile = videoOverlayPages(
-      {
-        ...PLAN,
-        sides: [
-          {
-            ...BEFORE,
-            label: 'Device A <i>x</i>',
-            steps: [
-              {
-                index: 1,
-                caption: 'confirm',
-                atMs: 2000,
-                device: 'B<b>',
-                tab: 'T"1',
-                label: 'Device B<b> · tab T"1',
-              },
-            ],
-          },
-        ],
-      },
+      hostilePlan,
       TOKENS,
+      timelineOf(hostilePlan),
     );
     const [side] = hostile.sides;
     assert.ok(
@@ -183,11 +203,44 @@ describe('the caption strips', () => {
     assert.ok(first?.html.includes('open the form'));
   });
 
-  test('a side with no steps has one opening strip, at data-step 0, and no step strips', () => {
-    const empty = videoOverlayPages(
-      { ...PLAN, sides: [{ ...AFTER, steps: [] }] },
-      TOKENS,
+  test('there is one strip per caption window of the paced timeline, and a first step at 0 on both sides drops the opening strip', () => {
+    const timeline = timelineOf(PLAN);
+    assert.deepEqual(
+      pages.sides.map((side) => side.strips.length),
+      timeline.sides.map((side) => side.windows.length),
     );
+
+    const atZero: AnnotatedVideoPlan = {
+      ...PLAN,
+      sides: [
+        {
+          ...BEFORE,
+          steps: [
+            stepAt(1, 'open the form', 0),
+            stepAt(2, 'press "Save" & wait <now>', 2000, 'B', 'B1'),
+          ],
+        },
+        { ...AFTER, steps: [stepAt(1, 'confirm', 0)] },
+      ],
+    };
+    const shifted = videoOverlayPages(atZero, TOKENS, timelineOf(atZero));
+    for (const side of shifted.sides) {
+      assert.equal(side.strips.length, side.side === 'before' ? 2 : 1);
+      assert.ok(side.strips[0]?.html.includes('data-step="1"'));
+      assert.equal(
+        side.strips.some((strip) => strip.html.includes('data-step="0"')),
+        false,
+        `${side.side} has no opening strip`,
+      );
+    }
+  });
+
+  test('a side with no steps has one opening strip, at data-step 0, and no step strips', () => {
+    const emptyPlan: AnnotatedVideoPlan = {
+      ...PLAN,
+      sides: [{ ...AFTER, steps: [] }],
+    };
+    const empty = videoOverlayPages(emptyPlan, TOKENS, timelineOf(emptyPlan));
     const strips = empty.sides[0]?.strips ?? [];
     assert.equal(strips.length, 1);
     assert.ok(strips[0]?.html.includes('data-step="0"'));
@@ -237,6 +290,7 @@ describe('the overlay stylesheet', () => {
     const hostile = videoOverlayPages(
       PLAN,
       '</style><script>alert(1)</script>',
+      timelineOf(PLAN),
     );
     assert.ok(
       hostile.band.html.includes('<\\/style><script>alert(1)<\\/script>'),

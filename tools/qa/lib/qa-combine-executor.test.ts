@@ -1,10 +1,10 @@
 // Contracts for the combine executor (ADR 0147 decision 5; PRD #1544's
 // annotated MP4; PRD #1550's re-render), run with stubbed deps: an in-memory
-// run folder, and every Chromium render and ffmpeg run a fake, so no process
-// starts and no file is written. The pure rules are in qa-combine.test.ts, the
-// overlay pages in video-overlay-html.test.ts, and the real renders in
-// ../qa-combine.real-ffmpeg.test.ts. A re-render checked against what `qa:run`
-// made is in qa-run-executor.test.ts.
+// run folder, and every Chromium render, ffprobe and ffmpeg run a fake, so no
+// process starts and no file is written. The pure rules are in
+// qa-combine.test.ts, the overlay pages in video-overlay-html.test.ts, and the
+// real renders in ../qa-combine.real-ffmpeg.test.ts. A re-render checked
+// against what `qa:run` made is in qa-run-executor.test.ts.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test, { describe } from 'node:test';
@@ -19,11 +19,16 @@ import {
 } from './qa-combine-executor.ts';
 import {
   type AnnotatedVideoPlan,
+  FFPROBE,
   type VideoStep,
   VIDEO_BAND_HEIGHT,
+  VIDEO_FPS,
   VIDEO_LABEL_HEIGHT,
   VIDEO_PANEL,
+  VIDEO_PLAYBACK_SPEED,
+  VIDEO_STEP_HOLD_SECONDS,
   VIDEO_STRIP_HEIGHT,
+  probeDurationArgs,
 } from './qa-combine.ts';
 import { type Band, type Storyboard, buildStoryboard } from './storyboard.ts';
 
@@ -146,6 +151,8 @@ interface RecombineOptions {
   chromium?: string;
   /** The `ffmpeg -version` status; `null` when not installed. Default 0. */
   ffmpegStatus?: number | null;
+  /** The `ffprobe -version` status; `null` when not installed. Default 0. */
+  ffprobeStatus?: number | null;
   /** When set, the Storyboard render rejects with this. */
   renderError?: Error;
   /** When set, the MP4 render rejects with this. */
@@ -174,9 +181,13 @@ function fakeRecombine(folder: RunFolder, options: RecombineOptions = {}) {
   const deps: RecombineDeps = {
     run(argv) {
       calls.push([...argv]);
-      const status =
-        options.ffmpegStatus === undefined ? 0 : options.ffmpegStatus;
-      return { status, stderr: status === 0 ? '' : 'spawn ffmpeg ENOENT' };
+      const configured =
+        argv[0] === FFPROBE ? options.ffprobeStatus : options.ffmpegStatus;
+      const status = configured === undefined ? 0 : configured;
+      return {
+        status,
+        stderr: status === 0 ? '' : `spawn ${argv[0]} ENOENT`,
+      };
     },
     exists: (path) => disk.has(path) || texts.has(path),
     makeDir: () => undefined,
@@ -315,7 +326,10 @@ describe('runCombine: a video scenario also re-renders its annotated MP4', () =>
     assert.ok(fake.ops.includes(`move ${VIDEO_TEMP} ${VIDEO_MP4}`));
     assert.equal(fake.disk.has(VIDEO_MP4), true);
     assert.equal(fake.disk.has(VIDEO_TEMP), false, 'no temp MP4 is left');
-    assert.deepEqual(fake.calls, [['ffmpeg', '-version']]);
+    assert.deepEqual(fake.calls, [
+      ['ffmpeg', '-version'],
+      ['ffprobe', '-version'],
+    ]);
   });
 });
 
@@ -547,9 +561,42 @@ describe('runCombine: a missing input exits 2, names it, and renders nothing', (
     });
     assert.equal(fake.code, 2);
     assert.deepEqual(fake.err, [`qa:combine: ${FFMPEG_MISSING_MESSAGE}`]);
-    assert.deepEqual(fake.calls, [['ffmpeg', '-version']]);
+    assert.deepEqual(
+      fake.calls,
+      [['ffmpeg', '-version']],
+      'ffprobe is not asked once ffmpeg is missing',
+    );
     assert.deepEqual(fake.renders, []);
     assert.deepEqual(fake.annotations, []);
+  });
+
+  for (const [label, ffprobeStatus] of [
+    ['not installed', null],
+    ['failing', 1],
+  ] as const) {
+    test(`a video scenario with ffmpeg present but ffprobe ${label} exits 2 with the install message, and renders nothing`, async () => {
+      const fake = await reRender(RE_RENDER, runFolder('video'), {
+        ffprobeStatus,
+      });
+      assert.equal(fake.code, 2);
+      assert.deepEqual(fake.err, [`qa:combine: ${FFMPEG_MISSING_MESSAGE}`]);
+      assert.deepEqual(fake.out, []);
+      assert.deepEqual(fake.calls, [
+        ['ffmpeg', '-version'],
+        ['ffprobe', '-version'],
+      ]);
+      assert.deepEqual(fake.renders, []);
+      assert.deepEqual(fake.annotations, []);
+      assert.equal(fake.disk.has(SCREEN_PNG), false, 'no PNG is written');
+      assert.equal(fake.disk.has(VIDEO_MP4), false, 'no MP4 is written');
+    });
+  }
+
+  test('the install message names ffmpeg and ffprobe', () => {
+    assert.equal(
+      FFMPEG_MISSING_MESSAGE,
+      'ffmpeg or ffprobe was not found on PATH, so nothing was combined. Install ffmpeg, which ships ffprobe (macOS: `brew install ffmpeg`; Debian/Ubuntu: `sudo apt-get install ffmpeg`), and run again.',
+    );
   });
 });
 
@@ -875,6 +922,33 @@ const PLAN: AnnotatedVideoPlan = {
   output: ANNOTATE_OUT,
 };
 
+/** What one ffprobe run replies: its status, its stderr, and what it prints. */
+interface ProbeReply {
+  status: number | null;
+  stderr?: string;
+  stdout?: string;
+}
+
+/** The length each recording reads as, in seconds, unless a test gives its probe a reply. */
+const RECORDING_SECONDS: Record<string, number> = {
+  '/work/before.webm': 6,
+  '/work/after.webm': 3,
+};
+
+/** What ffprobe prints for a recording of `seconds`: one packet time per frame, from 0. */
+function packetTimes(seconds: number): string {
+  return Array.from({ length: Math.round(seconds * VIDEO_FPS) }, (_, n) =>
+    (n / VIDEO_FPS).toFixed(6),
+  ).join('\n');
+}
+
+/** The filter graph of one ffmpeg argv: the value after `-filter_complex`. */
+function filterOf(argv: readonly string[]): string {
+  const at = argv.indexOf('-filter_complex');
+  assert.notEqual(at, -1, 'the argv has a filter graph');
+  return argv[at + 1];
+}
+
 interface AnnotateFakeOptions {
   /** The ffmpeg run's status; default 0. */
   status?: number;
@@ -883,10 +957,14 @@ interface AnnotateFakeOptions {
   writesOutput?: boolean;
   /** When set, the Chromium render rejects with this error. */
   renderError?: Error;
+  /** A recording's ffprobe reply, by its path; a recording not named prints its packet times. */
+  probes?: Partial<Record<string, ProbeReply>>;
 }
 
 function fakeAnnotate(options: AnnotateFakeOptions = {}) {
+  /** The ffmpeg runs only: an ffprobe run is in `probes`. */
   const calls: string[][] = [];
+  const probes: string[][] = [];
   const files = new Set<string>();
   const removed: string[] = [];
   const dirs: string[] = [];
@@ -901,6 +979,21 @@ function fakeAnnotate(options: AnnotateFakeOptions = {}) {
 
   const deps: AnnotateDeps = {
     run(argv) {
+      if (argv[0] === FFPROBE) {
+        const video = argv[argv.length - 1];
+        log.push(`probe ${video}`);
+        probes.push([...argv]);
+        const reply = options.probes?.[video];
+        const printed = packetTimes(RECORDING_SECONDS[video]);
+        if (reply === undefined) {
+          return { status: 0, stderr: '', stdout: printed };
+        }
+        return {
+          status: reply.status,
+          stderr: reply.stderr ?? '',
+          stdout: reply.stdout ?? printed,
+        };
+      }
       log.push('run');
       calls.push([...argv]);
       const status = options.status ?? 0;
@@ -938,7 +1031,7 @@ function fakeAnnotate(options: AnnotateFakeOptions = {}) {
     },
   };
 
-  return { deps, calls, dirs, files, removed, renders, log };
+  return { deps, calls, probes, dirs, files, removed, renders, log };
 }
 
 describe('makeAnnotatedVideo: the overlay PNGs', () => {
@@ -990,6 +1083,134 @@ describe('makeAnnotatedVideo: the overlay PNGs', () => {
       fake.log.indexOf('render') < fake.log.indexOf('run'),
       'the PNGs exist before ffmpeg reads them',
     );
+  });
+});
+
+describe('makeAnnotatedVideo: each recording is probed for its length before anything is drawn', () => {
+  test('each side is probed with ffprobe, in side order, before the overlays are drawn and ffmpeg runs', async () => {
+    const fake = fakeAnnotate();
+    await makeAnnotatedVideo(PLAN, fake.deps);
+    assert.deepEqual(fake.probes, [
+      [FFPROBE, ...probeDurationArgs('/work/before.webm')],
+      [FFPROBE, ...probeDurationArgs('/work/after.webm')],
+    ]);
+    const lastProbe = Math.max(
+      fake.log.indexOf('probe /work/before.webm'),
+      fake.log.indexOf('probe /work/after.webm'),
+    );
+    assert.ok(lastProbe >= 0, 'both recordings are probed');
+    assert.ok(
+      lastProbe < fake.log.indexOf('makeTempDir'),
+      'no temp dir before the probes',
+    );
+    assert.ok(
+      lastProbe < fake.log.indexOf('render'),
+      'no overlay before the probes',
+    );
+    assert.ok(
+      lastProbe < fake.log.indexOf('run'),
+      'no ffmpeg before the probes',
+    );
+  });
+
+  test("the MP4 is paced from the probed lengths: a longer After recording moves the second step's hold", async () => {
+    const fake = fakeAnnotate({
+      probes: { '/work/after.webm': { status: 0, stdout: packetTimes(4) } },
+    });
+    await makeAnnotatedVideo(PLAN, fake.deps);
+    // Before's lead is 1.5 s; between the steps the longer side's stretch is
+    // After's 4 s less its 0.5 s first step, 3.5 s, not the 2.5 s the 3 s default gives.
+    const secondHold =
+      1.5 / VIDEO_PLAYBACK_SPEED +
+      VIDEO_STEP_HOLD_SECONDS +
+      3.5 / VIDEO_PLAYBACK_SPEED;
+    assert.ok(
+      filterOf(fake.calls[0]).includes(
+        `enable='gte(t,${secondHold.toFixed(3)})'`,
+      ),
+      filterOf(fake.calls[0]),
+    );
+  });
+
+  test('a probe that fails rejects with its reason, names the side, and makes no temp dir, overlay, ffmpeg run or MP4', async () => {
+    const fake = fakeAnnotate({
+      probes: {
+        '/work/before.webm': {
+          status: 1,
+          stderr: 'Invalid data found when processing input\nmore detail',
+        },
+      },
+    });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message:
+        "ffprobe could not read the length of before's recording: Invalid data found when processing input",
+    });
+    assert.equal(
+      fake.probes.length,
+      1,
+      'the first probe is the one that failed',
+    );
+    assert.equal(
+      fake.log.includes('makeTempDir'),
+      false,
+      'no temp dir is made',
+    );
+    assert.equal(fake.log.includes('render'), false, 'no overlay is drawn');
+    assert.equal(fake.calls.length, 0, 'ffmpeg never runs');
+    assert.deepEqual(
+      fake.removed,
+      [],
+      'nothing was made, so nothing is removed',
+    );
+    assert.equal(fake.files.has(ANNOTATE_OUT), false, 'no MP4 is left');
+  });
+
+  test('a probe that prints no packet time rejects, and names the side', async () => {
+    const fake = fakeAnnotate({
+      probes: { '/work/after.webm': { status: 0, stdout: '' } },
+    });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message:
+        "ffprobe could not read the length of after's recording: it printed no packet times",
+    });
+    assert.equal(fake.calls.length, 0, 'ffmpeg never runs');
+    assert.equal(fake.files.has(ANNOTATE_OUT), false, 'no MP4 is left');
+  });
+
+  test('an ffprobe that cannot be started rejects with the reason it gave', async () => {
+    const fake = fakeAnnotate({
+      probes: {
+        '/work/before.webm': {
+          status: null,
+          stderr: 'spawnSync ffprobe ENOENT',
+        },
+      },
+    });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message:
+        "ffprobe could not read the length of before's recording: spawnSync ffprobe ENOENT",
+    });
+    assert.equal(fake.calls.length, 0, 'ffmpeg never runs');
+  });
+
+  test('a probe that fails on the second side stops after both probes, before any overlay is drawn', async () => {
+    const fake = fakeAnnotate({
+      probes: {
+        '/work/after.webm': { status: 1, stderr: 'moov atom not found' },
+      },
+    });
+    await assert.rejects(makeAnnotatedVideo(PLAN, fake.deps), {
+      message:
+        "ffprobe could not read the length of after's recording: moov atom not found",
+    });
+    assert.equal(fake.probes.length, 2, 'both recordings were probed');
+    assert.equal(fake.log.includes('render'), false, 'no overlay is drawn');
+    assert.equal(
+      fake.log.includes('makeTempDir'),
+      false,
+      'no temp dir is made',
+    );
+    assert.equal(fake.calls.length, 0, 'ffmpeg never runs');
   });
 });
 

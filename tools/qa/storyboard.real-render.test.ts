@@ -31,7 +31,15 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
-import type { AnnotatedVideoPlan } from './lib/qa-combine.ts';
+import {
+  type AnnotatedVideoPlan,
+  VIDEO_FPS,
+  VIDEO_PLAYBACK_SPEED,
+  VIDEO_STEP_HOLD_SECONDS,
+  durationFromPackets,
+  pacedTimeline,
+  probeDurationArgs,
+} from './lib/qa-combine.ts';
 import { makeAnnotatedVideo } from './lib/qa-combine-executor.ts';
 import { storyboardRenderer } from './lib/storyboard-render.ts';
 import { type Storyboard, buildStoryboard } from './lib/storyboard.ts';
@@ -237,13 +245,16 @@ function ffmpeg(args: string[]): void {
   assert.equal(result.status, 0, `fixture ffmpeg failed: ${result.stderr}`);
 }
 
+/** The Before recording's length in seconds, as `makeRecording` writes it. */
+const RECORDING_SECONDS = 2;
+
 /** A 2 s, 1280x720 test pattern at 25 fps, as the Before recording. */
 function makeRecording(file: string): void {
   ffmpeg([
     '-f',
     'lavfi',
     '-i',
-    'testsrc=size=1280x720:rate=25:duration=2',
+    `testsrc=size=1280x720:rate=25:duration=${RECORDING_SECONDS}`,
     '-c:v',
     'libx264',
     '-pix_fmt',
@@ -253,8 +264,9 @@ function makeRecording(file: string): void {
 }
 
 /**
- * One side, one step at 1 s: the opening strip shows from 0 to 1 s, then the
- * step's caption from 1 s to the end.
+ * One side, one step at 1 s of its recording. On the paced timeline the opening
+ * strip shows until the step's hold, and the step's caption holds for
+ * VIDEO_STEP_HOLD_SECONDS from there; the sample times are worked out from it.
  */
 function annotatedPlan(recording: string, output: string): AnnotatedVideoPlan {
   const step = {
@@ -308,6 +320,24 @@ function probeVideo(file: string): string[] {
   return result.stdout.trim().split(',');
 }
 
+/** One frame, in seconds. */
+const FRAME = 1 / VIDEO_FPS;
+
+/**
+ * A file's length in seconds, read from its packet times the way the executor
+ * reads a recording (`durationFromPackets`), so the paced timeline is built from
+ * the same measure the MP4 is.
+ */
+function probeSeconds(file: string): number {
+  const result = spawnSync('ffprobe', probeDurationArgs(file), {
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, `ffprobe failed: ${result.stderr}`);
+  const seconds = durationFromPackets(result.stdout);
+  assert.ok(seconds !== null, 'ffprobe printed packet times');
+  return seconds;
+}
+
 /** The largest difference in any one byte of two equal-length RGB24 strips. */
 function largestDelta(a: Buffer, b: Buffer): number {
   let largest = 0;
@@ -315,6 +345,48 @@ function largestDelta(a: Buffer, b: Buffer): number {
     largest = Math.max(largest, Math.abs(a[i] - b[i]));
   }
   return largest;
+}
+
+/**
+ * Reference matches (a strip against a reference MP4's strip) use these instead
+ * of the largest difference. The two MP4s are encoded separately, so a few
+ * bytes at glyph edges differ by up to 28 (measured) with the same caption on
+ * screen, and that is quantisation, not a different strip. On the measured
+ * strips the mean difference is 0.37 and the bytes over ENCODER_NOISE_MAX are
+ * about 0.01 to 0.02% of the strip.
+ */
+const REFERENCE_MEAN_DELTA_MAX = 1;
+const REFERENCE_OVER_SHARE_MAX = 0.005;
+
+/** The mean difference per byte of two equal-length RGB24 strips. */
+function meanDelta(a: Buffer, b: Buffer): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    sum += Math.abs(a[i] - b[i]);
+  }
+  return sum / a.length;
+}
+
+/** The share of bytes in two equal-length RGB24 strips that differ by more than ENCODER_NOISE_MAX. */
+function overNoiseShare(a: Buffer, b: Buffer): number {
+  let over = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    if (Math.abs(a[i] - b[i]) > ENCODER_NOISE_MAX) over += 1;
+  }
+  return over / a.length;
+}
+
+/**
+ * Whether a strip is the reference strip, to within encoder quantisation: a
+ * small mean difference and a tiny share of bytes past ENCODER_NOISE_MAX. A
+ * different strip fails it by a wide margin (a black or opening strip has a
+ * mean far above the limit, as the self-check in the test shows).
+ */
+function matchesReference(a: Buffer, b: Buffer): boolean {
+  return (
+    meanDelta(a, b) <= REFERENCE_MEAN_DELTA_MAX &&
+    overNoiseShare(a, b) <= REFERENCE_OVER_SHARE_MAX
+  );
 }
 
 /** The caption strip of the frame at `seconds`, as raw RGB24 bytes. */
@@ -347,7 +419,7 @@ function stripAt(file: string, seconds: number): Buffer {
 }
 
 test(
-  "burns a step's caption into a short annotated MP4 at its timestamp with real ffmpeg",
+  "a real annotated MP4 shows the opening strip until a step's paced hold, then that step's caption strip",
   { skip: ANNOTATE_SKIP },
   async () => {
     assert.equal(
@@ -364,12 +436,70 @@ test(
     try {
       const recording = join(dir, 'before.mp4');
       const output = join(dir, 'annotated.mp4');
+      const reference = join(dir, 'reference.mp4');
       makeRecording(recording);
+      const real = nodeAnnotateDeps(REPO_ROOT, overlays);
+      const plan = annotatedPlan(recording, output);
+      // The recording's length as ffprobe reads it, which the executor paces the MP4 from.
+      const probed = probeSeconds(recording);
+      assert.ok(
+        Math.abs(probed - RECORDING_SECONDS) <= FRAME,
+        `the recording is ${probed} s; makeRecording wrote ${RECORDING_SECONDS} s`,
+      );
+      const timeline = pacedTimeline(plan.sides, [probed]);
+      const [opening, caption] = timeline.sides[0].windows;
+      const holdStart = timeline.holdStarts[0];
+      // 1 s of recording at the playback speed: the lead before the step is
+      // 1 / VIDEO_PLAYBACK_SPEED seconds, and the step's hold starts after it.
+      assert.ok(
+        Math.abs(holdStart - 1 / VIDEO_PLAYBACK_SPEED) < 0.01,
+        `the hold starts at ${holdStart} s`,
+      );
+      assert.equal(
+        opening.end,
+        holdStart,
+        'the opening strip runs to the hold',
+      );
+      assert.equal(caption.start, holdStart, 'the caption starts at the hold');
+      // Samples: the opening strip mid-way to its end, just before the hold, and
+      // two points inside the caption's hold.
+      const openingAt = holdStart / 2;
+      const beforeHold = holdStart - 0.15;
+      const captionFirst = holdStart + VIDEO_STEP_HOLD_SECONDS / 3;
+      const captionSecond = holdStart + (2 * VIDEO_STEP_HOLD_SECONDS) / 3;
+      // A reference MP4 of the same side with no steps: its one strip is the
+      // opening strip, shown to the end, so it is the caption-free strip.
+      await makeAnnotatedVideo(
+        {
+          ...plan,
+          sides: [{ ...plan.sides[0], steps: [] }],
+          output: reference,
+        },
+        real,
+      );
+      const captionFree = stripAt(reference, openingAt);
+      // A reference MP4 of the same step taken at 0: the timeline drops the
+      // opening strip, so the step's caption strip shows throughout, and its
+      // strip at the caption sample is the caption strip.
+      const captionReference = join(dir, 'caption-reference.mp4');
+      await makeAnnotatedVideo(
+        {
+          ...plan,
+          sides: [
+            {
+              ...plan.sides[0],
+              steps: plan.sides[0].steps.map((step) => ({ ...step, atMs: 0 })),
+            },
+          ],
+          output: captionReference,
+        },
+        real,
+      );
+      const captionRef = stripAt(captionReference, captionFirst);
       // Wraps the real temp-dir maker to prove the overlay dir is made under
       // `overlays`: an implementation that ignored tempRoot would fail here.
-      const real = nodeAnnotateDeps(REPO_ROOT, overlays);
       const made: string[] = [];
-      await makeAnnotatedVideo(annotatedPlan(recording, output), {
+      await makeAnnotatedVideo(plan, {
         ...real,
         makeTempDir: () => {
           const created = real.makeTempDir();
@@ -395,18 +525,51 @@ test(
         ['h264', String(FRAME_WIDTH), String(FRAME_HEIGHT)],
         'an H.264 MP4, 1280 px wide for one side and 872 px high',
       );
-      // The opening strip is on screen at 0.5 s; the caption strip at 1.5 s.
-      const opening = stripAt(output, 0.5);
-      const caption = stripAt(output, 1.5);
+      // The opening strip is on screen before the hold: the frame matches the
+      // caption-free reference, both just before the hold and mid-way to it.
       assert.ok(
-        largestDelta(opening, caption) >= CAPTION_CHANGE_MIN,
-        'the caption strip at 1.5 s differs from the opening strip at 0.5 s',
+        largestDelta(stripAt(output, openingAt), captionFree) <=
+          ENCODER_NOISE_MAX,
+        `the strip at ${openingAt.toFixed(2)} s is the opening strip`,
+      );
+      assert.ok(
+        largestDelta(stripAt(output, beforeHold), captionFree) <=
+          ENCODER_NOISE_MAX,
+        `the strip at ${beforeHold.toFixed(2)} s, before the hold, is still the opening strip`,
+      );
+      // The strip after the hold is the step's caption strip, matched against
+      // the caption reference; the caption differs from the opening strip too.
+      // The self-check: the opening strip fails the same reference match, so the
+      // thresholds above separate the caption from the opening strip.
+      assert.equal(
+        matchesReference(stripAt(output, openingAt), captionRef),
+        false,
+        'the opening strip does not match the caption reference',
+      );
+      const afterHold = stripAt(output, captionFirst);
+      assert.ok(
+        matchesReference(afterHold, captionRef),
+        `the strip after the hold is the step's caption strip (mean delta ${meanDelta(afterHold, captionRef).toFixed(2)}, bytes over ${ENCODER_NOISE_MAX} ${(overNoiseShare(afterHold, captionRef) * 100).toFixed(3)}%)`,
+      );
+      assert.ok(
+        largestDelta(stripAt(output, captionFirst), captionFree) >=
+          CAPTION_CHANGE_MIN,
+        `the strip at ${captionFirst.toFixed(2)} s is the caption, not the opening strip`,
+      );
+      // One frame after the hold is already the caption, so the onset is bounded
+      // to (holdStart - 0.15 s, holdStart + one frame].
+      const oneFrameAfter = stripAt(output, holdStart + FRAME);
+      assert.ok(
+        matchesReference(oneFrameAfter, captionRef),
+        `the strip at ${(holdStart + FRAME).toFixed(3)} s, one frame after the hold, is the caption (mean delta ${meanDelta(oneFrameAfter, captionRef).toFixed(2)}, bytes over ${ENCODER_NOISE_MAX} ${(overNoiseShare(oneFrameAfter, captionRef) * 100).toFixed(3)}%)`,
       );
       // Two frames inside the caption window show the same strip to within
       // encoder noise, so the change above is the caption, not noise.
       assert.ok(
-        largestDelta(stripAt(output, 1.2), stripAt(output, 1.8)) <=
-          ENCODER_NOISE_MAX,
+        largestDelta(
+          stripAt(output, captionFirst),
+          stripAt(output, captionSecond),
+        ) <= ENCODER_NOISE_MAX,
         'two frames inside the caption window show the same strip',
       );
     } finally {

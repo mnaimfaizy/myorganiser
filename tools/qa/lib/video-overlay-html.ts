@@ -10,7 +10,7 @@
  *   - each side's label: "BEFORE · Device B · tab B1", on a transparent
  *     page, for the top left of that side's panel;
  *   - each side's caption strips, one per caption window
- *     (`captionWindows`): the step's number and caption, with the tab it was
+ *     (`pacedTimeline`): the step's number and caption, with the tab it was
  *     taken on when that is not the MP4's tab, and the last step marked as
  *     the one the check is made on. The opening strip covers the time before
  *     step 1.
@@ -27,12 +27,12 @@
 import {
   type AnnotatedVideoPlan,
   type CaptionWindow,
+  type PacedTimeline,
   VIDEO_BAND_HEIGHT,
   VIDEO_LABEL_HEIGHT,
   VIDEO_PANEL,
   VIDEO_STRIP_HEIGHT,
   type VideoSide,
-  captionWindows,
 } from './qa-combine.ts';
 import type { Side } from './qa-stack.ts';
 import {
@@ -125,6 +125,7 @@ function stripHtml(
 export function videoOverlayPages(
   plan: AnnotatedVideoPlan,
   tokenCss: string,
+  timeline: PacedTimeline,
 ): VideoOverlayPages {
   const { width } = VIDEO_PANEL;
   const bandWidth = width * plan.sides.length;
@@ -141,7 +142,7 @@ export function videoOverlayPages(
       height: VIDEO_BAND_HEIGHT,
       transparent: false,
     },
-    sides: plan.sides.map((side) => {
+    sides: plan.sides.map((side, sideIndex) => {
       const lastIndex = Math.max(0, ...side.steps.map((step) => step.index));
       return {
         side: side.side,
@@ -157,7 +158,7 @@ export function videoOverlayPages(
           height: VIDEO_LABEL_HEIGHT,
           transparent: true,
         },
-        strips: captionWindows(side).map((window) => ({
+        strips: timeline.sides[sideIndex].windows.map((window) => ({
           html: page(
             tokenCss,
             'overlay-strip',

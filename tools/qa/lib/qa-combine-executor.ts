@@ -39,8 +39,12 @@ import {
   type AnnotatedVideoPlan,
   CombineInputError,
   FFMPEG,
+  FFPROBE,
   buildAnnotatedVideoArgs,
+  durationFromPackets,
+  pacedTimeline,
   parseStepRecords,
+  probeDurationArgs,
   resultOf,
 } from './qa-combine.ts';
 import {
@@ -65,6 +69,8 @@ export interface CombineRun {
   /** `null` when the program could not be started (not installed). */
   status: number | null;
   stderr: string;
+  /** What the program printed; only a probe reads it. */
+  stdout?: string;
 }
 
 export interface CombineDeps {
@@ -80,7 +86,7 @@ export const COMBINE_USAGE =
   "usage: node tools/qa/qa-combine.ts --run <qa:run output folder> --scenario <id> (re-renders the scenario's Storyboard PNG, and its annotated MP4 for a video scenario, from the step records the run saved under <folder>/steps, beside the stills and recordings it kept; files are written to <folder>/combined as qa:run wrote them. A bare --before/--after file pair is refused. Secrets are not saved, so only the Bearer/JWT half of the caption check is redone: an exact-secret check cannot be redone here)";
 
 export const FFMPEG_MISSING_MESSAGE =
-  'ffmpeg was not found on PATH, so nothing was combined. Install it (macOS: `brew install ffmpeg`; Debian/Ubuntu: `sudo apt-get install ffmpeg`) and run again.';
+  'ffmpeg or ffprobe was not found on PATH, so nothing was combined. Install ffmpeg, which ships ffprobe (macOS: `brew install ffmpeg`; Debian/Ubuntu: `sudo apt-get install ffmpeg`), and run again.';
 
 /** The machine behind a re-render. The real one is in `tools/qa/qa-combine.ts`. */
 export interface RecombineDeps extends CombineDeps {
@@ -228,7 +234,12 @@ async function recombine(
 
   const chromium = deps.chromiumMissing();
   if (chromium) throw new CombineInputError(chromium);
-  if (isVideo && deps.run([FFMPEG, '-version']).status !== 0) {
+  if (
+    isVideo &&
+    [FFMPEG, FFPROBE].some(
+      (program) => deps.run([program, '-version']).status !== 0,
+    )
+  ) {
     throw new CombineInputError(FFMPEG_MISSING_MESSAGE);
   }
 
@@ -309,6 +320,22 @@ export interface AnnotateDeps extends Pick<
   renderPngs(pages: readonly OverlayPng[]): Promise<void>;
 }
 
+/** A side's recording length, read from its packets; throws when it cannot be. */
+function recordingSeconds(
+  side: AnnotatedVideoPlan['sides'][number],
+  deps: Pick<AnnotateDeps, 'run'>,
+): number {
+  const probed = deps.run([FFPROBE, ...probeDurationArgs(side.video)]);
+  const seconds =
+    probed.status === 0 ? durationFromPackets(probed.stdout ?? '') : null;
+  if (seconds === null) {
+    throw new Error(
+      `ffprobe could not read the length of ${side.side}'s recording: ${firstLine(probed.stderr) || 'it printed no packet times'}`,
+    );
+  }
+  return seconds;
+}
+
 /**
  * Makes one annotated MP4 at `plan.output`. Rejects with the reason on any
  * failure, with no MP4 left behind; the overlay PNGs never outlive the call.
@@ -317,7 +344,11 @@ export async function makeAnnotatedVideo(
   plan: AnnotatedVideoPlan,
   deps: AnnotateDeps,
 ): Promise<void> {
-  const pages = videoOverlayPages(plan, deps.tokenCss());
+  const timeline = pacedTimeline(
+    plan.sides,
+    plan.sides.map((side) => recordingSeconds(side, deps)),
+  );
+  const pages = videoOverlayPages(plan, deps.tokenCss(), timeline);
   const temp = deps.makeTempDir();
   try {
     const band: OverlayPng = { ...pages.band, path: join(temp, 'band.png') };
@@ -335,13 +366,17 @@ export async function makeAnnotatedVideo(
     deps.makeDir(dirname(plan.output));
     const made = deps.run([
       FFMPEG,
-      ...buildAnnotatedVideoArgs(plan, {
-        band: band.path,
-        sides: sides.map(({ label, strips }) => ({
-          label: label.path,
-          strips: strips.map((strip) => strip.path),
-        })),
-      }),
+      ...buildAnnotatedVideoArgs(
+        plan,
+        {
+          band: band.path,
+          sides: sides.map(({ label, strips }) => ({
+            label: label.path,
+            strips: strips.map((strip) => strip.path),
+          })),
+        },
+        timeline,
+      ),
     ]);
     if (made.status !== 0 || !deps.exists(plan.output)) {
       throw new Error(

@@ -17,6 +17,7 @@ export function nodeCombineDeps(): CombineDeps {
       return {
         status: result.error ? null : result.status,
         stderr: result.error ? result.error.message : (result.stderr ?? ''),
+        stdout: result.stdout ?? '',
       };
     },
     exists: existsSync,

@@ -54,8 +54,12 @@ const deps: RunDeps = {
   renderStoryboard: storyboardRenderer(repoRoot),
   annotateVideo: (plan) => makeAnnotatedVideo(plan, nodeAnnotateDeps(repoRoot)),
   chromiumMissing,
+  // The annotated MP4 reads each recording's length with ffprobe, which ships with ffmpeg.
   ffmpegMissing: () =>
-    qaDeps.run(['ffmpeg', '-version'], { cwd: repoRoot }).status !== 0,
+    ['ffmpeg', 'ffprobe'].some(
+      (program) =>
+        qaDeps.run([program, '-version'], { cwd: repoRoot }).status !== 0,
+    ),
   listScenarioFiles(dir) {
     try {
       return readdirSync(dir)

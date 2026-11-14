@@ -1,5 +1,6 @@
 // One end-to-end check that `qa:combine` re-renders a scenario from a run
-// folder with the real Chromium and the real ffmpeg (PRD #1550). The run folder
+// folder with the real Chromium and the real ffmpeg (PRD #1550), and that the
+// annotated MP4 is paced to its timeline (PRD #1544, #1555). The run folder
 // is written with ffmpeg and the step records by hand, the CLI runs as a
 // subprocess so its real wiring is what runs, and the outputs are probed with
 // ffprobe and read as a PNG. Every other suite stubs both.
@@ -25,6 +26,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from '@playwright/test';
+
+import {
+  VIDEO_PLAYBACK_SPEED,
+  VIDEO_STEP_HOLD_SECONDS,
+} from './lib/qa-combine.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'qa-combine.ts');
@@ -59,6 +65,46 @@ const SKIP: string | false =
           `${gap.what} not installed (set ${gap.variable}=1 to require it)`,
       ).join('; ');
 
+/**
+ * Each side's recording length in seconds, and the times of its two steps in
+ * milliseconds from the recording's start. The sides differ in both, so the
+ * pacing has to line the steps up on one output time.
+ */
+const FIXTURE = {
+  before: { seconds: 2, stepsMs: [500, 1500] },
+  after: { seconds: 1.5, stepsMs: [250, 1000] },
+} as const;
+
+/**
+ * How far the MP4's length may be from the paced timeline's, in seconds. A
+ * recording is measured by its packets, which end a frame or so short of its
+ * length, so the measured lengths sit a little under the fixture's.
+ */
+const PACED_TOLERANCE_SECONDS = 0.3;
+
+/**
+ * The paced MP4's length for the fixture, from the constants and the fixture's
+ * lengths and step times: a lead before step 1, a hold for each step, and the
+ * stretches between and after the steps. Each stretch is as long as the longer
+ * side's segment, and every segment plays slowed by the playback speed.
+ */
+function expectedPacedSeconds(): number {
+  const slow = (seconds: number) => seconds / VIDEO_PLAYBACK_SPEED;
+  const [b1, b2] = FIXTURE.before.stepsMs.map((ms) => ms / 1000);
+  const [a1, a2] = FIXTURE.after.stepsMs.map((ms) => ms / 1000);
+  const lead = slow(Math.max(b1, a1));
+  const middle = slow(Math.max(b2 - b1, a2 - a1));
+  const tail = slow(
+    Math.max(FIXTURE.before.seconds - b2, FIXTURE.after.seconds - a2),
+  );
+  return (
+    lead +
+    FIXTURE.before.stepsMs.length * VIDEO_STEP_HOLD_SECONDS +
+    middle +
+    tail
+  );
+}
+
 function ffmpeg(args: string[]): void {
   const result = spawnSync(
     'ffmpeg',
@@ -68,9 +114,14 @@ function ffmpeg(args: string[]): void {
   assert.equal(result.status, 0, `fixture ffmpeg failed: ${result.stderr}`);
 }
 
-/** A 1 s, 10 fps test pattern of the given width, 48 px high. */
-function testPattern(width: number): string[] {
-  return ['-f', 'lavfi', '-i', `testsrc=size=${width}x48:rate=10:duration=1`];
+/** A test pattern of the given width, 48 px high, `seconds` long, at 10 fps. */
+function testPattern(width: number, seconds = 1): string[] {
+  return [
+    '-f',
+    'lavfi',
+    '-i',
+    `testsrc=size=${width}x48:rate=10:duration=${seconds}`,
+  ];
 }
 
 function probeSize(file: string): number[] {
@@ -93,23 +144,39 @@ function probeSize(file: string): number[] {
   return result.stdout.trim().split(',').map(Number);
 }
 
-/** One step as `qa:run` saves it, its still relative to the run folder. */
-function savedStep(side: 'before' | 'after', caption: string) {
+/** A file's length in seconds, as its container reports it. */
+function probeSeconds(file: string): number {
+  const result = spawnSync(
+    'ffprobe',
+    ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, `ffprobe failed: ${result.stderr}`);
+  return Number.parseFloat(result.stdout);
+}
+
+/** One step as `qa:run` saves it, its still relative to the run folder; `atMs` from the recording's start. */
+function savedStep(
+  side: 'before' | 'after',
+  index: number,
+  caption: string,
+  atMs: number,
+) {
   return {
     side,
-    index: 1,
+    index,
     device: 'A',
     tab: 'A',
     label: 'Device A',
     caption,
-    still: `steps/S/${side}/01.png`,
+    still: `steps/S/${side}/0${index}.png`,
     subject: null,
-    atMs: 0,
+    atMs,
   };
 }
 
 test(
-  'qa:combine re-renders a video scenario from its run folder: the Storyboard PNG and the annotated MP4 land in combined/',
+  'qa:combine re-renders a video scenario from its run folder: the Storyboard PNG and the paced annotated MP4 land in combined/',
   { skip: SKIP },
   () => {
     assert.equal(
@@ -122,16 +189,18 @@ test(
     const run = mkdtempSync(join(tmpdir(), 'qa-combine-run-'));
     try {
       for (const side of ['before', 'after'] as const) {
-        const still = join(run, 'steps', 'S', side, '01.png');
-        mkdirSync(dirname(still), { recursive: true });
-        ffmpeg([...testPattern(320), '-frames:v', '1', still]);
+        for (const index of [1, 2]) {
+          const still = join(run, 'steps', 'S', side, `0${index}.png`);
+          mkdirSync(dirname(still), { recursive: true });
+          ffmpeg([...testPattern(320), '-frames:v', '1', still]);
+        }
         // The recording is named as `qa:run` names it. ffmpeg picks a WebM muxer
         // by the name, which cannot hold H.264, so the MP4 muxer is forced; the
         // annotated MP4 reads the file by its content, which is all it needs.
         const recording = join(run, side, 'S.webm');
         mkdirSync(dirname(recording), { recursive: true });
         ffmpeg([
-          ...testPattern(320),
+          ...testPattern(320, FIXTURE[side].seconds),
           '-c:v',
           'libx264',
           '-pix_fmt',
@@ -153,12 +222,38 @@ test(
             before: {
               outcome: 'fail',
               message: 'the defect shows here',
-              steps: [savedStep('before', 'the defect shows')],
+              steps: [
+                savedStep(
+                  'before',
+                  1,
+                  'open the form',
+                  FIXTURE.before.stepsMs[0],
+                ),
+                savedStep(
+                  'before',
+                  2,
+                  'the defect shows',
+                  FIXTURE.before.stepsMs[1],
+                ),
+              ],
             },
             after: {
               outcome: 'pass',
               observed: 'the fix shows here',
-              steps: [savedStep('after', 'the fix shows')],
+              steps: [
+                savedStep(
+                  'after',
+                  1,
+                  'open the form',
+                  FIXTURE.after.stepsMs[0],
+                ),
+                savedStep(
+                  'after',
+                  2,
+                  'the fix shows',
+                  FIXTURE.after.stepsMs[1],
+                ),
+              ],
             },
           },
           video: {
@@ -214,6 +309,14 @@ test(
       // Two 1280x720 panels side by side, under the 96 px band, with the 56 px
       // caption strip under each panel.
       assert.deepEqual(probeSize(mp4), [2560, 872]);
+      // Paced, not the recordings' own lengths: the MP4 is as long as the paced
+      // timeline of the fixture, which is longer than either recording.
+      const seconds = probeSeconds(mp4);
+      const expected = expectedPacedSeconds();
+      assert.ok(
+        Math.abs(seconds - expected) <= PACED_TOLERANCE_SECONDS,
+        `the MP4 is ${seconds.toFixed(2)} s; the paced timeline is ${expected.toFixed(2)} s`,
+      );
     } finally {
       rmSync(run, { recursive: true, force: true });
     }
