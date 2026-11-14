@@ -23,7 +23,7 @@ type UnlockToast = {
 const FAILED_TOAST: UnlockToast = {
   title: "Your passkey didn't unlock the vault",
   description:
-    'Nothing was changed. Enter your passphrase, or try the passkey again.',
+    'Nothing was changed. Enter your passphrase, or try the passkey again. If you removed this passkey, turn Passkey Unlock off on the Vault page.',
   variant: 'destructive',
 };
 
