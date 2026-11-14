@@ -10,12 +10,18 @@
 import type { AxiosResponse } from 'axios';
 import type { VaultApi, VaultMetaV1 } from '@myorganiser/app-api-client';
 import type { VaultStorageV1 } from './localVaultStorage';
-import { createVaultHandle, VaultSecretMismatchError } from './vaultHandle';
+import {
+  createVaultHandle,
+  VaultSecretMismatchError,
+  VaultWrappingMovedError,
+} from './vaultHandle';
+import { mintRecoveryKey } from './recoveryKeyMint';
 import {
   probeVaultMetaReachability,
   pushLocalVaultMeta,
   resetPassphraseAfterRecovery,
   changePassphraseWithCurrent,
+  rotateRecoveryKeyWithPassphrase,
   settleVaultMeta,
 } from './vaultMetaPush';
 import { vaultIdentityOf, type VaultMetaDecision } from './vaultMetaConverge';
@@ -1311,5 +1317,83 @@ describe('settleVaultMeta', () => {
     });
     expect(handle.hasVault()).toBe(false);
     expect(storageSnapshot()).toEqual(snapshotAtAnswer);
+  });
+});
+
+describe('rewraps whose wrapping moved during their awaits', () => {
+  const owner = 'test-owner';
+  const passphrase = 'old-pass';
+  const newPassphrase = 'new-pass';
+
+  // A rewrap that throws VaultWrappingMovedError has written nothing, so the
+  // push must never start: no base is recorded, and the server is not read or
+  // written. The handle's rewrap is replaced by one that rejects with the
+  // error; the real contended write is covered in vaultRewrapContention.test.ts.
+
+  test('changePassphraseWithCurrent rejects with VaultWrappingMovedError, records no Vault Meta Bookmark, and never calls the Vault Meta API', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    const api = createApiDouble();
+    jest
+      .spyOn(handle, 'changePassphrase')
+      .mockRejectedValue(new VaultWrappingMovedError());
+    const recordAgreement = jest.spyOn(handle, 'recordVaultMetaAgreement');
+    const bookmarkBefore = handle.lastAgreedVaultMetaHash();
+
+    await expect(
+      changePassphraseWithCurrent({
+        api,
+        handle,
+        currentPassphrase: passphrase,
+        newPassphrase,
+      }),
+    ).rejects.toBeInstanceOf(VaultWrappingMovedError);
+
+    expect(recordAgreement).not.toHaveBeenCalled();
+    expect(handle.lastAgreedVaultMetaHash()).toBe(bookmarkBefore);
+    expect(api.getVaultMeta).not.toHaveBeenCalled();
+    expect(api.putVaultMeta).not.toHaveBeenCalled();
+  });
+
+  test('resetPassphraseAfterRecovery rejects with VaultWrappingMovedError, records no Vault Meta Bookmark, and never calls the Vault Meta API', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    const api = createApiDouble();
+    jest
+      .spyOn(handle, 'resetPassphrase')
+      .mockRejectedValue(new VaultWrappingMovedError());
+    const recordAgreement = jest.spyOn(handle, 'recordVaultMetaAgreement');
+    const bookmarkBefore = handle.lastAgreedVaultMetaHash();
+
+    await expect(
+      resetPassphraseAfterRecovery({ api, handle, newPassphrase }),
+    ).rejects.toBeInstanceOf(VaultWrappingMovedError);
+
+    expect(recordAgreement).not.toHaveBeenCalled();
+    expect(handle.lastAgreedVaultMetaHash()).toBe(bookmarkBefore);
+    expect(api.getVaultMeta).not.toHaveBeenCalled();
+    expect(api.putVaultMeta).not.toHaveBeenCalled();
+  });
+
+  test('rotateRecoveryKeyWithPassphrase rejects with VaultWrappingMovedError, records no Vault Meta Bookmark, and never calls the Vault Meta API', async () => {
+    const handle = await setupHandle(owner, passphrase);
+    const api = createApiDouble();
+    jest
+      .spyOn(handle, 'rotateRecoveryKey')
+      .mockRejectedValue(new VaultWrappingMovedError());
+    const recordAgreement = jest.spyOn(handle, 'recordVaultMetaAgreement');
+    const bookmarkBefore = handle.lastAgreedVaultMetaHash();
+
+    await expect(
+      rotateRecoveryKeyWithPassphrase({
+        api,
+        handle,
+        currentPassphrase: passphrase,
+        recoveryKey: mintRecoveryKey(),
+      }),
+    ).rejects.toBeInstanceOf(VaultWrappingMovedError);
+
+    expect(recordAgreement).not.toHaveBeenCalled();
+    expect(handle.lastAgreedVaultMetaHash()).toBe(bookmarkBefore);
+    expect(api.getVaultMeta).not.toHaveBeenCalled();
+    expect(api.putVaultMeta).not.toHaveBeenCalled();
   });
 });

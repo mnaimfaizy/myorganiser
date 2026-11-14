@@ -10,6 +10,8 @@ Amended by [#1501](https://github.com/mnaimfaizy/myorganiser/issues/1501): decis
 
 Amended by [#1499](https://github.com/mnaimfaizy/myorganiser/issues/1499): Vault Meta adoption joins the whole-Local-Vault writes this ADR still allows, under the rule given after the decisions.
 
+Amended by [#1543](https://github.com/mnaimfaizy/myorganiser/issues/1543): the three local rewraps (passphrase change, passphrase reset, Recovery Key Rotation) join Vault Meta adoption under the same rules.
+
 ## Context
 
 Every web Local Vault write had the same shape. It read the whole Local Vault, awaited key import and encryption, and wrote the whole object back. Anything another writer put there during those awaits was reverted, and that included other Vault Blob Types.
@@ -37,6 +39,8 @@ Vault Meta adoption ([ADR 0057](0057-vault-meta-converges-separately-and-never-s
 - **Fresh read.** The write is built from a Local Vault read synchronously just before it, with no await between. The Local Vault read before the User was asked is never written back: the prompt has no timeout, so that read can be arbitrarily old.
 - **Wrapping only.** The adopted wrapping comes from the server's Vault Meta. Every Vault Blob Type's Ciphertext is carried across from the fresh read, so whatever was stored at the moment of the write is kept.
 - **No write when the wrapping moved.** If the wrapping just read is not the one convergence compared against, nothing is written. Another tab adopted or rotated it, and a decision made against an older wrapping must not overwrite a newer one. The Vault Meta settle runs again instead. No Local Vault at the moment of the write also writes nothing. A wrapping that moved is compared by Vault Meta identity, the same identity divergence and the Vault Meta Bookmark use.
+
+The three local rewraps — passphrase change, passphrase reset after recovery, and Recovery Key Rotation — write the whole Local Vault for the same reason, under the same three rules. The Local Vault read before the rewrap's key derivation and wrap is used only for its KDF salt and parameters and the wrapping being unwrapped; it is never written back. After the last crypto await the rewrap reads the Local Vault again, and writes its one new wrapping field over that fresh read's Vault Blob Types. If the fresh read's Vault Meta identity is not the one the rewrap started from, it throws `VaultWrappingMovedError` and writes nothing, and the Vault Meta Push that follows a rewrap is never made. There is no retry: the User's passphrase or Recovery Key belongs to a wrapping that no longer exists.
 
 `convergeVaultMeta` still cannot write. It returns the wrapping to adopt and the local wrapping it was decided against, and `settleVaultMeta` makes the write through the Vault Handle.
 

@@ -145,6 +145,31 @@ export class VaultWriteContendedError extends Error {
 }
 
 /**
+ * A rewrap (passphrase change, passphrase reset, or Recovery Key Rotation)
+ * found that the Local Vault's wrapping had moved since it read the wrapping it
+ * unwrapped, and wrote nothing.
+ *
+ * Another tab changed, rotated or adopted the wrapping during the rewrap's
+ * crypto awaits. Writing anyway would replace that newer wrapping with one
+ * built from an older one ([ADR 0143](../../../../../docs/adr/0143-a-local-vault-write-is-conditional-on-the-ciphertext-it-read-and-a-contended-save-merges.md)).
+ * There is no retry: the passphrase or Recovery Key the User supplied belongs
+ * to a wrapping that no longer exists, so the User has to start again. The
+ * stored Local Vault is whatever the other writer left there, and the server
+ * has been told nothing.
+ */
+export class VaultWrappingMovedError extends Error {
+  public readonly code = 'vault-wrapping-moved';
+
+  constructor() {
+    super(
+      'Your vault changed in another tab while this change was in progress. Nothing was saved; please try again.',
+    );
+    this.name = 'VaultWrappingMovedError';
+    Object.setPrototypeOf(this, VaultWrappingMovedError.prototype);
+  }
+}
+
+/**
  * Whether two reads of one Vault Blob Type's Ciphertext are the same bytes.
  * Absent on both sides is the same; absent on one side is not.
  */
@@ -354,6 +379,11 @@ export type LocalVaultAccess = {
    * passphrase leaves the Local Vault byte-identical and throws
    * `VaultSecretMismatchError` — the secret is wrong, the Vault is not damaged,
    * and it must never be offered as resettable.
+   *
+   * The write is built on a fresh Local Vault read after the crypto awaits and
+   * changes only the wrapping, so a Vault Blob Type written meanwhile is kept.
+   * If the wrapping itself moved meanwhile, it throws
+   * `VaultWrappingMovedError` and writes nothing (ADR 0143).
    */
   changePassphrase(options: {
     currentPassphrase: string;
@@ -371,6 +401,11 @@ export type LocalVaultAccess = {
    * Its authorization is the recovery key the caller has already presented:
    * reaching an unlocked Vault through `unlockWithRecoveryKey` is the proof,
    * and there is nothing further to verify here.
+   *
+   * The write is built on a fresh Local Vault read after the crypto awaits and
+   * changes only the wrapping, so a Vault Blob Type written meanwhile is kept.
+   * If the wrapping itself moved meanwhile, it throws
+   * `VaultWrappingMovedError` and writes nothing (ADR 0143).
    */
   resetPassphrase(options: { newPassphrase: string }): Promise<void>;
   /**
@@ -393,6 +428,11 @@ export type LocalVaultAccess = {
    * every Vault Blob stays readable and no salt and no KDF parameter changes —
    * which is why another device reads this as a rotation rather than as a
    * different Vault.
+   *
+   * The write is built on a fresh Local Vault read after the crypto awaits and
+   * changes only the wrapping, so a Vault Blob Type written meanwhile is kept.
+   * If the wrapping itself moved meanwhile, it throws
+   * `VaultWrappingMovedError` and writes nothing (ADR 0143).
    */
   rotateRecoveryKey(options: {
     currentPassphrase: string;
@@ -514,6 +554,18 @@ function vaultOf(read: LocalVaultReadResult): VaultStorageV1 | null {
   return read.status === 'owned' ? read.vault : null;
 }
 
+/**
+ * Whether a fresh Local Vault read no longer carries the wrapping a write was
+ * decided against. Judged by Vault Meta identity, the identity divergence and
+ * the Vault Meta Bookmark use, so Vault Meta adoption and the three rewraps
+ * share one definition of "the wrapping moved" (ADR 0143).
+ */
+function wrappingMoved(fresh: VaultStorageV1, compared: VaultMetaV1): boolean {
+  return (
+    vaultMetaIdentity(localToServerMeta(fresh)) !== vaultMetaIdentity(compared)
+  );
+}
+
 export function createLocalVaultAccess(options: {
   slot: LocalVaultSlot;
   masterKeyBytes?: Uint8Array | null;
@@ -577,12 +629,39 @@ export function createLocalVaultAccess(options: {
   };
 
   /**
+   * Write a rewrap's new wrapping field onto a fresh Local Vault read.
+   *
+   * Read, check and write with no await between them (ADR 0143). The Local
+   * Vault the rewrap read before its crypto awaits is used only for its KDF
+   * parameters and the wrapping it unwrapped, and is never written back: every
+   * Vault Blob Type's Ciphertext is carried across from this fresh read, so a
+   * page save, a `takeRemote`, or another tab's write that landed meanwhile is
+   * kept. If the wrapping itself moved, judged by Vault Meta identity as meta
+   * adoption judges it, nothing is written.
+   */
+  const writeRewrappedWrapping = (options: {
+    readVault: VaultStorageV1;
+    wrapping:
+      | { masterKeyWrappedWithPassphrase: EncryptedBlob }
+      | { masterKeyWrappedWithRecoveryKey: EncryptedBlob };
+  }): void => {
+    const fresh = requireVault();
+    if (wrappingMoved(fresh, localToServerMeta(options.readVault))) {
+      throw new VaultWrappingMovedError();
+    }
+    slot.write({ ...fresh, ...options.wrapping });
+  };
+
+  /**
    * Rewrap the Master Key under a new passphrase and write the result.
    *
    * The salt is deliberately reused rather than minted. A moved salt is how
    * another device tells two separate Vaults apart from one Vault whose
    * passphrase rotated, so minting one here would make every rotation look
    * like a stranger's Vault (#578).
+   *
+   * `vault` is the read the rewrap started from. It is not mutated and not
+   * written back; see `writeRewrappedWrapping`.
    */
   const rewrapWithPassphrase = async (options: {
     vault: VaultStorageV1;
@@ -595,12 +674,15 @@ export function createLocalVaultAccess(options: {
       iterations: options.vault.kdf.iterations,
     });
 
-    options.vault.masterKeyWrappedWithPassphrase = await wrapMasterKeyWithKey({
+    const masterKeyWrappedWithPassphrase = await wrapMasterKeyWithKey({
       wrappingKey: derivedKey,
       masterKeyBytes: options.masterKeyBytes,
     });
 
-    slot.write(options.vault);
+    writeRewrappedWrapping({
+      readVault: options.vault,
+      wrapping: { masterKeyWrappedWithPassphrase },
+    });
   };
 
   return {
@@ -640,10 +722,7 @@ export function createLocalVaultAccess(options: {
       // Read, check and write with no await between them (ADR 0143).
       const fresh = vaultOf(slot.read());
       if (!fresh) return 'no-local-vault';
-      if (
-        vaultMetaIdentity(localToServerMeta(fresh)) !==
-        vaultMetaIdentity(comparedLocalMeta)
-      ) {
+      if (wrappingMoved(fresh, comparedLocalMeta)) {
         return 'wrapping-moved';
       }
       slot.write(
@@ -903,12 +982,15 @@ export function createLocalVaultAccess(options: {
       // The salt and the KDF parameters are untouched because the Recovery Key
       // derives nothing — which is what keeps another device reading this as a
       // rotation rather than as a different Vault.
-      vault.masterKeyWrappedWithRecoveryKey = await wrapMasterKeyWithKey({
+      const masterKeyWrappedWithRecoveryKey = await wrapMasterKeyWithKey({
         wrappingKey: recoveryWrappingKey,
         masterKeyBytes,
       });
 
-      slot.write(vault);
+      writeRewrappedWrapping({
+        readVault: vault,
+        wrapping: { masterKeyWrappedWithRecoveryKey },
+      });
     },
 
     async loadDecryptedData<T>({
