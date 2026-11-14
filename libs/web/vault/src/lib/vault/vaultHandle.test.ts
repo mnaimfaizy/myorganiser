@@ -1674,7 +1674,7 @@ describe('createVaultHandle (owner-bound Vault Handle)', () => {
 
   // Test 21: API shape validation
   describe('API shape validation (ADR 0047)', () => {
-    test('only createVaultHandle, VaultLockedError, VaultSecretMismatchError, and VaultWriteContendedError are exported', () => {
+    test('only createVaultHandle, VaultLockedError, VaultSecretMismatchError, VaultWriteContendedError, and VaultWrappingMovedError are exported', () => {
       const exportedKeys = Object.keys(vaultHandleModule)
         .filter((key) => key !== '__esModule')
         .sort();
@@ -1682,6 +1682,7 @@ describe('createVaultHandle (owner-bound Vault Handle)', () => {
         'VaultLockedError',
         'VaultSecretMismatchError',
         'VaultWriteContendedError',
+        'VaultWrappingMovedError',
         'createVaultHandle',
       ].sort();
 

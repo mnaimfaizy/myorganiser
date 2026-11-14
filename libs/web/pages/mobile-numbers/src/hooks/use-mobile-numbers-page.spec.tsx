@@ -398,6 +398,64 @@ describe('useMobileNumbersPage', () => {
       expect(saveVaultRecords).not.toHaveBeenCalled();
       expect(result.current.items).toEqual([WORK]);
     });
+
+    it('does not apply the write-back of a superseded read once a newer read has applied', async () => {
+      const reads: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }> = [];
+      loadDecryptedData.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            reads.push({ resolve, reject });
+          }),
+      );
+      const staleRaw = [{ legacy: true }];
+      jest
+        .mocked(normalizeMobileNumbers)
+        .mockImplementation((raw) =>
+          raw === staleRaw
+            ? { value: [PERSONAL], changed: true }
+            : { value: raw as MobileNumberRecord[], changed: false },
+        );
+      // Holds the write-back open; the test releases it after the newer read has applied.
+      let releaseSave: (written: MobileNumberRecord[]) => void = () =>
+        undefined;
+      jest.mocked(saveVaultRecords).mockImplementation(
+        () =>
+          new Promise<MobileNumberRecord[]>((resolve) => {
+            releaseSave = resolve;
+          }),
+      );
+      const savedBack: MobileNumberRecord[] = [
+        { ...WORK, id: 'mn-saved', label: 'Saved back' },
+      ];
+
+      const { result, rerender } = renderHook(() =>
+        useMobileNumbersPage(handle),
+      );
+      await waitFor(() => expect(reads).toHaveLength(1));
+      await act(async () => {
+        reads[0].resolve(staleRaw);
+      });
+      await waitFor(() => expect(saveVaultRecords).toHaveBeenCalledTimes(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+      await act(async () => {
+        reads[1].resolve([WORK]);
+      });
+      await waitFor(() => expect(result.current.items).toEqual([WORK]));
+
+      // The held write-back finishes last; it must not put its list back.
+      await act(async () => {
+        releaseSave(savedBack);
+      });
+
+      expect(result.current.items).toEqual([WORK]);
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('mobile number writes', () => {

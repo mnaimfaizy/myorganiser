@@ -117,6 +117,13 @@ const CIPHERTEXT_KEYS = new Set(
 );
 
 /**
+ * Named non-credential fields whose value is withheld (#1540): a person's
+ * phone number. The key name prints; the value never does. Not widened into the
+ * credential-name pattern. Any other field still refuses when unknown.
+ */
+const WITHHELD_KEYS = new Set(['phone']);
+
+/**
  * Keys recognised as safe: the transcript's own structure, ordinary HTTP
  * headers, and the plain fields API responses carry. Extending the list is a
  * deliberate edit here, never a runtime option.
@@ -171,7 +178,8 @@ const SAFE_KEYS = new Set(
     'userId',
     // response bodies of sign-in, YouTube availability and the vault (#1515).
     // `user`, `blobs` and `meta` are containers: each nested key is classified
-    // on its own. `phone` and `details` are left out on purpose.
+    // on its own. `details` is left out on purpose; `phone` is withheld by name
+    // (WITHHELD_KEYS).
     'expires_in',
     'available',
     'user',
@@ -181,6 +189,23 @@ const SAFE_KEYS = new Set(
     'blobs',
     'meta',
     'kdf_name',
+    // admin Users and Overview responses (#1540). Every one is a timestamp,
+    // boolean, count or enum that cannot identify a person. `users` is a
+    // container (the list); each nested key is classified on its own.
+    'disabledAt', // when a Platform Admin disabled the User (timestamp)
+    'emailVerified', // boolean
+    'lastActiveAt', // timestamp of the last Session refresh
+    'youtubeAccess', // boolean grant flag
+    'users', // list container on the Users list; a count on Overview
+    'usersJoinedLast7Days', // count
+    'platformAdmins', // count
+    'unverified', // count
+    'unverifiedOverAWeek', // count
+    'feedbackReportsReceived', // count
+    'youtubeAccessCeiling', // count
+    'youtubeAccessPlacesLeft', // count
+    'youtubeAccessPlacesUsed', // count
+    'youtubeDisconnect', // enum: completed | pending | not_connected
     // query parameters the backend reads (apps/backend @Query()). Left out on
     // purpose: cursor, channelId, trackingIssueNumber (opaque or id-like; the
     // runner, #1512, adds what real calls need). `code` is not safe anywhere.
@@ -394,6 +419,7 @@ function judgeUrl(decoded: string, leadingIsParameter: boolean): UrlVerdict {
 export function classifyKey(key: string): Classification {
   const lower = canonical(key).toLowerCase();
   if (CREDENTIAL_KEY.test(lower)) return 'withhold';
+  if (WITHHELD_KEYS.has(lower)) return 'withhold';
   if (CIPHERTEXT_KEYS.has(lower)) return 'ciphertext';
   if (SAFE_KEYS.has(lower)) return 'safe';
   return 'unknown';
@@ -539,7 +565,10 @@ export function redactTranscript(
         const fieldClass = classifyKey(key);
         // A credential-word key that is not a clean credential name may itself
         // be the secret (`token=V`, `Bearer V`): it is never echoed.
-        const hidden = fieldClass === 'withhold' && !isCleanCredentialName(key);
+        const hidden =
+          fieldClass === 'withhold' &&
+          !isCleanCredentialName(key) &&
+          !WITHHELD_KEYS.has(canonical(key).toLowerCase());
         const outKey = hidden ? `<field #${index + 1}>` : key;
         const here = hidden
           ? childPath(path, outKey, index)

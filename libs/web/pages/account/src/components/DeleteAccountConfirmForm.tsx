@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UserDeletionBodyConfirmationEnum } from '@myorganiser/app-api-client';
-import { clearAuthSession } from '@myorganiser/auth';
+import { clearAuthSession, getCurrentUser } from '@myorganiser/auth';
 import {
   Button,
   Form,
@@ -15,6 +15,7 @@ import {
   FormMessage,
   Input,
 } from '@myorganiser/web-ui';
+import { disablePasskeyUnlock } from '@myorganiser/web-vault';
 import { isAxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -91,6 +92,12 @@ export function DeleteAccountConfirmForm({
       // The account is gone, so logout() would only 401 and run the refresh
       // path. clearAuthSession does not emit sessionEnded, so the dashboard
       // guard will not race this navigation to /login.
+      // Read the owner first: clearing the session removes the current-User
+      // entry. Like sign-out, remove only this owner's Passkey Unlock record;
+      // disablePasskeyUnlock swallows storage errors, so deletion still ends
+      // on /account-deleted.
+      const owner = getCurrentUser()?.id;
+      if (owner) disablePasskeyUnlock(owner);
       clearAuthSession();
       router.replace('/account-deleted');
     },

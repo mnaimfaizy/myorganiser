@@ -35,6 +35,7 @@ export {
   VaultLockedError,
   VaultSecretMismatchError,
   VaultWriteContendedError,
+  VaultWrappingMovedError,
 } from './localVaultAccess';
 // `NoUnclaimedLocalVaultError` and `LocalVaultAlreadyOwnedError` stay
 // internal: `claimUnclaimedLocalVaultOnEvidence` reads `vaultStatus` before it
