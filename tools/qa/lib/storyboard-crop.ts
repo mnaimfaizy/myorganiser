@@ -2,7 +2,7 @@
  * Crop geometry for a Storyboard still (PRD #1544).
  *
  * A step's subject box becomes the part of the 1280×720 still that is shown:
- * the box plus padding, grown to a minimum size, then to a fixed aspect,
+ * the box's outline ring plus padding, grown to a minimum size, then to a fixed aspect,
  * centred on the subject and moved, never shrunk, to stay inside the
  * viewport. The subject is drawn as one outline, with no dimming around it
  * (the prototype showed dimming doubling up when two outlines share a still).
@@ -20,13 +20,24 @@ export const CROP = {
   /** Space kept around the subject on every side, in viewport pixels. */
   padding: 32,
   /** The smallest crop's width; its height follows from the aspect. */
-  minWidth: 640,
+  minWidth: 960,
+  /** Visible space between the subject and the outline drawn around it. */
+  outlineGap: 4,
+  /** The outline's stroke width; it is drawn outside the gap. */
+  outlineStroke: 3,
 } as const;
+
+/** How far the outline's outer edge sits from the subject's edge. */
+export const OUTLINE_OFFSET = CROP.outlineGap + CROP.outlineStroke;
 
 export interface Crop {
   /** The part of the still that is shown, in viewport pixels. */
   crop: Box;
-  /** The subject, relative to the crop, or `null` when there is none to outline. */
+  /**
+   * The outline's outer box (stroke included), relative to the crop: the subject
+   * grown by `OUTLINE_OFFSET` on every side, so the stroke never covers it.
+   * `null` when there is no subject to outline.
+   */
   outline: Box | null;
 }
 
@@ -63,11 +74,18 @@ export function cropFor(
   if (visible === null) return FULL_FRAME(viewport);
 
   const aspect = viewport.width / viewport.height;
-  let width = Math.max(visible.width + 2 * CROP.padding, CROP.minWidth);
-  let height = Math.max(
-    visible.height + 2 * CROP.padding,
-    CROP.minWidth / aspect,
-  );
+  // The crop is sized from the outline's box, so the gap and stroke are
+  // inside it. The one exception is a subject touching the viewport's edge:
+  // there are no pixels beyond the edge to show, so the outline runs past the
+  // crop on that side and the still's overflow clips it.
+  const ring = {
+    x: visible.x - OUTLINE_OFFSET,
+    y: visible.y - OUTLINE_OFFSET,
+    width: visible.width + 2 * OUTLINE_OFFSET,
+    height: visible.height + 2 * OUTLINE_OFFSET,
+  };
+  let width = Math.max(ring.width + 2 * CROP.padding, CROP.minWidth);
+  let height = Math.max(ring.height + 2 * CROP.padding, CROP.minWidth / aspect);
   if (width / height > aspect) height = width / aspect;
   else width = height * aspect;
   if (width > viewport.width) {
@@ -90,10 +108,10 @@ export function cropFor(
   return {
     crop,
     outline: {
-      x: visible.x - x,
-      y: visible.y - y,
-      width: visible.width,
-      height: visible.height,
+      x: ring.x - x,
+      y: ring.y - y,
+      width: ring.width,
+      height: ring.height,
     },
   };
 }
