@@ -20,6 +20,8 @@
  * comment's last edit. An earlier decision on an older head is not kept.
  */
 import {
+  AUTO_MERGED,
+  AUTO_MERGED_COMMENT_LEAD,
   SHADOW_COMMENT_LEAD,
   SHADOW_COMMENT_MARKER,
   SHADOW_HELD,
@@ -96,7 +98,9 @@ export interface ShadowGather {
 
 export type ShadowDecision =
   | { kind: 'would-merge'; head: string }
-  | { kind: 'held'; reason: string };
+  | { kind: 'held'; reason: string }
+  /** The `on` record an Auto-merge leaves (issue #1530): the head merged. */
+  | { kind: 'auto-merged'; head: string };
 
 /**
  * The decision a shadow comment body states, or `null` when the body is not
@@ -105,6 +109,12 @@ export type ShadowDecision =
 export function parseShadowComment(body: string): ShadowDecision | null {
   if (!body.includes(SHADOW_COMMENT_MARKER)) return null;
   for (const line of body.split(/\r?\n/)) {
+    if (line.startsWith(AUTO_MERGED_COMMENT_LEAD)) {
+      const rest = line.slice(AUTO_MERGED_COMMENT_LEAD.length).trim();
+      if (!rest.startsWith(AUTO_MERGED)) return null;
+      const head = /`([0-9a-f]{7,40})`/i.exec(rest)?.[1];
+      return head ? { kind: 'auto-merged', head } : null;
+    }
     if (!line.startsWith(SHADOW_COMMENT_LEAD)) continue;
     const rest = line.slice(SHADOW_COMMENT_LEAD.length).trim();
     if (rest.startsWith(SHADOW_WOULD_MERGE)) {
@@ -239,6 +249,21 @@ function badWithinWindow(
   return found;
 }
 
+/** An `on`-mode Auto-merge, watched on its own and never counted toward `on`. */
+export interface ClassifiedAutoMerge {
+  number: number;
+  title: string;
+  head: string;
+  mergedAt: number | null;
+  /**
+   * `watching`: merged, inside its seven days. `cleared`: seven days passed
+   * with no revert or fix. `bad`: reverted or fixed. `unconfirmed`: the record
+   * says merged but the Pull Request is not merged, or its merge time is unread.
+   */
+  status: 'watching' | 'cleared' | 'bad' | 'unconfirmed';
+  bad: { kind: BadKind; by: number; at: number } | null;
+}
+
 export interface ShadowSummary {
   asOf: string;
   window: { since: string; until: string };
@@ -262,7 +287,11 @@ export interface ShadowSummary {
   verdict: 'met' | 'not-met' | 'reset';
   /** Each measured part of the criterion that does not hold. */
   unmet: string[];
-  /** True when a bad Auto-merge was found while the setting is `on`. */
+  /** Every `on` Auto-merge record in the window, apart from the decisions. */
+  autoMerges: ClassifiedAutoMerge[];
+  /** The `on` Auto-merges that were reverted or fixed within seven days. */
+  badAutoMerges: ClassifiedAutoMerge[];
+  /** True when a bad Auto-merge, shadow decision or `on` record, was found while the setting is `on`. */
   returnToShadow: boolean;
 }
 
@@ -270,6 +299,7 @@ export interface ShadowSummary {
 export function summarizeShadowRecord(gather: ShadowGather): ShadowSummary {
   const asOf = parseTime(gather.asOf) ?? Date.now();
   const decisions: ClassifiedDecision[] = [];
+  const autoMerges: ClassifiedAutoMerge[] = [];
   const heldReasons = new Map<string, number>();
   let heldTotal = 0;
   let unreadableComments = 0;
@@ -287,6 +317,28 @@ export function summarizeShadowRecord(gather: ShadowGather): ShadowSummary {
     const decidedAt = parseTime(pr.comment.updatedAt);
     if (parsed === null || decidedAt === null) {
       unreadableComments += 1;
+      continue;
+    }
+    if (parsed.kind === 'auto-merged') {
+      const at =
+        pr.state === 'merged' && pr.mergedAt ? parseTime(pr.mergedAt) : null;
+      const found =
+        at === null ? null : badWithinWindow(pr.number, at, gather.merges);
+      autoMerges.push({
+        number: pr.number,
+        title: pr.title,
+        head: parsed.head,
+        mergedAt: at,
+        bad: found,
+        status:
+          at === null
+            ? 'unconfirmed'
+            : found
+              ? 'bad'
+              : asOf < at + BAD_WITHIN_DAYS * DAY_MS
+                ? 'watching'
+                : 'cleared',
+      });
       continue;
     }
     if (parsed.kind === 'held') {
@@ -335,6 +387,10 @@ export function summarizeShadowRecord(gather: ShadowGather): ShadowSummary {
     });
   }
   decisions.sort((a, b) => a.decidedAt - b.decidedAt || a.number - b.number);
+  autoMerges.sort(
+    (a, b) => (a.mergedAt ?? 0) - (b.mergedAt ?? 0) || a.number - b.number,
+  );
+  const badAutoMerges = autoMerges.filter((a) => a.status === 'bad');
 
   const bad = decisions.filter((d) => d.bad !== null);
   const restart = bad.reduce<number | null>(
@@ -398,7 +454,10 @@ export function summarizeShadowRecord(gather: ShadowGather): ShadowSummary {
     mergedUnchanged: unchanged,
     verdict: met ? 'met' : bad.length > 0 ? 'reset' : 'not-met',
     unmet,
-    returnToShadow: bad.length > 0 && gather.mode === 'on',
+    autoMerges,
+    badAutoMerges,
+    returnToShadow:
+      (bad.length > 0 || badAutoMerges.length > 0) && gather.mode === 'on',
   };
 }
 
@@ -430,8 +489,18 @@ export function renderShadowRecord(summary: ShadowSummary): string {
   if (summary.returnToShadow && summary.verdict !== 'reset') {
     lines.push(
       '',
-      'A bad Auto-merge was found and the setting is `on`: it **must return to `shadow`**, and the count restarts after ' +
-        `${summary.restartAt}.`,
+      'A bad Auto-merge was found and the setting is `on`: it **must return to `shadow`**' +
+        (summary.restartAt
+          ? `, and the count restarts after ${summary.restartAt}.`
+          : '.'),
+    );
+  }
+  if (summary.badAutoMerges.length > 0) {
+    lines.push(
+      '',
+      summary.mode === 'on'
+        ? `**An \`on\` Auto-merge was reverted or fixed within ${BAD_WITHIN_DAYS} days: \`tools/config/merge-train-auto-merge.json\` must return to \`shadow\`** (ADR 0148).`
+        : `An \`on\` Auto-merge was reverted or fixed within ${BAD_WITHIN_DAYS} days; the setting is \`${summary.mode}\`, keep it away from \`on\` (ADR 0148).`,
     );
   }
   if (summary.untrustedComments > 0) {
@@ -457,6 +526,28 @@ export function renderShadowRecord(summary: ShadowSummary): string {
       lines.push(
         `- #${d.number} ${d.title}: ${d.bad!.kind} by #${d.bad!.by} on ${new Date(d.bad!.at).toISOString().slice(0, 10)}`,
       );
+    }
+    lines.push('');
+  }
+  if (summary.autoMerges.length > 0) {
+    lines.push(
+      '## `on` Auto-merges (watched apart; never counted toward the exit criterion)',
+      '',
+    );
+    for (const a of summary.autoMerges) {
+      const when =
+        a.mergedAt === null
+          ? ''
+          : ` merged ${day(new Date(a.mergedAt).toISOString())},`;
+      const state =
+        a.status === 'bad'
+          ? `BAD: ${a.bad!.kind} by #${a.bad!.by} on ${new Date(a.bad!.at).toISOString().slice(0, 10)}`
+          : a.status === 'watching'
+            ? `merged and watching (${BAD_WITHIN_DAYS}-day watch open)`
+            : a.status === 'cleared'
+              ? `merged and cleared (no revert or fix in ${BAD_WITHIN_DAYS} days)`
+              : 'recorded as merged, but the merge could not be confirmed';
+      lines.push(`- #${a.number} ${a.title}:${when} ${state}`);
     }
     lines.push('');
   }
