@@ -184,10 +184,13 @@ const FRAME_HEIGHT = 872;
 const STRIP_TOP = 816;
 const STRIP_HEIGHT = 56;
 const STRIP_BYTES = FRAME_WIDTH * STRIP_HEIGHT * 3;
-// H.264 is lossy, so a static strip is not bit-identical from frame to frame:
-// on this fixture the largest one-channel change inside a window measured 4 of
-// 255, and the change from the opening strip to the caption measured 252. The
-// two bounds sit between those.
+// H.264 is lossy, so the same strip is not bit-identical across frames or across
+// encodes. ENCODER_NOISE_MAX is the per-byte bound that `overNoiseShare` counts
+// bytes against. Measured on this fixture: two frames of one MP4 differ by at
+// most 2 of 255, two separate encodes of the opening strip by at most 5, and two
+// separate encodes of the caption by up to 28 at a few glyph edges. The change
+// from the opening strip to the caption measured 252; CAPTION_CHANGE_MIN sits
+// between that and the noise.
 const ENCODER_NOISE_MAX = 16;
 const CAPTION_CHANGE_MIN = 64;
 
@@ -379,8 +382,8 @@ function overNoiseShare(a: Buffer, b: Buffer): number {
 /**
  * Whether a strip is the reference strip, to within encoder quantisation: a
  * small mean difference and a tiny share of bytes past ENCODER_NOISE_MAX. A
- * different strip fails it by a wide margin (a black or opening strip has a
- * mean far above the limit, as the self-check in the test shows).
+ * different strip fails it: the test's self-checks assert that an opening strip
+ * and an all-black strip each fail it against the caption reference.
  */
 function matchesReference(a: Buffer, b: Buffer): boolean {
   return (
@@ -528,13 +531,11 @@ test(
       // The opening strip is on screen before the hold: the frame matches the
       // caption-free reference, both just before the hold and mid-way to it.
       assert.ok(
-        largestDelta(stripAt(output, openingAt), captionFree) <=
-          ENCODER_NOISE_MAX,
+        matchesReference(stripAt(output, openingAt), captionFree),
         `the strip at ${openingAt.toFixed(2)} s is the opening strip`,
       );
       assert.ok(
-        largestDelta(stripAt(output, beforeHold), captionFree) <=
-          ENCODER_NOISE_MAX,
+        matchesReference(stripAt(output, beforeHold), captionFree),
         `the strip at ${beforeHold.toFixed(2)} s, before the hold, is still the opening strip`,
       );
       // The strip after the hold is the step's caption strip, matched against
@@ -545,6 +546,13 @@ test(
         matchesReference(stripAt(output, openingAt), captionRef),
         false,
         'the opening strip does not match the caption reference',
+      );
+      // A black strip is nothing like the caption either: an all-zero strip of the
+      // same size fails the same reference match, with no render needed.
+      assert.equal(
+        matchesReference(Buffer.alloc(STRIP_BYTES), captionRef),
+        false,
+        'an all-black strip does not match the caption reference',
       );
       const afterHold = stripAt(output, captionFirst);
       assert.ok(
@@ -563,14 +571,13 @@ test(
         matchesReference(oneFrameAfter, captionRef),
         `the strip at ${(holdStart + FRAME).toFixed(3)} s, one frame after the hold, is the caption (mean delta ${meanDelta(oneFrameAfter, captionRef).toFixed(2)}, bytes over ${ENCODER_NOISE_MAX} ${(overNoiseShare(oneFrameAfter, captionRef) * 100).toFixed(3)}%)`,
       );
-      // Two frames inside the caption window show the same strip to within
-      // encoder noise, so the change above is the caption, not noise.
+      // A second frame inside the caption window is the caption too. It is matched
+      // against the caption reference, not against the first frame by max-delta:
+      // a frame-to-frame max is encoder-sensitive, and the reference match is not.
+      const captionSecondStrip = stripAt(output, captionSecond);
       assert.ok(
-        largestDelta(
-          stripAt(output, captionFirst),
-          stripAt(output, captionSecond),
-        ) <= ENCODER_NOISE_MAX,
-        'two frames inside the caption window show the same strip',
+        matchesReference(captionSecondStrip, captionRef),
+        `the strip at ${captionSecond.toFixed(2)} s, inside the caption window, is the caption (mean delta ${meanDelta(captionSecondStrip, captionRef).toFixed(2)}, bytes over ${ENCODER_NOISE_MAX} ${(overNoiseShare(captionSecondStrip, captionRef) * 100).toFixed(3)}%)`,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
