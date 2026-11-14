@@ -10,9 +10,11 @@ import {
   TranscriptInputError,
   canonical,
   decodeBounded,
+  holdsKnownSecret,
   parseTranscriptInput,
   redactTranscript,
   renderTranscript,
+  type RedactionOptions,
   type RedactionOutcome,
 } from './redact-transcript.ts';
 
@@ -74,8 +76,11 @@ function encodedTimes(text: string, levels: number): string {
   return encoded;
 }
 
-function redactOk(input: unknown): RedactionOutcome {
-  const result = redactTranscript(input);
+function redactOk(
+  input: unknown,
+  options?: RedactionOptions,
+): RedactionOutcome {
+  const result = redactTranscript(input, options);
   if (!result.ok) {
     throw new Error(`unexpected refusal: ${result.refusedPaths.join(', ')}`);
   }
@@ -2486,5 +2491,164 @@ describe('sign-in, YouTube availability and vault response bodies (#1515)', () =
       query: string;
     };
     assert.equal(queryRequest.query, '[withheld]');
+  });
+});
+
+describe('knownSecrets (#1554)', () => {
+  // A synthetic sentinel the caller passes as a known secret, kept under the
+  // secret-scan hook's 16-character window.
+  const KNOWN = 'synth-known-01';
+
+  test('a plain string holding a known secret is withheld whole, and its path is listed in withheld', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { name: `typed ${KNOWN}` },
+    });
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { body } = onlyCall(result.transcript).request as {
+      body: { name: string };
+    };
+    assert.equal(body.name, '[withheld]');
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].request.body.name',
+    ]);
+    assertNoLeak(JSON.stringify(result), KNOWN);
+  });
+
+  test('a URL-typed string the rules refuse still refuses with knownSecrets set, and no refusal path holds the secret', () => {
+    const input = afterRequest({
+      method: 'GET',
+      path: `/x?note=${KNOWN}&page=2`,
+    });
+    const result = redactTranscript(input, { knownSecrets: [KNOWN] });
+    assert.equal(result.ok, false, 'a refusal wins over a known secret');
+    if (result.ok) return;
+    assert.deepEqual(result.refusedPaths, [
+      'scenarios[0].calls[0].request.path parameter #1',
+    ]);
+    assertNoLeak(JSON.stringify(result), KNOWN);
+  });
+
+  test('a URL-typed string the rules pass, holding a known secret, is withheld whole and listed once; without the option it passes through', () => {
+    const input = afterRequest({
+      method: 'GET',
+      path: `/x?page=${KNOWN}`,
+    });
+    const withoutOption = redactOk(input);
+    assert.deepEqual(withoutOption.transcript, input);
+    assert.deepEqual(withoutOption.withheld, []);
+
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { path } = onlyCall(result.transcript).request as { path: string };
+    assert.equal(path, '[withheld]');
+    assert.deepEqual(result.withheld, ['scenarios[0].calls[0].request.path']);
+    assertNoLeak(JSON.stringify(result), KNOWN);
+  });
+
+  test('a URL the rules partly withhold, with a known secret in a safe parameter, becomes [withheld] whole and its path is listed once', () => {
+    const input = afterRequest({
+      method: 'GET',
+      path: `/x?token=synth-cred-001&page=${KNOWN}`,
+    });
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { path } = onlyCall(result.transcript).request as { path: string };
+    assert.equal(path, '[withheld]');
+    assert.equal(
+      result.withheld.filter(
+        (listed) => listed === 'scenarios[0].calls[0].request.path',
+      ).length,
+      1,
+      'the path is listed once',
+    );
+    assertNoLeak(JSON.stringify(result), KNOWN);
+    assertNoLeak(JSON.stringify(result), 'synth-cred-001');
+  });
+
+  test('holdsKnownSecret matches an exact substring and never matches an empty secret', () => {
+    assert.equal(holdsKnownSecret(`a ${KNOWN} b`, [KNOWN]), true);
+    assert.equal(holdsKnownSecret('nothing here', [KNOWN]), false);
+    assert.equal(holdsKnownSecret('nothing here', ['']), false);
+    assert.equal(holdsKnownSecret('nothing here', []), false);
+  });
+
+  test('without knownSecrets the same input passes through unchanged, as qa:redact always has', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { name: `typed ${KNOWN}` },
+    });
+    const result = redactOk(input);
+    assert.deepEqual(result.transcript, input);
+    assert.deepEqual(result.withheld, []);
+  });
+
+  test('a known secret under a ciphertext key withholds the whole value: not shortened, and no part of it printed', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { kdf_salt: KNOWN },
+    });
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { body } = onlyCall(result.transcript).request as {
+      body: { kdf_salt: string };
+    };
+    assert.equal(body.kdf_salt, '[withheld]');
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].request.body.kdf_salt',
+    ]);
+    assert.equal(
+      result.shortened.includes('scenarios[0].calls[0].request.body.kdf_salt'),
+      false,
+      'the withheld value is not also shortened',
+    );
+    const text = JSON.stringify(result);
+    assertNoLeak(text, KNOWN);
+    assertNoLeak(text, KNOWN.slice(0, 8));
+  });
+
+  test('a known secret nested under a ciphertext container withholds the container whole', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { kdf_params: { salt: KNOWN } },
+    });
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { body } = onlyCall(result.transcript).request as {
+      body: { kdf_params: string };
+    };
+    assert.equal(body.kdf_params, '[withheld]');
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].request.body.kdf_params',
+    ]);
+    assertNoLeak(JSON.stringify(result), KNOWN);
+  });
+
+  test('a ciphertext value holding no known secret is still shortened, not withheld', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { kdf_salt: 'abcdefghijklmnop' },
+    });
+    const result = redactOk(input, { knownSecrets: [KNOWN] });
+    const { body } = onlyCall(result.transcript).request as {
+      body: { kdf_salt: string };
+    };
+    assert.match(body.kdf_salt, /ciphertext, 16 chars/);
+    assert.deepEqual(result.withheld, []);
+    assert.deepEqual(result.shortened, [
+      'scenarios[0].calls[0].request.body.kdf_salt',
+    ]);
+  });
+
+  test('an empty known secret withholds nothing, since every string holds it', () => {
+    const input = afterRequest({
+      method: 'POST',
+      path: '/x',
+      body: { name: 'typed plain text' },
+    });
+    const result = redactOk(input, { knownSecrets: [''] });
+    assert.deepEqual(result.transcript, input);
+    assert.deepEqual(result.withheld, []);
   });
 });
