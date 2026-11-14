@@ -276,6 +276,28 @@ describe('the caption strips', () => {
   });
 });
 
+describe('the checked step on the strips', () => {
+  test("the strip of a step marked checked carries the checked class and tag; the last step's strip does not, and the other side keeps its last step", () => {
+    const plan: AnnotatedVideoPlan = {
+      ...PLAN,
+      sides: [
+        {
+          ...BEFORE,
+          steps: [{ ...BEFORE.steps[0], checked: true }, BEFORE.steps[1]],
+        },
+        AFTER,
+      ],
+    };
+    const out = videoOverlayPages(plan, TOKENS, timelineOf(plan));
+    const [, marked, last] = out.sides[0].strips;
+    assert.ok(marked?.html.includes('class="strip checked"'), marked?.html);
+    assert.ok(marked?.html.includes(CHECKED_HERE), marked?.html);
+    assert.equal(last?.html.includes(CHECKED_HERE), false, last?.html);
+    assert.equal(last?.html.includes('class="strip checked"'), false);
+    assert.ok(out.sides[1].strips.at(-1)?.html.includes(CHECKED_HERE));
+  });
+});
+
 describe('the overlay stylesheet', () => {
   test('no page carries a literal colour: every colour is a Semantic Role variable', () => {
     for (const html of everyPageHtml()) {

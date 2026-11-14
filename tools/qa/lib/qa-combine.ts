@@ -135,7 +135,8 @@ export function parseStepRecords(
         !isString(step.tab) ||
         !isString(step.still) ||
         typeof step.index !== 'number' ||
-        typeof step.atMs !== 'number'
+        typeof step.atMs !== 'number' ||
+        (step.checked !== undefined && step.checked !== true)
       ) {
         return bad(`${side} has a malformed step`);
       }
@@ -216,7 +217,7 @@ export const VIDEO_LABEL_HEIGHT = 48;
 /** One step, as the MP4 captions it: the parts of its step record the strip shows and times. */
 export type VideoStep = Pick<
   StepRecord,
-  'index' | 'caption' | 'atMs' | 'device' | 'tab' | 'label'
+  'index' | 'caption' | 'atMs' | 'device' | 'tab' | 'label' | 'checked'
 >;
 
 /** One side of the MP4: its recording of the MP4's tab and its steps. */

@@ -16,6 +16,7 @@ import {
   type StoryboardInput,
   type StoryboardSideInput,
   buildStoryboard,
+  checkedStepIndex,
   expectedOutcome,
 } from './storyboard.ts';
 
@@ -720,6 +721,143 @@ describe('buildStoryboard: a side that declares its expected result is judged as
     for (const [name, sides, expected, side, mark] of cases) {
       assert.equal(markOf(board(sides, { expected }), side), mark, name);
     }
+  });
+});
+
+/** A step the script marked `checked`. */
+const marked = (side: Side, index: number): StepRecord => ({
+  ...step(side, index),
+  checked: true,
+});
+
+describe('checkedStepIndex: the step the check is made on', () => {
+  test('the marked step, else the last; the first mark when there are several; 0 with no steps', () => {
+    const steps = (...marks: number[]) =>
+      [1, 2, 3].map((index) => ({
+        index,
+        ...(marks.includes(index) ? { checked: true as const } : {}),
+      }));
+    assert.equal(checkedStepIndex(steps()), 3, 'no mark: the last');
+    assert.equal(checkedStepIndex(steps(2)), 2, 'a mark on an earlier step');
+    assert.equal(checkedStepIndex(steps(1, 2)), 1, 'several marks: the first');
+    assert.equal(checkedStepIndex([]), 0, 'no steps');
+  });
+});
+
+describe('buildStoryboard: the checked step', () => {
+  const passing = (side: Side, steps: StepRecord[]): StoryboardSideInput => ({
+    outcome: 'pass',
+    observed: 'shows',
+    steps,
+  });
+  const checkedRows = (storyboard: ReturnType<typeof board>) =>
+    storyboard.rows.map((row) => row.checked);
+
+  test('with no mark, the last row is the checked one', () => {
+    const storyboard = board({
+      before: passing('before', [
+        step('before', 1),
+        step('before', 2),
+        step('before', 3),
+      ]),
+      after: passing('after', [
+        step('after', 1),
+        step('after', 2),
+        step('after', 3),
+      ]),
+    });
+    assert.deepEqual(checkedRows(storyboard), [false, false, true]);
+    assert.deepEqual(storyboard.problems, []);
+  });
+
+  test('a step marked on both sides is the checked row, and the last step is not', () => {
+    const storyboard = board({
+      before: passing('before', [
+        step('before', 1),
+        marked('before', 2),
+        step('before', 3),
+      ]),
+      after: passing('after', [
+        step('after', 1),
+        marked('after', 2),
+        step('after', 3),
+      ]),
+    });
+    assert.deepEqual(checkedRows(storyboard), [false, true, false]);
+    assert.deepEqual(storyboard.problems, []);
+  });
+
+  test('a side that marks the last step, with the other unmarked, agrees and draws the last row checked', () => {
+    const storyboard = board({
+      before: passing('before', [step('before', 1), marked('before', 2)]),
+      after: passing('after', [step('after', 1), step('after', 2)]),
+    });
+    assert.deepEqual(checkedRows(storyboard), [false, true]);
+    assert.deepEqual(storyboard.problems, []);
+  });
+
+  test('a side marking an earlier step while the other leaves the last checked is a problem naming both steps', () => {
+    const storyboard = board({
+      before: passing('before', [marked('before', 1), step('before', 2)]),
+      after: passing('after', [step('after', 1), step('after', 2)]),
+    });
+    assert.deepEqual(storyboard.problems, [
+      'Before checks step 1 and After checks step 2; steps are matched by index, so both sides must check the same step and no Storyboard was made',
+    ]);
+  });
+
+  test('a side that marks two steps is a problem naming that side', () => {
+    const storyboard = board({
+      before: passing('before', [marked('before', 1), marked('before', 2)]),
+      after: passing('after', [marked('after', 1), step('after', 2)]),
+    });
+    assert.deepEqual(storyboard.problems, [
+      'before marked 2 steps as checked; at most one may be, so no Storyboard was made',
+    ]);
+  });
+
+  test('sides that check different steps are a problem, and the Storyboard is not made from them', () => {
+    const storyboard = board({
+      before: passing('before', [marked('before', 1), step('before', 2)]),
+      after: passing('after', [step('after', 1), marked('after', 2)]),
+    });
+    assert.deepEqual(storyboard.problems, [
+      'Before checks step 1 and After checks step 2; steps are matched by index, so both sides must check the same step and no Storyboard was made',
+    ]);
+  });
+
+  test('the alike one-column path still draws its checked row', () => {
+    const storyboard = board(
+      {
+        before: passing('before', [step('before', 1), marked('before', 2)]),
+        after: passing('after', [step('after', 1), marked('after', 2)]),
+      },
+      { expected: SAME },
+    );
+    assert.deepEqual(storyboard.columns, ['after']);
+    assert.equal(storyboard.band.alike, ALIKE_TEXT);
+    assert.deepEqual(checkedRows(storyboard), [false, true]);
+    assert.deepEqual(storyboard.problems, []);
+  });
+
+  test('a ragged grid keeps only its own problem, even where the sides check different steps', () => {
+    const storyboard = board({
+      before: passing('before', [marked('before', 1)]),
+      after: passing('after', [step('after', 1), step('after', 2)]),
+    });
+    assert.deepEqual(storyboard.problems, [
+      'Before took 1 step(s) and After took 2; steps are matched by index, so no Storyboard was made',
+    ]);
+  });
+
+  test('an empty side keeps only its own problem, even where the other side checks a step', () => {
+    const storyboard = board({
+      before: { outcome: 'fail', message: 'm', steps: [] },
+      after: passing('after', [step('after', 1), marked('after', 2)]),
+    });
+    assert.deepEqual(storyboard.problems, [
+      'before: no step() was called, so no Storyboard was made',
+    ]);
   });
 });
 

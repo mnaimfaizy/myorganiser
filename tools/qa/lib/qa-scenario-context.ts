@@ -425,7 +425,7 @@ export function stepRecorder(run: {
       observation = text;
     },
     async step(on, caption, options = {}) {
-      const { subject } = options;
+      const { subject, checked } = options;
       const index = steps.length + 1;
       const subjectSettled = subject ? await settleSubject(on, subject) : true;
       const animationsSettled = await settleAnimations(on);
@@ -455,6 +455,7 @@ export function stepRecorder(run: {
         still,
         subject: box,
         atMs,
+        ...(checked ? { checked: true as const } : {}),
         // The still is taken anyway, and marked, so a reader can tell.
         ...(subjectSettled && animationsSettled ? {} : { settled: false }),
       });

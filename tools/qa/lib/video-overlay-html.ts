@@ -11,7 +11,7 @@
  *     page, for the top left of that side's panel;
  *   - each side's caption strips, one per caption window
  *     (`pacedTimeline`): the step's number and caption, with the tab it was
- *     taken on when that is not the MP4's tab, and the last step marked as
+ *     taken on when that is not the MP4's tab, and the checked step marked as
  *     the one the check is made on. The opening strip covers the time before
  *     step 1.
  *
@@ -35,6 +35,7 @@ import {
   type VideoSide,
 } from './qa-combine.ts';
 import type { Side } from './qa-stack.ts';
+import { checkedStepIndex } from './storyboard.ts';
 import {
   STORYBOARD_STYLE,
   bandHtml,
@@ -104,13 +105,13 @@ export function labelText(side: VideoSide): string {
 function stripHtml(
   side: VideoSide,
   window: CaptionWindow,
-  lastIndex: number,
+  checkedIndex: number,
 ): string {
   const { step } = window;
   if (step === null) {
     return `<div class="strip" data-step="0"><span class="waiting">${escapeHtml(BEFORE_FIRST_STEP)}</span></div>`;
   }
-  const checked = step.index === lastIndex;
+  const checked = step.index === checkedIndex;
   const elsewhere =
     step.device !== side.device || step.tab !== side.tab
       ? `<span class="where">(${escapeHtml(step.label)})</span>`
@@ -143,7 +144,7 @@ export function videoOverlayPages(
       transparent: false,
     },
     sides: plan.sides.map((side, sideIndex) => {
-      const lastIndex = Math.max(0, ...side.steps.map((step) => step.index));
+      const checkedIndex = checkedStepIndex(side.steps);
       return {
         side: side.side,
         label: {
@@ -164,7 +165,7 @@ export function videoOverlayPages(
             'overlay-strip',
             width,
             VIDEO_STRIP_HEIGHT,
-            stripHtml(side, window, lastIndex),
+            stripHtml(side, window, checkedIndex),
           ),
           width,
           height: VIDEO_STRIP_HEIGHT,

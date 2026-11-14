@@ -74,6 +74,8 @@ export interface StepRecord {
   subject: Box | null;
   /** Milliseconds from the run's start. */
   atMs: number;
+  /** Set when the script marked this step as the one the check is made on. */
+  checked?: true;
   /**
    * `false` when the still was taken after settling timed out (the subject
    * kept moving, or an animation kept running); absent when it settled.
@@ -89,6 +91,11 @@ export function stepNumber(index: number): string {
 export interface StepOptions {
   /** The element the step is about: the still is cropped to it and it is outlined. */
   subject?: Locator;
+  /**
+   * Marks this step as the one the scenario's check is made on. Without a
+   * marked step it is the last one. At most one step per side may be marked.
+   */
+  checked?: true;
 }
 
 /** What a scenario's `run` is given. */

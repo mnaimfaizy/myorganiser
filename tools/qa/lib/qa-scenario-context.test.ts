@@ -802,3 +802,27 @@ describe('a step with a subject', () => {
     assert.ok(step?.subject, 'the subject box is still recorded');
   });
 });
+
+describe('a step marked checked', () => {
+  test('only the step taken with checked: true records checked: true; an unmarked step has no checked key at all', async () => {
+    const log: string[] = [];
+    const { ownPage, registry } = rig(log);
+    const recorder = stepRecorder({
+      side: 'before',
+      workDir: '/work',
+      startedAt: 0,
+      now: () => 0,
+      lookup: registry.lookup,
+    });
+    await recorder.step(asPage(ownPage), 'the first screen');
+    await recorder.step(asPage(ownPage), 'the check', { checked: true });
+    await recorder.step(asPage(ownPage), 'after the check');
+
+    assert.deepEqual(
+      recorder.steps.map((step) => step.checked),
+      [undefined, true, undefined],
+    );
+    assert.equal('checked' in recorder.steps[0], false);
+    assert.equal('checked' in recorder.steps[2], false);
+  });
+});

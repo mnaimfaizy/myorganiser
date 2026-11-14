@@ -278,6 +278,80 @@ describe('runCombine: a screen scenario is re-rendered from its saved step recor
     );
   });
 
+  /** Two steps per side, the first marked `checked` on each side when `checkedFirst` is set. */
+  const twoSteps = (
+    side: 'before' | 'after',
+    checkedFirst: boolean,
+    secondCaption: string,
+  ) => [
+    {
+      ...savedStep(side, 'open the form'),
+      ...(checkedFirst ? { checked: true } : {}),
+    },
+    {
+      ...savedStep(side, secondCaption),
+      index: 2,
+      still: `steps/S/${side}/02.png`,
+    },
+  ];
+
+  test('a step marked checked in the saved records reaches the Storyboard as the checked row', async () => {
+    const folder = runFolder(
+      'screenshot',
+      recordsOf('screenshot', {
+        sides: {
+          before: {
+            outcome: 'fail',
+            message: 'the defect shows here',
+            steps: twoSteps('before', true, 'the defect shows'),
+          },
+          after: {
+            outcome: 'pass',
+            observed: 'the fix shows here',
+            steps: twoSteps('after', true, 'the fix shows'),
+          },
+        },
+      }),
+    );
+    folder.disk.add(`${RUN}/steps/S/before/02.png`);
+    folder.disk.add(`${RUN}/steps/S/after/02.png`);
+    const fake = await reRender(RE_RENDER, folder);
+    assert.equal(fake.code, 0, fake.err.join('\n'));
+    assert.deepEqual(
+      fake.renders[0].storyboard.rows.map((row) => row.checked),
+      [true, false],
+      'the marked first step is the checked row, not the last',
+    );
+  });
+
+  test('a Before that checks a step After does not is refused before anything is rendered, naming both steps', async () => {
+    const folder = runFolder(
+      'screenshot',
+      recordsOf('screenshot', {
+        sides: {
+          before: {
+            outcome: 'fail',
+            message: 'the defect shows here',
+            steps: twoSteps('before', true, 'the defect shows'),
+          },
+          after: {
+            outcome: 'pass',
+            observed: 'the fix shows here',
+            steps: twoSteps('after', false, 'the fix shows'),
+          },
+        },
+      }),
+    );
+    folder.disk.add(`${RUN}/steps/S/before/02.png`);
+    folder.disk.add(`${RUN}/steps/S/after/02.png`);
+    const fake = await reRender(RE_RENDER, folder);
+    assert.equal(fake.code, 1);
+    assert.deepEqual(fake.err, [
+      'qa:combine: Before checks step 1 and After checks step 2; steps are matched by index, so both sides must check the same step and no Storyboard was made',
+    ]);
+    assert.deepEqual(fake.renders, []);
+  });
+
   test('a screen scenario needs no ffmpeg: it re-renders with ffmpeg not installed and never probes it', async () => {
     const fake = await reRender(RE_RENDER, runFolder('screenshot'), {
       ffmpegStatus: null,

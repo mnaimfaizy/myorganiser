@@ -425,6 +425,37 @@ describe('parseStepRecords: a file that is not a step-records file is refused', 
   });
 });
 
+describe('parseStepRecords: a step marked checked', () => {
+  const withChecked = (checked: unknown) =>
+    recordsJson({
+      sides: {
+        before: {
+          outcome: 'fail',
+          message: 'the defect shows here',
+          steps: [{ ...savedStep('before'), checked }],
+        },
+      },
+    });
+
+  test('a step marked checked: true is kept, and a step with no mark parses as before', () => {
+    const records = parse(withChecked(true));
+    assert.equal(records.sides.before?.steps[0].checked, true);
+    assert.equal(
+      parse(recordsJson()).sides.before?.steps[0].checked,
+      undefined,
+    );
+  });
+
+  test('a checked that is not exactly true is a malformed step', () => {
+    for (const bad of [false, 'yes', 1]) {
+      assert.throws(() => parse(withChecked(bad)), {
+        name: 'CombineInputError',
+        message: `${RECORDS_FILE} is not a step-records file: before has a malformed step`,
+      });
+    }
+  });
+});
+
 describe('resultOf: the graded result of one scenario in the run manifest', () => {
   const manifest = (scenarios: unknown) =>
     JSON.stringify({ scenarios, headline: 'QA passed' });

@@ -5,8 +5,8 @@
  * A Storyboard stands alone. Its band names the scenario, its graded result
  * and the commits each side ran on; one side card per side gives that side's
  * Expected and Observed and whether it showed what it was expected to; one
- * row per step puts Before beside After, the last step marked as the one the
- * check is made on.
+ * row per step puts Before beside After, the step the check is made on marked
+ * (the one the script marked `checked`, else the last).
  *
  * Two rules keep it from being misread:
  *
@@ -148,6 +148,19 @@ function observedText(run: StoryboardSideInput): string {
   return text === undefined || text.trim() === '' ? NOTHING_OBSERVED : text;
 }
 
+/**
+ * The step the check is made on: the one the script marked `checked`, else
+ * the last. 0 when there are no steps. A side that marked more than one is a
+ * problem (`buildStoryboard`); this reads the first so the page can still be
+ * drawn from what it is given.
+ */
+export function checkedStepIndex(
+  steps: readonly { index: number; checked?: true }[],
+): number {
+  const marked = steps.find((step) => step.checked);
+  return marked?.index ?? Math.max(0, ...steps.map((step) => step.index));
+}
+
 /** Each side's step at a row index, or `null` where that side took none. */
 function cellsAt(
   sides: StoryboardInput['sides'],
@@ -197,13 +210,39 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
     sides.every((card) => card.mark === 'as-expected');
   const shown: readonly Side[] = alike ? ['after'] : columns;
 
+  // The checked step is the marked one, else the last; it is the same step on
+  // both sides, because steps are matched by index.
+  const checkedAt = columns.map((side) =>
+    checkedStepIndex(input.sides[side]?.steps ?? []),
+  );
+  for (const side of columns) {
+    const marks = (input.sides[side]?.steps ?? []).filter(
+      (step) => step.checked,
+    ).length;
+    if (marks > 1) {
+      problems.push(
+        `${side} marked ${marks} steps as checked; at most one may be, so no Storyboard was made`,
+      );
+    }
+  }
+  // (A ragged grid or an empty side already has its own problem.)
+  if (
+    !counts.includes(0) &&
+    new Set(counts).size === 1 &&
+    new Set(checkedAt).size > 1
+  ) {
+    problems.push(
+      `Before checks step ${checkedAt[0]} and After checks step ${checkedAt[1]}; steps are matched by index, so both sides must check the same step and no Storyboard was made`,
+    );
+  }
+
   const rowCount = Math.max(0, ...counts);
   const rows: StoryboardRow[] = [];
   for (let i = 0; i < rowCount; i++) {
     rows.push({
       index: i + 1,
       cells: cellsAt(input.sides, i),
-      checked: i === rowCount - 1,
+      checked: i + 1 === Math.max(0, ...checkedAt),
     });
   }
 
