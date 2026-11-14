@@ -9,7 +9,7 @@ passphrase unlock does not.
 
 ## Status
 
-accepted
+accepted. Amended 2026-11-14 (issue #1573): "removed at logout" includes a Session the server ended. See _Amendment: a Session the server ended_.
 
 ## Context
 
@@ -49,7 +49,8 @@ can wrap the Master Key the way the Recovery Key does.
    discarded and Passkey Unlock is not offered. Nothing is shown in its place.
 6. **A failed check keeps the wrapped key.** The browser reports a cancel and
    a deleted passkey alike, so a failure only falls back. The wrapped key is
-   removed at logout, when the User turns Passkey Unlock off, when it no
+   removed at logout (a Session the server ended counts: see the amendment
+   below), when the User turns Passkey Unlock off, when it no
    longer decrypts, or when the browser reports the credential is gone.
 7. **Locking is unchanged.** The unlocked Master Key still lives in memory
    only, and the web app gains no Auto-Lock from this decision.
@@ -81,3 +82,18 @@ can wrap the Master Key the way the Recovery Key does.
 - Browsers and passkey providers without PRF get nothing new. The passphrase
   remains the way in for them.
 - A web Auto-Lock is a separate decision and is not made here.
+
+## Amendment: a Session the server ended
+
+Issue #1573. Decision 6's "removed at logout" covers a Session the server ended
+(`refresh_rejected`), not only the two sign-out buttons. The client cannot tell
+a Platform Admin force-logout or disable from a refresh token reaching its
+lifetime — both arrive as a non-transient 4xx — so every `refresh_rejected`
+removes that owner's record. A device whose Session was revoked for security
+must not keep a convenience unlock; after a routine expiry the cost is one
+passphrase unlock and one tap on the existing offer. A refresh that did not
+complete (no answer, 5xx, 408, 429) removes nothing, and `signed_out_elsewhere`
+adds no second removal: the other window's sign-out already removed the shared
+record. The auth library reports the owner on the session-ended signal; the web
+app removes the record from one root-layout subscriber, so a restore rejected
+during a cold load is covered too.

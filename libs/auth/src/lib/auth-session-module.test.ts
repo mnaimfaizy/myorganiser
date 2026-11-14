@@ -173,7 +173,10 @@ describe('createAuthSessionModule', () => {
       expect(result).toEqual({ kind: 'session_cleared' });
       expect(mockStorage.clearSession).toHaveBeenCalledTimes(1);
       expect(listener).toHaveBeenCalledTimes(1);
-      expect(listener).toHaveBeenCalledWith({ reason: 'refresh_rejected' });
+      expect(listener).toHaveBeenCalledWith({
+        reason: 'refresh_rejected',
+        owner: 'user-1',
+      });
     });
 
     it.each([
@@ -185,6 +188,8 @@ describe('createAuthSessionModule', () => {
           isAxiosError: true,
         }),
       ],
+      ['a server error', httpError(500)],
+      ['a request timeout', httpError(408)],
       ['a service unavailable', httpError(503)],
       ['a rate limit', httpError(429)],
     ])(
@@ -842,6 +847,48 @@ describe('createAuthSessionModule', () => {
 
         module.onSessionEnded(jest.fn());
         expect(watch).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('owner of an ended session', () => {
+      it('carries the User signed in before the clear when the refresh is rejected', async () => {
+        let currentUser: AuthUser | undefined = mockUser;
+        mockStorage.getAccessToken.mockReturnValue(undefined);
+        mockStorage.getCurrentUser.mockImplementation(() => currentUser);
+        mockStorage.clearSession.mockImplementation(() => {
+          currentUser = undefined;
+        });
+        (
+          mockTransport.getAuthApi().refreshToken as jest.Mock
+        ).mockRejectedValue(httpError(401));
+        const listener = jest.fn();
+        module.onSessionEnded(listener);
+
+        const result = await module.restoreSession();
+
+        expect(result).toEqual({ kind: 'session_cleared' });
+        expect(mockStorage.clearSession).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledWith({
+          reason: 'refresh_rejected',
+          owner: 'user-1',
+        });
+      });
+
+      it('carries no owner when only a token was stored', async () => {
+        mockStorage.getAccessToken.mockReturnValue('stale-tab-token');
+        mockStorage.getCurrentUser.mockReturnValue(undefined);
+        (
+          mockTransport.getAuthApi().refreshToken as jest.Mock
+        ).mockRejectedValue(httpError(403));
+        const listener = jest.fn();
+        module.onSessionEnded(listener);
+
+        await module.restoreSession();
+
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener.mock.calls[0][0].reason).toBe('refresh_rejected');
+        expect(listener.mock.calls[0][0].owner).toBeUndefined();
       });
     });
 

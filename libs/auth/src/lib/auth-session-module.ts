@@ -179,6 +179,9 @@ export function createAuthSessionModule(deps: {
         return { kind: 'session_cleared' };
       }
 
+      // Read before the clear: `clearSession()` drops the current-User entry.
+      const ownerBeforeClear = storage.getCurrentUser()?.id;
+
       try {
         await refreshSessionViaTransport();
         return { kind: 'authenticated' };
@@ -189,7 +192,10 @@ export function createAuthSessionModule(deps: {
           return { kind: 'not_restored' };
         }
         storage.clearSession();
-        sessionEnded.emit({ reason: 'refresh_rejected' });
+        sessionEnded.emit({
+          reason: 'refresh_rejected',
+          owner: ownerBeforeClear,
+        });
         return { kind: 'session_cleared' };
       }
     },

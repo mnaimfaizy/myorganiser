@@ -1,3 +1,4 @@
+export * from './lib/endedSessionPasskeyCleanup';
 export * from './lib/CloudBackupCard';
 export * from './lib/formatDate';
 export * from './lib/LastBackupCard';

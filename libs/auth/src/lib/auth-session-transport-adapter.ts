@@ -135,9 +135,10 @@ export function createAuthSessionTransportAdapter(
           // no answer, a 5xx, 408 or 429 keeps it (#1082): the request rejects
           // with the refresh's own error and the next 401 asks again.
           if (isRefreshRejectedByServer(refreshErr)) {
+            const owner = storage.getCurrentUser()?.id;
             storage.clearSession();
             if (firstToSeeFailure) {
-              sessionEnded?.emit({ reason: 'refresh_rejected' });
+              sessionEnded?.emit({ reason: 'refresh_rejected', owner });
             }
           }
           return Promise.reject(refreshErr);
