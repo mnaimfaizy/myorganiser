@@ -670,6 +670,8 @@ _Avoid_: Test plan, test matrix, QA cycle, verification checklist, regression pl
 
 **QA Account**:
 A User that exists only in a local database, created by the seeder and not by registration, for manual and agent QA. Its sign-in password, Vault passphrase and Recovery Key are public by design: they are plaintext derived from tracked source, and they open nothing outside a local database. The server holds a QA Account's Vault as Ciphertext, like any other. The User the live logout spec signs in as is not one.
+
+The **Platform Admin QA Account** is the one QA Account (`admin`) that holds the `platform_admin` role, so a QA run can reach `/admin/**`; `primary` and `secondary` stay ordinary Users. The table marks it with `platformAdmin: true`, at most one account. It gets the role from the backend's own `PLATFORM_ADMIN_BOOTSTRAP_EMAIL` bootstrap, which the QA stack's environment points at it, after the stack seeds the QA Accounts. `yarn qa:accounts:seed` alone does not promote it.
 _Avoid_: Test account, throwaway account, test user, fixture user
 
 **QA Plan Issue**:

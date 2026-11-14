@@ -38,7 +38,7 @@ corepack yarn qa:stack:stop
 - The stack serves web on `http://localhost:4300` and the backend on `3300`, with its own Postgres container on `127.0.0.1:5499`, so it never collides with the Maintainer's services.
 - It builds its environment from `.env.example` with generated local-only secrets and writes it to `tmp/qa/stack/`. Never read the Maintainer's env files or work around the hook that protects them. If the stack cannot run the app, stop and report it.
 - It refuses a database that is not local, the primary checkout, a worktree with uncommitted changes, and a port already in use. Report a refusal; never work around it.
-- It seeds the QA Accounts once, at start. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
+- It seeds the QA Accounts once, at start. A QA Plan that needs `/admin/**` asks for the `admin` QA Account (the Platform Admin QA Account), never SQL: the stack's backend bootstraps it, while `primary` and `secondary` stay ordinary Users. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
 - Every start and switch ends by checking the commit the stack serves. A mismatch exits 1: run no scenario on it. `yarn qa:stack:status` re-checks at any time.
 - A switch back to Before after After is refused. When a feature's After fails, `yarn qa:run` stops the stack and starts a fresh one with `--before-only` for the merge-base re-run; by hand, do the same.
 
