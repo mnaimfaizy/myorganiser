@@ -49,6 +49,8 @@ const VIDEO_TEMP = `${RUN}/combined/.recombine-S.mp4`;
 const RE_RENDER = ['--run', RUN, '--scenario', 'S'];
 
 const NO_CHROMIUM = "Playwright's Chromium is not installed";
+/** A run's wall clock start in the saved records: 2 January 2026, 03:04:05 UTC. */
+const CLOCK_START = Date.UTC(2026, 0, 2, 3, 4, 5);
 // Secrets built at runtime, so no literal credential sits in the source.
 const BEARER = 'Bearer qa-tok';
 const JWT = ['eyJ'.concat('a'.repeat(8)), 'b'.repeat(8), 'c2ln'].join('.');
@@ -404,6 +406,45 @@ describe('runCombine: a video scenario also re-renders its annotated MP4', () =>
       ['ffmpeg', '-version'],
       ['ffprobe', '-version'],
     ]);
+  });
+
+  test("a clock start saved on each side's video block reaches that side of the MP4 plan", async () => {
+    const records = recordsOf('video', {
+      video: {
+        tab: 'A',
+        sides: {
+          before: { ...VIDEO_SIDE, startedAtMs: CLOCK_START },
+          after: { ...VIDEO_SIDE, startedAtMs: CLOCK_START + 1000 },
+        },
+      },
+    });
+    const fake = await reRender(RE_RENDER, runFolder('video', records));
+    assert.equal(fake.code, 0, fake.err.join('\n'));
+    assert.deepEqual(
+      fake.annotations[0]?.sides.map(({ side, startedAtMs }) => [
+        side,
+        startedAtMs,
+      ]),
+      [
+        ['before', CLOCK_START],
+        ['after', CLOCK_START + 1000],
+      ],
+    );
+  });
+
+  test('a step-records file saved before the clock start existed still re-renders its MP4, with no startedAtMs on either side', async () => {
+    const fake = await reRender(RE_RENDER, runFolder('video'));
+    assert.equal(fake.code, 0, fake.err.join('\n'));
+    assert.deepEqual(fake.err, []);
+    assert.equal(fake.annotations.length, 1, 'the MP4 is still made');
+    for (const side of fake.annotations[0]?.sides ?? []) {
+      assert.equal(
+        'startedAtMs' in side,
+        false,
+        `${side.side} has no clock start`,
+      );
+    }
+    assert.ok(fake.ops.includes(`move ${VIDEO_TEMP} ${VIDEO_MP4}`));
   });
 });
 

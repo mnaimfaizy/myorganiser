@@ -203,6 +203,9 @@ async function recombine(
           tab: saved.tab,
           path,
           openedAtMs: saved.openedAtMs,
+          ...(saved.startedAtMs === undefined
+            ? {}
+            : { startedAtMs: saved.startedAtMs }),
         },
         label: saved.label,
       };

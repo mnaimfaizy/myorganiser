@@ -86,7 +86,13 @@ export function annotatedVideoSides(
       );
       continue;
     }
-    const { device, tab: recordedTab, path, openedAtMs } = choice.recording;
+    const {
+      device,
+      tab: recordedTab,
+      path,
+      openedAtMs,
+      startedAtMs,
+    } = choice.recording;
     sides.push({
       side,
       video: path,
@@ -94,6 +100,7 @@ export function annotatedVideoSides(
       tab: recordedTab,
       label: choice.label ?? tabLabel(device, recordedTab, 1),
       openedAtMs,
+      ...(startedAtMs === undefined ? {} : { startedAtMs }),
       steps: run.steps,
     });
   }

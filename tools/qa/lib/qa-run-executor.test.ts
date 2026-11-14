@@ -57,6 +57,8 @@ interface Scripted {
   denied?: string[];
   /** Each step's caption by call order; a step past the list keeps `step N`. */
   captions?: string[];
+  /** The wall clock the run began at, as the browser runner reports it; absent when it reports none. */
+  startedAtMs?: number;
 }
 
 const DEFAULT_RUN: Scripted = {
@@ -176,6 +178,9 @@ function fakeRun(options: Partial<Plan> = {}) {
       };
       if (scripted.tabVideos !== undefined) {
         recorded.tabVideos = scripted.tabVideos;
+      }
+      if (scripted.startedAtMs !== undefined) {
+        recorded.startedAtMs = scripted.startedAtMs;
       }
       if (scripted.message !== undefined) recorded.message = scripted.message;
       if (scripted.observed !== undefined)
@@ -2330,6 +2335,43 @@ describe('the step records a video scenario saves for its re-render (PRD #1550)'
       'video' in savedRecords(fake, 'S'),
       false,
       'a screen scenario saves no video block',
+    );
+  });
+
+  test("a clock start the browser run reports lands on each side's video block, for a tab other than the default, and the re-render plan carries it", async () => {
+    const start = Date.UTC(2026, 0, 2, 3, 4, 5);
+    const fake = fakeRun({
+      exports: filesOf({ ...scenario('V', 'video'), tab: 'B1' }),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        startedAtMs: side === 'before' ? start : start + 1000,
+        tabVideos: [
+          {
+            device: 'B',
+            tab: 'B1',
+            path: tabWork(id, side, 'B', 'B1'),
+            openedAtMs: 1200,
+          },
+        ],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    const block = savedRecords(fake, 'V').video as {
+      sides: Record<string, { openedAtMs: number; startedAtMs?: number }>;
+    };
+    assert.equal(block.sides.before?.startedAtMs, start);
+    assert.equal(block.sides.after?.startedAtMs, start + 1000);
+    assert.equal(
+      block.sides.before?.openedAtMs,
+      1200,
+      'the tab facts are kept',
+    );
+
+    const re = await reRenderFrom(fake, 'V');
+    assert.equal(re.code, 0, re.err.join('\n'));
+    assert.deepEqual(
+      re.annotations[0]?.sides.map(({ startedAtMs }) => startedAtMs),
+      [start, start + 1000],
     );
   });
 

@@ -28,12 +28,28 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 import {
+  VIDEO_BAND_HEIGHT,
+  VIDEO_PANEL,
   VIDEO_PLAYBACK_SPEED,
   VIDEO_STEP_HOLD_SECONDS,
+  VIDEO_STRIP_HEIGHT,
 } from './lib/qa-combine.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'qa-combine.ts');
+
+/**
+ * A caption long enough to need most of a strip's width, with no markup in it.
+ * The MP4 must still show it whole under the clock and elapsed-time line.
+ */
+const LONG_CAPTION =
+  'open the saved item, check every field against the form, then wait for the confirmation to appear before leaving the page';
+
+/**
+ * The Before run's wall clock start: 2 January 2026, 03:04:05 UTC (After's is
+ * 1 s later). The CLI is run with TZ=UTC, so the clock reads in UTC.
+ */
+const CLOCK_START = Date.UTC(2026, 0, 2, 3, 4, 5);
 
 function binaryAvailable(binary: string): boolean {
   return spawnSync(binary, ['-version'], { encoding: 'utf8' }).status === 0;
@@ -229,12 +245,7 @@ test(
                   'open the form',
                   FIXTURE.before.stepsMs[0],
                 ),
-                savedStep(
-                  'before',
-                  2,
-                  'the defect shows',
-                  FIXTURE.before.stepsMs[1],
-                ),
+                savedStep('before', 2, LONG_CAPTION, FIXTURE.before.stepsMs[1]),
               ],
             },
             after: {
@@ -264,12 +275,14 @@ test(
                 tab: 'A',
                 label: 'Device A',
                 openedAtMs: 0,
+                startedAtMs: CLOCK_START,
               },
               after: {
                 device: 'A',
                 tab: 'A',
                 label: 'Device A',
                 openedAtMs: 0,
+                startedAtMs: CLOCK_START + 1000,
               },
             },
           },
@@ -283,10 +296,13 @@ test(
         }),
       );
 
+      // qa:combine has no zone flag, so the clock is written in the machine's
+      // zone: TZ=UTC pins it here. The text itself is checked on a plan that
+      // pins its zone, in storyboard.real-render.test.ts.
       const combine = spawnSync(
         process.execPath,
         [CLI, '--run', run, '--scenario', 'S'],
-        { encoding: 'utf8' },
+        { encoding: 'utf8', env: { ...process.env, TZ: 'UTC' } },
       );
       assert.equal(combine.status, 0, combine.stderr);
       const png = join(run, 'combined', 'S.png');
@@ -306,9 +322,12 @@ test(
         1280,
         'the Storyboard is 1280 px wide',
       );
-      // Two 1280x720 panels side by side, under the 96 px band, with the 56 px
-      // caption strip under each panel.
-      assert.deepEqual(probeSize(mp4), [2560, 872]);
+      // Two panels side by side, under the band, with the caption strip under
+      // each panel: the strip is two lines (caption, then timing).
+      assert.deepEqual(probeSize(mp4), [
+        VIDEO_PANEL.width * 2,
+        VIDEO_BAND_HEIGHT + VIDEO_PANEL.height + VIDEO_STRIP_HEIGHT,
+      ]);
       // Paced, not the recordings' own lengths: the MP4 is as long as the paced
       // timeline of the fixture, which is longer than either recording.
       const seconds = probeSeconds(mp4);

@@ -33,17 +33,23 @@ import { chromium } from '@playwright/test';
 
 import {
   type AnnotatedVideoPlan,
+  type VideoSide,
+  VIDEO_BAND_HEIGHT,
   VIDEO_FPS,
+  VIDEO_PANEL,
   VIDEO_PLAYBACK_SPEED,
   VIDEO_STEP_HOLD_SECONDS,
+  VIDEO_STRIP_HEIGHT,
   durationFromPackets,
   pacedTimeline,
   probeDurationArgs,
 } from './lib/qa-combine.ts';
 import { makeAnnotatedVideo } from './lib/qa-combine-executor.ts';
+import { readTokenCss } from './lib/storyboard-palette.ts';
 import { storyboardRenderer } from './lib/storyboard-render.ts';
 import { type Storyboard, buildStoryboard } from './lib/storyboard.ts';
 import { nodeAnnotateDeps } from './lib/video-overlay-render.ts';
+import { videoOverlayPages } from './lib/video-overlay-html.ts';
 
 /** tools/qa/ is two levels below the repository root. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -178,11 +184,13 @@ test(
   },
 );
 
-const FRAME_WIDTH = 1280;
-const FRAME_HEIGHT = 872;
-/** The caption strip is the bottom 56 px of the 1280 px wide side panel. */
-const STRIP_TOP = 816;
-const STRIP_HEIGHT = 56;
+const FRAME_WIDTH = VIDEO_PANEL.width;
+/** One side's frame: the band over the side's panel, with its caption strip under the panel. */
+const FRAME_HEIGHT =
+  VIDEO_BAND_HEIGHT + VIDEO_PANEL.height + VIDEO_STRIP_HEIGHT;
+/** The caption strip is the bottom VIDEO_STRIP_HEIGHT px of the frame, under the band and the panel. */
+const STRIP_TOP = VIDEO_BAND_HEIGHT + VIDEO_PANEL.height;
+const STRIP_HEIGHT = VIDEO_STRIP_HEIGHT;
 const STRIP_BYTES = FRAME_WIDTH * STRIP_HEIGHT * 3;
 // H.264 is lossy, so the same strip is not bit-identical across frames or across
 // encodes. ENCODER_NOISE_MAX is the per-byte bound that `overNoiseShare` counts
@@ -526,7 +534,7 @@ test(
       assert.deepEqual(
         probeVideo(output),
         ['h264', String(FRAME_WIDTH), String(FRAME_HEIGHT)],
-        'an H.264 MP4, 1280 px wide for one side and 872 px high',
+        `an H.264 MP4, ${FRAME_WIDTH} px wide for one side and ${FRAME_HEIGHT} px high`,
       );
       // The opening strip is on screen before the hold: the frame matches the
       // caption-free reference, both just before the hold and mid-way to it.
@@ -578,6 +586,135 @@ test(
       assert.ok(
         matchesReference(captionSecondStrip, captionRef),
         `the strip at ${captionSecond.toFixed(2)} s, inside the caption window, is the caption (mean delta ${meanDelta(captionSecondStrip, captionRef).toFixed(2)}, bytes over ${ENCODER_NOISE_MAX} ${(overNoiseShare(captionSecondStrip, captionRef) * 100).toFixed(3)}%)`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(overlays, { recursive: true, force: true });
+    }
+  },
+);
+
+/** A caption long enough to need most of a strip's width, with no markup in it. */
+const LONG_CAPTION =
+  'open the saved item, check every field against the form, then wait for the confirmation to appear before leaving the page';
+
+/** The run's wall clock start: 2 January 2026, 03:04:05 UTC. */
+const CLOCK_START = Date.UTC(2026, 0, 2, 3, 4, 5);
+
+/** What the caption strip's layout reads back in Chromium. */
+interface StripLayout {
+  caption: string | null;
+  captionTruncated: boolean;
+  timing: string | null;
+  lines: number;
+}
+
+test(
+  'a real annotated MP4 writes a step clock and elapsed time on its caption strip, and keeps a long caption whole on its own line',
+  { skip: ANNOTATE_SKIP },
+  async () => {
+    assert.equal(
+      REQUIRED_GAPS.length,
+      0,
+      REQUIRED_GAPS.map(
+        (gap) => `${gap.what} required (${gap.variable} is set) but not found`,
+      ).join('; '),
+    );
+    const dir = mkdtempSync(join(tmpdir(), 'annotated-timing-real-'));
+    const overlays = mkdtempSync(join(tmpdir(), 'annotated-timing-overlays-'));
+    try {
+      const recording = join(dir, 'before.mp4');
+      const output = join(dir, 'annotated.mp4');
+      const noClock = join(dir, 'no-clock.mp4');
+      makeRecording(recording);
+      const real = nodeAnnotateDeps(REPO_ROOT, overlays);
+      const base = annotatedPlan(recording, output);
+      const [side] = base.sides;
+      // The plan pins its zone, so the clock reads the same on every machine,
+      // and the step's caption is the long one.
+      const plan: AnnotatedVideoPlan = {
+        ...base,
+        timeZone: 'UTC',
+        sides: [
+          {
+            ...side,
+            startedAtMs: CLOCK_START,
+            steps: side.steps.map((step) => ({
+              ...step,
+              caption: LONG_CAPTION,
+            })),
+          },
+        ],
+      };
+      const probed = probeSeconds(recording);
+      const timeline = pacedTimeline(plan.sides, [probed]);
+      const holdStart = timeline.holdStarts[0];
+      const captionFirst = holdStart + VIDEO_STEP_HOLD_SECONDS / 3;
+
+      // The strip's layout, in Chromium: the caption is the whole text on a line
+      // of its own (no ellipsis), and the timing is a second line. The step is
+      // at 1 s, so its clock is 03:04:06 UTC, 1.0 s on.
+      const strip = videoOverlayPages(plan, readTokenCss(REPO_ROOT), timeline)
+        .sides[0]?.strips[1];
+      assert.ok(strip, 'the step has a caption strip');
+      const browser = await chromium.launch();
+      let layout: StripLayout;
+      try {
+        const page = await browser.newPage({
+          viewport: { width: strip.width, height: strip.height },
+        });
+        await page.setContent(strip.html, { waitUntil: 'load' });
+        layout = (await page.evaluate(`(() => {
+          const caption = document.querySelector('.strip .caption');
+          const timing = document.querySelector('.strip .timing');
+          return {
+            caption: caption ? caption.textContent : null,
+            captionTruncated: caption ? caption.scrollWidth > caption.clientWidth : true,
+            timing: timing ? timing.textContent : null,
+            lines: document.querySelectorAll('.strip .line').length,
+          };
+        })()`)) as StripLayout;
+        await page.close();
+      } finally {
+        await browser.close();
+      }
+      assert.equal(layout.caption, LONG_CAPTION, 'the whole caption is shown');
+      assert.equal(
+        layout.captionTruncated,
+        false,
+        'the caption fits its line, with no ellipsis',
+      );
+      assert.equal(
+        layout.timing,
+        '03:04:06 UTC · 0:01.0 elapsed',
+        'the timing line reads the clock in the plan zone, then the elapsed time',
+      );
+      assert.equal(layout.lines, 2, 'the caption and the timing are two lines');
+
+      await makeAnnotatedVideo(plan, real);
+      assert.ok(existsSync(output), 'the annotated MP4 exists');
+      assert.deepEqual(
+        probeVideo(output),
+        ['h264', String(FRAME_WIDTH), String(FRAME_HEIGHT)],
+        `an H.264 MP4, ${FRAME_WIDTH} px wide and ${FRAME_HEIGHT} px high, with the strip two lines deep`,
+      );
+      // The same plan with no clock start: the note stands where the clock is,
+      // and everything else on the strip is the same. During the hold, the
+      // strip with the clock differs from it, which shows the clock is drawn.
+      const withoutClock: VideoSide = {
+        ...plan.sides[0],
+        startedAtMs: undefined,
+      };
+      await makeAnnotatedVideo(
+        { ...plan, sides: [withoutClock], output: noClock },
+        real,
+      );
+      assert.ok(
+        largestDelta(
+          stripAt(output, captionFirst),
+          stripAt(noClock, captionFirst),
+        ) >= CAPTION_CHANGE_MIN,
+        `the strip at ${captionFirst.toFixed(2)} s, during the hold, shows the clock where the no-clock strip shows the note`,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
