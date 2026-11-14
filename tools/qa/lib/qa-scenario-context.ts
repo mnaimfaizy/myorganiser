@@ -12,6 +12,9 @@
  *     Storyboard;
  *   - hides the toast region, unless the subject is a toast or sits inside
  *     one, so a stale toast does not cover or confuse the subject;
+ *   - with `showing`, waits for that element instead, takes the still at once
+ *     (no settle) and keeps the toast region visible; a wait that times out
+ *     throws, naming the step;
  *   - records the subject's bounding box, in viewport pixels.
  *
  * The runner owns devices and tabs (`deviceRegistry`): the runner's own page
@@ -425,12 +428,32 @@ export function stepRecorder(run: {
       observation = text;
     },
     async step(on, caption, options = {}) {
-      const { subject, checked } = options;
+      const { subject, checked, showing } = options;
       const index = steps.length + 1;
-      const subjectSettled = subject ? await settleSubject(on, subject) : true;
-      const animationsSettled = await settleAnimations(on);
+      if (showing) {
+        // Wait for the element, then capture before it can go: no settling.
+        await showing
+          .waitFor({ state: 'visible', timeout: SETTLE_TIMEOUT_MS })
+          .catch((error: unknown) => {
+            const timedOut =
+              error instanceof Error && error.name === 'TimeoutError';
+            const why = timedOut
+              ? `the element it must show did not appear within ${SETTLE_TIMEOUT_MS} ms`
+              : `waiting for the element it must show failed: ${error instanceof Error ? error.message : String(error)}`;
+            throw new Error(`Step ${index} ("${caption}"): ${why}`, {
+              cause: error,
+            });
+          });
+      }
+      const subjectSettled =
+        subject && !showing ? await settleSubject(on, subject) : true;
+      const animationsSettled = showing ? true : await settleAnimations(on);
       const box: Box | null = subject ? await subject.boundingBox() : null;
-      const showToasts = subject ? await insideToast(subject) : false;
+      const showToasts = showing
+        ? true
+        : subject
+          ? await insideToast(subject)
+          : false;
       const still = join(run.workDir, `step-${stepNumber(index)}.png`);
       const atMs = now() - run.startedAt;
       await on.screenshot({

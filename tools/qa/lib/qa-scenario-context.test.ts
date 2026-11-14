@@ -826,3 +826,180 @@ describe('a step marked checked', () => {
     assert.equal('checked' in recorder.steps[2], false);
   });
 });
+
+describe('a step with showing', () => {
+  const BOX: Box = { x: 10, y: 20, width: 100, height: 40 };
+
+  /** A locator `step()` waits on with `showing`; its `waitFor` is the test's. */
+  function fakeShowing(waitFor: (options: unknown) => Promise<void>) {
+    return { waitFor } as unknown as Locator;
+  }
+
+  test('waits for the showing element, then takes the still at once with no animation settle, no toast-hiding style, and atMs from the clock at capture', async () => {
+    let clock = 1500;
+    const page = fakePage('A');
+    let animationWaits = 0;
+    page.waitForFunction = async () => {
+      animationWaits++;
+    };
+    const waits: unknown[] = [];
+    const recorder = stepRecorder({
+      side: 'after',
+      workDir: '/work',
+      startedAt: 1000,
+      now: () => clock,
+    });
+
+    await recorder.step(asPage(page), 'the toast appears', {
+      showing: fakeShowing(async (options) => {
+        waits.push(options);
+        clock = 2300;
+      }),
+    });
+
+    assert.deepEqual(waits, [{ state: 'visible', timeout: 5000 }]);
+    assert.equal(animationWaits, 0, 'the animation settle is not waited for');
+    assert.equal(page.shots.length, 1, 'the still is taken');
+    const [shot] = page.shots;
+    assert.equal(shot?.path, '/work/step-01.png');
+    assert.equal(shot?.animations, 'disabled');
+    assert.equal(
+      Object.hasOwn(shot ?? {}, 'style'),
+      false,
+      'no toast-hiding style is passed',
+    );
+    const [step] = recorder.steps;
+    assert.equal(step?.atMs, 1300, 'atMs is read after the wait');
+    assert.equal(step?.settled, undefined, 'the record has no settled: false');
+  });
+
+  test('the still is taken straight after the wait resolves, before any animation settle', async () => {
+    const events: string[] = [];
+    const page = fakePage('A');
+    const takeShot = page.screenshot;
+    page.screenshot = async (shot) => {
+      events.push('screenshot');
+      await takeShot(shot);
+    };
+    page.waitForFunction = async () => {
+      events.push('animation settle');
+    };
+    const recorder = stepRecorder({
+      side: 'after',
+      workDir: '/work',
+      startedAt: 0,
+      now: () => 0,
+    });
+
+    await recorder.step(asPage(page), 'the toast dismisses soon', {
+      showing: fakeShowing(async () => {
+        events.push('waitFor resolved');
+      }),
+    });
+
+    assert.deepEqual(events, ['waitFor resolved', 'screenshot']);
+    assert.equal(page.shots.length, 1);
+    assert.equal(recorder.steps.length, 1);
+  });
+
+  test('an element that never appears fails the step, naming the step and its caption, with no still taken and no step recorded', async () => {
+    const page = fakePage('A');
+    const recorder = stepRecorder({
+      side: 'after',
+      workDir: '/work',
+      startedAt: 0,
+      now: () => 0,
+    });
+    await recorder.step(asPage(page), 'the first screen');
+    const timeout = Object.assign(
+      new Error('locator.waitFor: Timeout 5000ms exceeded.'),
+      {
+        name: 'TimeoutError',
+      },
+    );
+
+    await assert.rejects(
+      recorder.step(asPage(page), 'the toast confirms', {
+        showing: fakeShowing(async () => {
+          throw timeout;
+        }),
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        /^Step 2 \("the toast confirms"\): the element it must show did not appear within 5000 ms$/.test(
+          error.message,
+        ) &&
+        error.cause === timeout,
+    );
+    assert.equal(page.shots.length, 1, 'only the first step has a still');
+    assert.equal(recorder.steps.length, 1, 'only the first step is recorded');
+  });
+
+  test('a wait that fails for another reason names the step and the original message, not a timeout, and records no step', async () => {
+    const page = fakePage('A');
+    const recorder = stepRecorder({
+      side: 'after',
+      workDir: '/work',
+      startedAt: 0,
+      now: () => 0,
+    });
+    await recorder.step(asPage(page), 'the first screen');
+    const closed = new Error('Target page, context or browser has been closed');
+
+    await assert.rejects(
+      recorder.step(asPage(page), 'the toast confirms', {
+        showing: fakeShowing(async () => {
+          throw closed;
+        }),
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        /^Step 2 \("the toast confirms"\): waiting for the element it must show failed: Target page, context or browser has been closed$/.test(
+          error.message,
+        ) &&
+        !error.message.includes('did not appear') &&
+        error.cause === closed,
+    );
+    assert.equal(page.shots.length, 1, 'only the first step has a still');
+    assert.equal(recorder.steps.length, 1, 'only the first step is recorded');
+  });
+
+  test('a showing step with a subject records the subject box from its one read, and the region stays visible', async () => {
+    const page = fakePage('A');
+    const reads: number[] = [];
+    const subject = fakeSubject((read) => {
+      reads.push(read);
+      return BOX;
+    });
+    const waits: unknown[] = [];
+    const recorder = stepRecorder({
+      side: 'after',
+      workDir: '/work',
+      startedAt: 0,
+      now: () => 0,
+    });
+
+    await recorder.step(asPage(page), 'the toast over the subject', {
+      subject: asLocator(subject),
+      showing: fakeShowing(async (options) => {
+        waits.push(options);
+      }),
+    });
+
+    assert.deepEqual(waits, [{ state: 'visible', timeout: 5000 }]);
+    assert.deepEqual(
+      reads,
+      [0],
+      'the subject is read once, with no stability tries',
+    );
+    const [shot] = page.shots;
+    assert.equal(
+      Object.hasOwn(shot ?? {}, 'style'),
+      false,
+      'no toast-hiding style is passed',
+    );
+    const [step] = recorder.steps;
+    assert.deepEqual(step?.subject, BOX);
+    assert.equal(step?.settled, undefined);
+  });
+});

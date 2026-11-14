@@ -96,6 +96,15 @@ export interface StepOptions {
    * marked step it is the last one. At most one step per side may be marked.
    */
   checked?: true;
+  /**
+   * An element that must be visible in this step's still, such as a toast
+   * that auto-dismisses. `step()` waits for it, then takes the still at once:
+   * no animation settle, and the toast region stays visible. If it does not
+   * appear within the settle timeout the step throws, naming the step, and
+   * the run fails. Given with `subject`, the subject is not settled either:
+   * its box is read once, as it is at capture.
+   */
+  showing?: Locator;
 }
 
 /** What a scenario's `run` is given. */
