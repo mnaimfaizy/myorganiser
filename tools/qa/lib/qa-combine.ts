@@ -55,7 +55,18 @@ export interface StepRecordsVideo {
   sides: Partial<
     Record<
       Side,
-      { device: string; tab: string; label: string; openedAtMs: number }
+      {
+        device: string;
+        tab: string;
+        label: string;
+        openedAtMs: number;
+        /**
+         * The wall clock when this side's run began (its steps' `atMs` 0), in
+         * epoch milliseconds. Absent in records `qa:run` saved before it was
+         * added: they still re-render, without clock times.
+         */
+        startedAtMs?: number;
+      }
     >
   >;
 }
@@ -161,7 +172,10 @@ export function parseStepRecords(
             isString(one.device) &&
             isString(one.tab) &&
             isString(one.label) &&
-            typeof one.openedAtMs === 'number')
+            typeof one.openedAtMs === 'number' &&
+            (one.startedAtMs === undefined ||
+              (typeof one.startedAtMs === 'number' &&
+                Number.isFinite(one.startedAtMs))))
         );
       })
     ) {
@@ -208,8 +222,8 @@ export const VIDEO_PANEL = VIEWPORT;
 /** The band across the top of the MP4, in pixels. */
 export const VIDEO_BAND_HEIGHT = 96;
 
-/** The caption strip under each side's panel, in pixels. */
-export const VIDEO_STRIP_HEIGHT = 56;
+/** The strip under each side's panel (caption line, timing line), in pixels. */
+export const VIDEO_STRIP_HEIGHT = 88;
 
 /** The device and tab label at the top left of each side's panel, in pixels. */
 export const VIDEO_LABEL_HEIGHT = 48;
@@ -231,6 +245,8 @@ export interface VideoSide {
   label: string;
   /** When the recording starts, in milliseconds from the run's start. */
   openedAtMs: number;
+  /** The wall clock at the run's start, epoch ms; absent when the records predate it. */
+  startedAtMs?: number;
   steps: readonly VideoStep[];
 }
 
@@ -242,6 +258,8 @@ export interface AnnotatedVideoPlan {
   sides: readonly VideoSide[];
   /** Where the MP4 is written. */
   output: string;
+  /** The IANA time zone clock times are shown in; the rendering machine's own when absent. */
+  timeZone?: string;
 }
 
 /**
@@ -251,6 +269,8 @@ export interface AnnotatedVideoPlan {
  */
 export interface CaptionWindow {
   step: VideoStep | null;
+  /** The step's timing on this side; absent for the strip before step 1. */
+  timing?: StepTiming;
   start: number;
   end: number | null;
 }
@@ -322,6 +342,81 @@ export function probeDurationArgs(video: string): string[] {
     'csv=p=0',
     video,
   ];
+}
+
+/** What the overlay shows of one step's timing on one side; every part is milliseconds. */
+export interface StepTiming {
+  /** Time since the side began: the step's `atMs`. */
+  elapsedMs: number;
+  /** The wall clock (epoch ms) of the step; absent when the side has no saved start. */
+  clockMs?: number;
+  /**
+   * How much later (+) or earlier (-) this side reached the step than Before,
+   * steps matched by position. Present on After when Before ran and has the
+   * step; absent on Before and on a single-side run.
+   */
+  differenceMs?: number;
+}
+
+/** The timing of step `n` (0-based) on `sides[sideIndex]`, from the step records alone. */
+export function stepTiming(
+  sides: readonly VideoSide[],
+  sideIndex: number,
+  n: number,
+): StepTiming | undefined {
+  const side = sides[sideIndex];
+  const step = side.steps[n];
+  if (step === undefined) return undefined;
+  const before = sides.find((one) => one.side === 'before');
+  const beforeStep = before?.steps[n];
+  return {
+    elapsedMs: step.atMs,
+    ...(side.startedAtMs === undefined
+      ? {}
+      : { clockMs: side.startedAtMs + step.atMs }),
+    ...(side.side === 'after' && beforeStep !== undefined
+      ? { differenceMs: step.atMs - beforeStep.atMs }
+      : {}),
+  };
+}
+
+/** Time since a side began: `0:14.9`, or `1:02:03.0` from an hour on. */
+export function formatElapsed(ms: number): string {
+  const tenths = Math.round(Math.max(0, ms) / 100);
+  const total = Math.floor(tenths / 10);
+  const frac = tenths % 10;
+  const s = total % 60;
+  const m = Math.floor(total / 60) % 60;
+  const h = Math.floor(total / 3600);
+  const two = (v: number): string => String(v).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(s)}.${frac}` : `${m}:${two(s)}.${frac}`;
+}
+
+/** How far After was from Before: `+1.3 s`, `-0.4 s`, `+0.0 s`; the sign is never left out. */
+export function formatDifference(ms: number): string {
+  const tenths = Math.round(Math.abs(ms) / 100);
+  const sign = tenths === 0 || ms > 0 ? '+' : '-';
+  return `${sign}${(tenths / 10).toFixed(1)} s`;
+}
+
+/**
+ * The wall clock with its zone, `14:40:41 AEDT`. The locale is pinned so
+ * every machine writes it alike; `timeZone` is the rendering machine's own
+ * unless given (tests give one). Zones with no abbreviation in the locale
+ * come out as an offset label such as `GMT+11`, which is as unambiguous.
+ */
+export function formatClock(ms: number, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+    timeZoneName: 'short',
+    ...(timeZone === undefined ? {} : { timeZone }),
+  }).formatToParts(new Date(ms));
+  const get = (type: string): string =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('hour')}:${get('minute')}:${get('second')} ${get('timeZoneName')}`;
 }
 
 /** A step's moment in a side's recording: its time from the run's start, less the recording's. */
@@ -445,6 +540,7 @@ export function pacedTimeline(
         },
         ...side.steps.map((step, n) => ({
           step,
+          timing: stepTiming(sides, i, n),
           start: holdStarts[n],
           end: n + 1 < side.steps.length ? holdStarts[n + 1] : null,
         })),

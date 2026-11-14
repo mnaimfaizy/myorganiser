@@ -135,6 +135,8 @@ export interface RecordedRun {
    * recording and made into the MP4.
    */
   tabVideos?: TabRecording[];
+  /** The wall clock when the run began (`atMs` 0), epoch milliseconds. */
+  startedAtMs?: number;
 }
 
 /** The machine, as the runner sees it. The real one is in `tools/qa/qa-run.ts`. */
@@ -400,7 +402,11 @@ async function runScenarios(
         openedAtMs: 0,
       },
       ...(recorded.tabVideos ?? []),
-    ];
+    ].map((tab) =>
+      recorded.startedAtMs === undefined
+        ? tab
+        : { ...tab, startedAtMs: recorded.startedAtMs },
+    );
     const choice = mp4TabOf(scenario.tab, side, all);
     let tabNumber = 0;
     for (const tab of all) {
@@ -518,7 +524,8 @@ async function runScenarios(
     for (const side of SIDES) {
       const choice = mp4Tabs.get(scenario.id)?.[side];
       if (!choice?.ok || choice.label === undefined) continue;
-      const { device, tab, openedAtMs } = choice.recording;
+      const { device, tab, openedAtMs, startedAtMs } = choice.recording;
+      const clock = startedAtMs === undefined ? {} : { startedAtMs };
       // A label is built from its device and tab names, so a refused label
       // withholds all three.
       const refused = leakingFields.includes(
@@ -531,8 +538,9 @@ async function runScenarios(
             tab: WITHHELD_FIELD,
             label: WITHHELD_FIELD,
             openedAtMs,
+            ...clock,
           }
-        : { device, tab, label: choice.label, openedAtMs };
+        : { device, tab, label: choice.label, openedAtMs, ...clock };
     }
     // The declared tab is written even when no side built a label from it.
     const tabLeaks = leaks(scenario.tab, secrets);

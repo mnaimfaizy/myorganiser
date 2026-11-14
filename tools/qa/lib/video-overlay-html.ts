@@ -28,6 +28,10 @@ import {
   type AnnotatedVideoPlan,
   type CaptionWindow,
   type PacedTimeline,
+  type StepTiming,
+  formatClock,
+  formatDifference,
+  formatElapsed,
   VIDEO_BAND_HEIGHT,
   VIDEO_LABEL_HEIGHT,
   VIDEO_PANEL,
@@ -78,7 +82,9 @@ body{width:auto}
 .overlay-band .band h1{overflow:hidden;text-overflow:ellipsis}
 .overlay-label{background:transparent}
 .overlay-label .tag{display:inline-block;margin:${token('space-sm')};background:${roleColour('navy')};color:${roleColour('navy-foreground')};font-size:${token('type-label-sm-size')};font-weight:${token('font-weight-semibold')};letter-spacing:${token('type-label-caps-tracking')};padding:${token('space-xs')} ${token('space-sm')};border-radius:${token('radius-sm')};white-space:nowrap}
-.strip{box-sizing:border-box;height:${VIDEO_STRIP_HEIGHT}px;display:flex;align-items:center;gap:${token('space-sm')};padding:0 ${token('space-md')};background:${roleColour('card')};color:${roleColour('foreground')};border-top:1px solid ${roleColour('border')};font-size:${token('type-body-sm-size')};white-space:nowrap;overflow:hidden}
+.strip{box-sizing:border-box;height:${VIDEO_STRIP_HEIGHT}px;display:flex;flex-direction:column;justify-content:center;gap:${token('space-xs')};padding:0 ${token('space-md')};background:${roleColour('card')};color:${roleColour('foreground')};border-top:1px solid ${roleColour('border')};font-size:${token('type-body-sm-size')};white-space:nowrap;overflow:hidden}
+.strip .line{display:flex;align-items:center;gap:${token('space-sm')};min-width:0}
+.strip .timing{color:${roleColour('foreground-supporting')};font-size:${token('type-caption-size')};font-variant-numeric:tabular-nums}
 .strip.checked{background:${roleColour('warning-faint')}}
 .strip .n{font-weight:${token('font-weight-bold')};color:${roleColour('foreground-supporting')}}
 .strip .caption{overflow:hidden;text-overflow:ellipsis}
@@ -97,6 +103,27 @@ function page(
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${tokens}</style><style>${STORYBOARD_STYLE}</style><style>${OVERLAY_STYLE}</style></head><body class="${bodyClass}" style="width:${width}px;height:${height}px">${body}</body></html>`;
 }
 
+/** Shown in place of the clock time when a side's records have no wall-clock start. */
+export const NO_CLOCK_NOTE = 'clock time unavailable: older run';
+
+/** One step's timing line: clock with zone, elapsed, and After's difference from Before. */
+export function timingText(
+  timing: StepTiming,
+  timeZone: string | undefined,
+): string {
+  const parts: string[] = [];
+  parts.push(
+    timing.clockMs === undefined
+      ? NO_CLOCK_NOTE
+      : formatClock(timing.clockMs, timeZone),
+  );
+  parts.push(`${formatElapsed(timing.elapsedMs)} elapsed`);
+  if (timing.differenceMs !== undefined) {
+    parts.push(`After ${formatDifference(timing.differenceMs)}`);
+  }
+  return parts.join(' · ');
+}
+
 /** A side's label: its side, and the MP4's tab on that side. */
 export function labelText(side: VideoSide): string {
   return `${SIDE_TAG[side.side]} · ${side.label}`;
@@ -106,10 +133,11 @@ function stripHtml(
   side: VideoSide,
   window: CaptionWindow,
   checkedIndex: number,
+  timeZone: string | undefined,
 ): string {
   const { step } = window;
   if (step === null) {
-    return `<div class="strip" data-step="0"><span class="waiting">${escapeHtml(BEFORE_FIRST_STEP)}</span></div>`;
+    return `<div class="strip" data-step="0"><div class="line"><span class="waiting">${escapeHtml(BEFORE_FIRST_STEP)}</span></div></div>`;
   }
   const checked = step.index === checkedIndex;
   const elsewhere =
@@ -119,7 +147,10 @@ function stripHtml(
   const tag = checked
     ? `<span class="checked-tag">${escapeHtml(CHECKED_HERE)}</span>`
     : '';
-  return `<div class="strip${checked ? ' checked' : ''}" data-step="${step.index}"><span class="n">${step.index}</span><span class="caption">${escapeHtml(step.caption)}</span>${elsewhere}${tag}</div>`;
+  const timing = window.timing
+    ? `<div class="line"><span class="timing">${escapeHtml(timingText(window.timing, timeZone))}</span></div>`
+    : '';
+  return `<div class="strip${checked ? ' checked' : ''}" data-step="${step.index}"><div class="line"><span class="n">${step.index}</span><span class="caption">${escapeHtml(step.caption)}</span>${elsewhere}${tag}</div>${timing}</div>`;
 }
 
 /** Every overlay page one annotated MP4 needs, with `tokenCss` inlined. */
@@ -165,7 +196,7 @@ export function videoOverlayPages(
             'overlay-strip',
             width,
             VIDEO_STRIP_HEIGHT,
-            stripHtml(side, window, checkedIndex),
+            stripHtml(side, window, checkedIndex, plan.timeZone),
           ),
           width,
           height: VIDEO_STRIP_HEIGHT,

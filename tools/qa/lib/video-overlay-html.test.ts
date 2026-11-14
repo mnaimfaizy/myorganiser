@@ -12,12 +12,15 @@ import {
   type AnnotatedVideoPlan,
   type VideoSide,
   type VideoStep,
+  VIDEO_STRIP_HEIGHT,
   pacedTimeline,
 } from './qa-combine.ts';
 import {
   BEFORE_FIRST_STEP,
   CHECKED_HERE,
+  NO_CLOCK_NOTE,
   type OverlayPage,
+  timingText,
   videoOverlayPages,
 } from './video-overlay-html.ts';
 import type { Band } from './storyboard.ts';
@@ -183,14 +186,20 @@ describe('the label overlay', () => {
 });
 
 describe('the caption strips', () => {
-  test('each side has one opaque 1280 by 56 strip per caption window, the opening strip included', () => {
+  test('each side has one opaque 1280 wide strip of VIDEO_STRIP_HEIGHT per caption window, the opening strip included', () => {
     const [before, after] = pages.sides;
     assert.equal(before?.strips.length, 3);
     assert.equal(after?.strips.length, 2);
     for (const strip of [...(before?.strips ?? []), ...(after?.strips ?? [])]) {
       assert.equal(strip.width, 1280);
-      assert.equal(strip.height, 56);
+      assert.equal(strip.height, VIDEO_STRIP_HEIGHT);
       assert.equal(strip.transparent, false);
+      assert.ok(
+        strip.html.includes(
+          `style="width:1280px;height:${VIDEO_STRIP_HEIGHT}px"`,
+        ),
+        strip.html,
+      );
     }
   });
 
@@ -273,6 +282,227 @@ describe('the caption strips', () => {
     assert.equal(before?.strips[1]?.html.includes(CHECKED_HERE), false);
     assert.ok(after?.strips[1]?.html.includes(CHECKED_HERE));
     assert.equal(after?.strips[0]?.html.includes(CHECKED_HERE), false);
+  });
+});
+
+/** The run's wall clock start: 2 January 2026, 03:04:05 UTC. */
+const START = Date.UTC(2026, 0, 2, 3, 4, 5);
+
+/** A caption long enough to need most of a strip's width, with no markup in it. */
+const LONG_CAPTION =
+  'open the saved item, check every field against the form, then wait for the confirmation to appear before leaving the page';
+
+/**
+ * PLAN with both sides' clocks saved and its zone pinned to UTC. Before's step 1
+ * is at 1.5 s and After's at 2 s, so After is 0.5 s later on the same step.
+ */
+const CLOCKED: AnnotatedVideoPlan = {
+  ...PLAN,
+  timeZone: 'UTC',
+  sides: [
+    { ...BEFORE, startedAtMs: START },
+    { ...AFTER, startedAtMs: START + 1000 },
+  ],
+};
+const clockedPages = videoOverlayPages(CLOCKED, TOKENS, timelineOf(CLOCKED));
+
+describe("timingText: what a step's timing line says", () => {
+  test("the wall clock, the elapsed time and After's difference, joined by middle dots", () => {
+    assert.equal(
+      timingText(
+        { elapsedMs: 1500, clockMs: START + 1500, differenceMs: 500 },
+        'UTC',
+      ),
+      '03:04:06 UTC · 0:01.5 elapsed · After +0.5 s',
+    );
+  });
+
+  test('with no clock, the note stands in for the clock; with no difference there is no After part', () => {
+    assert.equal(
+      timingText({ elapsedMs: 1500 }, 'UTC'),
+      'clock time unavailable: older run · 0:01.5 elapsed',
+    );
+    assert.equal(NO_CLOCK_NOTE, 'clock time unavailable: older run');
+  });
+});
+
+describe('the timing line of a caption strip', () => {
+  test("a step's strip has a second line: the wall clock in the plan's zone, then the elapsed time", () => {
+    const [, beforeStep1] = clockedPages.sides[0]?.strips ?? [];
+    assert.ok(
+      beforeStep1?.html.includes(
+        '<span class="timing">03:04:06 UTC · 0:01.5 elapsed</span>',
+      ),
+      beforeStep1?.html,
+    );
+    assert.equal(
+      beforeStep1?.html.includes('After'),
+      false,
+      'Before has no difference',
+    );
+  });
+
+  test("After's strip adds its difference from Before at the same step", () => {
+    const [, afterStep1] = clockedPages.sides[1]?.strips ?? [];
+    assert.ok(
+      afterStep1?.html.includes(
+        '<span class="timing">03:04:08 UTC · 0:02.0 elapsed · After +0.5 s</span>',
+      ),
+      afterStep1?.html,
+    );
+  });
+
+  test('a side with no saved start shows the note in place of the clock, and still shows its elapsed time and difference', () => {
+    const [, beforeStep1] = pages.sides[0]?.strips ?? [];
+    const [, afterStep1] = pages.sides[1]?.strips ?? [];
+    assert.ok(
+      beforeStep1?.html.includes(
+        '<span class="timing">clock time unavailable: older run · 0:01.5 elapsed</span>',
+      ),
+      beforeStep1?.html,
+    );
+    assert.ok(
+      afterStep1?.html.includes(
+        '<span class="timing">clock time unavailable: older run · 0:02.0 elapsed · After +0.5 s</span>',
+      ),
+      afterStep1?.html,
+    );
+  });
+
+  test("the clock is written in the plan's zone, so the same instant reads in another zone", () => {
+    const sydney: AnnotatedVideoPlan = {
+      ...CLOCKED,
+      timeZone: 'Australia/Sydney',
+    };
+    const out = videoOverlayPages(sydney, TOKENS, timelineOf(sydney));
+    const [, beforeStep1] = out.sides[0]?.strips ?? [];
+    assert.ok(
+      beforeStep1?.html.includes('14:04:06 AEDT · 0:01.5 elapsed'),
+      beforeStep1?.html,
+    );
+  });
+
+  test('a single-side run shows its clock and elapsed time, and no difference', () => {
+    const alone: AnnotatedVideoPlan = {
+      ...CLOCKED,
+      sides: [{ ...AFTER, startedAtMs: START + 1000 }],
+    };
+    const out = videoOverlayPages(alone, TOKENS, timelineOf(alone));
+    const [, step1] = out.sides[0]?.strips ?? [];
+    assert.ok(
+      step1?.html.includes(
+        '<span class="timing">03:04:08 UTC · 0:02.0 elapsed</span>',
+      ),
+      step1?.html,
+    );
+    assert.equal(step1?.html.includes('After +'), false);
+  });
+
+  test('the timing span holds exactly the timing text, with no markup inside it', () => {
+    const [, step1] = clockedPages.sides[1]?.strips ?? [];
+    const timing = /<span class="timing">([^<]*)<\/span>/.exec(
+      step1?.html ?? '',
+    );
+    // After's clock starts at START + 1000, so its 2 s step is at START + 3000.
+    assert.equal(
+      timing?.[1],
+      timingText(
+        { elapsedMs: 2000, clockMs: START + 3000, differenceMs: 500 },
+        'UTC',
+      ),
+    );
+  });
+
+  test('a step strip is two lines, the caption first and whole on its own line, and the opening strip is one line', () => {
+    const long: AnnotatedVideoPlan = {
+      ...CLOCKED,
+      sides: [
+        {
+          ...BEFORE,
+          startedAtMs: START,
+          steps: [
+            { ...BEFORE.steps[0], caption: LONG_CAPTION },
+            BEFORE.steps[1],
+          ],
+        },
+        AFTER,
+      ],
+    };
+    const out = videoOverlayPages(long, TOKENS, timelineOf(long));
+    const [opening, step1, step2] = out.sides[0]?.strips ?? [];
+    assert.equal(
+      (opening?.html.match(/class="line"/g) ?? []).length,
+      1,
+      'the opening strip is one line',
+    );
+    for (const strip of [step1, step2]) {
+      assert.equal(
+        (strip?.html.match(/class="line"/g) ?? []).length,
+        2,
+        'a step strip is two lines',
+      );
+    }
+    assert.ok(
+      step1?.html.includes(
+        `<div class="line"><span class="n">1</span><span class="caption">${LONG_CAPTION}</span>`,
+      ),
+      step1?.html,
+    );
+    assert.ok(
+      (step1?.html.indexOf('class="caption"') ?? -1) <
+        (step1?.html.indexOf('class="timing"') ?? 0),
+      'the caption line comes before the timing line',
+    );
+  });
+});
+
+describe('the timing line when only one side has a saved clock start', () => {
+  test('a side without a clock start shows the note with its elapsed time, and After adds its difference; the side with a clock shows its clock', () => {
+    // Before has its clock (step 1 at 1.5 s, 03:04:06 UTC); After has none
+    // (step 1 at 2.0 s), so its strip shows the note and the difference.
+    const mixed: AnnotatedVideoPlan = {
+      ...PLAN,
+      timeZone: 'UTC',
+      sides: [{ ...BEFORE, startedAtMs: START }, AFTER],
+    };
+    const out = videoOverlayPages(mixed, TOKENS, timelineOf(mixed));
+    const [, beforeStep1] = out.sides[0]?.strips ?? [];
+    const [, afterStep1] = out.sides[1]?.strips ?? [];
+    assert.ok(
+      beforeStep1?.html.includes(
+        '<span class="timing">03:04:06 UTC · 0:01.5 elapsed</span>',
+      ),
+      beforeStep1?.html,
+    );
+    assert.equal(beforeStep1?.html.includes(NO_CLOCK_NOTE), false);
+    assert.ok(
+      afterStep1?.html.includes(
+        `<span class="timing">${NO_CLOCK_NOTE} · 0:02.0 elapsed · After +0.5 s</span>`,
+      ),
+      afterStep1?.html,
+    );
+
+    // The other way round: After has its clock, Before has none.
+    const reversed: AnnotatedVideoPlan = {
+      ...PLAN,
+      timeZone: 'UTC',
+      sides: [BEFORE, { ...AFTER, startedAtMs: START + 1000 }],
+    };
+    const back = videoOverlayPages(reversed, TOKENS, timelineOf(reversed));
+    const [, noClockStep1] = back.sides[0]?.strips ?? [];
+    const [, clockStep1] = back.sides[1]?.strips ?? [];
+    assert.ok(
+      noClockStep1?.html.includes(
+        `<span class="timing">${NO_CLOCK_NOTE} · 0:01.5 elapsed</span>`,
+      ),
+      noClockStep1?.html,
+    );
+    assert.ok(
+      clockStep1?.html.includes(
+        '<span class="timing">03:04:08 UTC · 0:02.0 elapsed · After +0.5 s</span>',
+      ),
+      clockStep1?.html,
+    );
   });
 });
 

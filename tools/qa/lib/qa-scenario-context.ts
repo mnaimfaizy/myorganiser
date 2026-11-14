@@ -76,6 +76,12 @@ export interface TabRecording {
   path: string | null;
   /** When the tab's recording starts, in milliseconds from the run's start. */
   openedAtMs: number;
+  /**
+   * The wall clock at the run's start (`atMs` 0), epoch milliseconds, the
+   * same for every tab of a side. Set by the runner on the recordings it
+   * keeps; absent on records from before it was saved.
+   */
+  startedAtMs?: number;
 }
 
 export interface DeviceRegistry {

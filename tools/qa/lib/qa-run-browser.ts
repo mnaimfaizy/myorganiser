@@ -211,6 +211,7 @@ export function chromiumRunner(
         calls,
         denied: [...denied],
         ...(tabVideos.length === 0 ? {} : { tabVideos }),
+        startedAtMs: startedAt,
       };
     } finally {
       await browser.close();

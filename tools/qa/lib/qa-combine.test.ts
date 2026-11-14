@@ -26,10 +26,14 @@ import {
   buildAnnotatedVideoArgs,
   durationFromPackets,
   enableExpression,
+  formatClock,
+  formatDifference,
+  formatElapsed,
   pacedTimeline,
   parseStepRecords,
   probeDurationArgs,
   resultOf,
+  stepTiming,
 } from './qa-combine.ts';
 import type { Band } from './storyboard.ts';
 
@@ -914,6 +918,208 @@ describe('probeDurationArgs: the ffprobe arguments that read the packet times', 
       'csv=p=0',
       '/work/before.webm',
     ]);
+  });
+});
+
+/** A run's wall clock start: 2 January 2026, 03:04:05 UTC. */
+const START = Date.UTC(2026, 0, 2, 3, 4, 5);
+
+describe('parseStepRecords: a video side keeps its clock start, which is optional', () => {
+  const videoWith = (side: Record<string, unknown>) =>
+    recordsJson({
+      capture: 'video',
+      video: {
+        tab: 'A',
+        sides: {
+          before: {
+            device: 'A',
+            tab: 'A',
+            label: 'Device A',
+            openedAtMs: 0,
+            ...side,
+          },
+        },
+      },
+    });
+
+  test('a side saved with its clock start keeps it as a number', () => {
+    const records = parse(videoWith({ startedAtMs: START }));
+    assert.equal(records.video?.sides.before?.startedAtMs, START);
+  });
+
+  test('a side saved before the clock start existed parses, with no startedAtMs', () => {
+    const records = parse(videoWith({}));
+    assert.equal(records.video?.sides.before?.openedAtMs, 0);
+    assert.equal('startedAtMs' in (records.video?.sides.before ?? {}), false);
+  });
+
+  test('a clock start that is not a number is a malformed video block', () => {
+    for (const wrong of ['1767323045000', null, true]) {
+      assert.throws(() => parse(videoWith({ startedAtMs: wrong })), {
+        name: 'CombineInputError',
+        message: `${RECORDS_FILE} is not a step-records file: its video block is malformed`,
+      });
+    }
+  });
+
+  test('a clock start that is not finite is a malformed video block', () => {
+    // JSON.stringify cannot write Infinity, so the raw text carries 1e999,
+    // which JSON.parse reads as Infinity.
+    const raw = videoWith({ startedAtMs: null }).replace(
+      '"startedAtMs":null',
+      '"startedAtMs":1e999',
+    );
+    assert.notEqual(
+      raw,
+      videoWith({ startedAtMs: null }),
+      'the raw text changed',
+    );
+    assert.throws(() => parse(raw), {
+      name: 'CombineInputError',
+      message: `${RECORDS_FILE} is not a step-records file: its video block is malformed`,
+    });
+  });
+});
+
+describe('formatElapsed, formatDifference and formatClock: how each part is written', () => {
+  test('elapsed time is minutes, seconds and tenths, with an hour part from an hour on', () => {
+    assert.equal(formatElapsed(0), '0:00.0');
+    assert.equal(formatElapsed(14949), '0:14.9');
+    assert.equal(formatElapsed(59960), '1:00.0');
+    assert.equal(formatElapsed(3599900), '59:59.9');
+    assert.equal(formatElapsed(3723000), '1:02:03.0');
+    assert.equal(formatElapsed(-5), '0:00.0');
+  });
+
+  test('a difference is signed to the tenth of a second, and a zero difference is never minus', () => {
+    assert.equal(formatDifference(1300), '+1.3 s');
+    assert.equal(formatDifference(-1300), '-1.3 s');
+    assert.equal(formatDifference(60), '+0.1 s');
+    assert.equal(formatDifference(-60), '-0.1 s');
+    assert.equal(formatDifference(0), '+0.0 s');
+    assert.equal(formatDifference(-40), '+0.0 s');
+  });
+
+  test('a clock time is written in the zone it is given, with the zone short name', () => {
+    const instant = Date.UTC(2026, 0, 2, 3, 40, 41);
+    assert.equal(formatClock(instant, 'UTC'), '03:40:41 UTC');
+    assert.equal(formatClock(instant, 'Australia/Sydney'), '14:40:41 AEDT');
+    assert.equal(
+      formatClock(Date.UTC(2026, 5, 2, 4, 40, 41), 'Australia/Sydney'),
+      '14:40:41 AEST',
+    );
+    assert.equal(formatClock(Date.UTC(2026, 0, 2), 'UTC'), '00:00:00 UTC');
+    assert.equal(formatClock(START, 'Asia/Kolkata'), '08:34:05 GMT+5:30');
+  });
+
+  test('with no zone given, a clock time is written in the machine zone', () => {
+    const saved = process.env.TZ;
+    process.env.TZ = 'Australia/Sydney';
+    try {
+      assert.equal(
+        formatClock(Date.UTC(2026, 0, 2, 3, 40, 41)),
+        '14:40:41 AEDT',
+      );
+    } finally {
+      if (saved === undefined) delete process.env.TZ;
+      else process.env.TZ = saved;
+    }
+  });
+});
+
+describe("stepTiming: each step's elapsed time, wall clock, and After's difference from Before", () => {
+  test('a side with a saved start gives each step its elapsed time and its wall clock, the start plus the step time', () => {
+    const sides = [
+      {
+        ...sideOf('before', 0, [stepAt(1, 1500), stepAt(2, 4000)]),
+        startedAtMs: START,
+      },
+    ];
+    assert.deepEqual(stepTiming(sides, 0, 0), {
+      elapsedMs: 1500,
+      clockMs: START + 1500,
+    });
+    assert.deepEqual(stepTiming(sides, 0, 1), {
+      elapsedMs: 4000,
+      clockMs: START + 4000,
+    });
+  });
+
+  test("After's difference is its step's time less Before's step at the same position: later is plus, earlier is minus", () => {
+    const sides = [
+      sideOf('before', 0, [stepAt(1, 1500), stepAt(2, 4000)]),
+      sideOf('after', 0, [stepAt(1, 2500), stepAt(2, 3000)]),
+    ];
+    assert.equal(stepTiming(sides, 1, 0)?.differenceMs, 1000);
+    assert.equal(stepTiming(sides, 1, 1)?.differenceMs, -1000);
+  });
+
+  test('Before never has a difference, and a single-side run (After only) has none either', () => {
+    const both = [
+      sideOf('before', 0, [stepAt(1, 1500)]),
+      sideOf('after', 0, [stepAt(1, 2500)]),
+    ];
+    assert.equal('differenceMs' in (stepTiming(both, 0, 0) ?? {}), false);
+    const afterOnly = [sideOf('after', 0, [stepAt(1, 2500)])];
+    assert.deepEqual(stepTiming(afterOnly, 0, 0), { elapsedMs: 2500 });
+  });
+
+  test("a step past Before's last step has no difference, but keeps its elapsed time and clock", () => {
+    const sides = [
+      { ...sideOf('before', 0, [stepAt(1, 1500)]), startedAtMs: START },
+      {
+        ...sideOf('after', 0, [stepAt(1, 2500), stepAt(2, 3000)]),
+        startedAtMs: START,
+      },
+    ];
+    assert.equal(stepTiming(sides, 1, 0)?.differenceMs, 1000);
+    assert.deepEqual(stepTiming(sides, 1, 1), {
+      elapsedMs: 3000,
+      clockMs: START + 3000,
+    });
+  });
+
+  test('a side with no saved start has no clock time, and its elapsed time and difference are still given', () => {
+    const sides = [
+      sideOf('before', 0, [stepAt(1, 1500)]),
+      sideOf('after', 0, [stepAt(1, 2500)]),
+    ];
+    assert.deepEqual(stepTiming(sides, 0, 0), { elapsedMs: 1500 });
+    assert.deepEqual(stepTiming(sides, 1, 0), {
+      elapsedMs: 2500,
+      differenceMs: 1000,
+    });
+  });
+
+  test("a step index past a side's last step has no timing", () => {
+    assert.equal(
+      stepTiming([sideOf('before', 0, [stepAt(1, 1500)])], 0, 1),
+      undefined,
+    );
+  });
+
+  test('each step window carries its step timing, and the opening strip carries none', () => {
+    const sides = [
+      {
+        ...sideOf('before', 0, [stepAt(1, 1500), stepAt(2, 4000)]),
+        startedAtMs: START,
+      },
+      {
+        ...sideOf('after', 0, [stepAt(1, 2500)]),
+        startedAtMs: START,
+      },
+    ];
+    const [before, after] = pacedTimeline(sides, [6, 3]).sides;
+    assert.equal(before?.windows[0]?.timing, undefined, 'the opening strip');
+    assert.deepEqual(before?.windows[2]?.timing, {
+      elapsedMs: 4000,
+      clockMs: START + 4000,
+    });
+    assert.deepEqual(after?.windows[1]?.timing, {
+      elapsedMs: 2500,
+      clockMs: START + 2500,
+      differenceMs: 1000,
+    });
   });
 });
 

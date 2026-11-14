@@ -321,6 +321,26 @@ describe('what a run records of its calls and observation', () => {
     );
   });
 
+  test('a run records the wall clock it began at, and its steps count their times from that same instant', async () => {
+    const start = Date.UTC(2026, 0, 2, 3, 4, 5);
+    // The first Date.now() is the run's start (qa-run-browser.ts), the next is
+    // the step's time, 1.5 s on; later reads stay at the last value.
+    const readings = [start, start + 1500];
+    let reads = 0;
+    mock.method(
+      Date,
+      'now',
+      () => readings[Math.min(reads++, readings.length - 1)],
+    );
+    const run = await playWith(fakeBrowser([]), async (context) => {
+      await context.step(context.page, 'the first screen');
+    });
+
+    assert.equal(run.outcome, 'pass');
+    assert.equal(run.startedAtMs, start);
+    assert.equal(run.steps[0]?.atMs, 1500);
+  });
+
   test('what a passing scenario passes to observed is the run observation when it returns nothing', async () => {
     const run = await playWith(fakeBrowser([]), async (context) => {
       context.observed('seen');
