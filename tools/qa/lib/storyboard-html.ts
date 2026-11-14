@@ -25,7 +25,7 @@ import { VIEWPORT } from './qa-run.ts';
 import type { StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
-import { cropFor } from './storyboard-crop.ts';
+import { CROP, cropFor, OUTLINE_OFFSET } from './storyboard-crop.ts';
 import {
   type Band,
   MARK_TEXT,
@@ -201,7 +201,7 @@ body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:$
 .stills{display:grid;grid-template-columns:repeat(var(--columns),1fr);gap:${token('space-md')}}
 .still{position:relative;border:1px solid ${roleColour('border')};border-radius:${token('radius-md')};overflow:hidden;background:${roleColour('background')}}
 .still img{position:absolute;max-width:none}
-.outline{position:absolute;border:3px solid ${roleColour('warning')};border-radius:${token('radius-md')}}
+.outline{position:absolute;outline:${CROP.outlineStroke}px solid ${roleColour('warning')};outline-offset:${CROP.outlineGap}px;border-radius:${token('radius-md')}}
 .tags{position:absolute;left:${token('space-sm')};top:${token('space-sm')};display:flex;gap:${token('space-xs')}}
 .label,.unsettled,.side-tag{font-size:${token('type-label-caps-size')};font-weight:${token('font-weight-semibold')};padding:${token('space-xs')} ${token('space-sm')};border-radius:${token('radius-sm')}}
 .label{background:${roleColour('brand')};color:${roleColour('brand-foreground')}}
@@ -241,8 +241,10 @@ function stillHtml(
   const { crop, outline } = cropFor(step.subject);
   // The still is the full viewport; the crop is scaled to fill the cell.
   const image = `<img src="${escapeHtml(stillUrl(step))}" alt="" style="width:${pct(VIEWPORT.width, crop.width)};left:-${pct(crop.x, crop.width)};top:-${pct(crop.y, crop.height)}">`;
+  // The div is the subject's own box; the CSS outline draws the stroke and
+  // gap outside it at a fixed pixel size, so scaling the cell never closes the gap.
   const box = outline
-    ? `<div class="outline" style="left:${pct(outline.x, crop.width)};top:${pct(outline.y, crop.height)};width:${pct(outline.width, crop.width)};height:${pct(outline.height, crop.height)}"></div>`
+    ? `<div class="outline" style="left:${pct(outline.x + OUTLINE_OFFSET, crop.width)};top:${pct(outline.y + OUTLINE_OFFSET, crop.height)};width:${pct(outline.width - 2 * OUTLINE_OFFSET, crop.width)};height:${pct(outline.height - 2 * OUTLINE_OFFSET, crop.height)}"></div>`
     : '';
   const ownCaption =
     step.caption === rowCaption
