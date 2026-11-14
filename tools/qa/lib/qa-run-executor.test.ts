@@ -292,6 +292,25 @@ function kept(fake: ReturnType<typeof fakeRun>): string[] {
   return [...fake.disk].sort();
 }
 
+/**
+ * Every text the run writes or prints, which a known value must not reach:
+ * each written file's path and text, each path listed in run.json, and what
+ * was printed. A path in `ownerOnly` may hold the value (the owner-only copy of
+ * a withheld message, #1554), so its text is left out.
+ */
+function everyOutput(
+  fake: ReturnType<typeof fakeRun>,
+  ownerOnly: readonly string[] = [],
+): string[] {
+  const listed = manifestOf(fake).scenarios.flatMap((s) =>
+    s.files.map(({ path }) => path),
+  );
+  const written = [...fake.files].flatMap(([path, text]) =>
+    ownerOnly.includes(path) ? [path] : [path, text],
+  );
+  return [...written, ...listed, ...fake.out, ...fake.err];
+}
+
 /** The Storyboard PNG a screen run with both sides renders. */
 const storyboardPng = (id: string): string => `${OUT}/combined/${id}.png`;
 
@@ -1536,14 +1555,9 @@ describe("the run's printed output", () => {
   });
 });
 
-/** A tab's recording as the runner keeps it: under `local/`, numbered per run. */
-const tabLocal = (
-  id: string,
-  side: Side,
-  n: number,
-  device: string,
-  tab: string,
-): string => `${OUT}/local/${id}-${side}-tab${n}-${device}-${tab}.webm`;
+/** A tab's recording as the runner keeps it: under `local/`, by side and tab number only (#1554). */
+const tabLocal = (id: string, side: Side, n: number): string =>
+  `${OUT}/local/${id}-${side}-tab${n}.webm`;
 
 /** A tab's recording as the browser wrote it, in the side's work directory. */
 const tabWork = (id: string, side: Side, device: string, tab: string): string =>
@@ -1586,10 +1600,10 @@ describe('a tab other than the default is recorded locally and never offered', (
     );
     const tabFiles = entry?.files.filter((file) => file.path.includes('-tab'));
     const expected = [
-      tabLocal('V', 'before', 1, 'B', 'B1'),
-      tabLocal('V', 'before', 2, 'B', 'B2'),
-      tabLocal('V', 'after', 1, 'B', 'B1'),
-      tabLocal('V', 'after', 2, 'B', 'B2'),
+      tabLocal('V', 'before', 1),
+      tabLocal('V', 'before', 2),
+      tabLocal('V', 'after', 1),
+      tabLocal('V', 'after', 2),
     ];
     assert.deepEqual(
       tabFiles?.map((file) => file.path).sort(),
@@ -1628,24 +1642,24 @@ describe('a tab other than the default is recorded locally and never offered', (
 
     const [entry] = manifestOf(fake).scenarios;
     assert.deepEqual(entry?.problems, [
-      'after: no video was recorded for device B, tab B2',
+      'after: no video was recorded for tab 2',
     ]);
     assert.match(
       fake.err.join('\n'),
-      /qa:run: N: after: no video was recorded for device B, tab B2/,
+      /qa:run: N: after: no video was recorded for tab 2/,
     );
     assert.deepEqual(
       entry?.files.filter((file) => file.path.includes('-tab')),
       [
         {
-          path: tabLocal('N', 'after', 1, 'B', 'B1'),
+          path: tabLocal('N', 'after', 1),
           place: 'local',
           uploadEligible: false,
         },
       ],
       'the tab with a recording is still kept, and the missing one is not',
     );
-    assert.ok(kept(fake).includes(tabLocal('N', 'after', 1, 'B', 'B1')));
+    assert.ok(kept(fake).includes(tabLocal('N', 'after', 1)));
   });
 
   test('a run with no other tab keeps only what its line asks for, plus its step records, and makes the MP4 from the same two recordings', async () => {
@@ -1914,31 +1928,13 @@ describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused
     sides: Record<string, { steps: { caption: string }[] }>;
   }
 
-  /**
-   * Every text the run writes or prints, which a denied value must not reach:
-   * each written file's path and text, each path listed in run.json, and what
-   * was printed.
-   */
-  function everyOutput(fake: ReturnType<typeof fakeRun>): string[] {
-    const listed = manifestOf(fake).scenarios.flatMap((s) =>
-      s.files.map(({ path }) => path),
-    );
-    return [
-      ...fake.files.keys(),
-      ...fake.files.values(),
-      ...listed,
-      ...fake.out,
-      ...fake.err,
-    ];
-  }
-
   function problemsOf(fake: ReturnType<typeof fakeRun>, id: string): string[] {
     const entry = manifestOf(fake).scenarios.find((s) => s.id === id);
     assert.ok(entry !== undefined, `${id} is in run.json`);
     return entry.problems;
   }
 
-  test('a caption holding a denied value refuses a screenshot: no PNG, the step records hold [withheld] and name the field, and run.json withholds the message', async () => {
+  test('a caption holding a denied value refuses a screenshot: no PNG, the step records hold [withheld] and name the field, and a harmless message stays verbatim in run.json', async () => {
     const fake = fakeRun({
       exports: filesOf(scenario('S', 'screenshot')),
       runs: (_id, side) =>
@@ -1962,7 +1958,13 @@ describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused
     assert.equal(records.sides.before?.steps[0].caption, '[withheld]');
 
     const [entry] = manifestOf(fake).scenarios;
-    assert.equal(entry.runs.before?.message, '[withheld]');
+    // The message holds no known value, so the run-wide rule (#1554) keeps it.
+    assert.equal(entry.runs.before?.message, 'the defect shows here');
+    assert.equal(
+      fake.files.has(`${OUT}/local/S-before.message.txt`),
+      false,
+      'a harmless message is kept in no message file',
+    );
     assert.deepEqual(entry.problems, [
       'the Storyboard was refused: a secret or credential is in S before step 1 caption',
     ]);
@@ -2104,7 +2106,7 @@ describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused
     );
   });
 
-  test('a failure message holding a denied value is named, withheld from run.json, and kept out of every output', async () => {
+  test('a failure message holding a denied value is withheld from run.json, kept owner-only under local/, and kept out of every other output', async () => {
     const fake = fakeRun({
       exports: filesOf(scenario('S', 'screenshot')),
       runs: (_id, side) =>
@@ -2126,8 +2128,21 @@ describe('a Storyboard that holds a denied value, or a Bearer or JWT, is refused
       'S after message',
     ]);
     const [entry] = manifestOf(fake).scenarios;
-    assert.equal(entry.runs.after?.message, '[withheld]');
-    for (const text of everyOutput(fake)) {
+    const messageFile = `${OUT}/local/S-after.message.txt`;
+    assert.equal(
+      entry.runs.after?.message,
+      '[withheld: it holds a secret or credential; the message is in local/S-after.message.txt]',
+    );
+    assert.equal(
+      fake.files.get(messageFile),
+      `the label is gone after ${DENIED}\n`,
+      'the raw message is kept owner-only',
+    );
+    assert.deepEqual(
+      entry.files.find(({ path }) => path === messageFile),
+      { path: messageFile, place: 'local', uploadEligible: false },
+    );
+    for (const text of everyOutput(fake, [messageFile])) {
       assert.equal(text.includes(DENIED), false, 'the value is in no output');
     }
   });
@@ -2415,5 +2430,304 @@ describe('the step records a video scenario saves for its re-render (PRD #1550)'
     );
     assert.deepEqual(re.annotations, []);
     assert.equal(re.disk.has(storyboardPng('S')), true);
+  });
+});
+
+describe('run.json and transcripts hold no known secret (#1554)', () => {
+  // Fixture values only, each kept at 15 characters or fewer.
+  /** An account password a scenario registers as denied. */
+  const PASSWORD = 'hunter2-fake';
+  /** A value a scenario passes to `secret()`. */
+  const VALUE = 'fixture-val-1';
+  /** A value only one scenario registers, to show the set is the whole run's. */
+  const SHARED = 'shared-fixt-01';
+  // A JWT shape built at runtime: a readable header prefix, two dotted segments.
+  const JWT = ['eyJ'.concat('a'.repeat(8)), 'b'.repeat(8), 'c2ln'].join('.');
+  const WITHHELD_PROBLEM = '[withheld: it holds a secret or credential]';
+
+  const messageFile = (id: string, side: Side): string =>
+    `${OUT}/local/${id}-${side}.message.txt`;
+
+  /**
+   * A withheld message: run.json names its owner-only file in place of the
+   * text, the raw message is in that file alone, and the file is local.
+   */
+  function assertMessageWithheld(
+    fake: ReturnType<typeof fakeRun>,
+    id: string,
+    side: Side,
+    raw: string,
+  ): void {
+    const entry = manifestOf(fake).scenarios.find((s) => s.id === id);
+    assert.ok(entry !== undefined, `${id} is in run.json`);
+    assert.equal(
+      entry.runs[side]?.message,
+      `[withheld: it holds a secret or credential; the message is in local/${id}-${side}.message.txt]`,
+    );
+    assert.equal(fake.files.get(messageFile(id, side)), `${raw}\n`);
+    assert.deepEqual(
+      entry.files.find(({ path }) => path === messageFile(id, side)),
+      { path: messageFile(id, side), place: 'local', uploadEligible: false },
+    );
+  }
+
+  test('a transcript failure message holding the account password is withheld from run.json, and its raw text is kept owner-only', async () => {
+    const message = `login refused for ${PASSWORD}`;
+    const fake = fakeRun({
+      exports: filesOf(scenario('X', 'transcript')),
+      runs: (id, side) =>
+        side === 'before'
+          ? { outcome: 'fail', message, denied: [PASSWORD] }
+          : { ...reproduced(id, side), denied: [PASSWORD] },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assertMessageWithheld(fake, 'X', 'before', message);
+    for (const text of everyOutput(fake, [messageFile('X', 'before')])) {
+      assert.equal(
+        text.includes(PASSWORD),
+        false,
+        'the password is in no output',
+      );
+    }
+  });
+
+  test('a none scenario whose failure message holds a value passed to secret() is withheld the same way', async () => {
+    const message = `could not type ${VALUE}`;
+    const fake = fakeRun({
+      exports: filesOf(scenario('N', 'none')),
+      runs: (id, side) =>
+        side === 'before'
+          ? { outcome: 'fail', message, denied: [VALUE] }
+          : { ...reproduced(id, side), denied: [VALUE] },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assertMessageWithheld(fake, 'N', 'before', message);
+    for (const text of everyOutput(fake, [messageFile('N', 'before')])) {
+      assert.equal(text.includes(VALUE), false, 'the value is in no output');
+    }
+  });
+
+  test('a failure message holding a JWT is withheld by the detector even with no denied value supplied', async () => {
+    const message = `the fix sent ${JWT}`;
+    const fake = fakeRun({
+      exports: filesOf(scenario('N', 'none')),
+      runs: (id, side) =>
+        side === 'before' ? { outcome: 'fail', message } : reproduced(id, side),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assertMessageWithheld(fake, 'N', 'before', message);
+    for (const text of everyOutput(fake, [messageFile('N', 'before')])) {
+      assert.equal(text.includes(JWT), false, 'the JWT is in no output');
+    }
+  });
+
+  test('a failure message holding a JWT in a transcript scenario is withheld the same way', async () => {
+    const message = `the fix sent ${JWT}`;
+    const fake = fakeRun({
+      exports: filesOf(scenario('X', 'transcript')),
+      runs: (id, side) =>
+        side === 'before' ? { outcome: 'fail', message } : reproduced(id, side),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assertMessageWithheld(fake, 'X', 'before', message);
+    for (const text of everyOutput(fake, [messageFile('X', 'before')])) {
+      assert.equal(text.includes(JWT), false, 'the JWT is in no output');
+    }
+  });
+
+  test('a harmless failure message on a none scenario is kept verbatim in run.json, and no message file is written', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('N', 'none')),
+      runs: reproduced,
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.equal(entry.runs.before?.message, 'the defect shows here');
+    assert.equal(
+      [...fake.files.keys()].some((path) => path.endsWith('.message.txt')),
+      false,
+      'no message file is written',
+    );
+    assert.equal(
+      entry.files.some(({ path }) => path.endsWith('.message.txt')),
+      false,
+      'no message file is listed',
+    );
+  });
+
+  test('a message is withheld when its value is one only another scenario registered: the set is the whole run', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('X', 'none'), scenario('Y', 'none')),
+      runs: (id, side) => {
+        if (id === 'Y') {
+          return side === 'before'
+            ? {
+                outcome: 'fail',
+                message: 'the defect shows here',
+                denied: [SHARED],
+              }
+            : reproduced(id, side);
+        }
+        return side === 'before'
+          ? { outcome: 'fail', message: `still shows ${SHARED}` }
+          : reproduced(id, side);
+      },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    assertMessageWithheld(fake, 'X', 'before', `still shows ${SHARED}`);
+    const y = manifestOf(fake).scenarios.find((s) => s.id === 'Y');
+    assert.equal(y?.runs.before?.message, 'the defect shows here');
+    for (const text of everyOutput(fake, [messageFile('X', 'before')])) {
+      assert.equal(
+        text.includes(SHARED),
+        false,
+        'the shared value is in no output',
+      );
+    }
+  });
+
+  test('a problem holding a known value is replaced by the problem marker in run.json and on stderr', async () => {
+    // The MP4 tab's name is in its "no tab was opened" problem on each side.
+    const tab = `B1-${VALUE}`;
+    const fake = fakeRun({
+      exports: filesOf({ ...scenario('V', 'video'), tab }),
+      runs: (id, side) => ({ ...reproduced(id, side), denied: [VALUE] }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+
+    const [entry] = manifestOf(fake).scenarios;
+    assert.deepEqual(entry.problems, [WITHHELD_PROBLEM, WITHHELD_PROBLEM]);
+    assert.ok(
+      fake.err.includes(`qa:run: V: ${WITHHELD_PROBLEM}`),
+      'stderr names the withheld problem',
+    );
+    // Every output: run.json, the printed lines and the local step records
+    // (steps/V.json), which hold the declared tab as `[withheld]` (#1554).
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(VALUE), false, 'the value is in no output');
+    }
+  });
+
+  test('a Request Transcript holding a known value under a safe key withholds it: the transcript never shows the value', async () => {
+    const calls: RecordedCall[] = [
+      {
+        request: {
+          method: 'POST',
+          path: '/api/v1/items',
+          body: { name: PASSWORD },
+        },
+        response: { status: 200, body: { message: `saved ${VALUE}` } },
+      },
+    ];
+    const fake = fakeRun({
+      exports: filesOf(scenario('X', 'transcript')),
+      runs: (id, side) =>
+        side === 'before'
+          ? { ...reproduced(id, side), calls, denied: [PASSWORD, VALUE] }
+          : { observed: 'the fix shows here', calls: [] },
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    const transcript = fake.files.get(`${OUT}/transcripts/X.md`);
+    assert.ok(transcript !== undefined, 'the transcript was written');
+    assert.match(transcript, /"name": "\[withheld\]"/);
+    assert.match(transcript, /"message": "\[withheld\]"/);
+    for (const text of everyOutput(fake)) {
+      assert.equal(
+        text.includes(PASSWORD),
+        false,
+        'the password is in no output',
+      );
+      assert.equal(text.includes(VALUE), false, 'the value is in no output');
+    }
+  });
+
+  test('a refused Request Transcript holding a known value writes no transcript, keeps the raw calls owner-only, and names no value', async () => {
+    const UNKNOWN: RecordedCall = {
+      request: { method: 'GET', path: '/api/v1/items' },
+      response: { status: 200, body: { unknownFieldXyz: VALUE } },
+    };
+    // The same transcript holds the value under an allow-listed key, so the
+    // known-secret path runs beside the refusal, not on its own.
+    const ALLOWED: RecordedCall = {
+      request: { method: 'POST', path: '/api/v1/items', body: { name: VALUE } },
+      response: { status: 200, body: { message: 'ok' } },
+    };
+    const fake = fakeRun({
+      exports: filesOf(scenario('X', 'transcript')),
+      runs: () => ({ calls: [UNKNOWN, ALLOWED], denied: [VALUE] }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+
+    assert.equal(fake.files.has(`${OUT}/transcripts/X.md`), false);
+    const callsFile = `${OUT}/local/X.calls.json`;
+    assert.ok(fake.files.has(callsFile), 'the calls were kept locally');
+    const entry = manifestOf(fake).scenarios[0];
+    assert.deepEqual(
+      entry.files.find(({ path }) => path === callsFile),
+      { path: callsFile, place: 'local', uploadEligible: false },
+    );
+    assert.ok(
+      entry.problems.some((problem) =>
+        problem.startsWith('the Request Transcript was refused at:'),
+      ),
+      'the refusal is reported',
+    );
+    for (const text of everyOutput(fake, [callsFile])) {
+      assert.equal(text.includes(VALUE), false, 'the value is in no output');
+    }
+  });
+
+  test('a non-default tab whose device name holds a known value is kept as local/<id>-<side>-tab<n>.webm, and no path, move or line names the device', async () => {
+    const DEVICE = `B-${VALUE}`;
+    const fake = fakeRun({
+      exports: filesOf(scenario('V', 'video')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        denied: [VALUE],
+        tabVideos: [
+          {
+            device: DEVICE,
+            tab: 'B2',
+            path: `${OUT}/.work/${side}/${id}/tab-1.webm`,
+            openedAtMs: 1400,
+          },
+        ],
+      }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 0);
+
+    const entry = manifestOf(fake).scenarios[0];
+    assert.deepEqual(
+      entry.files
+        .filter(({ path }) => path.includes('-tab'))
+        .map(({ path }) => path)
+        .sort(),
+      [tabLocal('V', 'after', 1), tabLocal('V', 'before', 1)].sort(),
+    );
+    assert.equal(
+      fake.ops.some((op) => op.includes(VALUE)),
+      false,
+      'no move or removal names the value',
+    );
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(VALUE), false, 'the value is in no output');
+    }
   });
 });

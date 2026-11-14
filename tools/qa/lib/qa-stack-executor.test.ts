@@ -43,7 +43,13 @@ interface FakeOptions {
   isAncestorStatus?: number;
   lockStatus?: number;
   dockerStatus?: number | null;
+  /**
+   * Whether `<worktree>/node_modules` exists. `exists` follows links, so a
+   * dangling symlink is `nodeModules: false` together with `nodeModulesSymlink`.
+   */
   nodeModules?: boolean;
+  /** `<worktree>/node_modules` is a symbolic link, valid or dangling. */
+  nodeModulesSymlink?: boolean;
   /** The shell's NODE_ENV; undefined when unset. */
   nodeEnv?: string;
   files?: Record<string, string>;
@@ -200,6 +206,9 @@ function fakeMachine(options: FakeOptions = {}) {
       path === join(WT, 'node_modules')
         ? (options.nodeModules ?? true)
         : files.has(path),
+    isSymlink: (path) =>
+      path === join(WT, 'node_modules') &&
+      (options.nodeModulesSymlink ?? false),
     sleep: () => Promise.resolve(),
     generateSecret: () => `secret-${++secrets}`,
     out: (line) => out.push(line),
@@ -548,6 +557,59 @@ describe('runQaStack start', () => {
     assert.equal(await runQaStack(startArgv(), f.deps), 1);
     assert.match(f.err.join('\n'), /not serving/);
     assert.ok(f.out.every((line) => !line.startsWith('qa:stack: up')));
+  });
+
+  const NODE_MODULES_LINKS: readonly {
+    name: string;
+    options: FakeOptions;
+  }[] = [
+    { name: 'a valid', options: { nodeModulesSymlink: true } },
+    // existsSync follows the link, so a dangling one reads as missing.
+    {
+      name: 'a dangling',
+      options: { nodeModulesSymlink: true, nodeModules: false },
+    },
+  ];
+
+  for (const { name, options } of NODE_MODULES_LINKS) {
+    test(`refuses ${name} symlinked node_modules with exit 2, naming the fix, before any docker, install, spawn or write`, async () => {
+      const f = fakeMachine(options);
+      assert.equal(await runQaStack(startArgv(), f.deps), 2);
+      const message = f.err.join('\n');
+      assert.match(message, /\/wt\/node_modules is a symbolic link/);
+      assert.match(message, /corepack yarn install --immutable/);
+      assert.match(message, /cp -c -R/);
+      assert.deepEqual(
+        f.runs.filter((run) => run.argv[0] !== 'git'),
+        [],
+        'no docker, install, prisma, seed or probe runs',
+      );
+      assert.equal(indexOfCall(f.calls, 'checkout'), -1);
+      assert.equal(f.spawns.length, 0);
+      assert.equal(f.writes.length, 0);
+      assert.equal(f.files.has(STATE_PATH), false);
+    });
+  }
+
+  test('a missing node_modules plans the install between checkout and migrate, and the stack starts', async () => {
+    const f = fakeMachine({ nodeModules: false });
+    assert.equal(await runQaStack(startArgv(), f.deps), 0);
+    const checkout = indexOfCall(f.calls, `checkout --detach ${MERGE_BASE}`);
+    const install = indexOfCall(f.calls, 'corepack yarn install --immutable');
+    const migrate = indexOfCall(f.calls, 'prisma migrate deploy');
+    assert.ok(checkout >= 0 && install >= 0 && migrate >= 0);
+    assert.ok(checkout < install && install < migrate);
+    const installRun = f.runs.find(
+      (run) => run.argv.join(' ') === 'corepack yarn install --immutable',
+    );
+    assert.equal(installRun?.options.cwd, WT);
+  });
+
+  test('a real node_modules directory plans no install and the stack starts', async () => {
+    const f = fakeMachine({ nodeModules: true });
+    assert.equal(await runQaStack(startArgv(), f.deps), 0);
+    assert.equal(indexOfCall(f.calls, 'yarn install'), -1);
+    assert.ok(f.out.some((line) => line.startsWith('qa:stack: up')));
   });
 });
 
