@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
+
 import { HomePage } from '@myorganiser/web-pages/home';
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 const jsonLd = {
   '@context': 'https://schema.org',

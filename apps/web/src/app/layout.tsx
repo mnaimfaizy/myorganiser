@@ -5,6 +5,8 @@ import {
   ServiceWorkerRegistration,
 } from '@myorganiser/web-pages/offline';
 
+import { SITE_URL } from './site-url';
+
 import './global.css';
 
 // Staging's deploy depends on this (ADR 0128): it reads the build id out of
@@ -14,10 +16,8 @@ import './global.css';
 // export goes.
 export const dynamic = 'force-dynamic';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myorganiser.app';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(APP_URL),
+  metadataBase: new URL(SITE_URL),
 
   title: {
     default: 'MyOrganiser – Organise Your Life, Secure Your Data',
@@ -37,16 +37,15 @@ export const metadata: Metadata = {
     'end-to-end encryption',
     'e2ee',
   ],
-  authors: [{ name: 'MyOrganiser', url: APP_URL }],
+  authors: [{ name: 'MyOrganiser', url: SITE_URL }],
   creator: 'MyOrganiser',
   publisher: 'MyOrganiser',
 
+  // No `index` / `follow` here: pages are indexable by default, and stating
+  // it would contradict the `noindex` Next.js adds to a 404 page. A segment
+  // that sets its own `robots` replaces this whole object.
   robots: {
-    index: true,
-    follow: true,
     googleBot: {
-      index: true,
-      follow: true,
       'max-video-preview': -1,
       'max-image-preview': 'large',
       'max-snippet': -1,
