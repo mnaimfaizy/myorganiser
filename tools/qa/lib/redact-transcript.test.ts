@@ -2366,15 +2366,8 @@ describe('sign-in, YouTube availability and vault response bodies (#1515)', () =
     assertNoLeak(JSON.stringify(result), CREDENTIAL);
   });
 
-  test('a phone, details or unknown key beside the new keys refuses the transcript', () => {
+  test('a details or unknown key beside the new keys refuses the transcript', () => {
     const cases: [object, string[]][] = [
-      [
-        {
-          ...LOGIN_BODY,
-          user: { id: USER.id, email: USER.email, phone: NESTED },
-        },
-        ['scenarios[0].calls[0].response.body.user key #3'],
-      ],
       [
         { available: true, details: { reason: NESTED } },
         ['scenarios[0].calls[0].response.body key #2'],
@@ -2650,5 +2643,87 @@ describe('knownSecrets (#1554)', () => {
     const result = redactOk(input, { knownSecrets: [''] });
     assert.deepEqual(result.transcript, input);
     assert.deepEqual(result.withheld, []);
+  });
+});
+
+describe('admin Users and Overview response bodies (#1540)', () => {
+  const PHONE = '+61400000000';
+  const SECONDARY = 'secondary@example.test';
+  const IDENTITY = {
+    id: 'user-0001',
+    name: 'QA Account',
+    email: 'qa.account@example.test',
+    firstName: 'QA',
+    lastName: 'Account',
+    role: 'user',
+    disabled: true,
+    disabledAt: '2026-11-02T08:15:00.000Z',
+    emailVerified: true,
+    youtubeAccess: false,
+    createdAt: '2026-11-01T09:00:00.000Z',
+    lastActiveAt: null,
+  };
+  const LIST = { users: [IDENTITY], total: 1, page: 1, pageSize: 20 };
+  const OVERVIEW = {
+    users: 10,
+    usersJoinedLast7Days: 2,
+    platformAdmins: 1,
+    unverified: 3,
+    unverifiedOverAWeek: 1,
+    disabled: 1,
+    youtubeAccessPlacesUsed: 4,
+    youtubeAccessPlacesLeft: 6,
+    youtubeAccessCeiling: 10,
+    feedbackReportsReceived: 5,
+  };
+  const run = (body: unknown) =>
+    redactTranscript(
+      transcriptOf(
+        call(
+          'after',
+          { method: 'GET', path: '/admin/users' },
+          { status: 200, body },
+        ),
+      ),
+    );
+
+  test('a Users list, a single User, a withdrawal and an Overview keep their values', () => {
+    for (const body of [
+      LIST,
+      IDENTITY,
+      { ...IDENTITY, youtubeDisconnect: 'not_connected' },
+      OVERVIEW,
+    ]) {
+      const result = run(body);
+      assert.ok(result.ok);
+      assert.deepEqual(
+        (result.transcript as any).scenarios[0].calls[0].response.body,
+        body,
+      );
+      assert.deepEqual(result.withheld, []);
+    }
+  });
+
+  test('phone is withheld by name, its value never printed', () => {
+    const result = run({ ...LIST, users: [{ ...IDENTITY, phone: PHONE }] });
+    assert.ok(result.ok);
+    assert.equal(
+      (result.transcript as any).scenarios[0].calls[0].response.body.users[0]
+        .phone,
+      '[withheld]',
+    );
+    assert.deepEqual(result.withheld, [
+      'scenarios[0].calls[0].response.body.users[0].phone',
+    ]);
+    assertNoLeak(JSON.stringify(result), PHONE);
+  });
+
+  test('an unknown key nested under users still refuses the transcript', () => {
+    const result = run({
+      ...LIST,
+      users: [{ ...IDENTITY, secondaryEmail: SECONDARY }],
+    });
+    assert.equal(result.ok, false);
+    assertNoLeak(JSON.stringify(result), SECONDARY);
   });
 });
