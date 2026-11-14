@@ -8,6 +8,7 @@ import {
   deriveQaSecrets,
   localDatabaseRefusal,
   parseQaAccountsArgs,
+  platformAdminEmail,
   qaAccountsProblem,
   qaUserDrift,
   readQaAccounts,
@@ -160,6 +161,93 @@ describe('qaAccountsProblem', () => {
     );
     assert.match(qaAccountsProblem([account({ lastName: '' })])!, /lastName/);
     assert.notEqual(qaAccountsProblem([]), null);
+  });
+
+  it('accepts a table with one account marked as the Platform Admin QA Account, or with none marked', () => {
+    assert.equal(
+      qaAccountsProblem([
+        account(),
+        account({
+          id: 'admin',
+          email: 'qa-admin@myorganizer.test',
+          platformAdmin: true,
+        }),
+      ]),
+      null,
+    );
+    assert.equal(
+      qaAccountsProblem([
+        account({ platformAdmin: false }),
+        account({ id: 'secondary', email: 'qa-secondary@myorganizer.test' }),
+      ]),
+      null,
+    );
+  });
+
+  it('refuses two accounts marked as the Platform Admin QA Account', () => {
+    assert.match(
+      qaAccountsProblem([
+        account({ platformAdmin: true }),
+        account({
+          id: 'admin',
+          email: 'qa-admin@myorganizer.test',
+          platformAdmin: true,
+        }),
+      ])!,
+      /only one account may be the Platform Admin/,
+    );
+  });
+
+  it('refuses a platformAdmin marker that is not a boolean', () => {
+    for (const platformAdmin of ['yes', 1, null]) {
+      assert.match(
+        qaAccountsProblem([{ ...account(), platformAdmin }])!,
+        /"platformAdmin" as true or false/,
+      );
+    }
+  });
+});
+
+describe('platformAdminEmail', () => {
+  it('gives the email of the marked account', () => {
+    assert.equal(
+      platformAdminEmail([
+        account(),
+        account({
+          id: 'admin',
+          email: 'qa-admin@myorganizer.test',
+          platformAdmin: true,
+        }),
+      ]),
+      'qa-admin@myorganizer.test',
+    );
+  });
+
+  it('gives null when no account is marked', () => {
+    assert.equal(platformAdminEmail([account()]), null);
+    assert.equal(platformAdminEmail([account({ platformAdmin: false })]), null);
+  });
+});
+
+describe('the tracked QA Account table', () => {
+  it('marks exactly one account, admin, as the Platform Admin QA Account', () => {
+    const accounts = readQaAccounts(workspaceRoot);
+    assert.deepEqual(
+      accounts
+        .filter((found) => found.platformAdmin === true)
+        .map(({ id }) => id),
+      ['admin'],
+    );
+    assert.equal(platformAdminEmail(accounts), 'qa-admin@myorganizer.test');
+  });
+
+  it('leaves primary and secondary unmarked', () => {
+    const accounts = readQaAccounts(workspaceRoot);
+    for (const id of ['primary', 'secondary']) {
+      const found = accounts.find((candidate) => candidate.id === id);
+      assert.ok(found, `expected a "${id}" account`);
+      assert.notEqual(found.platformAdmin, true, id);
+    }
   });
 });
 

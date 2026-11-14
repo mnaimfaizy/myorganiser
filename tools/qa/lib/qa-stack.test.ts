@@ -2,6 +2,7 @@
 // exercised through qa-stack.ts's public exports. Every fact is passed in;
 // the only reads are the committed `.env.example`, `docker-compose.yml`, and
 // `.claude/launch.json` at the repo root, to pin values the stack depends on.
+import { QA_ACCOUNT_EMAIL_SUFFIX } from '../../scripts/lib/qa-accounts.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -159,6 +160,56 @@ describe('buildQaEnv', () => {
         assert.ok(!value.includes(port), `${key} contains ${port}`);
       }
     }
+  });
+
+  test('sets PLATFORM_ADMIN_BOOTSTRAP_EMAIL to the marked account email when one is given', () => {
+    const env = buildQaEnv({
+      envExample: ENV_EXAMPLE,
+      databaseUrl: qaContainerDatabaseUrl('qa-local-only'),
+      generateSecret: () => 'generated',
+      platformAdminEmail: `qa-admin${QA_ACCOUNT_EMAIL_SUFFIX}`,
+    });
+    assert.equal(
+      env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL,
+      `qa-admin${QA_ACCOUNT_EMAIL_SUFFIX}`,
+    );
+  });
+
+  test('leaves PLATFORM_ADMIN_BOOTSTRAP_EMAIL blank when no account is marked, whether null or absent', () => {
+    const base = {
+      envExample: ENV_EXAMPLE,
+      databaseUrl: qaContainerDatabaseUrl('qa-local-only'),
+      generateSecret: () => 'generated',
+    };
+    assert.equal(
+      buildQaEnv({ ...base, platformAdminEmail: null })
+        .PLATFORM_ADMIN_BOOTSTRAP_EMAIL,
+      '',
+    );
+    assert.equal(buildQaEnv(base).PLATFORM_ADMIN_BOOTSTRAP_EMAIL, '');
+  });
+
+  test('changes no other key when the marked email is given, against a call without it', () => {
+    const numbered = () => {
+      let calls = 0;
+      return () => `generated-${++calls}`;
+    };
+    const base = {
+      envExample: ENV_EXAMPLE,
+      databaseUrl: qaContainerDatabaseUrl('qa-local-only'),
+    };
+    const without = buildQaEnv({ ...base, generateSecret: numbered() });
+    const withAdmin = buildQaEnv({
+      ...base,
+      generateSecret: numbered(),
+      platformAdminEmail: `qa-admin${QA_ACCOUNT_EMAIL_SUFFIX}`,
+    });
+    const withKeyRemoved = (env: Record<string, string>) => {
+      const rest = { ...env };
+      delete rest.PLATFORM_ADMIN_BOOTSTRAP_EMAIL;
+      return rest;
+    };
+    assert.deepEqual(withKeyRemoved(withAdmin), withKeyRemoved(without));
   });
 });
 
