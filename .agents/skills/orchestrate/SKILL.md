@@ -147,7 +147,7 @@ Close out through the existing Skills: `finish-standalone-runs` for Standalone R
 3. its QA Report is on the Pull Request and is not stale, as `finish-standalone-runs` defines it, even when it records "no manual QA needed". For a PRD, the QA Report on the Pull Request gives the headline and links the QA Plan Issue's Execution record, which stays the full record;
 4. `git merge-tree` against `main` is clean.
 
-When every Delegation is Ready to Merge, build the merge order by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), run `yarn merge:train --auto <pr> …` over it, and end as that section ends: a plain `yarn merge:train <pr> …` for every Pull Request the pass did not merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md), [ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)). A PRD Pull Request's QA Report carries no header the train can read yet, so it always comes back held.
+When every Delegation is Ready to Merge, build the merge order by the rules in [Closing report](../finish-standalone-runs/SKILL.md#closing-report), run `yarn merge:train --auto <pr> …` over it, and end as that section ends: a plain `yarn merge:train <pr> …` for every Pull Request the pass did not merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md), [ADR 0144](../../../docs/adr/0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md)).
 
 After the human merges:
 
