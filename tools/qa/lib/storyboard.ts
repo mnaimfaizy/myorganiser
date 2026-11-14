@@ -31,6 +31,7 @@ import type { ScenarioResult } from './grade-scenarios.ts';
 import type { RunOutcome } from './qa-run.ts';
 import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
+import type { RunContext } from './storyboard-context.ts';
 import { SIDES } from './qa-switch.ts';
 
 /** What one side's run left for its side card and its column. */
@@ -50,6 +51,8 @@ export interface StoryboardInput {
   /** The graded result: the band's, and nothing else's. */
   result: ScenarioResult;
   commits: Record<Side, string>;
+  /** What the band says of the run (#1558); absent in records saved before it. */
+  context?: RunContext;
   sides: Partial<Record<Side, StoryboardSideInput>>;
 }
 
@@ -58,6 +61,8 @@ export interface Band {
   title: string;
   result: ScenarioResult;
   commits: Record<Side, string>;
+  /** Change kind, QA Account ids, devices and tabs; absent draws no line. */
+  context?: RunContext;
   /** Set to `ALIKE_TEXT` when one column stands for both sides; else absent. */
   alike?: typeof ALIKE_TEXT;
 }
@@ -252,6 +257,7 @@ export function buildStoryboard(input: StoryboardInput): Storyboard {
       title: input.title,
       result: input.result,
       commits: input.commits,
+      ...(input.context === undefined ? {} : { context: input.context }),
       ...(alike ? { alike: ALIKE_TEXT } : {}),
     },
     columns: shown,

@@ -116,6 +116,8 @@ export function chromiumRunner(
       const pending: Promise<RecordedCall>[] = [];
       /** Values the Storyboard may not show; they stay in memory. */
       const denied = new Set<string>();
+      /** The ids (never emails) of the QA Accounts the scenario asked for. */
+      const accountIds = new Set<string>();
       /** Every device is made alike, and its backend calls are recorded. */
       const open = async (): Promise<BrowserContext> => {
         const context = await browser.newContext({
@@ -151,6 +153,7 @@ export function chromiumRunner(
             side,
             account(id) {
               const found = account(id);
+              accountIds.add(found.id);
               denied.add(found.password);
               denied.add(found.vaultPassphrase);
               return found;
@@ -210,6 +213,7 @@ export function chromiumRunner(
         screenshot,
         calls,
         denied: [...denied],
+        accountIds: [...accountIds],
         ...(tabVideos.length === 0 ? {} : { tabVideos }),
         startedAtMs: startedAt,
       };

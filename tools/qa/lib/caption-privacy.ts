@@ -2,9 +2,10 @@
  * Caption privacy for a Storyboard (PRD #1544, #1548). A pure check over the
  * strings a scenario's author wrote that reach the Storyboard page or a video
  * overlay: the title, the expected results, each side's observed text and
- * failure message, and every step's caption and device/tab label, plus any
- * further field the caller names for the same check (a `video` scenario's
- * MP4 tab label on each side, which a step need not carry).
+ * failure message, every step's caption and device/tab label, and the band's
+ * run context (QA Account ids, devices, tabs), plus any further field the
+ * caller names for the same check (a `video` scenario's MP4 tab label on each
+ * side, which a step need not carry).
  *
  * It is a DENY-list, not an allow-list. A string is refused when it contains,
  * as an exact substring, a known secret (the QA Account's password or vault
@@ -22,6 +23,7 @@ import {
   looksLikeCredentialValue,
 } from './redact-transcript.ts';
 import { SIDES } from './qa-switch.ts';
+import { contextFields } from './storyboard-context.ts';
 import type { StoryboardInput } from './storyboard.ts';
 
 /** Whether one string leaks: it holds a secret verbatim, or a Bearer/JWT. */
@@ -48,6 +50,11 @@ export function captionFields(input: StoryboardInput): CheckedField[] {
       field: `${id} expected before`,
       text: input.expected.before,
     });
+  }
+  if (input.context) {
+    for (const { name, text } of contextFields(input.context)) {
+      fields.push({ field: `${id} band ${name}`, text });
+    }
   }
   for (const side of SIDES) {
     const run = input.sides[side];
@@ -119,6 +126,16 @@ export function withholdLeaks(
   }
   return {
     ...input,
+    ...(input.context === undefined
+      ? {}
+      : {
+          context: {
+            ...input.context,
+            accounts: input.context.accounts.map(hide),
+            devices: input.context.devices.map(hide),
+            tabs: input.context.tabs.map(hide),
+          },
+        }),
     title: hide(input.title),
     expected: {
       after: hide(input.expected.after),

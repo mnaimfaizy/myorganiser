@@ -30,6 +30,8 @@ import {
   VIDEO_STRIP_HEIGHT,
   probeDurationArgs,
 } from './qa-combine.ts';
+import type { RunContext } from './storyboard-context.ts';
+import { storyboardHtml } from './storyboard-html.ts';
 import { type Band, type Storyboard, buildStoryboard } from './storyboard.ts';
 
 const TEMP = '/tmp/qa-combine-fake';
@@ -804,6 +806,69 @@ describe('runCombine: a refused scenario is not re-rendered, and no secret is pr
     assert.equal(printed(fake).includes(JWT), false, 'the JWT is not printed');
     assert.deepEqual(fake.renders, []);
     assert.deepEqual(fake.annotations, []);
+  });
+});
+
+describe('runCombine: the run context the band names is re-rendered from the saved records (#1558)', () => {
+  const CONTEXT: RunContext = {
+    changeKind: 'fix',
+    accounts: ['primary'],
+    devices: ['A', 'B'],
+    tabs: ['B1', 'B2'],
+  };
+
+  test('a saved context reaches the Storyboard band, and the page draws its line', async () => {
+    const fake = await reRender(
+      RE_RENDER,
+      runFolder('screenshot', recordsOf('screenshot', { context: CONTEXT })),
+    );
+    assert.equal(fake.code, 0, fake.err.join('\n'));
+    const storyboard = fake.renders[0]?.storyboard;
+    assert.ok(storyboard, 'a Storyboard is rendered');
+    assert.deepEqual(storyboard.band.context, CONTEXT);
+    const html = storyboardHtml(storyboard, () => '', TOKENS);
+    assert.ok(
+      html.includes(
+        '<div class="context">Fix · QA Account primary · devices A, B (tabs B1, B2)</div>',
+      ),
+    );
+  });
+
+  test('a file saved before the context existed re-renders with no context on the band and no line on the page', async () => {
+    const fake = await reRender(RE_RENDER, runFolder('screenshot'));
+    assert.equal(fake.code, 0, fake.err.join('\n'));
+    const storyboard = fake.renders[0]?.storyboard;
+    assert.ok(storyboard, 'a Storyboard is rendered');
+    assert.equal('context' in storyboard.band, false);
+    assert.equal(
+      storyboardHtml(storyboard, () => '', TOKENS).includes(
+        '<div class="context">',
+      ),
+      false,
+    );
+  });
+
+  test('a JWT in a saved device name refuses the re-render, names the band field, and prints no value', async () => {
+    const fake = await reRender(
+      RE_RENDER,
+      runFolder(
+        'screenshot',
+        recordsOf('screenshot', {
+          context: { ...CONTEXT, devices: ['A', JWT] },
+        }),
+      ),
+    );
+    assert.equal(fake.code, 2);
+    assert.deepEqual(fake.err, [
+      'qa:combine: scenario "S" was refused for caption privacy: a secret or credential is in S band device 2',
+    ]);
+    assert.equal(printed(fake).includes(JWT), false, 'the JWT is not printed');
+    assert.equal(
+      printed(fake).includes('eyJ'),
+      false,
+      'no part of it is printed',
+    );
+    assert.deepEqual(fake.renders, []);
   });
 });
 

@@ -79,7 +79,7 @@ const OVERLAY_STYLE = `
 html,body{margin:0;overflow:hidden}
 body{width:auto}
 .overlay-band .band{height:${VIDEO_BAND_HEIGHT}px;overflow:hidden;white-space:nowrap}
-.overlay-band .band h1{overflow:hidden;text-overflow:ellipsis}
+.overlay-band .band h1,.overlay-band .band .context{overflow:hidden;text-overflow:ellipsis}
 .overlay-label{background:transparent}
 .overlay-label .tag{display:inline-block;margin:${token('space-sm')};background:${roleColour('navy')};color:${roleColour('navy-foreground')};font-size:${token('type-label-sm-size')};font-weight:${token('font-weight-semibold')};letter-spacing:${token('type-label-caps-tracking')};padding:${token('space-xs')} ${token('space-sm')};border-radius:${token('radius-sm')};white-space:nowrap}
 .strip{box-sizing:border-box;height:${VIDEO_STRIP_HEIGHT}px;display:flex;flex-direction:column;justify-content:center;gap:${token('space-xs')};padding:0 ${token('space-md')};background:${roleColour('card')};color:${roleColour('foreground')};border-top:1px solid ${roleColour('border')};font-size:${token('type-body-sm-size')};white-space:nowrap;overflow:hidden}

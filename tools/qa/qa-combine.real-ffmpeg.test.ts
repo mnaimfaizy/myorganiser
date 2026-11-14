@@ -23,20 +23,29 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
+import type { RunContext } from './lib/storyboard-context.ts';
 import {
+  type AnnotatedVideoPlan,
+  type VideoSide,
+  type VideoStep,
   VIDEO_BAND_HEIGHT,
   VIDEO_PANEL,
   VIDEO_PLAYBACK_SPEED,
   VIDEO_STEP_HOLD_SECONDS,
   VIDEO_STRIP_HEIGHT,
+  pacedTimeline,
 } from './lib/qa-combine.ts';
+import { readTokenCss } from './lib/storyboard-palette.ts';
+import { videoOverlayPages } from './lib/video-overlay-html.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'qa-combine.ts');
+/** tools/qa/ is two levels below the repository root. */
+const REPO_ROOT = join(HERE, '..', '..');
 
 /**
  * A caption long enough to need most of a strip's width, with no markup in it.
@@ -338,6 +347,200 @@ test(
       );
     } finally {
       rmSync(run, { recursive: true, force: true });
+    }
+  },
+);
+
+/** One step of a side's MP4 band fixture, on `device`'s `tab`, `atMs` from the recording's start. */
+function bandStep(
+  index: number,
+  device: string,
+  tab: string,
+  atMs: number,
+): VideoStep {
+  return {
+    index,
+    caption: `step ${index}`,
+    atMs,
+    device,
+    tab,
+    label: `Device ${device} · tab ${tab}`,
+  };
+}
+
+/**
+ * Renders the band overlay page of a one-side annotated MP4 (the narrowest MP4,
+ * one panel wide) in Chromium for `context`, and measures its context line.
+ * `steps` are the side's steps; the page is never written anywhere but `dir`.
+ */
+async function measureMp4Band(
+  dir: string,
+  context: RunContext,
+  steps: VideoStep[],
+) {
+  const side: VideoSide = {
+    side: 'before',
+    video: join(dir, 'before.webm'),
+    device: 'A',
+    tab: 'A1',
+    label: 'Device A · tab A1',
+    openedAtMs: 0,
+    steps,
+  };
+  const plan: AnnotatedVideoPlan = {
+    band: {
+      id: 'S',
+      title: 'Band context',
+      result: 'PASS',
+      commits: { before: 'a'.repeat(40), after: 'b'.repeat(40) },
+      context,
+    },
+    sides: [side],
+    output: join(dir, 'annotated.mp4'),
+  };
+  const pages = videoOverlayPages(
+    plan,
+    readTokenCss(REPO_ROOT),
+    pacedTimeline(plan.sides, [3]),
+  );
+  const bandPath = join(dir, 'band.html');
+  writeFileSync(bandPath, pages.band.html);
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: pages.band.width, height: pages.band.height },
+    });
+    await page.goto(pathToFileURL(bandPath).href, { waitUntil: 'load' });
+    // A string, not a function: this package's tsconfig has no DOM lib.
+    const measured = (await page.evaluate(`(() => {
+      const band = document.querySelector('.band');
+      const line = document.querySelector('.band .context');
+      if (!band || !line) return null;
+      const range = document.createRange();
+      range.selectNodeContents(line);
+      return {
+        text: line.textContent,
+        lineBoxes: range.getClientRects().length,
+        lineScrollWidth: line.scrollWidth,
+        lineClientWidth: line.clientWidth,
+        lineRight: line.getBoundingClientRect().right,
+        viewportWidth: window.innerWidth,
+        contentBottom: Math.max(
+          ...[...band.children].map((child) => child.getBoundingClientRect().bottom),
+        ),
+      };
+    })()`)) as {
+      text: string | null;
+      lineBoxes: number;
+      lineScrollWidth: number;
+      lineClientWidth: number;
+      lineRight: number;
+      viewportWidth: number;
+      contentBottom: number;
+    } | null;
+    assert.ok(measured, 'the band has a context line');
+    return measured;
+  } finally {
+    await browser.close();
+  }
+}
+
+test(
+  'the MP4 band overlay (measured in Chromium) puts a run of three devices and four tabs on a single line that is not cut off',
+  { skip: SKIP },
+  async () => {
+    assert.equal(
+      REQUIRED.length,
+      0,
+      REQUIRED.map(
+        (gap) => `${gap.what} required (${gap.variable} is set) but not found`,
+      ).join('; '),
+    );
+    assert.equal(VIDEO_BAND_HEIGHT, 112);
+    const dir = mkdtempSync(join(tmpdir(), 'qa-band-context-'));
+    try {
+      const measured = await measureMp4Band(
+        dir,
+        {
+          changeKind: 'fix',
+          accounts: ['primary', 'secondary'],
+          devices: ['A', 'B', 'C'],
+          tabs: ['A1', 'B1', 'B2', 'C1'],
+        },
+        [
+          bandStep(1, 'A', 'A1', 500),
+          bandStep(2, 'B', 'B1', 1000),
+          bandStep(3, 'B', 'B2', 1500),
+          bandStep(4, 'C', 'C1', 2000),
+        ],
+      );
+      assert.equal(
+        measured.text,
+        'Fix · QA Accounts primary, secondary · devices A, B, C (tabs A1, B1, B2, C1)',
+      );
+      assert.equal(measured.lineBoxes, 1, 'the line is one line box');
+      assert.ok(
+        measured.lineScrollWidth <= measured.lineClientWidth,
+        `the line is not cut off (${measured.lineScrollWidth} px of text in ${measured.lineClientWidth} px)`,
+      );
+      assert.ok(
+        measured.lineRight <= measured.viewportWidth,
+        'the line stays within the MP4 width',
+      );
+      assert.ok(
+        measured.contentBottom <= VIDEO_BAND_HEIGHT,
+        `the band's content ends at ${measured.contentBottom} px, within ${VIDEO_BAND_HEIGHT} px`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'the MP4 band overlay (measured in Chromium) names a fix on devices A and B with tabs B1 and B2 and one account, exactly, on a single line',
+  { skip: SKIP },
+  async () => {
+    assert.equal(
+      REQUIRED.length,
+      0,
+      REQUIRED.map(
+        (gap) => `${gap.what} required (${gap.variable} is set) but not found`,
+      ).join('; '),
+    );
+    assert.equal(VIDEO_BAND_HEIGHT, 112);
+    const dir = mkdtempSync(join(tmpdir(), 'qa-band-context-'));
+    try {
+      const measured = await measureMp4Band(
+        dir,
+        {
+          changeKind: 'fix',
+          accounts: ['primary'],
+          devices: ['A', 'B'],
+          tabs: ['B1', 'B2'],
+        },
+        [
+          bandStep(1, 'A', 'A1', 500),
+          bandStep(2, 'B', 'B1', 1000),
+          bandStep(3, 'B', 'B2', 1500),
+        ],
+      );
+      assert.equal(
+        measured.text,
+        'Fix · QA Account primary · devices A, B (tabs B1, B2)',
+      );
+      assert.equal(measured.lineBoxes, 1, 'the line is one line box');
+      assert.ok(
+        measured.lineScrollWidth <= measured.lineClientWidth,
+        `the line is not cut off (${measured.lineScrollWidth} px of text in ${measured.lineClientWidth} px)`,
+      );
+      assert.ok(
+        measured.contentBottom <= VIDEO_BAND_HEIGHT,
+        `the band's content ends at ${measured.contentBottom} px, within ${VIDEO_BAND_HEIGHT} px`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   },
 );

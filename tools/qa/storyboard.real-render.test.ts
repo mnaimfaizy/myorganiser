@@ -23,11 +23,12 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
@@ -45,6 +46,8 @@ import {
   probeDurationArgs,
 } from './lib/qa-combine.ts';
 import { makeAnnotatedVideo } from './lib/qa-combine-executor.ts';
+import { VIEWPORT } from './lib/qa-run.ts';
+import { storyboardHtml } from './lib/storyboard-html.ts';
 import { readTokenCss } from './lib/storyboard-palette.ts';
 import { storyboardRenderer } from './lib/storyboard-render.ts';
 import { type Storyboard, buildStoryboard } from './lib/storyboard.ts';
@@ -178,6 +181,84 @@ test(
         storyboardRenderer(REPO_ROOT)(storyboardFixture(), dir, png),
       );
       assert.equal(existsSync(png), false, 'no PNG is left behind');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'a fix Storyboard names its run context inside the band, in real Chromium',
+  { skip: SKIP },
+  async () => {
+    assert.ok(PRESENT, MISSING_CHROMIUM);
+    const dir = mkdtempSync(join(tmpdir(), 'storyboard-context-'));
+    try {
+      await makeStills(dir, [
+        ['steps/S/before/01.png', 'Before'],
+        ['steps/S/after/01.png', 'After'],
+      ]);
+      const base = storyboardFixture();
+      const storyboard: Storyboard = {
+        ...base,
+        band: {
+          ...base.band,
+          context: {
+            changeKind: 'fix',
+            accounts: ['primary'],
+            devices: ['A', 'B'],
+            tabs: ['B1', 'B2'],
+          },
+        },
+      };
+      const html = storyboardHtml(
+        storyboard,
+        (step) => pathToFileURL(join(dir, step.still)).href,
+        readTokenCss(REPO_ROOT),
+      );
+      const htmlPath = join(dir, 'page.html');
+      writeFileSync(htmlPath, html);
+
+      const browser = await chromium.launch();
+      try {
+        const page = await browser.newPage({ viewport: VIEWPORT });
+        await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
+        // A string, not a function: this package's tsconfig has no DOM lib.
+        const measured = (await page.evaluate(`(() => {
+          const band = document.querySelector('.band');
+          const line = document.querySelector('.band .context');
+          if (!band || !line) return null;
+          const b = band.getBoundingClientRect();
+          const l = line.getBoundingClientRect();
+          return {
+            text: line.textContent,
+            lineInsideBand: l.left >= b.left && l.right <= b.right && l.bottom <= b.bottom,
+            bandOverflowsX: band.scrollWidth > band.clientWidth,
+          };
+        })()`)) as {
+          text: string | null;
+          lineInsideBand: boolean;
+          bandOverflowsX: boolean;
+        } | null;
+
+        assert.ok(measured, 'the band has a context line');
+        assert.equal(
+          measured.text,
+          'Fix · QA Account primary · devices A, B (tabs B1, B2)',
+        );
+        assert.equal(
+          measured.lineInsideBand,
+          true,
+          'the line is inside the band',
+        );
+        assert.equal(
+          measured.bandOverflowsX,
+          false,
+          'the band does not overflow',
+        );
+      } finally {
+        await browser.close();
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

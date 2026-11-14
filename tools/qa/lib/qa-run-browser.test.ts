@@ -134,6 +134,74 @@ const scenario = (run: Scenario['run']): Scenario => ({
   run,
 });
 
+describe('which QA Accounts a run reports it signed in with (#1558)', () => {
+  // Obviously fake values, each under the fixture length limit.
+  const EMAIL = 'qa-fake@example.test';
+  const PASSWORD = 'hunter2-fake';
+  const PASSPHRASE = 'qa-fake-phrase';
+  const lookup = (id: string): ScenarioAccount => ({
+    id,
+    email: EMAIL,
+    password: PASSWORD,
+    vaultPassphrase: PASSPHRASE,
+  });
+
+  test('each account the scenario signs in with is reported by its id, and its email is not in the run', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async (context) => {
+        context.account('primary');
+        context.account('secondary');
+      }),
+      { side: 'after', workDir: WORK_DIR },
+    );
+
+    assert.deepEqual(run.accountIds, ['primary', 'secondary']);
+    assert.equal(JSON.stringify(run).includes(EMAIL), false, 'no email');
+  });
+
+  test('an account signed in with twice is reported once', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async (context) => {
+        context.account('primary');
+        context.account('primary');
+      }),
+      { side: 'before', workDir: WORK_DIR },
+    );
+
+    assert.deepEqual(run.accountIds, ['primary']);
+  });
+
+  test('a scenario that signs in with no account reports an empty list', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async () => undefined),
+      { side: 'after', workDir: WORK_DIR },
+    );
+
+    assert.deepEqual(run.accountIds, []);
+  });
+
+  test('an account signed in with before the scenario throws is still reported', async () => {
+    mock.method(chromium, 'launch', async () => asBrowser(fakeBrowser([])));
+
+    const run = await chromiumRunner(lookup)(
+      scenario(async (context) => {
+        context.account('primary');
+        throw new Error('the form did not load');
+      }),
+      { side: 'before', workDir: WORK_DIR },
+    );
+
+    assert.equal(run.outcome, 'fail');
+    assert.deepEqual(run.accountIds, ['primary']);
+  });
+});
+
 afterEach(() => {
   mock.restoreAll();
 });

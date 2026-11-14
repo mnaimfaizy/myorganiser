@@ -12,6 +12,7 @@ import {
   type AnnotatedVideoPlan,
   type VideoSide,
   type VideoStep,
+  VIDEO_BAND_HEIGHT,
   VIDEO_STRIP_HEIGHT,
   pacedTimeline,
 } from './qa-combine.ts';
@@ -24,6 +25,7 @@ import {
   videoOverlayPages,
 } from './video-overlay-html.ts';
 import type { Band } from './storyboard.ts';
+import type { RunContext } from './storyboard-context.ts';
 
 const TOKENS = ':root{--navy:220 50% 20%;--space-md:12px}';
 
@@ -113,18 +115,76 @@ function everyPageHtml(): string[] {
 }
 
 describe('the band overlay', () => {
-  test('is one band per side wide, 96 pixels tall and opaque, holding the scenario id, title and result', () => {
+  test('is one band per side wide, VIDEO_BAND_HEIGHT pixels tall and opaque, holding the scenario id, title and result', () => {
     const band: OverlayPage = pages.band;
     assert.equal(band.width, 2560);
-    assert.equal(band.height, 96);
+    assert.equal(VIDEO_BAND_HEIGHT, 112);
+    assert.equal(band.height, 112);
     assert.equal(band.transparent, false);
-    assert.ok(band.html.includes('style="width:2560px;height:96px"'));
+    assert.ok(
+      band.html.includes(`style="width:2560px;height:${VIDEO_BAND_HEIGHT}px"`),
+    );
     assert.ok(band.html.includes('S1 · Save &lt;an&gt; item &amp; more'));
     assert.match(band.html, /<span class="result"[^>]*>PASS<\/span>/);
 
     const onePlan = { ...PLAN, sides: [BEFORE] };
     const one = videoOverlayPages(onePlan, TOKENS, timelineOf(onePlan));
     assert.equal(one.band.width, 1280);
+  });
+
+  test('an MP4 band for a fix on devices A and B with tabs B1 and B2 and one account names exactly that line', () => {
+    const contextual = videoOverlayPages(
+      {
+        ...PLAN,
+        band: {
+          ...BAND,
+          context: {
+            changeKind: 'fix',
+            accounts: ['primary'],
+            devices: ['A', 'B'],
+            tabs: ['B1', 'B2'],
+          },
+        },
+      },
+      TOKENS,
+      timelineOf(PLAN),
+    );
+    assert.ok(
+      contextual.band.html.includes(
+        '<div class="context">Fix · QA Account primary · devices A, B (tabs B1, B2)</div>',
+      ),
+    );
+  });
+
+  test('a band with a run context names it on its own line, between the title and the commits', () => {
+    const context: RunContext = {
+      changeKind: 'fix',
+      accounts: ['primary'],
+      devices: ['A', 'B'],
+      tabs: ['B1', 'B2', 'B3'],
+    };
+    const contextual = videoOverlayPages(
+      { ...PLAN, band: { ...BAND, context } },
+      TOKENS,
+      timelineOf(PLAN),
+    );
+    const html = contextual.band.html;
+    assert.ok(
+      html.includes(
+        '<div class="context">Fix · QA Account primary · devices A, B (tabs B1, B2, B3)</div>',
+      ),
+      'the context line is in the band',
+    );
+    assert.ok(
+      html.indexOf('class="context"') < html.indexOf('class="meta"'),
+      'the line sits above the commits',
+    );
+    assert.equal(
+      pages.band.html.includes('class="context"'),
+      false,
+      'a band with no context has no line',
+    );
+    assert.equal(contextual.band.height, VIDEO_BAND_HEIGHT);
   });
 });
 
