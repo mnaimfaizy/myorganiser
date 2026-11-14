@@ -38,7 +38,7 @@ corepack yarn qa:stack:stop
 - The stack serves web on `http://localhost:4300` and the backend on `3300`, with its own Postgres container on `127.0.0.1:5499`, so it never collides with the Maintainer's services.
 - It builds its environment from `.env.example` with generated local-only secrets and writes it to `tmp/qa/stack/`. Never read the Maintainer's env files or work around the hook that protects them. If the stack cannot run the app, stop and report it.
 - It refuses a database that is not local, the primary checkout, a worktree with uncommitted changes, and a port already in use. Report a refusal; never work around it.
-- It seeds the QA Accounts once, at start. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
+- It seeds the QA Accounts once, at start. A QA Plan that needs `/admin/**` asks for the `admin` QA Account (the Platform Admin QA Account), never SQL: the stack's backend bootstraps it, while `primary` and `secondary` stay ordinary Users. `qa:switch` migrates forward and restarts both services without re-seeding, so Before and After share the same data.
 - Every start and switch ends by checking the commit the stack serves. A mismatch exits 1: run no scenario on it. `yarn qa:stack:status` re-checks at any time.
 - A switch back to Before after After is refused. When a feature's After fails, `yarn qa:run` stops the stack and starts a fresh one with `--before-only` for the merge-base re-run; by hand, do the same.
 
@@ -143,7 +143,7 @@ One comment per Pull Request, starting with `<!-- qa-report -->`. Update it on a
 
 The line right after the marker is the **header**: the Merge Train reads it to decide an Auto-merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Keep it the first non-blank line after the marker, before the `## QA Report` heading, in exactly one of these two forms:
 
-- `QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>`, or `result=failed` in the same place. The commit is the full 40-character SHA QA ran on, in lowercase. `<n>` is the number of items under Left for a person, and must equal the number of items listed there.
+- `QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>`, or `result=failed` in the same place. The commit is the full 40-character SHA QA ran on, in lowercase. `<n>` is the number of items under Left for a person, and must equal the number of items listed there. A **Not proven** scenario, and a **FAIL: pre-existing** scenario not yet filed as an issue, is listed under Left for a person and counted in `<n>`; once filed, a FAIL: pre-existing is written with its issue number and is no longer counted ([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)).
 - `QA Report: no manual QA needed; commit=<40-hex sha>`, when the plan left nothing to verify by hand and no run was made.
 
 A header in any other form is unparseable, and an unparseable report holds the merge. The train reads only a report posted by the login it runs as, and only the latest one.
