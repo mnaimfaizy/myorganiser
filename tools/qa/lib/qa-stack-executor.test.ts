@@ -3,10 +3,12 @@
 // docker, process, port and file fact is an in-memory fake here, so no real
 // command, container, process or port runs. The pure rules are tested in
 // qa-stack.test.ts and qa-switch.test.ts.
+import { QA_ACCOUNT_EMAIL_SUFFIX } from '../../scripts/lib/qa-accounts.ts';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test, { describe } from 'node:test';
 
+import { QA_ACCOUNTS_CONFIG } from '../../scripts/lib/qa-accounts.ts';
 import {
   type QaDeps,
   type RunResult,
@@ -94,6 +96,8 @@ const code = (status: number | null): RunResult => ({
  */
 function fakeMachine(options: FakeOptions = {}) {
   const calls: string[] = [];
+  /** Every run and spawn in the order it happened: `argv` for a run, `spawn <argv>` for a spawn. */
+  const sequence: string[] = [];
   const runs: Run[] = [];
   const spawns: Spawn[] = [];
   const kills: { pgid: number; signal: string }[] = [];
@@ -156,6 +160,7 @@ function fakeMachine(options: FakeOptions = {}) {
     nodeEnv: options.nodeEnv,
     run(argv, runOptions) {
       calls.push(argv.join(' '));
+      sequence.push(argv.join(' '));
       runs.push({ argv: [...argv], options: runOptions });
       if (options.failCommand && argv.join(' ').includes(options.failCommand)) {
         return { status: 1, stdout: '', stderr: 'boom' };
@@ -168,6 +173,7 @@ function fakeMachine(options: FakeOptions = {}) {
     },
     spawnDetached(argv, spawnOptions) {
       const pgid = nextPgid++;
+      sequence.push(`spawn ${argv.join(' ')}`);
       spawns.push({
         argv: [...argv],
         cwd: spawnOptions.cwd,
@@ -218,6 +224,7 @@ function fakeMachine(options: FakeOptions = {}) {
   return {
     deps,
     calls,
+    sequence,
     runs,
     spawns,
     kills,
@@ -531,6 +538,67 @@ describe('runQaStack start', () => {
     assert.equal(await runQaStack(startArgv(), f.deps), 2);
     assert.match(f.err.join('\n'), /cannot tell whether/);
     assert.equal(f.spawns.length, 0);
+  });
+
+  describe('runQaStack platform admin bootstrap', () => {
+    const ADMIN_EMAIL = `qa-admin${QA_ACCOUNT_EMAIL_SUFFIX}`;
+
+    function trackedAccounts(marked: boolean): string {
+      return JSON.stringify({
+        accounts: [
+          {
+            id: 'primary',
+            email: `qa-primary${QA_ACCOUNT_EMAIL_SUFFIX}`,
+            firstName: 'QA',
+            lastName: 'Primary',
+          },
+          {
+            id: 'admin',
+            email: ADMIN_EMAIL,
+            firstName: 'QA',
+            lastName: 'Admin',
+            ...(marked ? { platformAdmin: true } : {}),
+          },
+        ],
+      });
+    }
+
+    test('seeds the QA Accounts before the backend service is spawned', async () => {
+      const f = fakeMachine();
+      assert.equal(await runQaStack(startArgv(), f.deps), 0);
+
+      const seed = indexOfCall(f.sequence, 'qa-accounts.ts seed --restore');
+      const firstSpawn = f.sequence.findIndex((entry) =>
+        entry.startsWith('spawn '),
+      );
+      assert.ok(seed >= 0, 'expected the seed step');
+      assert.ok(firstSpawn >= 0, 'expected a spawned service');
+      assert.equal(
+        f.sequence[firstSpawn],
+        `spawn ${SERVICE_COMMAND.backend.join(' ')}`,
+      );
+      assert.ok(seed < firstSpawn, 'the seed runs before the backend starts');
+    });
+
+    test('gives the backend the marked account email from the tracked table', async () => {
+      const f = fakeMachine({
+        files: { [join(REPO, QA_ACCOUNTS_CONFIG)]: trackedAccounts(true) },
+      });
+      assert.equal(await runQaStack(startArgv(), f.deps), 0);
+      assert.equal(f.spawns[0].env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL, ADMIN_EMAIL);
+    });
+
+    test('gives the backend a blank PLATFORM_ADMIN_BOOTSTRAP_EMAIL when the table marks no account or is absent', async () => {
+      const unmarked = fakeMachine({
+        files: { [join(REPO, QA_ACCOUNTS_CONFIG)]: trackedAccounts(false) },
+      });
+      assert.equal(await runQaStack(startArgv(), unmarked.deps), 0);
+      assert.equal(unmarked.spawns[0].env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL, '');
+
+      const absent = fakeMachine();
+      assert.equal(await runQaStack(startArgv(), absent.deps), 0);
+      assert.equal(absent.spawns[0].env.PLATFORM_ADMIN_BOOTSTRAP_EMAIL, '');
+    });
   });
 
   test('a failing step exits 1, names the step, prints no "up" line, and keeps state.json', async () => {

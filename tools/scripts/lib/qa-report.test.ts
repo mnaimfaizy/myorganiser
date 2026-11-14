@@ -121,6 +121,60 @@ describe('parseQaReport: the template the Skill prints', () => {
   });
 });
 
+// ------------------------------------- the template the qa-plan Skill prints
+
+const QA_PLAN_SKILL_PATH = '.agents/skills/qa-plan/SKILL.md';
+
+/** The qa-plan step that posts a PRD Pull Request's QA Report. */
+function qaPlanReportTemplate(): string {
+  const lines = readFileSync(join(REPO_ROOT, QA_PLAN_SKILL_PATH), 'utf8').split(
+    /\r?\n/,
+  );
+  const start = lines.findIndex((line) =>
+    line.startsWith('### E5. Post the QA Report'),
+  );
+  assert.notEqual(start, -1, 'qa-plan has the Post the QA Report step');
+  const open = lines.findIndex(
+    (line, index) => index > start && line.trim() === '```md',
+  );
+  assert.notEqual(open, -1, 'the step prints a ```md template');
+  const close = lines.findIndex(
+    (line, index) => index > open && line.trim() === '```',
+  );
+  assert.notEqual(close, -1, 'the ```md template is closed');
+  return lines.slice(open + 1, close).join('\n');
+}
+
+describe('parseQaReport: the template the qa-plan Skill prints', () => {
+  test('parses as passed, with its commit and the items left', () => {
+    assert.deepEqual(
+      parseQaReport(fillPlaceholders(qaPlanReportTemplate(), 3)),
+      { result: 'passed', commit: SHA, leftForPerson: 3 },
+    );
+  });
+
+  test('with result=failed it parses as failed', () => {
+    const failed = fillPlaceholders(qaPlanReportTemplate(), 0).replace(
+      'result=passed',
+      'result=failed',
+    );
+    assert.deepEqual(parseQaReport(failed), {
+      result: 'failed',
+      commit: SHA,
+      leftForPerson: 0,
+    });
+  });
+});
+
+describe('the Skills carry the Not proven rule', () => {
+  test('finish-standalone-runs counts Not proven and unfiled pre-existing items', () => {
+    const { prose } = qaReportSection();
+    assert.match(prose, /\*\*Not proven\*\*/);
+    assert.match(prose, /\*\*FAIL: pre-existing\*\*[^.]*not yet filed/);
+    assert.match(prose, /counted in `<n>`/);
+  });
+});
+
 describe('parseQaReport: a header in any other form is unparseable', () => {
   const malformed: [string, string][] = [
     [

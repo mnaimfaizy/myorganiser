@@ -15,6 +15,13 @@
 import { join, resolve } from 'node:path';
 
 import {
+  QA_ACCOUNTS_CONFIG,
+  type QaAccountRecord,
+  platformAdminEmail,
+  qaAccountsProblem,
+} from '../../scripts/lib/qa-accounts.ts';
+
+import {
   NEXT_DEV_REWRITE,
   QA_SERVICES,
   QA_STACK,
@@ -455,6 +462,21 @@ function gatherServedFacts(
   };
 }
 
+/** The tracked QA Account table's Platform Admin email; null when absent or unusable. */
+function readPlatformAdminEmail(deps: QaDeps): string | null {
+  const text = deps.readFile(join(deps.repoRoot, QA_ACCOUNTS_CONFIG));
+  if (text === null) return null;
+  let accounts: unknown;
+  try {
+    accounts = (JSON.parse(text) as { accounts: unknown }).accounts;
+  } catch {
+    throw new StackRefusal(`${QA_ACCOUNTS_CONFIG} is not valid JSON`);
+  }
+  const problem = qaAccountsProblem(accounts);
+  if (problem) throw new StackRefusal(`${QA_ACCOUNTS_CONFIG}: ${problem}`);
+  return platformAdminEmail(accounts as QaAccountRecord[]);
+}
+
 async function runSteps(steps: Step[], ctx: StepContext): Promise<void> {
   for (const step of steps) await runStep(step, ctx);
 }
@@ -549,6 +571,7 @@ export async function runQaStack(
       databaseUrl:
         args.databaseUrl ?? qaContainerDatabaseUrl(databasePassword ?? ''),
       generateSecret: deps.generateSecret,
+      platformAdminEmail: readPlatformAdminEmail(deps),
     });
     // The stack's env always says development, so the shell's own NODE_ENV
     // is what tells a production host apart.

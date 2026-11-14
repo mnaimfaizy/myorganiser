@@ -47,6 +47,7 @@ import {
   readAutoMergeModeFromGit,
   readPathMapFromGit,
   readDoor,
+  renderAutoMergedComment,
   renderAutoTrainResult,
   renderShadowComment,
   reviewTierFromView,
@@ -192,9 +193,12 @@ function templateMergeDanger(): string {
   return section.join('\n');
 }
 
-/** The decision line of a shadow comment, without its lead: its short form. */
+/**
+ * The decision line of a marker comment, without its bold lead: its short
+ * form. Both the shadow comment and the `on` record lead with a bold label.
+ */
 const decisionLine = (body: string): string =>
-  body.split('\n')[1].slice(SHADOW_COMMENT_LEAD.length + 1);
+  body.split('\n')[1].replace(/^\*\*[^*]*\*\*\s*/, '');
 
 /**
  * A fake GitHub for one `--auto` pass. Each Pull Request plays back a script
@@ -2838,7 +2842,11 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
     assert.deepEqual(result.merged, [1]);
     assert.deepEqual(result.held, []);
     assert.deepEqual(merges, [{ pr: 1, headOid: HEAD, method: 'merge' }]);
-    assert.deepEqual(writes, ['merge #1 @a merge'], 'no update was needed');
+    assert.deepEqual(
+      writes,
+      ['merge #1 @a merge', `comment #1 auto-merged at \`${HEAD}\``],
+      'no update was needed, and the merge is recorded',
+    );
   });
 
   test('after the train updates the branch from A to B, every fact is read again at B, and B is merged', async () => {
@@ -2880,7 +2888,11 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
     assert.deepEqual(seen.reviewTier, [HEAD, UPDATED_HEAD]);
     assert.deepEqual(seen.agentVerdict, [HEAD, UPDATED_HEAD]);
     assert.deepEqual(seen.qaReport, [HEAD, UPDATED_HEAD]);
-    assert.deepEqual(writes, ['update #1 @a', 'merge #1 @b merge']);
+    assert.deepEqual(writes, [
+      'update #1 @a',
+      'merge #1 @b merge',
+      `comment #1 auto-merged at \`${UPDATED_HEAD}\``,
+    ]);
     assert.deepEqual(merges, [
       { pr: 1, headOid: UPDATED_HEAD, method: 'merge' },
     ]);
@@ -2968,6 +2980,153 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
         reason: `the Agent Verdict approved \`${HEAD.slice(0, 8)}\`, not the head \`${UPDATED_HEAD.slice(0, 8)}\``,
       },
     ]);
+  });
+});
+
+describe('runAutoTrain under on: the record an Auto-merge leaves (ADR 0148)', () => {
+  const approvedAt = (_pr: number, headRefOid: string): AgentVerdictFact => ({
+    status: 'read',
+    verdict: 'approve',
+    reviewedOid: headRefOid,
+  });
+  const passedAt = (_pr: number, headRefOid: string): QaReportFact =>
+    currentPassed(headRefOid);
+
+  test('an Auto-merge writes the on record, naming the head the merge named', async () => {
+    const { io, comments, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        tier: 'auto',
+        agentVerdict: approvedAt,
+        qaReportFact: passedAt,
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(merges, [{ pr: 1, headOid: HEAD, method: 'merge' }]);
+    assert.equal(comments.get(1), renderAutoMergedComment(HEAD));
+    assert.deepEqual(writes, [
+      'merge #1 @a merge',
+      `comment #1 auto-merged at \`${HEAD}\``,
+    ]);
+    assert.deepEqual(result.commentFailures, []);
+  });
+
+  test('after the train updates the branch, the record names the head passed to merge, not the first read', async () => {
+    const { io, comments, writes } = fakeAutoIo(
+      {
+        1: [
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+        ],
+      },
+      {
+        tier: 'auto',
+        agentVerdict: approvedAt,
+        qaReportFact: passedAt,
+      },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.equal(comments.get(1), renderAutoMergedComment(UPDATED_HEAD));
+    assert.deepEqual(writes, [
+      'update #1 @a',
+      'merge #1 @b merge',
+      `comment #1 auto-merged at \`${UPDATED_HEAD}\``,
+    ]);
+  });
+
+  test('a record GitHub refuses leaves the merge standing, lists the Pull Request in commentFailures, and the closing line says so', async () => {
+    const { io, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        tier: 'auto',
+        agentVerdict: approvedAt,
+        qaReportFact: passedAt,
+        commentRefusals: new Set([1]),
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(merges, [{ pr: 1, headOid: HEAD, method: 'merge' }]);
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(result.commentFailures, [1]);
+    assert.deepEqual(writes, [
+      'merge #1 @a merge',
+      `comment #1 auto-merged at \`${HEAD}\``,
+    ]);
+    const closing = renderAutoTrainResult(result);
+    assert.ok(
+      closing.includes('Auto-merge record not written (the merge stands): #1.'),
+      closing,
+    );
+    assert.ok(!closing.includes('Shadow comment not written'), closing);
+  });
+
+  test('a Pull Request held under on writes no record, and nothing merges', async () => {
+    // No Agent Verdict is read, so the candidate is held before any merge.
+    const { io, comments, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { tier: 'auto', qaReportFact: passedAt },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(merges, []);
+    assert.deepEqual(writes, []);
+    assert.equal(comments.size, 0);
+    assert.deepEqual(result.merged, []);
+    assert.deepEqual(result.commentFailures, []);
+    assert.deepEqual(result.held, [{ pr: 1, reason: NOT_READ.agentVerdict }]);
+  });
+
+  test('a Pull Request the drive finds already MERGED writes no record, and the record failures stay empty', async () => {
+    // The first read is open and passes every fact; the drive's next read
+    // finds it merged, so the pass merges nothing and names no head.
+    const { io, comments, writes } = fakeAutoIo(
+      {
+        1: [snapshot({ number: 1 }), snapshot({ number: 1, state: 'MERGED' })],
+      },
+      {
+        tier: 'auto',
+        agentVerdict: approvedAt,
+        qaReportFact: passedAt,
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(merges, []);
+    assert.deepEqual(writes, []);
+    assert.equal(comments.size, 0);
+    assert.deepEqual(result.commentFailures, []);
+  });
+
+  test('under shadow the same candidate gets a shadow comment, no record, and no merge', async () => {
+    const { io, comments, writes } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        tier: 'auto',
+        agentVerdict: approvedAt,
+        qaReportFact: passedAt,
+      },
+    );
+    const merges = recordMerges(io);
+    const result = await runAutoTrain(autoArgs('shadow', [1]), io);
+
+    assert.deepEqual(merges, []);
+    assert.deepEqual(result.merged, []);
+    assert.deepEqual(result.wouldMerge, [{ pr: 1, headRefOid: HEAD }]);
+    assert.deepEqual(writes, [`comment #1 would auto-merge at \`${HEAD}\``]);
+    assert.equal(
+      comments.get(1)?.split('\n')[1],
+      `${SHADOW_COMMENT_LEAD} ${SHADOW_WOULD_MERGE} \`${HEAD}\``,
+    );
   });
 });
 

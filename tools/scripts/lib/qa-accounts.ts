@@ -34,6 +34,8 @@ export interface QaAccountRecord {
   email: string;
   firstName: string;
   lastName: string;
+  /** Marks the Platform Admin QA Account. At most one account carries it. */
+  platformAdmin?: boolean;
   [key: string]: unknown;
 }
 
@@ -43,6 +45,7 @@ export function qaAccountsProblem(accounts: unknown): string | null {
     return 'expected a non-empty "accounts" array';
   }
   const seen = new Set<string>();
+  const marked: string[] = [];
   for (const account of accounts as Record<string, unknown>[]) {
     for (const field of ACCOUNT_FIELDS) {
       if (typeof account?.[field] !== 'string' || account[field] === '') {
@@ -57,12 +60,34 @@ export function qaAccountsProblem(accounts: unknown): string | null {
     if (!email.endsWith(QA_ACCOUNT_EMAIL_SUFFIX)) {
       return `account "${id}" must use an ${QA_ACCOUNT_EMAIL_SUFFIX} address`;
     }
+    if (account.platformAdmin !== undefined) {
+      if (typeof account.platformAdmin !== 'boolean') {
+        return `account "${id}" must give "platformAdmin" as true or false`;
+      }
+      if (account.platformAdmin) marked.push(id);
+    }
     for (const key of [id, email]) {
       if (seen.has(key)) return `"${key}" is used by two accounts`;
       seen.add(key);
     }
   }
+  if (marked.length > 1) {
+    return `only one account may be the Platform Admin QA Account, but ${marked.join(' and ')} are marked`;
+  }
   return null;
+}
+
+/**
+ * The email of the Platform Admin QA Account, or `null` when none is marked.
+ * The QA stack hands it to the backend's own `PLATFORM_ADMIN_BOOTSTRAP_EMAIL`
+ * bootstrap; nothing else promotes a User.
+ */
+export function platformAdminEmail(
+  accounts: readonly QaAccountRecord[],
+): string | null {
+  return (
+    accounts.find((account) => account.platformAdmin === true)?.email ?? null
+  );
 }
 
 export interface QaAccountSecrets {
