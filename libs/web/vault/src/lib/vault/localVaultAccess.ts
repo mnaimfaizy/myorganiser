@@ -554,6 +554,18 @@ function vaultOf(read: LocalVaultReadResult): VaultStorageV1 | null {
   return read.status === 'owned' ? read.vault : null;
 }
 
+/**
+ * Whether a fresh Local Vault read no longer carries the wrapping a write was
+ * decided against. Judged by Vault Meta identity, the identity divergence and
+ * the Vault Meta Bookmark use, so Vault Meta adoption and the three rewraps
+ * share one definition of "the wrapping moved" (ADR 0143).
+ */
+function wrappingMoved(fresh: VaultStorageV1, compared: VaultMetaV1): boolean {
+  return (
+    vaultMetaIdentity(localToServerMeta(fresh)) !== vaultMetaIdentity(compared)
+  );
+}
+
 export function createLocalVaultAccess(options: {
   slot: LocalVaultSlot;
   masterKeyBytes?: Uint8Array | null;
@@ -634,10 +646,7 @@ export function createLocalVaultAccess(options: {
       | { masterKeyWrappedWithRecoveryKey: EncryptedBlob };
   }): void => {
     const fresh = requireVault();
-    if (
-      vaultMetaIdentity(localToServerMeta(fresh)) !==
-      vaultMetaIdentity(localToServerMeta(options.readVault))
-    ) {
+    if (wrappingMoved(fresh, localToServerMeta(options.readVault))) {
       throw new VaultWrappingMovedError();
     }
     slot.write({ ...fresh, ...options.wrapping });
@@ -713,10 +722,7 @@ export function createLocalVaultAccess(options: {
       // Read, check and write with no await between them (ADR 0143).
       const fresh = vaultOf(slot.read());
       if (!fresh) return 'no-local-vault';
-      if (
-        vaultMetaIdentity(localToServerMeta(fresh)) !==
-        vaultMetaIdentity(comparedLocalMeta)
-      ) {
+      if (wrappingMoved(fresh, comparedLocalMeta)) {
         return 'wrapping-moved';
       }
       slot.write(
