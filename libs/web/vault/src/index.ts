@@ -17,6 +17,7 @@ export {
   VaultLockedError,
   VaultSecretMismatchError,
   VaultWriteContendedError,
+  VaultWrappingMovedError,
   createVaultHandle,
 } from './lib/vault/vaultHandle';
 export type {
