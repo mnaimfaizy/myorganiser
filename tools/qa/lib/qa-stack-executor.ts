@@ -76,6 +76,8 @@ export interface QaDeps {
   writeFile(path: string, text: string): void;
   removeFile(path: string): void;
   exists(path: string): boolean;
+  /** True for a symbolic link, valid or dangling; false for anything else, including a missing path. */
+  isSymlink(path: string): boolean;
   sleep(ms: number): Promise<void>;
   generateSecret(): string;
   out(line: string): void;
@@ -472,6 +474,19 @@ async function guard(
   }
 }
 
+/**
+ * The QA stack's Next.js cannot resolve its package through a symlinked
+ * `node_modules`, valid or dangling, and the failure shows only in `web.log`.
+ */
+function refuseSymlinkedNodeModules(deps: QaDeps, worktree: string): void {
+  const nodeModules = join(worktree, 'node_modules');
+  if (deps.isSymlink(nodeModules)) {
+    throw new StackUsageError(
+      `${nodeModules} is a symbolic link; the QA stack cannot run from one. Replace it with a real install ("corepack yarn install --immutable") or a copy-on-write clone ("cp -c -R <source>/node_modules ${nodeModules}" on APFS)`,
+    );
+  }
+}
+
 function refusePlan<T>(plan: () => T): T {
   try {
     return plan();
@@ -505,6 +520,7 @@ export async function runQaStack(
     }
     const worktree = resolve(args.worktree);
     refuseUnsafeWorktree(deps, worktree);
+    refuseSymlinkedNodeModules(deps, worktree);
     const mergeBase = resolveCommit(deps, worktree, args.mergeBase);
     const head = resolveCommit(deps, worktree, args.head);
     const ancestry = git(deps, worktree, [
