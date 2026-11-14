@@ -290,7 +290,31 @@ Each row: scenario id/name → PASS/FAIL → artifact path or link → notes (op
   or equivalent). Do **not** block sign-off of the current PR on that follow-up existing — sign-off
   still follows the residue scenarios themselves.
 
-### E5. Sign-off
+### E5. Post the QA Report (PRD mode)
+
+After the Execution record and before Sign-off, post one QA Report comment on the PRD's Pull Request, so the Merge Train can read its QA fact ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Follow [The QA Report](../finish-standalone-runs/SKILL.md#the-qa-report) for the marker, the header and its two forms, and the update-never-add rule. A QA Report is one comment per Pull Request: update it on a re-run.
+
+- `result=failed` exactly when `yarn qa:grade` prints "QA failed". Both "QA passed" headlines are `result=passed`.
+- `commit` is the full lowercase 40-character SHA of the Pull Request head QA ran on.
+- `left-for-person` equals the items listed under Left for a person, counting every Left for a person item, every **Not proven** scenario, and every **FAIL: pre-existing** scenario not yet filed as an issue.
+
+```md
+<!-- qa-report -->
+
+QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>
+
+## QA Report
+
+Run by an agent. Result: <the `yarn qa:grade` headline>
+
+Execution record: <link to the QA Plan Issue's Execution record>
+
+### Left for a person
+```
+
+The QA Plan Issue's Execution record stays the full record. Keep the report to the headline, the link, and the items left for a person.
+
+### E6. Sign-off
 
 - Tick the Sign-off checklist (Issue mode: in `tmp/`; PRD mode: on the QA Plan Issue).
 - Report the verdict: all PASS → safe to merge from QA; any Stop-and-do-not-merge outcome → block
@@ -483,4 +507,5 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - The headline came from `yarn qa:grade`, not from judgement.
 - Defects and automatable-residue follow-ups were filed as issues (follow-ups do not block sign-off).
 - QA Artifacts follow the Evidence section and each scenario's `Capture:` line.
+- In PRD mode, one QA Report with the Merge Train's header is on the Pull Request, with a `left-for-person` that matches the items listed.
 - Sign-off checklist is ticked at the correct destination (QA Plan Issue vs `tmp/`).
