@@ -56,6 +56,16 @@
  * parameter allow-list cannot reach these: they are secrets by shape, under a
  * perfectly safe name or in the middle of a path.
  *
+ * Known secrets (#1554). A caller that knows the exact values a run must never
+ * show (`qa:run`: the password and vault passphrase of each QA Account a
+ * scenario looked up, and every `secret()` value) passes them as
+ * `knownSecrets`. On top of the rules above, never instead of them: a string
+ * they refuse still refuses, and any other string holding one as an exact
+ * substring is withheld whole, as is a Ciphertext value with one anywhere in
+ * it. Encoded, split or case-changed variants are out of scope on
+ * purpose, as in the caption privacy check. Without the option (`qa:redact`)
+ * nothing changes.
+ *
  * A refusal never echoes an unrecognised name. An unknown field is reported as
  * its containing path plus `key #n`, an unknown parameter as the string's path
  * plus `parameter #n`, an `@` as the string's path plus `(an @ in a URL)`, so a
@@ -432,12 +442,62 @@ function childPath(parent: string, key: string, index: number): string {
   return parent === '' ? shown : `${parent}.${shown}`;
 }
 
-export function redactTranscript(input: unknown): RedactionResult {
+/**
+ * Whether a string holds one of `secrets` as an exact substring. An empty
+ * value is ignored: it is a substring of everything, so it can never be a
+ * secret. Shared with the caption privacy check.
+ */
+export function holdsKnownSecret(
+  text: string,
+  secrets: readonly string[],
+): boolean {
+  return secrets.some((secret) => secret !== '' && text.includes(secret));
+}
+
+export interface RedactionOptions {
+  /** Exact values no string may hold (`holdsKnownSecret`). Held in memory only. */
+  knownSecrets?: readonly string[];
+}
+
+export function redactTranscript(
+  input: unknown,
+  options: RedactionOptions = {},
+): RedactionResult {
   const refusedPaths: string[] = [];
   const withheld: string[] = [];
   const shortened: string[] = [];
+  const knownSecrets = options.knownSecrets ?? [];
+  const holdsSecret = (text: string): boolean =>
+    holdsKnownSecret(text, knownSecrets);
 
+  /** Whether any string or key in a subtree holds a known secret. */
+  function subtreeHoldsKnownSecret(value: unknown): boolean {
+    if (typeof value === 'string') return holdsSecret(value);
+    if (Array.isArray(value)) return value.some(subtreeHoldsKnownSecret);
+    if (value !== null && typeof value === 'object') {
+      return Object.entries(value).some(
+        ([key, child]) => holdsSecret(key) || subtreeHoldsKnownSecret(child),
+      );
+    }
+    return false;
+  }
+
+  /**
+   * The existing rules first: a string they refuse still refuses. Otherwise a
+   * string holding a known secret is withheld whole.
+   */
   function walkString(value: string, path: string, key: string): string {
+    const refusedBefore = refusedPaths.length;
+    const withheldBefore = withheld.length;
+    const judged = applyStringRules(value, path, key);
+    if (refusedPaths.length > refusedBefore || !holdsSecret(value)) {
+      return judged;
+    }
+    if (withheld.length === withheldBefore) withheld.push(path);
+    return WITHHELD_MARKER;
+  }
+
+  function applyStringRules(value: string, path: string, key: string): string {
     const decoded = decodeBounded(value);
     const urlTyped = URL_TYPED_KEYS.has(key) || URL_START.test(decoded.value);
     if (urlTyped && !decoded.stable) {
@@ -486,6 +546,12 @@ export function redactTranscript(input: unknown): RedactionResult {
           : childPath(path, key, index);
         if (fieldClass === 'unknown') {
           refusedPaths.push(`${path} key #${index + 1}`.trim());
+          continue;
+        }
+        // Ciphertext is shortened, not walked: a known secret under it withholds it whole.
+        if (fieldClass === 'ciphertext' && subtreeHoldsKnownSecret(child)) {
+          withheld.push(here);
+          out[outKey] = WITHHELD_MARKER;
           continue;
         }
         if (fieldClass === 'withhold') withheld.push(here);

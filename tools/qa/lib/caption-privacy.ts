@@ -18,17 +18,15 @@
  */
 import {
   decodeBounded,
+  holdsKnownSecret,
   looksLikeCredentialValue,
 } from './redact-transcript.ts';
 import { SIDES } from './qa-switch.ts';
 import type { StoryboardInput } from './storyboard.ts';
 
 /** Whether one string leaks: it holds a secret verbatim, or a Bearer/JWT. */
-function leaks(text: string, secrets: readonly string[]): boolean {
-  // An empty secret is a substring of everything; it can never be a secret.
-  if (secrets.some((secret) => secret !== '' && text.includes(secret))) {
-    return true;
-  }
+export function leaks(text: string, secrets: readonly string[]): boolean {
+  if (holdsKnownSecret(text, secrets)) return true;
   return looksLikeCredentialValue(decodeBounded(text).value);
 }
 
