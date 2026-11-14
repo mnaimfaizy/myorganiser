@@ -460,6 +460,40 @@ describe('parseStepRecords: a step marked checked', () => {
   });
 });
 
+describe('parseStepRecords: the run context the band names (#1558)', () => {
+  const CONTEXT = {
+    changeKind: 'fix',
+    accounts: ['primary'],
+    devices: ['A', 'B'],
+    tabs: ['B1', 'B2'],
+  };
+
+  test('a well-formed context is kept as saved', () => {
+    assert.deepEqual(parse(recordsJson({ context: CONTEXT })).context, CONTEXT);
+  });
+
+  test('a file saved before the context existed parses with no context, and is not a problem', () => {
+    assert.equal(parse(recordsJson()).context, undefined);
+  });
+
+  test('a context that is malformed is refused, and the message quotes no value from it', () => {
+    const malformed: unknown[] = [
+      { ...CONTEXT, changeKind: 'refactor' },
+      { ...CONTEXT, accounts: 'primary' },
+      { ...CONTEXT, devices: ['zz-marker', 3] },
+      { ...CONTEXT, tabs: [null] },
+      'fix',
+      [],
+    ];
+    for (const context of malformed) {
+      assert.throws(() => parse(recordsJson({ context })), {
+        name: 'CombineInputError',
+        message: `${RECORDS_FILE} is not a step-records file: its context block is malformed`,
+      });
+    }
+  });
+});
+
 describe('resultOf: the graded result of one scenario in the run manifest', () => {
   const manifest = (scenarios: unknown) =>
     JSON.stringify({ scenarios, headline: 'QA passed' });

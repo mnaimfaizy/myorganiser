@@ -24,6 +24,7 @@ import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
 import type { Band, StoryboardSideInput } from './storyboard.ts';
+import { type RunContext, isRunContext } from './storyboard-context.ts';
 
 export const FFMPEG = 'ffmpeg';
 
@@ -80,6 +81,12 @@ export interface StepRecordsFile {
   commits: Record<Side, string>;
   /** Field names the caption check refused at `qa:run`; non-empty means no re-render. */
   refused?: string[];
+  /**
+   * What the band says of the run: change kind, QA Account ids, devices and
+   * tabs (#1558). Absent in records `qa:run` saved before it: they re-render
+   * without the line.
+   */
+  context?: RunContext;
   video?: StepRecordsVideo;
   sides: Partial<Record<Side, StoryboardSideInput>>;
 }
@@ -157,6 +164,9 @@ export function parseStepRecords(
       }
     }
   }
+  if (json.context !== undefined && !isRunContext(json.context)) {
+    return bad('its context block is malformed');
+  }
   const video = json.video;
   if (video !== undefined) {
     const sides = isRecord(video) ? video.sides : undefined;
@@ -219,8 +229,12 @@ const MP4_OUTPUT = [
 /** One side's recording panel in the MP4: the viewport every run uses, unscaled. */
 export const VIDEO_PANEL = VIEWPORT;
 
-/** The band across the top of the MP4, in pixels. */
-export const VIDEO_BAND_HEIGHT = 96;
+/**
+ * The band across the top of the MP4, in pixels: the title row, the run
+ * context line (#1558) and the commits line. The context line is one line
+ * and is cut with an ellipsis only past the width of the narrowest MP4.
+ */
+export const VIDEO_BAND_HEIGHT = 112;
 
 /** The strip under each side's panel (caption line, timing line), in pixels. */
 export const VIDEO_STRIP_HEIGHT = 88;

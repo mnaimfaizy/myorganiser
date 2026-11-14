@@ -6,13 +6,16 @@ import { describe, test } from 'node:test';
 
 import type { Box, ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
+import type { RunContext } from './storyboard-context.ts';
 import { CROP, cropFor } from './storyboard-crop.ts';
 import {
   BEFORE_SAME_STEP,
+  bandHtml,
   roleColour,
   storyboardHtml,
 } from './storyboard-html.ts';
 import {
+  type Band,
   MARK_TEXT,
   type StoryboardSideInput,
   buildStoryboard,
@@ -654,5 +657,64 @@ describe('storyboardHtml: the subject outline', () => {
     // The stills are drawn, so the absence of an outline is not an empty page.
     assert.equal(countOf(html, '<div class="still"'), 2);
     assert.equal(countOf(html, '<div class="outline"'), 0);
+  });
+});
+
+describe('bandHtml: the run context line (#1558)', () => {
+  const BAND_INPUT = {
+    id: 'S1',
+    title: 'Save an item',
+    expected: DIFFERENT_EXPECTED,
+    result: 'PASS' as const,
+    commits: COMMITS,
+  };
+  const CONTEXT: RunContext = {
+    changeKind: 'fix',
+    accounts: ['primary'],
+    devices: ['A', 'B'],
+    tabs: ['B1', 'B2', 'B3'],
+  };
+
+  test('a band with a context renders the context line, escaped, in its own div between the title and the commits', () => {
+    const band: Band = {
+      ...buildStoryboard({ ...BAND_INPUT, sides: {} }).band,
+      context: {
+        ...CONTEXT,
+        devices: ['<A>', 'B'],
+      },
+    };
+    const html = bandHtml(band);
+    assert.ok(
+      html.includes(
+        '<div class="context">Fix · QA Account primary · devices &lt;A&gt;, B (tabs B1, B2, B3)</div>',
+      ),
+    );
+    assert.equal(
+      html.includes('<A>'),
+      false,
+      'the raw device name is not drawn',
+    );
+    assert.ok(
+      html.indexOf('class="context"') < html.indexOf('class="meta"'),
+      'the line sits above the commits',
+    );
+  });
+
+  test('a band with no context renders no context div', () => {
+    const band = buildStoryboard({ ...BAND_INPUT, sides: {} }).band;
+    assert.equal('context' in band, false);
+    assert.equal(countOf(bandHtml(band), 'class="context"'), 0);
+  });
+
+  test('buildStoryboard carries the input context into the band, and omits the key when the input has none', () => {
+    const withContext = buildStoryboard({
+      ...BAND_INPUT,
+      context: CONTEXT,
+      sides: {},
+    });
+    assert.deepEqual(withContext.band.context, CONTEXT);
+
+    const without = buildStoryboard({ ...BAND_INPUT, sides: {} });
+    assert.equal('context' in without.band, false);
   });
 });

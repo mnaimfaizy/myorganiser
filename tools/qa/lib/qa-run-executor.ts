@@ -103,6 +103,7 @@ import {
   renderStoryboardPng,
   videoLabelFields,
 } from './qa-storyboard-files.ts';
+import { runContext } from './storyboard-context.ts';
 import {
   type Storyboard,
   type StoryboardInput,
@@ -122,6 +123,8 @@ export interface RecordedRun {
    * Held in memory only: never written to a file, the manifest or output.
    */
   denied?: string[];
+  /** The ids of the QA Accounts the scenario signed in with (ids only, no emails). */
+  accountIds?: string[];
   /** Each `step()`, its still inside the run's work directory. */
   steps: StepRecord[];
   /** Files inside the run's work directory, or `null` if none was recorded. */
@@ -318,6 +321,8 @@ async function runScenarios(
   const calls = new Map<string, Partial<Record<Side, RecordedCall[]>>>();
   /** Per scenario, the values its Storyboard may not show. In memory only. */
   const denied = new Map<string, Set<string>>();
+  /** QA Account ids each scenario signed in with, over both sides. */
+  const accountIds = new Map<string, Set<string>>();
 
   /** Each screen scenario's side runs, their step stills already kept under `--out`. */
   const stepRuns = new Map<
@@ -465,6 +470,9 @@ async function runScenarios(
     const values = denied.get(scenario.id) ?? new Set<string>();
     for (const value of recorded.denied ?? []) values.add(value);
     denied.set(scenario.id, values);
+    const ids = accountIds.get(scenario.id) ?? new Set<string>();
+    for (const id of recorded.accountIds ?? []) ids.add(id);
+    accountIds.set(scenario.id, ids);
     record.runs[side] =
       recorded.message === undefined
         ? { outcome: recorded.outcome }
@@ -571,6 +579,11 @@ async function runScenarios(
       // The check reads text only; an ungraded scenario returns before the model is built.
       result: result ?? 'Not proven',
       commits,
+      context: runContext(
+        args.changeKind,
+        [...(accountIds.get(scenario.id) ?? [])],
+        SIDES.flatMap((side) => sides[side]?.steps ?? []),
+      ),
       sides,
     };
     const secrets = [...(denied.get(scenario.id) ?? [])];
@@ -592,6 +605,7 @@ async function runScenarios(
           title: kept.title,
           expected: kept.expected,
           commits,
+          context: kept.context,
           // Field names only. A re-render (`qa:combine`) refuses a file that lists any.
           ...(leakingFields.length > 0 ? { refused: leakingFields } : {}),
           ...(isVideoScenario(scenario)

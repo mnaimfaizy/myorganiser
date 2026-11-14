@@ -7,11 +7,14 @@ import { describe, test } from 'node:test';
 
 import {
   type CheckedField,
+  WITHHELD_FIELD,
+  captionFields,
   findCaptionLeaks,
   withholdLeaks,
 } from './caption-privacy.ts';
 import type { StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
+import type { RunContext } from './storyboard-context.ts';
 import type { StoryboardInput, StoryboardSideInput } from './storyboard.ts';
 
 // Obviously fake values, each under the 16-character fixture limit.
@@ -340,5 +343,104 @@ describe('an After-only Storyboard: no before side and no expected.before', () =
       withheld,
       patchStep(afterOnly(), 'after', 1, { caption: '[withheld]' }),
     );
+  });
+});
+
+describe('a run context on the band: its account ids, devices and tabs are checked by name (#1558)', () => {
+  /** A run context: one account, two devices, two tabs. */
+  const CONTEXT: RunContext = {
+    changeKind: 'fix',
+    accounts: ['primary'],
+    devices: ['A', 'B'],
+    tabs: ['B1', 'B2'],
+  };
+  /** A clean Storyboard that names the given run context. */
+  const withContextOf = (context: RunContext): StoryboardInput => ({
+    ...clean(),
+    context,
+  });
+  const withContext = (): StoryboardInput => withContextOf(CONTEXT);
+
+  test('captionFields names each account, device and tab of the band, after the expected results and before the sides', () => {
+    const fields = captionFields(withContext()).map(({ field, text }) => ({
+      field,
+      text,
+    }));
+    const band = fields.filter(({ field }) => field.includes(' band '));
+    assert.deepEqual(band, [
+      { field: 'S1 band account 1', text: 'primary' },
+      { field: 'S1 band device 1', text: 'A' },
+      { field: 'S1 band device 2', text: 'B' },
+      { field: 'S1 band tab 1', text: 'B1' },
+      { field: 'S1 band tab 2', text: 'B2' },
+    ]);
+    const position = (field: string) =>
+      fields.findIndex((entry) => entry.field === field);
+    const firstBand = position('S1 band account 1');
+    assert.ok(position('S1 expected after') < firstBand, 'after expected');
+    assert.ok(firstBand < position('S1 before message'), 'before the sides');
+  });
+
+  test('a Storyboard with no context has no band field', () => {
+    assert.equal(
+      captionFields(clean()).some(({ field }) => field.includes(' band ')),
+      false,
+    );
+  });
+
+  test('a QA Account password, device or tab name is refused by exactly that band field name', () => {
+    const cases: [string, RunContext][] = [
+      ['S1 band account 1', { ...CONTEXT, accounts: [PASSWORD] }],
+      ['S1 band device 2', { ...CONTEXT, devices: ['A', PASSWORD] }],
+      ['S1 band tab 1', { ...CONTEXT, tabs: [PASSPHRASE, 'B2'] }],
+    ];
+    for (const [field, context] of cases) {
+      assert.deepEqual(
+        findCaptionLeaks(withContextOf(context), ALL_SECRETS),
+        [field],
+        field,
+      );
+    }
+  });
+
+  test('a Bearer value in a device name is refused with no secret supplied, by its band field name', () => {
+    const input = withContextOf({ ...CONTEXT, devices: ['A', BEARER] });
+    assert.deepEqual(findCaptionLeaks(input, []), ['S1 band device 2']);
+  });
+
+  test('withholdLeaks replaces only the leaking context entries with [withheld], keeps the rest, and the output holds no secret', () => {
+    const leaking: StoryboardInput = {
+      ...withContext(),
+      context: {
+        changeKind: 'fix',
+        accounts: ['primary'],
+        devices: ['A', PASSWORD],
+        tabs: ['B1', PASSPHRASE],
+      },
+    };
+    assert.deepEqual(findCaptionLeaks(leaking, ALL_SECRETS), [
+      'S1 band device 2',
+      'S1 band tab 2',
+    ]);
+
+    const withheld = withholdLeaks(leaking, ALL_SECRETS);
+
+    assert.deepEqual(withheld.context, {
+      changeKind: 'fix',
+      accounts: ['primary'],
+      devices: ['A', WITHHELD_FIELD],
+      tabs: ['B1', WITHHELD_FIELD],
+    });
+    assert.deepEqual(findCaptionLeaks(withheld, ALL_SECRETS), []);
+    assert.equal(JSON.stringify(withheld).includes(PASSWORD), false);
+    assert.equal(JSON.stringify(withheld).includes(PASSPHRASE), false);
+  });
+
+  test('withholdLeaks leaves a clean context equal, and a Storyboard with no context has no context key', () => {
+    assert.deepEqual(
+      withholdLeaks(withContext(), ALL_SECRETS).context,
+      withContext().context,
+    );
+    assert.equal('context' in withholdLeaks(clean(), ALL_SECRETS), false);
   });
 });

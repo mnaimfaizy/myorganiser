@@ -59,6 +59,10 @@ interface Scripted {
   captions?: string[];
   /** The wall clock the run began at, as the browser runner reports it; absent when it reports none. */
   startedAtMs?: number;
+  /** Each step's device and tab by call order; a step past the list is on Desktop with no tab. */
+  places?: { device: string; tab: string }[];
+  /** The ids of the QA Accounts the run signed in with, as the browser runner reports them; absent when it reports none. */
+  accountIds?: string[];
 }
 
 const DEFAULT_RUN: Scripted = {
@@ -156,12 +160,16 @@ function fakeRun(options: Partial<Plan> = {}) {
         (_, i) => {
           const still = `${workDir}/${String(i + 1).padStart(2, '0')}.png`;
           disk.add(still);
+          const place = scripted.places?.[i];
           return {
             side,
             index: i + 1,
-            device: 'Desktop',
-            tab: '',
-            label: 'Device Desktop',
+            device: place?.device ?? 'Desktop',
+            tab: place?.tab ?? '',
+            label:
+              place === undefined
+                ? 'Device Desktop'
+                : `Device ${place.device} · tab ${place.tab}`,
             caption: scripted.captions?.[i] ?? `step ${i + 1}`,
             still,
             subject: null,
@@ -186,6 +194,9 @@ function fakeRun(options: Partial<Plan> = {}) {
       if (scripted.observed !== undefined)
         recorded.observed = scripted.observed;
       if (scripted.denied !== undefined) recorded.denied = scripted.denied;
+      if (scripted.accountIds !== undefined) {
+        recorded.accountIds = scripted.accountIds;
+      }
       return recorded;
     },
     async renderStoryboard(storyboard, stillRoot, pngPath) {
@@ -2472,6 +2483,127 @@ describe('the step records a video scenario saves for its re-render (PRD #1550)'
     );
     assert.deepEqual(re.annotations, []);
     assert.equal(re.disk.has(storyboardPng('S')), true);
+  });
+});
+
+describe('the run context a Storyboard band names, saved in the step records (#1558)', () => {
+  /** A value the browser reports as denied, held only in the run's memory. */
+  const DENIED = 'hunter2-fake';
+  /** Two steps: step 1 on device A's tab B1, step 2 on device B's tab B2; the same on both sides. */
+  const PLACES = [
+    { device: 'A', tab: 'B1' },
+    { device: 'B', tab: 'B2' },
+  ];
+
+  /** The context and refused fields `qa:run` saved for scenario `id`. */
+  function savedRecords(
+    fake: ReturnType<typeof fakeRun>,
+    id: string,
+  ): { context?: unknown; refused?: string[] } {
+    const text = fake.files.get(`${OUT}/steps/${id}.json`);
+    assert.ok(text !== undefined, 'the step records were written');
+    return JSON.parse(text) as { context?: unknown; refused?: string[] };
+  }
+
+  test('a fix on devices A and B, tabs B1 and B2, signed in as the primary account, saves that context and draws the Storyboard', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        steps: 2,
+        places: PLACES,
+        accountIds: ['primary'],
+        denied: [DENIED],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    assert.equal(fake.renders.length, 1, 'the Storyboard is drawn');
+    assert.deepEqual(savedRecords(fake, 'S').context, {
+      changeKind: 'fix',
+      accounts: ['primary'],
+      devices: ['A', 'B'],
+      tabs: ['B1', 'B2'],
+    });
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
+  });
+
+  test('a feature names its change kind as feature, and saves the account its After side signed in with', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        steps: 2,
+        places: PLACES,
+        accountIds: side === 'after' ? ['primary'] : undefined,
+      }),
+    });
+    await runQaRun(argvFor('feature'), fake.deps);
+    assert.deepEqual(savedRecords(fake, 'S').context, {
+      changeKind: 'feature',
+      accounts: ['primary'],
+      devices: ['A', 'B'],
+      tabs: ['B1', 'B2'],
+    });
+  });
+
+  test('the account ids of both sides are merged: each once, sorted', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        steps: 2,
+        places: PLACES,
+        accountIds: side === 'before' ? ['secondary', 'primary'] : ['primary'],
+      }),
+    });
+    assert.equal(await runQaRun(argvFor('fix'), fake.deps), 0);
+    assert.deepEqual(savedRecords(fake, 'S').context, {
+      changeKind: 'fix',
+      accounts: ['primary', 'secondary'],
+      devices: ['A', 'B'],
+      tabs: ['B1', 'B2'],
+    });
+  });
+
+  test('a tab name holding a denied value withholds that tab in the saved context, names it as refused, and draws no Storyboard', async () => {
+    const fake = fakeRun({
+      exports: filesOf(scenario('S', 'screenshot')),
+      runs: (id, side) => ({
+        ...reproduced(id, side),
+        steps: 2,
+        places: [
+          { device: 'A', tab: 'B1' },
+          { device: 'B', tab: DENIED },
+        ],
+        accountIds: ['primary'],
+        denied: [DENIED],
+      }),
+    });
+    const exit = await runQaRun(argvFor('fix'), fake.deps);
+    assert.equal(exit, 1);
+    assert.deepEqual(fake.renders, [], 'no Storyboard is drawn');
+
+    const saved = savedRecords(fake, 'S');
+    assert.deepEqual(saved.context, {
+      changeKind: 'fix',
+      accounts: ['primary'],
+      devices: ['A', 'B'],
+      tabs: ['B1', '[withheld]'],
+    });
+    assert.ok(
+      saved.refused?.includes('S band tab 2'),
+      `the band field is named as refused: ${saved.refused?.join('; ')}`,
+    );
+    const [entry] = manifestOf(fake).scenarios;
+    assert.ok(
+      entry.problems.some((problem) => problem.includes('S band tab 2')),
+      'run.json names the band field',
+    );
+    for (const text of everyOutput(fake)) {
+      assert.equal(text.includes(DENIED), false, 'the value is in no output');
+    }
   });
 });
 

@@ -25,6 +25,7 @@ import { VIEWPORT } from './qa-run.ts';
 import type { StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
 import { SIDES } from './qa-switch.ts';
+import { contextLine } from './storyboard-context.ts';
 import { CROP, cropFor, OUTLINE_OFFSET } from './storyboard-crop.ts';
 import {
   type Band,
@@ -186,6 +187,7 @@ body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:$
 .band .top{display:flex;align-items:center;gap:${token('space-md')}}
 .band h1{font-size:${token('type-title-size')};margin:0;font-weight:${token('font-weight-bold')}}
 .result{font-weight:${token('font-weight-bold')};font-size:${token('type-control-sm-size')};padding:${token('space-xs')} ${token('space-sm')};border-radius:${token('radius-md')};white-space:nowrap}
+.band .context{color:${roleColour('navy-foreground')};font-size:${token('type-caption-size')};margin-top:${token('space-xs')}}
 .band .meta{color:${roleColour('navy-muted-foreground')};font-size:${token('type-caption-size')};margin-top:${token('space-xs')}}
 .cards{display:grid;grid-template-columns:repeat(var(--columns),1fr);gap:${token('space-md')};padding:${token('space-md')} ${token('space-lg')}}
 .card{border:1px solid ${roleColour('border')};border-radius:${token('radius-md')};padding:${token('space-sm')} ${token('space-md')}}
@@ -215,13 +217,13 @@ body{margin:0;width:${VIEWPORT.width}px;background:${roleColour('card')};color:$
 
 /** The band: the scenario, its graded result and each side's commit. The MP4 shows it too. */
 export function bandHtml(band: Band): string {
-  const { id, title, result, commits, alike } = band;
+  const { id, title, result, commits, alike, context } = band;
   const tone = RESULT_TONE[result];
   const meta = SIDES.map(
     (side) =>
       `${SIDE_WORDS[side].name} ${escapeHtml(shortSha(commits[side]))} (${SIDE_WORDS[side].commit})`,
   ).join(' · ');
-  return `<header class="band"><div class="top"><h1>${escapeHtml(`${id} · ${title}`)}</h1><span class="result" style="background:${tone.background};color:${tone.color}">${escapeHtml(result)}</span></div><div class="meta">${alike ? `${escapeHtml(alike)} · ` : ''}${meta}</div></header>`;
+  return `<header class="band"><div class="top"><h1>${escapeHtml(`${id} · ${title}`)}</h1><span class="result" style="background:${tone.background};color:${tone.color}">${escapeHtml(result)}</span></div>${context ? `<div class="context">${escapeHtml(contextLine(context))}</div>` : ''}<div class="meta">${alike ? `${escapeHtml(alike)} · ` : ''}${meta}</div></header>`;
 }
 
 function cardHtml(card: SideCard): string {

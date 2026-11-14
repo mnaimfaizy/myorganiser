@@ -225,6 +225,7 @@ async function recombine(
     expected: records.expected,
     result,
     commits: records.commits,
+    ...(records.context === undefined ? {} : { context: records.context }),
     sides: records.sides,
   };
   // No secrets are saved, so only the Bearer/JWT half of the check can run.
