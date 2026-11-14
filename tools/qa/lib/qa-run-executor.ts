@@ -17,6 +17,14 @@
  * title, captions and labels, and each side's MP4 tab label is passed to
  * the same check as one more field, so the one check covers both.
  *
+ * `run.json` gets the same check (#1554): every side's failure message and
+ * every problem, whatever the capture, against the run's known secrets (every
+ * scenario's, both sides) and the Bearer/JWT detectors. A message that leaks
+ * is kept owner-only in `local/<id>-<side>.message.txt` and replaced by a
+ * marker naming that file; a problem that leaks is replaced by a marker. The
+ * same secrets go to the Request Transcript redactor as exact values it must
+ * withhold. A tab's local recording is named by side and tab number only.
+ *
  * Exit 0 = every scenario ran and graded, the headline is not QA failed, and
  * every kept file was made. 1 = QA failed, the stack or a switch failed
  * closed (no scenario starts on that side), or a kept file could not be made
@@ -85,6 +93,7 @@ import {
   type CheckedField,
   WITHHELD_FIELD,
   findCaptionLeaks,
+  leaks,
   withholdLeaks,
 } from './caption-privacy.ts';
 import { redactTranscript, renderTranscript } from './redact-transcript.ts';
@@ -171,21 +180,31 @@ export interface RunDeps {
   err(line: string): void;
 }
 
-/** Where a non-default tab's recording is kept: local, numbered so odd names never collide. */
+/**
+ * Where a non-default tab's recording is kept: local, by side and tab number
+ * only. Device and tab names are author-written and could hold a secret.
+ */
 export function tabVideoPath(
   out: string,
   id: string,
   side: Side,
   n: number,
-  tab: { device: string; tab: string },
 ): string {
-  const safe = (text: string) => text.replace(/[^A-Za-z0-9_-]/g, '_');
-  return join(
-    out,
-    'local',
-    `${id}-${side}-tab${n}-${safe(tab.device)}-${safe(tab.tab)}.webm`,
-  );
+  return join(out, 'local', `${id}-${side}-tab${n}.webm`);
 }
+
+/** Where a withheld failure message is kept: local, owner-only, relative to `--out`. */
+export function withheldMessagePath(id: string, side: Side): string {
+  return join('local', `${id}-${side}.message.txt`);
+}
+
+/** What `run.json` shows for a failure message that leaks. */
+export function withheldMessage(id: string, side: Side): string {
+  return `[withheld: it holds a secret or credential; the message is in ${withheldMessagePath(id, side)}]`;
+}
+
+/** What `run.json` shows for a problem that leaks. */
+export const WITHHELD_PROBLEM = '[withheld: it holds a secret or credential]';
 
 const CLEAN_UP =
   'stop whatever the QA stack left running with "yarn qa:stack:stop" before anything else';
@@ -247,6 +266,31 @@ export async function runQaRun(
     deps.err(`qa:run: ${firstLine(error)}; ${CLEAN_UP}`);
     return 1;
   }
+}
+
+/**
+ * Withholds from a scenario's `run.json` entry every failure message and
+ * problem that leaks. A leaking message is first kept owner-only under
+ * `local/`, so the session can still read it.
+ */
+function withholdRunJson(
+  record: ScenarioRecord,
+  secrets: readonly string[],
+  out: string,
+  deps: Pick<RunDeps, 'makeDir' | 'writeFile'>,
+): void {
+  for (const side of SIDES) {
+    const run = record.runs[side];
+    if (run?.message === undefined || !leaks(run.message, secrets)) continue;
+    const path = join(out, withheldMessagePath(record.id, side));
+    deps.makeDir(dirname(path));
+    deps.writeFile(path, `${run.message}\n`);
+    record.files.push({ path, place: 'local' });
+    run.message = withheldMessage(record.id, side);
+  }
+  record.problems = record.problems.map((problem) =>
+    leaks(problem, secrets) ? WITHHELD_PROBLEM : problem,
+  );
 }
 
 async function runScenarios(
@@ -317,12 +361,10 @@ async function runScenarios(
   ): void {
     for (const [n, tab] of (recorded.tabVideos ?? []).entries()) {
       if (tab.path === null) {
-        record.problems.push(
-          `${side}: no video was recorded for device ${tab.device}, tab ${tab.tab}`,
-        );
+        record.problems.push(`${side}: no video was recorded for tab ${n + 1}`);
         continue;
       }
-      const dest = tabVideoPath(args.out, scenario.id, side, n + 1, tab);
+      const dest = tabVideoPath(args.out, scenario.id, side, n + 1);
       deps.makeDir(dirname(dest));
       deps.moveFile(tab.path, dest);
       record.files.push({ path: dest, place: 'local' });
@@ -375,7 +417,7 @@ async function runScenarios(
           record.problems.push(
             isDefault
               ? `${side}: no video was recorded`
-              : `${side}: no video was recorded for device ${tab.device}, tab ${tab.tab}`,
+              : `${side}: no video was recorded for tab ${tabNumber}`,
           );
         }
         continue;
@@ -384,7 +426,7 @@ async function runScenarios(
         ? keptPath(args.out, scenario.id, side, 'video', 'side')
         : isDefault
           ? keptPath(args.out, scenario.id, side, 'video', 'local')
-          : tabVideoPath(args.out, scenario.id, side, tabNumber, tab);
+          : tabVideoPath(args.out, scenario.id, side, tabNumber);
       deps.makeDir(dirname(dest));
       deps.moveFile(tab.path, dest);
       record.files.push({ path: dest, place: isMp4 ? side : 'local' });
@@ -468,7 +510,8 @@ async function runScenarios(
    */
   function videoRecord(
     scenario: VideoScenario,
-    leaks: readonly string[],
+    leakingFields: readonly string[],
+    secrets: readonly string[],
   ): StepRecordsVideo {
     const sides: StepRecordsVideo['sides'] = {};
     let anyRefused = false;
@@ -478,7 +521,9 @@ async function runScenarios(
       const { device, tab, openedAtMs } = choice.recording;
       // A label is built from its device and tab names, so a refused label
       // withholds all three.
-      const refused = leaks.includes(`${scenario.id} video ${side} label`);
+      const refused = leakingFields.includes(
+        `${scenario.id} video ${side} label`,
+      );
       if (refused) anyRefused = true;
       sides[side] = refused
         ? {
@@ -489,7 +534,12 @@ async function runScenarios(
           }
         : { device, tab, label: choice.label, openedAtMs };
     }
-    return { tab: anyRefused ? WITHHELD_FIELD : scenario.tab, sides };
+    // The declared tab is written even when no side built a label from it.
+    const tabLeaks = leaks(scenario.tab, secrets);
+    return {
+      tab: anyRefused || tabLeaks ? WITHHELD_FIELD : scenario.tab,
+      sides,
+    };
   }
 
   /**
@@ -520,8 +570,9 @@ async function runScenarios(
     const videoLabels: CheckedField[] = isVideoScenario(scenario)
       ? videoLabelFields(scenario.id, mp4Tabs.get(scenario.id) ?? {})
       : [];
-    const leaks = findCaptionLeaks(input, secrets, videoLabels);
-    const kept = leaks.length > 0 ? withholdLeaks(input, secrets) : input;
+    const leakingFields = findCaptionLeaks(input, secrets, videoLabels);
+    const kept =
+      leakingFields.length > 0 ? withholdLeaks(input, secrets) : input;
     const recordsPath = stepRecordsPath(args.out, scenario.id);
     deps.makeDir(dirname(recordsPath));
     deps.writeFile(
@@ -534,9 +585,9 @@ async function runScenarios(
           expected: kept.expected,
           commits,
           // Field names only. A re-render (`qa:combine`) refuses a file that lists any.
-          ...(leaks.length > 0 ? { refused: leaks } : {}),
+          ...(leakingFields.length > 0 ? { refused: leakingFields } : {}),
           ...(isVideoScenario(scenario)
-            ? { video: videoRecord(scenario, leaks) }
+            ? { video: videoRecord(scenario, leakingFields, secrets) }
             : {}),
           sides: kept.sides,
         },
@@ -545,14 +596,10 @@ async function runScenarios(
       )}\n`,
     );
     record.files.push({ path: recordsPath, place: 'local' });
-    if (leaks.length > 0) {
-      // The raw failure message must not reach run.json for a refused scenario.
-      for (const side of SIDES) {
-        const run = record.runs[side];
-        if (run?.message !== undefined) run.message = WITHHELD_FIELD;
-      }
+    if (leakingFields.length > 0) {
+      // A leaking failure message is withheld from run.json with every other one (withholdRunJson).
       record.problems.push(
-        `the Storyboard was refused: a secret or credential is in ${leaks.join('; ')}`,
+        `the Storyboard was refused: a secret or credential is in ${leakingFields.join('; ')}`,
       );
       return null;
     }
@@ -669,6 +716,10 @@ async function runScenarios(
     throw error;
   }
   const results = new Map(report.scenarios.map((s) => [s.id, s.result]));
+  /** Every scenario's known secrets, both sides. In memory only. */
+  const runSecrets = [
+    ...new Set([...denied.values()].flatMap((values) => [...values])),
+  ];
 
   for (const scenario of scenarios) {
     const record = recordOf(scenario.id);
@@ -682,7 +733,7 @@ async function runScenarios(
     }
     if (scenario.capture === 'transcript') {
       const input = transcriptInput(scenario.id, calls.get(scenario.id) ?? {});
-      const redacted = redactTranscript(input);
+      const redacted = redactTranscript(input, { knownSecrets: runSecrets });
       if (redacted.ok) {
         const path = join(args.out, 'transcripts', `${scenario.id}.md`);
         deps.makeDir(dirname(path));
@@ -701,6 +752,9 @@ async function runScenarios(
     }
   }
 
+  for (const record of records.values()) {
+    withholdRunJson(record, runSecrets, args.out, deps);
+  }
   const manifest = buildManifest(args, report, [...records.values()]);
   const manifestPath = join(args.out, 'run.json');
   deps.makeDir(args.out);
