@@ -4,6 +4,8 @@
 
 accepted
 
+Partly superseded by [ADR 0150](0150-a-screen-scenarios-qa-artifact-is-a-storyboard.md): decision 5 entirely, and what `video` and `screenshot` mean in decision 4.
+
 Amends [ADR 0142](0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md) on how a QA session drives the app, which QA Artifacts may be uploaded, and how QA sessions start. Builds on [ADR 0048](0048-a-qa-plan-carries-only-what-automation-does-not-prove.md): its two-point coverage run now extends to the QA Plan's own scenarios.
 
 ## Context

@@ -333,14 +333,13 @@ A QA Artifact is captured only where a written result would not be enough, and s
 
 QA-specific lines:
 
-1. **One short demo video** covering residue scenarios only — start recording **after** Setup
-   (login, vault mint, MailHog) is done.
-2. **Screenshots** for assertions about presence/absence of fields or copy (e.g. no **Current
-   passphrase** after recovery unlock).
+1. **A `video` scenario** for residue flows: its script starts after Setup (login, vault mint,
+   MailHog) is done, and its steps are the Storyboard's rows.
+2. **A `screenshot` scenario** for assertions about presence/absence of fields or copy (e.g. no
+   **Current passphrase** after recovery unlock).
 
-A fix's Before and After captures are combined into one QA Artifact with `yarn qa:combine`: a
-screenshot pair into one labelled side-by-side PNG, a video pair into one side-by-side MP4 plus a GIF
-preview. Only a combined file may be uploaded, and the upload rules follow the result
+A screen scenario's QA Artifact is a Storyboard PNG made by `yarn qa:run`: numbered steps, Before beside After, under a band naming the scenario, each side's expected and observed result, and the result. A `Capture: video` scenario also keeps an annotated MP4 of the tab it names
+([ADR 0150](../../../docs/adr/0150-a-screen-scenarios-qa-artifact-is-a-storyboard.md)). Only that combined file may be uploaded, and the upload rules follow the result
 ([Uploading QA Artifacts](../finish-standalone-runs/SKILL.md#uploading-qa-artifacts)): a Before that
 shows the defect and a FAIL: pre-existing's file may be offered, as may Not proven and Left for a
 person (none is a failed run; ADR 0142 decision 3, ADR 0147 decision 6), a FAIL: regression's stays in
@@ -361,7 +360,7 @@ choice.
 
 Every scenario carries a `Capture:` line naming the QA Artifact it keeps
 ([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)
-decision 4). Set it while composing, using these criteria:
+decision 4; [ADR 0150](../../../docs/adr/0150-a-screen-scenarios-qa-artifact-is-a-storyboard.md) defines what `video` and `screenshot` keep). Set it while composing, using these criteria:
 
 | `Capture:`   | Use it when                                                                                                      |
 | ------------ | ---------------------------------------------------------------------------------------------------------------- |
@@ -425,7 +424,7 @@ Numbered. Each carries:
   - Why only a human can prove this — one sentence, the justification for its existence
   - Steps, using real UI copy
   - `Capture:` — video, screenshot, transcript or none (see The `Capture:` line)
-  - Expected result
+  - `Expected — Before: … / After: …`, or `Expected — After: …` for a feature run After only. The scenario script copies it into `expected: { before, after }`, and the scenario's heading into `title`
   - What a failure means — whether it blocks the merge or is a follow-up
   - If this fails, first rule out… — required when the scenario uses a Recovery Key or
     other high-entropy secret
@@ -468,7 +467,7 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - Every coverage claim is tagged `[observed]` or `[reconstructed]`.
 - No scenario re-tests something the coverage section says is covered.
 - Every scenario states why a human is required for it.
-- Every scenario carries a `Capture:` line.
+- Every scenario carries a `Capture:` line and an `Expected —` line, per side for a fix.
 - Steps quote UI copy read from source, not invented.
 - Secret-touching scenarios include failure-class preconditions.
 - Pre-existing failures appear as red herrings, never as scenarios.

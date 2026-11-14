@@ -327,7 +327,8 @@ export function decodeBounded(value: string): {
   return { value: current, stable: decodeOnce(current) === current };
 }
 
-function looksLikeCredentialValue(decoded: string): boolean {
+/** Whether a decoded string holds a Bearer/Basic value or a JWT. Exported for the caption privacy check; behaviour unchanged. */
+export function looksLikeCredentialValue(decoded: string): boolean {
   return AUTH_SCHEME_VALUE.test(decoded) || JWT.test(decoded);
 }
 

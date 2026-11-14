@@ -1,39 +1,42 @@
 // Contracts for the scenario runner's pure rules (ADR 0147 decisions 1-4 and 7),
 // exercised through the public exports of qa-run.ts. Nothing here touches disk,
-// a process or a browser. The steps that do are tested in
+// a process or a browser. The scenario contract itself (parseScenario and
+// checkScenarioIds) is qa-scenario.test.ts. The steps that do are tested in
 // qa-run-executor.test.ts, through runQaRun with a stubbed RunDeps.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import { type GradingReport, SCENARIO_RESULTS } from './grade-scenarios.ts';
 import {
-  COMBINED_CAPTURE,
-  type Capture,
+  FFMPEG_CAPTURE,
   type FilePlace,
   type KeptPlace,
   type RecordedCall,
   type Recording,
   type RunArgs,
-  RunInputError,
   type RunOutcome,
-  type Scenario,
   type ScenarioRecord,
+  type SideTabRecording,
   STACK_LEFT_UP,
+  annotatedVideoPath,
   buildManifest,
-  checkScenarioIds,
-  combineArgs,
-  combinedFiles,
   gradingInput,
   keptPath,
   keptRecordings,
   manifestFile,
+  mp4TabOf,
   needsFfmpeg,
+  parseOptions,
   parseRunArgs,
-  parseScenario,
   rerunOnMergeBase,
   stackStartArgs,
+  stepRecordsPath,
+  stepStillDir,
+  stepStillPath,
+  storyboardPath,
   transcriptInput,
 } from './qa-run.ts';
+import { type Capture, RunInputError } from './qa-scenario.ts';
 
 const REPO = '/repo';
 const WT = '/wt';
@@ -87,8 +90,6 @@ const RUN_ARGS: RunArgs = {
   scenarios: SCENARIOS,
   out: OUT,
 };
-
-const noop = async (): Promise<void> => undefined;
 
 describe('keptRecordings: the capture-keeping policy', () => {
   // Every capture x outcome cell, as ADR 0147 decision 4 and KEEP state it.
@@ -152,79 +153,20 @@ describe('keptPath', () => {
   });
 });
 
-describe('parseScenario', () => {
-  test('accepts a valid scenario object and returns it unchanged', () => {
-    const scenario = { id: 'S1', capture: 'video', run: noop };
-    assert.equal(parseScenario(scenario, 'a.ts'), scenario);
-  });
-
-  test('refuses a non-object export, naming the file', () => {
-    for (const exported of [null, 'S1', 3]) {
-      refusal(
-        () => parseScenario(exported, 'scenarios/a.ts'),
-        /scenarios\/a\.ts/,
-      );
-    }
-  });
-
-  test('refuses an id that is empty or contains a separator or a dot, naming the file', () => {
-    for (const id of ['', 'a/b', 'a.b']) {
-      refusal(
-        () =>
-          parseScenario({ id, capture: 'none', run: noop }, 'scenarios/a.ts'),
-        /scenarios\/a\.ts: id must be/,
-      );
-    }
-  });
-
-  test('refuses an unknown or missing capture, naming the file', () => {
-    refusal(
-      () =>
-        parseScenario(
-          { id: 'S1', capture: 'gif', run: noop },
-          'scenarios/a.ts',
-        ),
-      /scenarios\/a\.ts: capture must be one of/,
-    );
-    refusal(
-      () => parseScenario({ id: 'S1', run: noop }, 'scenarios/a.ts'),
-      /scenarios\/a\.ts: capture must be one of/,
-    );
-  });
-
-  test('refuses a run that is not a function, naming the file', () => {
-    refusal(
-      () =>
-        parseScenario(
-          { id: 'S1', capture: 'none', run: 'nope' },
-          'scenarios/a.ts',
-        ),
-      /scenarios\/a\.ts: run must be a function/,
-    );
-  });
-});
-
-describe('checkScenarioIds', () => {
-  test('refuses an empty list of scenarios', () => {
-    refusal(() => checkScenarioIds([]), /no scenario scripts/);
-  });
-
-  test('refuses two scripts with the same id', () => {
-    const twice: Scenario[] = [
-      { id: 'S1', capture: 'none', run: noop },
-      { id: 'S1', capture: 'video', run: noop },
-    ];
-    refusal(() => checkScenarioIds(twice), /scenario id "S1" is used twice/);
-  });
-});
-
 describe('needsFfmpeg', () => {
-  test('is true when some scenario keeps a video or a screenshot', () => {
+  test('is true when some scenario keeps a video, even mixed with none', () => {
     assert.equal(needsFfmpeg([{ capture: 'video' }]), true);
-    assert.equal(needsFfmpeg([{ capture: 'screenshot' }]), true);
+    assert.equal(
+      needsFfmpeg([{ capture: 'none' }, { capture: 'video' }]),
+      true,
+    );
+  });
+
+  test('is false for a screenshot, since its Storyboard is rendered in Chromium', () => {
+    assert.equal(needsFfmpeg([{ capture: 'screenshot' }]), false);
     assert.equal(
       needsFfmpeg([{ capture: 'none' }, { capture: 'screenshot' }]),
-      true,
+      false,
     );
   });
 
@@ -382,19 +324,9 @@ describe('gradingInput', () => {
   });
 });
 
-describe('combineArgs', () => {
-  test('combines the kept Before and After files into <out>/combined/<id>', () => {
-    assert.deepEqual(
-      combineArgs(OUT, 'S1', `${OUT}/before/S1.png`, `${OUT}/after/S1.png`),
-      [
-        '--before',
-        `${OUT}/before/S1.png`,
-        '--after',
-        `${OUT}/after/S1.png`,
-        '--out',
-        `${OUT}/combined/S1`,
-      ],
-    );
+describe('annotatedVideoPath', () => {
+  test("a video scenario's annotated MP4 is combined/<id>.mp4 under --out", () => {
+    assert.equal(annotatedVideoPath(OUT, 'S1'), `${OUT}/combined/S1.mp4`);
   });
 });
 
@@ -499,7 +431,7 @@ describe('buildManifest', () => {
     ]);
   });
 
-  test('a PASS offers its combined file and nothing else', () => {
+  test('a PASS offers its combined file and withholds its before file', () => {
     const report: GradingReport = {
       headline: 'QA passed',
       scenarios: [{ id: 'S1', result: 'PASS', maintainerDecision: false }],
@@ -526,6 +458,23 @@ describe('buildManifest', () => {
     );
   });
 
+  test('a scenario the report grades but no record covers is refused', () => {
+    refusal(
+      () =>
+        buildManifest(
+          { changeKind: 'fix', mergeBase: MERGE_BASE, head: HEAD },
+          {
+            headline: 'QA passed',
+            scenarios: [
+              { id: 'S1', result: 'PASS', maintainerDecision: false },
+            ],
+          },
+          [],
+        ),
+      /scenario "S1" has no record/,
+    );
+  });
+
   test('the manifest names the stack command that leaves the QA stack up for judgement', () => {
     const manifest = buildManifest(
       { changeKind: 'fix', mergeBase: MERGE_BASE, head: HEAD },
@@ -537,48 +486,102 @@ describe('buildManifest', () => {
   });
 });
 
-describe('combinedFiles: the files qa:combine reports making', () => {
-  test('an image combine reports only the combined image', () => {
-    assert.deepEqual(
-      combinedFiles(
-        '{"kind":"image","combined":"/o/c/S.png","gif":null,"gifBytes":null}',
-      ),
-      ['/o/c/S.png'],
-    );
+describe('mp4TabOf: the recording an annotated MP4 follows', () => {
+  test('follows the one recording of the named tab, with its device and start time', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
+      { device: 'B', tab: 'B1', path: '/work/B1.webm', openedAtMs: 1200 },
+    ];
+    assert.deepEqual(mp4TabOf('B1', 'after', recordings), {
+      ok: true,
+      recording: {
+        device: 'B',
+        tab: 'B1',
+        path: '/work/B1.webm',
+        openedAtMs: 1200,
+      },
+    });
   });
 
-  test('a video combine reports the MP4 then the GIF preview, in that order', () => {
-    assert.deepEqual(
-      combinedFiles(
-        '{"kind":"video","combined":"/o/c/V.mp4","gif":"/o/c/V.gif","gifBytes":1024}',
-      ),
-      ['/o/c/V.mp4', '/o/c/V.gif'],
-    );
+  test('a tab name no device opened is a problem naming the side and the tab', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'A', path: '/work/A.webm', openedAtMs: 0 },
+    ];
+    assert.deepEqual(mp4TabOf('C1', 'before', recordings), {
+      ok: false,
+      problem: 'before: no tab named "C1" was opened, so no MP4 was made',
+    });
   });
 
-  test('JSON with no string combined field is refused', () => {
-    assert.throws(
-      () => combinedFiles('{"kind":"image","gif":null}'),
-      /printed no combined file/,
-    );
-    assert.throws(
-      () => combinedFiles('{"kind":"image","combined":42,"gif":null}'),
-      /printed no combined file/,
-    );
+  test('a tab name open on two devices is ambiguous, and the problem names both devices', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'A', tab: 'B1', path: '/work/A-B1.webm', openedAtMs: 0 },
+      { device: 'B', tab: 'B1', path: '/work/B-B1.webm', openedAtMs: 1200 },
+    ];
+    assert.deepEqual(mp4TabOf('B1', 'after', recordings), {
+      ok: false,
+      problem:
+        'after: tab "B1" is open on devices A, B, so the tab the MP4 follows is ambiguous and no MP4 was made',
+    });
   });
 
-  test('output that is not JSON is refused', () => {
-    assert.throws(() => combinedFiles('ffmpeg: not found'), SyntaxError);
+  test('a tab with no recording is a problem naming the side, the device and the tab', () => {
+    const recordings: SideTabRecording[] = [
+      { device: 'C', tab: 'C1', path: null, openedAtMs: 300 },
+    ];
+    assert.deepEqual(mp4TabOf('C1', 'before', recordings), {
+      ok: false,
+      problem:
+        'before: no video was recorded for device C, tab C1, so no MP4 was made',
+    });
   });
 });
 
-describe('COMBINED_CAPTURE: which captures are combined with ffmpeg', () => {
-  test('only video and screenshot captures are combined', () => {
-    assert.deepEqual(COMBINED_CAPTURE, {
+describe('FFMPEG_CAPTURE: which captures need ffmpeg', () => {
+  test('only a video capture is combined with ffmpeg', () => {
+    assert.deepEqual(FFMPEG_CAPTURE, {
       video: true,
-      screenshot: true,
+      screenshot: false,
       transcript: false,
       none: false,
     });
+  });
+});
+
+describe('parseOptions: the scenario check follows the run order', () => {
+  test('a fix always plays Before, so its scenarios must declare expected.before', () => {
+    assert.deepEqual(parseOptions({ changeKind: 'fix', withBefore: false }), {
+      runsBefore: true,
+    });
+  });
+
+  test('a feature runs Before only with --with-before', () => {
+    assert.deepEqual(
+      parseOptions({ changeKind: 'feature', withBefore: true }),
+      { runsBefore: true },
+    );
+    assert.deepEqual(
+      parseOptions({ changeKind: 'feature', withBefore: false }),
+      { runsBefore: false },
+    );
+  });
+});
+
+describe('step and Storyboard paths', () => {
+  test('a side keeps its step stills in steps/<id>/<side>, relative to --out', () => {
+    assert.equal(stepStillDir('S1', 'before'), 'steps/S1/before');
+  });
+
+  test('a step still is kept relative to --out, under steps/<id>/<side>/, zero-padded to two digits', () => {
+    assert.equal(stepStillPath('S1', 'before', 3), 'steps/S1/before/03.png');
+    assert.equal(stepStillPath('S1', 'after', 12), 'steps/S1/after/12.png');
+  });
+
+  test('the step records of a scenario are saved to <out>/steps/<id>.json', () => {
+    assert.equal(stepRecordsPath(OUT, 'S1'), `${OUT}/steps/S1.json`);
+  });
+
+  test('the Storyboard of a scenario is made at <out>/combined/<id>.png', () => {
+    assert.equal(storyboardPath(OUT, 'S1'), `${OUT}/combined/S1.png`);
   });
 });

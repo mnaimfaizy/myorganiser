@@ -43,11 +43,12 @@
       "id": "qa:tools:test",
       "ciStep": "QA tooling contracts",
       "job": "tool-suites",
-      "why": "The shared QA tooling's suites (ADR 0147 decision 9) live beside the tooling in `tools/qa/`, not under `tools/scripts`, so `tools:test`'s glob does not reach them and is deliberately not widened to (the same arrangement as the upstream-brief suites above). Triggered by the directory they live in, plus the two files outside it that a suite depends on: `tools/scripts/lib/qa-accounts.ts`, whose local-database refusal the QA stack reuses unchanged, and `.claude/launch.json`, whose `qa-web` attach entry a suite pins to the stack's web port. `package.json` and the rest of the shared inputs already select every suite.",
+      "why": "The shared QA tooling's suites (ADR 0147 decision 9) live beside the tooling in `tools/qa/`, not under `tools/scripts`, so `tools:test`'s glob does not reach them and is deliberately not widened to (the same arrangement as the upstream-brief suites above). Triggered by the directory they live in, plus the files outside it that a suite depends on: `tools/scripts/lib/qa-accounts.ts`, whose local-database refusal the QA stack reuses unchanged, `.claude/launch.json`, whose `qa-web` attach entry a suite pins to the stack's web port, and the generated design-token modules the Storyboard page is coloured from, which the real-render test draws. `package.json` and the rest of the shared inputs already select every suite.",
       "triggers": [
         "tools/qa/**",
         "tools/scripts/lib/qa-accounts.ts",
-        ".claude/launch.json"
+        ".claude/launch.json",
+        "libs/design-tokens/src/generated/**"
       ]
     },
     {
@@ -74,8 +75,12 @@
       "id": "qa:tools:typecheck",
       "ciStep": "Typecheck tools/qa",
       "job": "typecheck",
-      "why": "`tools/qa/tsconfig.json` is its own program, as `tools/scripts/tsconfig.json` is: `tools/qa` is not a project the Inferred Target reaches, and `node --test` strips types without checking them, so a type error in the QA tooling would otherwise reach `main` unchecked. It does not extend `tsconfig.base.json`, and the one file outside its own tree it imports is `tools/scripts/lib/qa-accounts.ts` (the QA stack reuses its local-database refusal unchanged), which the program compiles too, so the triggers are that tree and that file; the TypeScript version is covered by the shared inputs.",
-      "triggers": ["tools/qa/**", "tools/scripts/lib/qa-accounts.ts"]
+      "why": "`tools/qa/tsconfig.json` is its own program, as `tools/scripts/tsconfig.json` is: `tools/qa` is not a project the Inferred Target reaches, and `node --test` strips types without checking them, so a type error in the QA tooling would otherwise reach `main` unchecked. It does not extend `tsconfig.base.json`, and the files outside its own tree it imports are `tools/scripts/lib/qa-accounts.ts` (the QA stack reuses its local-database refusal unchanged) and the generated design-token modules the Storyboard page is coloured from, which the program compiles too, so the triggers are that tree and those files; the TypeScript version is covered by the shared inputs.",
+      "triggers": [
+        "tools/qa/**",
+        "tools/scripts/lib/qa-accounts.ts",
+        "libs/design-tokens/src/generated/**"
+      ]
     },
     {
       "id": "prisma:migration:drift",
