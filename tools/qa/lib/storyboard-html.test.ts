@@ -4,8 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import type { ExpectedResults, StepRecord } from './qa-scenario.ts';
+import type { Box, ExpectedResults, StepRecord } from './qa-scenario.ts';
 import type { Side } from './qa-stack.ts';
+import { CROP, cropFor } from './storyboard-crop.ts';
 import {
   BEFORE_SAME_STEP,
   roleColour,
@@ -579,5 +580,79 @@ describe('storyboardHtml: the mark badge on each card', () => {
       assert.equal(before.includes(declaration), false, declaration);
       assert.equal(after.includes(declaration), false, declaration);
     }
+  });
+});
+
+/** A percentage the way the page writes it (`pct` in storyboard-html.ts). */
+const pctOf = (part: number, whole: number): string =>
+  `${((part / whole) * 100).toFixed(4)}%`;
+
+describe('storyboardHtml: the subject outline', () => {
+  // Inside the viewport, so the subject is not clipped and the box is exact.
+  const SUBJECT: Box = { x: 400, y: 200, width: 300, height: 120 };
+
+  test('the outline div is the subject box, as percentages of the crop', () => {
+    const { crop } = cropFor(SUBJECT);
+    const html = page({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [{ ...step('before', 1), subject: SUBJECT }],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [{ ...step('after', 1), subject: SUBJECT }],
+      },
+    });
+    const style = `left:${pctOf(SUBJECT.x - crop.x, crop.width)};top:${pctOf(SUBJECT.y - crop.y, crop.height)};width:${pctOf(SUBJECT.width, crop.width)};height:${pctOf(SUBJECT.height, crop.height)}`;
+    assert.equal(
+      countOf(html, `<div class="outline" style="${style}"></div>`),
+      2,
+      'one outline per side, each the subject box and not the ring',
+    );
+  });
+
+  test('the outline is drawn by CSS outline, offset by the gap, at the stroke width', () => {
+    const html = page({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [{ ...step('before', 1), subject: SUBJECT }],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [{ ...step('after', 1), subject: SUBJECT }],
+      },
+    });
+    const rule = /\.outline\{([^}]*)\}/.exec(html)?.[1];
+    assert.ok(rule !== undefined, 'the .outline rule is emitted');
+    assert.ok(
+      rule.includes(`outline:${CROP.outlineStroke}px solid`),
+      `stroke ${CROP.outlineStroke}px in ${rule}`,
+    );
+    assert.ok(
+      rule.includes(`outline-offset:${CROP.outlineGap}px`),
+      `gap ${CROP.outlineGap}px in ${rule}`,
+    );
+  });
+
+  test('a step with no subject renders its still with no outline div', () => {
+    const html = page({
+      before: {
+        outcome: 'fail',
+        message: 'the defect shows here',
+        steps: [step('before', 1)],
+      },
+      after: {
+        outcome: 'pass',
+        observed: 'the fix shows here',
+        steps: [step('after', 1)],
+      },
+    });
+    // The stills are drawn, so the absence of an outline is not an empty page.
+    assert.equal(countOf(html, '<div class="still"'), 2);
+    assert.equal(countOf(html, '<div class="outline"'), 0);
   });
 });

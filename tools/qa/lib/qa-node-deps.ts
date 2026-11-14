@@ -2,13 +2,15 @@
  * The real machine behind `QaDeps`, for `tools/qa/qa-stack.ts` and
  * `tools/qa/qa-switch.ts`. Kept apart from `qa-stack-executor.ts` so a test of
  * the executor never loads it: no test starts a process, a container or a
- * listener.
+ * listener. The one test that loads this file exercises `isSymlink` on a temp
+ * directory and starts nothing.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -110,6 +112,14 @@ export function nodeQaDeps(repoRoot: string): QaDeps {
       rmSync(path, { force: true });
     },
     exists: existsSync,
+    isSymlink(path) {
+      try {
+        return lstatSync(path).isSymbolicLink();
+      } catch (error) {
+        if (errorCode(error) === 'ENOENT') return false;
+        throw error;
+      }
+    },
     sleep: (ms) => delay(ms),
     generateSecret: () => randomBytes(32).toString('hex'),
     out: (line) => console.log(line),
