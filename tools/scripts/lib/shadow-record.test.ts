@@ -18,6 +18,7 @@ import {
   SHADOW_COMMENT_MARKER,
   SHADOW_HELD,
   SHADOW_WOULD_MERGE,
+  renderAutoMergedComment,
   renderShadowComment,
   type AutoMergeDecision,
 } from './merge-train.ts';
@@ -1040,6 +1041,260 @@ describe('a record met after a restart keeps the return instruction under on', (
       assert.ok(!report.includes('since the restart'));
       assert.ok(!report.includes('must return'));
     }
+  });
+});
+
+// ------------------------------------------------ the on record (issue #1530)
+
+/** The `on` record an Auto-merge leaves for PR `number`, merged at `mergedAt`. */
+const autoMerged = (
+  number: number,
+  mergedAt: string,
+  overrides: Partial<GatheredPullRequest> = {},
+): GatheredPullRequest => ({
+  number,
+  title: `feat: auto ${number}`,
+  state: 'merged',
+  mergedAt,
+  comment: {
+    author: BOT,
+    updatedAt: mergedAt,
+    body: renderAutoMergedComment(HEAD),
+  },
+  commits: null,
+  ...overrides,
+});
+
+describe('parseShadowComment reads the on record an Auto-merge leaves', () => {
+  test('renderAutoMergedComment(head) reads back as auto-merged at that head', () => {
+    const head = 'abcdef1234567890abcdef1234567890abcdef12';
+    assert.deepEqual(parseShadowComment(renderAutoMergedComment(head)), {
+      kind: 'auto-merged',
+      head,
+    });
+  });
+
+  test('an on record whose head is not hex is not readable', () => {
+    const body = `${SHADOW_COMMENT_MARKER}\n**Merge Train Auto-merge (on):** auto-merged at \`not-a-sha\``;
+    assert.equal(parseShadowComment(body), null);
+  });
+
+  test('an on record without the auto-merged at prefix is not readable', () => {
+    const body = `${SHADOW_COMMENT_MARKER}\n**Merge Train Auto-merge (on):** merged at \`${HEAD}\``;
+    assert.equal(parseShadowComment(body), null);
+  });
+});
+
+describe('an on record is watched for seven days after its merge, apart from the decisions', () => {
+  test('a revert within seven days makes it bad, and under on the setting must return to shadow', () => {
+    const summary = summarizeShadowRecord({
+      ...gather({
+        mode: 'on',
+        pullRequests: [autoMerged(100, at(1))],
+        merges: [revertOf(900, at(3), 100)],
+      }),
+    });
+    const [record] = summary.autoMerges;
+    assert.equal(record.status, 'bad');
+    assert.deepEqual(record.bad, {
+      kind: 'reverted',
+      by: 900,
+      at: Date.parse(at(3)),
+    });
+    assert.deepEqual(
+      summary.badAutoMerges.map((a) => a.number),
+      [100],
+    );
+    assert.equal(summary.returnToShadow, true);
+
+    const report = renderShadowRecord(summary);
+    assert.ok(report.includes('it **must return to `shadow`**.'), report);
+    assert.ok(
+      report.includes(
+        '- #100 feat: auto 100: merged 2026-11-02, BAD: reverted by #900 on 2026-11-04',
+      ),
+      report,
+    );
+  });
+
+  test('a follow-up fix that names it within seven days makes it bad, fixed', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        pullRequests: [autoMerged(100, at(1))],
+        merges: [fixOf(910, at(3), 100)],
+      }),
+    );
+    assert.equal(summary.autoMerges[0].status, 'bad');
+    assert.equal(summary.autoMerges[0].bad?.kind, 'fixed');
+    assert.equal(summary.returnToShadow, true);
+  });
+
+  test('neither a revert nor a fix, and seven days passed: cleared', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        asOf: at(20),
+        pullRequests: [autoMerged(100, at(1))],
+      }),
+    );
+    assert.equal(summary.autoMerges[0].status, 'cleared');
+    assert.equal(summary.badAutoMerges.length, 0);
+    assert.equal(summary.returnToShadow, false);
+  });
+
+  test('neither a revert nor a fix, and inside seven days: watching', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        asOf: at(2),
+        pullRequests: [autoMerged(100, at(1))],
+      }),
+    );
+    assert.equal(summary.autoMerges[0].status, 'watching');
+    assert.equal(summary.badAutoMerges.length, 0);
+    assert.equal(summary.returnToShadow, false);
+  });
+
+  test('an on record whose Pull Request is not merged, or has no merge time, is unconfirmed, not bad', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        pullRequests: [
+          autoMerged(100, at(1), { state: 'open', mergedAt: null }),
+          autoMerged(101, at(1), { state: 'merged', mergedAt: null }),
+        ],
+        merges: [revertOf(900, at(3), 100)],
+      }),
+    );
+    assert.deepEqual(
+      summary.autoMerges.map((a) => a.status),
+      ['unconfirmed', 'unconfirmed'],
+    );
+    assert.equal(summary.badAutoMerges.length, 0);
+    assert.equal(summary.returnToShadow, false);
+    const report = renderShadowRecord(summary);
+    assert.ok(
+      report.includes(
+        'recorded as merged, but the merge could not be confirmed',
+      ),
+      report,
+    );
+  });
+
+  test('a revert merged after the seven days does not make it bad', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        asOf: at(20),
+        pullRequests: [autoMerged(100, at(1))],
+        merges: [revertOf(900, at(9), 100)],
+      }),
+    );
+    assert.equal(summary.autoMerges[0].status, 'cleared');
+    assert.equal(summary.returnToShadow, false);
+  });
+
+  test('under shadow a bad on record is listed, says keep the setting away from on, and does not return it', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'shadow',
+        pullRequests: [autoMerged(100, at(1))],
+        merges: [revertOf(900, at(3), 100)],
+      }),
+    );
+    assert.equal(summary.returnToShadow, false);
+    const report = renderShadowRecord(summary);
+    assert.ok(
+      report.includes(
+        'the setting is `shadow`, keep it away from `on` (ADR 0148).',
+      ),
+      report,
+    );
+    assert.ok(!report.includes('must return to `shadow`'), report);
+  });
+
+  test('the report lists each on Auto-merge under its own heading, with its state', () => {
+    const report = renderShadowRecord(
+      summarizeShadowRecord(
+        gather({
+          mode: 'on',
+          asOf: at(20),
+          pullRequests: [autoMerged(100, at(1)), autoMerged(101, at(5))],
+          merges: [revertOf(900, at(3), 100)],
+        }),
+      ),
+    );
+    assert.ok(
+      report.includes(
+        '## `on` Auto-merges (watched apart; never counted toward the exit criterion)',
+      ),
+      report,
+    );
+    assert.ok(
+      report.includes(
+        '- #100 feat: auto 100: merged 2026-11-02, BAD: reverted by #900 on 2026-11-04',
+      ),
+      report,
+    );
+    assert.ok(
+      report.includes(
+        '- #101 feat: auto 101: merged 2026-11-06, merged and cleared (no revert or fix in 7 days)',
+      ),
+      report,
+    );
+  });
+
+  test('on records never change the decisions, the counts, or the exit criterion, bad or not', () => {
+    const base = gather({
+      mode: 'on',
+      pullRequests: [decided(1, 0), heldPr(2, 1, 'CI is red')],
+    });
+    const withRecords = gather({
+      mode: 'on',
+      pullRequests: [
+        ...base.pullRequests,
+        autoMerged(100, at(1)),
+        autoMerged(101, at(2)),
+      ],
+      merges: [revertOf(900, at(3), 100)],
+    });
+    const plain = summarizeShadowRecord(base);
+    const summary = summarizeShadowRecord(withRecords);
+
+    assert.equal(summary.autoMerges.length, 2);
+    assert.equal(summary.badAutoMerges.length, 1);
+    assert.deepEqual(summary.decisions, plain.decisions);
+    assert.deepEqual(summary.counted, plain.counted);
+    assert.deepEqual(summary.bad, plain.bad);
+    assert.deepEqual(summary.held, plain.held);
+    assert.equal(summary.unreadableComments, plain.unreadableComments);
+    assert.equal(summary.mergedUnchanged, plain.mergedUnchanged);
+    assert.equal(summary.restartAt, plain.restartAt);
+    assert.equal(summary.verdict, plain.verdict);
+    assert.deepEqual(summary.unmet, plain.unmet);
+  });
+
+  test('an on record by a login that is not trusted is set aside, and its revert does not make it bad', () => {
+    const summary = summarizeShadowRecord(
+      gather({
+        mode: 'on',
+        pullRequests: [
+          autoMerged(100, at(1), {
+            comment: {
+              author: 'someone-else',
+              updatedAt: at(1),
+              body: renderAutoMergedComment(HEAD),
+            },
+          }),
+        ],
+        merges: [revertOf(900, at(3), 100)],
+      }),
+    );
+    assert.equal(summary.autoMerges.length, 0);
+    assert.equal(summary.badAutoMerges.length, 0);
+    assert.equal(summary.untrustedComments, 1);
+    assert.equal(summary.returnToShadow, false);
   });
 });
 

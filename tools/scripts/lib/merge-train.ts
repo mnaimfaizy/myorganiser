@@ -422,7 +422,8 @@ const noRequiredChecksReason = (): string =>
 
 /** How driving one Pull Request ended. */
 type DriveOutcome =
-  | { kind: 'merged' }
+  /** `headRefOid` is the head the merge call named; absent when already merged. */
+  | { kind: 'merged'; headRefOid?: string }
   /** A dry run read it once and logged the step it would take. */
   | { kind: 'read' }
   | { kind: 'stopped'; reason: string };
@@ -493,7 +494,7 @@ async function drivePullRequest(
         `#${pr}: required checks green on ${step.headRefOid.slice(0, 8)}, merging`,
       );
       if (io.merge(pr, step.headRefOid, args.method)) {
-        return { kind: 'merged' };
+        return { kind: 'merged', headRefOid: step.headRefOid };
       }
       // Refused: most often `main` moved between the read and the merge,
       // and the next read is BEHIND and updates. A refusal that repeats on
@@ -1220,6 +1221,12 @@ export const SHADOW_COMMENT_LEAD = '**Merge Train Auto-merge (shadow):**';
 /** The shadow comment's two text forms (ADR 0148 decision 4). */
 export const SHADOW_WOULD_MERGE = 'would auto-merge at';
 export const SHADOW_HELD = 'held:';
+/**
+ * The lead of the `on` form's decision line (issue #1530): the record an
+ * Auto-merge leaves so the shadow record report can watch it.
+ */
+export const AUTO_MERGED_COMMENT_LEAD = '**Merge Train Auto-merge (on):**';
+export const AUTO_MERGED = 'auto-merged at';
 
 /**
  * The shadow comment's body: the marker, then `would auto-merge at \`<sha>\``
@@ -1243,6 +1250,18 @@ export function renderShadowComment(
   }
   if (decision.mismatch) lines.push('', `Mismatch: ${decision.mismatch}`);
   return lines.join('\n');
+}
+
+/**
+ * The `on` form of the marker comment, written after a successful Auto-merge:
+ * the same marker as the shadow comment, then `auto-merged at \`<sha>\``
+ * naming the head the merge call named.
+ */
+export function renderAutoMergedComment(headRefOid: string): string {
+  return [
+    SHADOW_COMMENT_MARKER,
+    `${AUTO_MERGED_COMMENT_LEAD} ${AUTO_MERGED} \`${headRefOid}\``,
+  ].join('\n');
 }
 
 /**
@@ -1295,7 +1314,7 @@ export interface AutoTrainIo extends TrainIo {
   mainPathMap(): ReviewTierPathMap | null;
   agentVerdict(pr: number, headRefOid: string): AgentVerdictFact;
   qaReport(pr: number, headRefOid: string): QaReportFact;
-  /** Posts the shadow comment, or edits the one already there; false on failure. */
+  /** Posts the marker comment (shadow, or the `on` record), or edits the one already there; false on failure. */
   upsertShadowComment(pr: number, body: string): boolean;
 }
 
@@ -1308,7 +1327,7 @@ export interface AutoTrainResult {
   wouldMerge: { pr: number; headRefOid: string }[];
   held: { pr: number; reason: string }[];
   mismatches: { pr: number; reason: string }[];
-  /** Candidates whose shadow comment GitHub would not take. */
+  /** Candidates whose shadow comment, or `on` Auto-merge record, GitHub would not take. */
   commentFailures: number[];
 }
 
@@ -1414,8 +1433,24 @@ export async function runAutoTrain(
           return atHead.held ? atHead.reason : null;
         },
       );
-      if (outcome.kind === 'merged') result.merged.push(pr);
-      else if (outcome.kind === 'stopped') hold(pr, outcome.reason);
+      if (outcome.kind === 'merged') {
+        result.merged.push(pr);
+        // The merge stands whether or not the record is written; a failed
+        // write is listed, never silent. A Pull Request found already merged
+        // was not merged by this pass and gets no record.
+        if (
+          outcome.headRefOid &&
+          !io.upsertShadowComment(
+            pr,
+            renderAutoMergedComment(outcome.headRefOid),
+          )
+        ) {
+          io.log(
+            `#${pr}: merged, but the Auto-merge record could not be written`,
+          );
+          result.commentFailures.push(pr);
+        }
+      } else if (outcome.kind === 'stopped') hold(pr, outcome.reason);
       continue;
     }
 
@@ -1523,7 +1558,11 @@ export function renderAutoTrainResult(result: AutoTrainResult): string {
     );
   }
   if (result.commentFailures.length > 0) {
-    lines.push(`Shadow comment not written: ${list(result.commentFailures)}.`);
+    lines.push(
+      result.mode === 'on'
+        ? `Auto-merge record not written (the merge stands): ${list(result.commentFailures)}.`
+        : `Shadow comment not written: ${list(result.commentFailures)}.`,
+    );
   }
   return lines.join('\n');
 }
