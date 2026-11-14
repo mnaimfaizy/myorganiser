@@ -13,6 +13,7 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('@myorganiser/auth', () => ({
   clearAuthSession: jest.fn(),
+  getCurrentUser: jest.fn(),
 }));
 
 jest.mock('@myorganiser/web-vault-ui', () => ({
@@ -23,7 +24,8 @@ jest.mock('../lib/apiClient', () => ({
   createUsersApi: jest.fn(),
 }));
 
-import { clearAuthSession } from '@myorganiser/auth';
+import { clearAuthSession, getCurrentUser } from '@myorganiser/auth';
+import { isPasskeyUnlockEnrolled } from '@myorganiser/web-vault';
 import { useExportVault } from '@myorganiser/web-vault-ui';
 import {
   act,
@@ -43,6 +45,23 @@ const mockDeleteMe = jest.fn();
 const mockExportVaultNow = jest.fn();
 
 const PASSWORD = 'hunter2-pass';
+
+// Storage key as the Passkey Unlock wrapping record writes it (ADR 0136).
+const PASSKEY_RECORD_PREFIX = 'myorganiser_passkey_unlock_v1';
+
+/** A fixture Passkey Unlock wrapping record in its stored shape; the values are placeholders. */
+function seedPasskeyRecord(owner: string): void {
+  localStorage.setItem(
+    `${PASSKEY_RECORD_PREFIX}:${owner}`,
+    JSON.stringify({
+      version: 1,
+      owner,
+      credentialId: 'Y3JlZA==',
+      prfSalt: 'c2FsdA==',
+      wrappedMasterKey: { iv: 'aXY=', ciphertext: 'Y3Q=' },
+    }),
+  );
+}
 
 function createAxiosError(
   status: number | undefined,
@@ -86,7 +105,9 @@ function submitConfirm() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  localStorage.clear();
 
+  (getCurrentUser as jest.Mock).mockReturnValue({ id: 'owner-a' });
   (createUsersApi as jest.Mock).mockReturnValue({ deleteMe: mockDeleteMe });
   mockDeleteMe.mockResolvedValue({});
   mockExportVaultNow.mockResolvedValue(true);
@@ -211,6 +232,117 @@ describe('DeleteAccountSection', () => {
     expect(
       (clearAuthSession as jest.Mock).mock.invocationCallOrder[0],
     ).toBeLessThan(mockReplace.mock.invocationCallOrder[0]);
+  });
+
+  describe('Passkey Unlock record on deletion', () => {
+    it('removes only the deleted owner’s passkey record, then clears the session and navigates', async () => {
+      seedPasskeyRecord('owner-a');
+      seedPasskeyRecord('owner-b');
+      renderSection();
+      await openDialog();
+      await continueToConfirm();
+
+      fillConfirm(PASSWORD, 'DELETE');
+      submitConfirm();
+
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/account-deleted'),
+      );
+      expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+      expect(isPasskeyUnlockEnrolled('owner-b')).toBe(true);
+      expect(clearAuthSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the owner before the session is cleared, so the record is still removed', async () => {
+      seedPasskeyRecord('owner-a');
+      // Model the real session store: clearing it removes the current User.
+      (clearAuthSession as jest.Mock).mockImplementationOnce(() =>
+        (getCurrentUser as jest.Mock).mockReturnValue(undefined),
+      );
+      renderSection();
+      await openDialog();
+      await continueToConfirm();
+
+      fillConfirm(PASSWORD, 'DELETE');
+      submitConfirm();
+
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/account-deleted'),
+      );
+      expect(isPasskeyUnlockEnrolled('owner-a')).toBe(false);
+    });
+
+    it.each([
+      {
+        label: 'a wrong password (403)',
+        status: 403,
+        serverMessage: 'Incorrect password.',
+        shownText: 'Incorrect password.',
+      },
+      {
+        label: 'a conflict (409)',
+        status: 409,
+        serverMessage: 'A YouTube sync is running. Try again.',
+        shownText: 'A YouTube sync is running. Try again.',
+      },
+      {
+        label: 'no response from the server',
+        status: undefined,
+        serverMessage: undefined,
+        shownText: 'Your account was not deleted. Try again.',
+      },
+      {
+        label: 'a server error (500)',
+        status: 500,
+        serverMessage: 'Internal Server Error',
+        shownText: 'Your account was not deleted. Try again.',
+      },
+    ])(
+      'keeps the passkey record and the session when the deletion fails with $label',
+      async ({ status, serverMessage, shownText }) => {
+        seedPasskeyRecord('owner-a');
+        mockDeleteMe.mockRejectedValue(createAxiosError(status, serverMessage));
+        renderSection();
+        await openDialog();
+        await continueToConfirm();
+
+        fillConfirm(PASSWORD, 'DELETE');
+        submitConfirm();
+
+        expect(await screen.findByText(shownText)).toBeInTheDocument();
+        expect(isPasskeyUnlockEnrolled('owner-a')).toBe(true);
+        expect(clearAuthSession).not.toHaveBeenCalled();
+        expect(mockReplace).not.toHaveBeenCalled();
+      },
+    );
+
+    it('still clears the session and navigates when storage refuses to remove the record', async () => {
+      seedPasskeyRecord('owner-a');
+      const removeItem = jest
+        .spyOn(Storage.prototype, 'removeItem')
+        .mockImplementation(() => {
+          throw new Error('QuotaExceededError');
+        });
+      renderSection();
+      await openDialog();
+      await continueToConfirm();
+
+      try {
+        fillConfirm(PASSWORD, 'DELETE');
+        submitConfirm();
+
+        await waitFor(() =>
+          expect(mockReplace).toHaveBeenCalledWith('/account-deleted'),
+        );
+        expect(removeItem).toHaveBeenCalledWith(
+          `${PASSKEY_RECORD_PREFIX}:owner-a`,
+        );
+        expect(clearAuthSession).toHaveBeenCalledTimes(1);
+        expect(screen.queryByTestId('delete-account-error')).toBeNull();
+      } finally {
+        removeItem.mockRestore();
+      }
+    });
   });
 
   it('shows a wrong-password error on the password field and stays on the dialog', async () => {
