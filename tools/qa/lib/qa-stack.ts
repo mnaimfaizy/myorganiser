@@ -87,6 +87,8 @@ export interface QaEnvInput {
   envExample: string;
   databaseUrl: string;
   generateSecret: () => string;
+  /** The Platform Admin QA Account's email, or null/absent when none is marked. */
+  platformAdminEmail?: string | null;
 }
 
 /**
@@ -98,6 +100,7 @@ export function buildQaEnv({
   envExample,
   databaseUrl,
   generateSecret,
+  platformAdminEmail = null,
 }: QaEnvInput): Record<string, string> {
   // Any local-development origin in the example (say GOOGLE_REDIRECT_URI) is
   // moved to the QA ports, so no key, including one added later, points the
@@ -124,6 +127,9 @@ export function buildQaEnv({
     NEXT_PUBLIC_API_BASE_URL: api,
     YOUTUBE_API_BASE_URL: api,
     DATABASE_URL: databaseUrl,
+    // The backend's own bootstrap promotes this account at boot, so the stack
+    // seeds the QA Accounts before it starts the backend. Blank when none is marked.
+    PLATFORM_ADMIN_BOOTSTRAP_EMAIL: platformAdminEmail ?? '',
   });
   return env;
 }

@@ -351,6 +351,64 @@ describe('useSubscriptionsPage', () => {
       expect(saveVaultRecords).not.toHaveBeenCalled();
       expect(result.current.items).toEqual([GYM]);
     });
+
+    it('does not apply the write-back of a superseded read once a newer read has applied', async () => {
+      const reads: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }> = [];
+      loadDecryptedData.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            reads.push({ resolve, reject });
+          }),
+      );
+      const staleRaw = [{ legacy: true }];
+      jest
+        .mocked(normalizeSubscriptions)
+        .mockImplementation((raw) =>
+          raw === staleRaw
+            ? { value: [NETFLIX], changed: true }
+            : { value: raw as SubscriptionRecord[], changed: false },
+        );
+      // Holds the write-back open; the test releases it after the newer read has applied.
+      let releaseSave: (written: SubscriptionRecord[]) => void = () =>
+        undefined;
+      jest.mocked(saveVaultRecords).mockImplementation(
+        () =>
+          new Promise<SubscriptionRecord[]>((resolve) => {
+            releaseSave = resolve;
+          }),
+      );
+      const savedBack: SubscriptionRecord[] = [
+        { ...GYM, id: 'sub-saved', name: 'Saved back' },
+      ];
+
+      const { result, rerender } = renderHook(() =>
+        useSubscriptionsPage(handle),
+      );
+      await waitFor(() => expect(reads).toHaveLength(1));
+      await act(async () => {
+        reads[0].resolve(staleRaw);
+      });
+      await waitFor(() => expect(saveVaultRecords).toHaveBeenCalledTimes(1));
+
+      jest.mocked(useLocalVaultRevision).mockReturnValue(1);
+      rerender();
+      await waitFor(() => expect(reads).toHaveLength(2));
+      await act(async () => {
+        reads[1].resolve([GYM]);
+      });
+      await waitFor(() => expect(result.current.items).toEqual([GYM]));
+
+      // The held write-back finishes last; it must not put its list back.
+      await act(async () => {
+        releaseSave(savedBack);
+      });
+
+      expect(result.current.items).toEqual([GYM]);
+      expect(saveVaultRecords).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('preferred currency', () => {

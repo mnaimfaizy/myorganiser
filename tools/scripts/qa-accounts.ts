@@ -125,6 +125,11 @@ function print() {
   for (const account of accounts) {
     console.log(`QA Account "${account.id}"`);
     console.log(`  email             ${account.email}`);
+    if (account.platformAdmin === true) {
+      console.log(
+        '  role              Platform Admin QA Account (promoted only by a QA stack backend; a seed alone does not)',
+      );
+    }
     console.log(`  password          ${account.password}`);
     console.log(`  Vault passphrase  ${account.vaultPassphrase}`);
     console.log(

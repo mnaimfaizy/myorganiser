@@ -25,7 +25,7 @@
 // itself from facts read for its head, under the mode in
 // tools/config/merge-train-auto-merge.json (`off`, `shadow`, `on`). A held
 // candidate is listed with its reason and the pass moves on. Exit 0 when the
-// pass finished, 1 when a shadow comment could not be written, 2 when it
+// pass finished, 1 when a marker comment (shadow decision or `on` record) could not be written, 2 when it
 // could not start.
 //
 // Not a gate: it changes GitHub, never the tree, and runs only by hand.
