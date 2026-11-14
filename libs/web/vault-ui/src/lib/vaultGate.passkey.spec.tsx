@@ -231,7 +231,10 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
       );
     });
     expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Unlocked' }),
+      expect.objectContaining({
+        title: 'Unlocked',
+        description: 'Vault unlocked with your passkey for this session.',
+      }),
     );
     expect(platform.getAssertion).toHaveBeenCalledWith(
       expect.objectContaining({ userVerification: 'required' }),
@@ -255,6 +258,8 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Your passkey didn't unlock the vault",
+          description:
+            'Nothing was changed. Enter your passphrase, or try the passkey again. If you removed this passkey, turn Passkey Unlock off on the Vault page.',
         }),
       );
     });
@@ -466,6 +471,8 @@ describe('VaultGate passkey unlock option (ADR 0136)', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Your passkey didn't unlock the vault",
+          description:
+            'Nothing was changed. Enter your passphrase, or try the passkey again. If you removed this passkey, turn Passkey Unlock off on the Vault page.',
         }),
       );
     });
