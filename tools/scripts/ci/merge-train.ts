@@ -61,6 +61,7 @@ import {
   runTrain,
   type AutoTrainIo,
   type CheckRun,
+  type HeadFactIo,
   type MergeMethod,
   type PullRequestSnapshot,
   type TrainIo,
@@ -97,7 +98,7 @@ const runGh = (
   };
 };
 
-const currentRepository = (): string | null => {
+export const currentRepository = (): string | null => {
   const result = runGh([
     'repo',
     'view',
@@ -113,7 +114,7 @@ const currentRepository = (): string | null => {
 
 /** The `gh` login the train runs as, so it edits only its own comments. */
 let cachedViewerLogin: string | null | undefined;
-const viewerLogin = (): string | null => {
+export const viewerLogin = (): string | null => {
   if (cachedViewerLogin !== undefined) return cachedViewerLogin;
   const result = runGh(['api', 'user', '-q', '.login']);
   cachedViewerLogin =
@@ -301,6 +302,25 @@ export function githubTrainIo(repository: string): TrainIo {
   };
 }
 
+/**
+ * The `gh`-backed Agent Verdict read, shared by `--auto` and `runs:ready`
+ * (`HeadFactIo`), so both judge one head's code review through one reader.
+ */
+export const githubAgentVerdict =
+  (repository: string): HeadFactIo['agentVerdict'] =>
+  (pr) =>
+    agentVerdictFromView(
+      ghJsonOrNull([
+        'pr',
+        'view',
+        String(pr),
+        '--repo',
+        repository,
+        '--json',
+        'comments',
+      ]) as { comments?: ReviewComment[] } | null,
+    );
+
 /** The `gh`-backed AutoTrainIo. */
 export function githubAutoTrainIo(repository: string): AutoTrainIo {
   return {
@@ -350,18 +370,7 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
         ]),
       ),
     mainPathMap: readMainPathMap,
-    agentVerdict: (pr) => {
-      const view = ghJsonOrNull([
-        'pr',
-        'view',
-        String(pr),
-        '--repo',
-        repository,
-        '--json',
-        'comments',
-      ]) as { comments?: ReviewComment[] } | null;
-      return agentVerdictFromView(view);
-    },
+    agentVerdict: githubAgentVerdict(repository),
     qaReport: (pr, head) =>
       qaReportFromView(
         prComments(repository, pr),

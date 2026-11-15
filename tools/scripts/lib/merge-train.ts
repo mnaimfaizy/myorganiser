@@ -1327,8 +1327,16 @@ export function checksOnCurrentHead(
   }
 }
 
+/**
+ * The per-head read both the Auto-merge and `runs:ready` make, so the two
+ * judge the code review of one head through the same reader.
+ */
+export interface HeadFactIo {
+  agentVerdict(pr: number, headRefOid: string): AgentVerdictFact;
+}
+
 /** The train's IO, plus the reads and the one write an Auto-merge needs. */
-export interface AutoTrainIo extends TrainIo {
+export interface AutoTrainIo extends TrainIo, HeadFactIo {
   /** The latest completed `push` run of CI on `main`. */
   mainCi(): MainCiFact;
   reviewTier(pr: number, headRefOid: string): ReviewTierFact;
@@ -1336,10 +1344,42 @@ export interface AutoTrainIo extends TrainIo {
   changedFiles(pr: number): ChangedFile[] | null;
   /** The path map as `main` has it, not the working tree's; null when unreadable. */
   mainPathMap(): ReviewTierPathMap | null;
-  agentVerdict(pr: number, headRefOid: string): AgentVerdictFact;
   qaReport(pr: number, headRefOid: string): QaReportFact;
   /** Posts the marker comment (shadow, or the `on` record), or edits the one already there; false on failure. */
   upsertShadowComment(pr: number, body: string): boolean;
+}
+
+/** The facts an `--auto` pass reads once, at its start, for every candidate. */
+export interface AutoMergePassFacts {
+  mainCi: MainCiFact;
+  mainPathMap: ReviewTierPathMap | null;
+}
+
+/**
+ * Every fact one Auto-merge decision reads for one head: the pass's own
+ * facts, plus the per-head reads, in this order. Of these, `runs:ready`
+ * shares the snapshot read (`TrainIo.read`), the required-check sort
+ * (`requiredCheckState`) and the Agent Verdict (`HeadFactIo`); it does not
+ * read the tier, path guard, QA Report or Door, which are merge facts.
+ */
+export function autoMergeFactsFor(
+  io: Pick<AutoTrainIo, 'reviewTier' | 'changedFiles' | 'qaReport'> &
+    HeadFactIo,
+  pr: number,
+  snapshot: PullRequestSnapshot,
+  requiredChecks: RequiredChecksFact,
+  { mainCi, mainPathMap }: AutoMergePassFacts,
+): AutoMergeFacts {
+  return {
+    headRefOid: snapshot.headRefOid,
+    mainCi,
+    requiredChecks,
+    reviewTier: io.reviewTier(pr, snapshot.headRefOid),
+    pathGuard: pathGuardFrom(io.changedFiles(pr), mainPathMap),
+    agentVerdict: io.agentVerdict(pr, snapshot.headRefOid),
+    qaReport: io.qaReport(pr, snapshot.headRefOid),
+    door: readDoor(snapshot.body),
+  };
 }
 
 /** How one `--auto` pass ended. Only `on` merges, so only `on` fills the Sign-off fields. */
@@ -1404,22 +1444,13 @@ export async function runAutoTrain(
     for (const pr of args.pullRequests) hold(pr, noRequiredChecksReason());
     return result;
   }
-  const mainCi = io.mainCi();
-  const mainPathMap = io.mainPathMap();
+  const passFacts = { mainCi: io.mainCi(), mainPathMap: io.mainPathMap() };
   const factsFor = (
     pr: number,
     snapshot: PullRequestSnapshot,
     requiredChecks: RequiredChecksFact,
-  ): AutoMergeFacts => ({
-    headRefOid: snapshot.headRefOid,
-    mainCi,
-    requiredChecks,
-    reviewTier: io.reviewTier(pr, snapshot.headRefOid),
-    pathGuard: pathGuardFrom(io.changedFiles(pr), mainPathMap),
-    agentVerdict: io.agentVerdict(pr, snapshot.headRefOid),
-    qaReport: io.qaReport(pr, snapshot.headRefOid),
-    door: readDoor(snapshot.body),
-  });
+  ): AutoMergeFacts =>
+    autoMergeFactsFor(io, pr, snapshot, requiredChecks, passFacts);
 
   for (const pr of args.pullRequests) {
     const first = io.read(pr);

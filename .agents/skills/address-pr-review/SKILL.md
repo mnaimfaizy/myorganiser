@@ -53,6 +53,7 @@ Work in the worktree at `tmp/qa/worktree`, set up as in [finish-standalone-runs]
 ## Respond
 
 - **Human comment:** reply briefly with what was done and the commit. Leave the thread for that person to resolve.
+- **Mark every reply.** Each comment or reply you post on a Pull Request starts with `<!-- agent-reply -->` alone on its first line. You post as the Maintainer, so that line is what tells `yarn runs:ready` your reply answers a comment; an unmarked comment from the same login is read as the Maintainer's own, waiting for an answer ([ADR 0142](../../../docs/adr/0142-a-standalone-runs-qa-is-run-by-agents-and-reported-on-its-pull-request.md) amendment).
 - **Inline thread from the automated review:** resolve it once the fix is pushed, with the `resolveReviewThread` GraphQL mutation.
 - **Automated report:** no reply. Its next run lists the finding as resolved.
 
