@@ -34,12 +34,8 @@ import {
   isMain,
   parseArgs,
 } from '../review/cli.ts';
-import {
-  currentRepository,
-  githubAgentVerdict,
-  githubTrainIo,
-  viewerLogin,
-} from './merge-train.ts';
+import { currentRepository, viewerLogin } from '../lib/gh-cli.ts';
+import { githubAgentVerdict, githubTrainIo } from './merge-train.ts';
 
 const bail = cannotRun('runs-ready');
 

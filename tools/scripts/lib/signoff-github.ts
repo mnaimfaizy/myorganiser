@@ -7,6 +7,8 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 
+import { currentRepository, runGh, viewerLogin } from './gh-cli.ts';
+
 import {
   isCandidate,
   type ContentEdit,
@@ -141,35 +143,7 @@ export function readSignOffIssues(
   return { owner: repoOwner, issues };
 }
 
-const gh = (
-  args: readonly string[],
-): { status: number; stdout: string; stderr: string } => {
-  const run = spawnSync('gh', args, { encoding: 'utf8' });
-  return {
-    status: run.status ?? 1,
-    stdout: run.stdout ?? '',
-    stderr: run.stderr ?? '',
-  };
-};
-
-/** The `gh` login the writes run as; null when it could not be read. */
-function viewerLogin(): string | null {
-  const run = gh(['api', 'user', '-q', '.login']);
-  return run.status === 0 && run.stdout.trim() ? run.stdout.trim() : null;
-}
-
-/** The `<owner>/<name>` of the repository `gh` is pointed at; null when unreadable. */
-export function currentRepository(): string | null {
-  const run = gh([
-    'repo',
-    'view',
-    '--json',
-    'nameWithOwner',
-    '-q',
-    '.nameWithOwner',
-  ]);
-  return run.status === 0 && run.stdout.trim() ? run.stdout.trim() : null;
-}
+export { currentRepository };
 
 /** The Cut's IO against `repository` (`<owner>/<name>`), through `gh` and `git`. */
 export function ghSignOffCutIo(repository: string): SignOffCutIo {
@@ -181,7 +155,7 @@ export function ghSignOffCutIo(repository: string): SignOffCutIo {
   return {
     read: () => ({ ...readSignOffIssues(owner, name), viewer: viewerLogin() }),
     readTitle: (number) => {
-      const run = gh([
+      const run = runGh([
         'api',
         `repos/${repository}/issues/${number}`,
         '-q',
@@ -203,7 +177,7 @@ export function ghSignOffCutIo(repository: string): SignOffCutIo {
     },
     // A blind replace, like the train's: GitHub has no conditional body update.
     updateIssue: (number, { title, body }) => {
-      const run = gh([
+      const run = runGh([
         'api',
         '--method',
         'PATCH',
@@ -216,7 +190,7 @@ export function ghSignOffCutIo(repository: string): SignOffCutIo {
       return run.status === 0 || fail('Sign-off Issue edit', run);
     },
     createIssue: ({ title, body }) => {
-      const run = gh([
+      const run = runGh([
         'issue',
         'create',
         '--repo',
@@ -236,7 +210,7 @@ export function ghSignOffCutIo(repository: string): SignOffCutIo {
       return created ? Number(created[1]) : null;
     },
     comment: (number, body) => {
-      const run = gh([
+      const run = runGh([
         'issue',
         'comment',
         String(number),
@@ -248,7 +222,13 @@ export function ghSignOffCutIo(repository: string): SignOffCutIo {
       return run.status === 0 || fail('Sign-off Issue comment', run);
     },
     close: (number) => {
-      const run = gh(['issue', 'close', String(number), '--repo', repository]);
+      const run = runGh([
+        'issue',
+        'close',
+        String(number),
+        '--repo',
+        repository,
+      ]);
       return run.status === 0 || fail('Sign-off Issue close', run);
     },
   };

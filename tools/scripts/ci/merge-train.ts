@@ -84,43 +84,11 @@ import {
 import type { ReviewComment } from '../review/escaped-defects.ts';
 import type { ReviewTierPathMap } from '../lib/review-tier.ts';
 
+import { currentRepository, runGh, viewerLogin } from '../lib/gh-cli.ts';
+
 const bail = cannotRun('merge-train');
 
-/** `gh`, with its exit status and output, never thrown. */
-const runGh = (
-  args: readonly string[],
-): { status: number; stdout: string; stderr: string } => {
-  const result = spawnSync('gh', args, { encoding: 'utf8' });
-  return {
-    status: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-  };
-};
-
-export const currentRepository = (): string | null => {
-  const result = runGh([
-    'repo',
-    'view',
-    '--json',
-    'nameWithOwner',
-    '-q',
-    '.nameWithOwner',
-  ]);
-  return result.status === 0 && result.stdout.trim()
-    ? result.stdout.trim()
-    : null;
-};
-
-/** The `gh` login the train runs as, so it edits only its own comments. */
-let cachedViewerLogin: string | null | undefined;
-export const viewerLogin = (): string | null => {
-  if (cachedViewerLogin !== undefined) return cachedViewerLogin;
-  const result = runGh(['api', 'user', '-q', '.login']);
-  cachedViewerLogin =
-    result.status === 0 && result.stdout.trim() ? result.stdout.trim() : null;
-  return cachedViewerLogin;
-};
+export { currentRepository, viewerLogin };
 
 const prCommits = (repository: string, pr: number) =>
   prCommitsFromGh(
