@@ -678,6 +678,14 @@ _Avoid_: Test account, throwaway account, test user, fixture user
 A QA Plan for a PRD Issue, published as a GitHub issue labelled `qa`. Scenarios are checkboxes, closing it is the sign-off, and defects it finds become their own linked issues. A QA Plan for a single issue is not one of these — it stays the uncommitted working file it was composed as.
 _Avoid_: QA ticket, test ticket, validation issue
 
+**Person Check**:
+One check a QA Report leaves for a person, because no QA session can make it: a judgement, a real device, a screen reader, or a deployed environment. It names how to check and its **Place**: `local` (before merge, on the QA stack or a device at hand), `staging` (once the merged work is on Staging) or `production` (once it is a Release). Only a `local` Person Check holds a merge; the others wait on the Sign-off Issue. An agent never marks one passed.
+_Avoid_: manual check, deferred check, human QA item
+
+**Sign-off Issue**:
+The one open GitHub issue, labelled `qa`, that gathers the `staging` and `production` Person Checks of the merged work for the next Cut. Each one is a checkbox naming its Pull Request and QA Report; a `staging` one that is neither ticked nor waived holds that Cut's deploy to Production, the `production` ones follow the Release, and closing the issue is the sign-off. Not a QA Plan Issue, which is one PRD's plan, and not a Release, which its `staging` checks come before.
+_Avoid_: release issue, release QA issue, QA backlog
+
 **QA Artifact**:
 A screenshot, video or Request Transcript captured while running a QA Plan, only where it shows something the written result cannot. For a fix it pairs what the code did before the change with what it does after, side by side. It stands alone: someone holding only the file can tell which scenario it is, what was expected and what happened on each side, and the scenario's result. A screenshot or video stays private to the person it was captured for unless they choose to publish it.
 _Avoid_: Evidence (a Finding's term), QA proof, attachment
