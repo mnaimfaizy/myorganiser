@@ -8,26 +8,35 @@ import { describe, test } from 'node:test';
 
 import { type PrCommit, QA_REPORT_MARKER } from './qa-report.ts';
 import {
+  addCarriedToSignOffIssue,
   addToSignOffIssue,
   type SignOffChecksRead,
   type SignOffPlace,
   signOffChecksFromView,
   emptySignOffReport,
   findSignOffIssue,
+  freezeSignOffBody,
+  parseCarriedComment,
   parseSignOffIssue,
   type QaReportComment,
   recordSignOff,
+  renderCarriedComment,
+  renderCarriedLine,
+  renderFrozenSignOffIssue,
   renderSignOffFrozen,
   renderSignOffIssue,
   renderSignOffLine,
   renderSignOffReport,
   SIGNOFF_ISSUE_MARKER,
+  SIGNOFF_ISSUE_TITLE,
   SIGNOFF_SECTION_HEADING,
+  type SignOffCheck,
   type SignOffEntry,
   type SignOffIo,
   type SignOffIssueCandidate,
   type SignOffIssueLookup,
   type SignOffReport,
+  signOffFrozenTitle,
   signOffKey,
   unsafeSignOffText,
 } from './signoff-issue.ts';
@@ -1376,5 +1385,244 @@ describe('recordSignOff', () => {
       '- [ ] [staging] line A',
       '- [ ] [production] line B',
     ]);
+  });
+});
+
+// ------------------------------------------------ the Cut (ADR 0151 decisions 7 and 8)
+
+describe('freezeSignOffBody', () => {
+  const FROZEN_LINE = renderSignOffFrozen('v1.2.3');
+
+  // 1
+  test('an unfrozen body gets the frozen line right after the marker, and every other line is kept', () => {
+    const body = sectionBody(renderSignOffLine(A));
+    const frozen = freezeSignOffBody(body, 'v1.2.3');
+    assert.equal(
+      frozen,
+      [SIGNOFF_ISSUE_MARKER, FROZEN_LINE, ...body.split('\n').slice(1)].join(
+        '\n',
+      ),
+    );
+    assert.deepEqual(parseSignOffIssue(frozen)?.frozen, { version: 'v1.2.3' });
+  });
+
+  // 2
+  test('a CRLF body keeps its CRLF line endings after the freeze', () => {
+    const body = sectionBody(renderSignOffLine(A)).replace(/\n/g, '\r\n');
+    assert.equal(
+      freezeSignOffBody(body, 'v1.2.3'),
+      [SIGNOFF_ISSUE_MARKER, FROZEN_LINE, ...body.split('\r\n').slice(1)].join(
+        '\r\n',
+      ),
+    );
+  });
+
+  // 3
+  test('null for a body outside the fixed form, and for a body already frozen, so nothing is written over either', () => {
+    assert.equal(freezeSignOffBody('not a Sign-off Issue', 'v1.2.3'), null);
+    const frozen = freezeSignOffBody(
+      sectionBody(renderSignOffLine(A)),
+      'v1.2.3',
+    );
+    assert.equal(freezeSignOffBody(frozen ?? '', 'v1.2.4'), null);
+  });
+});
+
+describe('renderFrozenSignOffIssue and renderCarriedLine', () => {
+  // 1
+  test('a frozen body round-trips: its version, and every carried check with its Pull Request, place, text and key, unticked', () => {
+    const checks: SignOffCheck[] = [
+      {
+        ...A,
+        key: signOffKey('staging', 'Check the invoice email'),
+        checked: false,
+      },
+      {
+        pr: 8,
+        place: 'production',
+        text: 'Confirm the tax · line',
+        reportUrl: COMMENT_URL,
+        key: signOffKey('production', 'Confirm the tax · line'),
+        checked: true,
+      },
+    ];
+    const parsed = parseSignOffIssue(
+      renderFrozenSignOffIssue('v1.2.3', checks),
+    );
+    assert.deepEqual(parsed?.frozen, { version: 'v1.2.3' });
+    assert.deepEqual(
+      parsed?.checks,
+      checks.map((c) => ({ ...c, checked: false })),
+    );
+  });
+
+  // 2
+  test('a carried line keeps the key of its original trailer when the visible text was edited, where renderSignOffLine would hash the new text', () => {
+    const check: SignOffCheck = {
+      pr: 7,
+      place: 'staging',
+      text: 'Check the invoice email, reworded',
+      reportUrl: COMMENT_URL,
+      key: signOffKey('staging', 'Check the invoice email'),
+      checked: false,
+    };
+    assert.ok(
+      renderCarriedLine(check).endsWith(
+        `<!-- signoff-check pr=7 key=${check.key} -->`,
+      ),
+    );
+    assert.ok(
+      renderSignOffLine(check).endsWith(
+        `<!-- signoff-check pr=7 key=${signOffKey('staging', check.text)} -->`,
+      ),
+    );
+  });
+});
+
+describe('addCarriedToSignOffIssue', () => {
+  const carried: SignOffCheck = {
+    pr: 7,
+    place: 'staging',
+    text: 'Check the invoice email',
+    reportUrl: COMMENT_URL,
+    key: signOffKey('staging', 'Check the invoice email'),
+    checked: true,
+  };
+
+  // 1
+  test('adds a carried check unticked with its original key after the section, and a repeat adds nothing and returns the same body', () => {
+    const once = addCarriedToSignOffIssue(sectionBody(renderSignOffLine(B)), [
+      carried,
+    ]);
+    assert.ok(once);
+    assert.deepEqual(
+      once.added.map((c) => c.key),
+      [carried.key],
+    );
+    assert.deepEqual(
+      parseSignOffIssue(once.body)?.checks.map((c) => [c.checked, c.key]),
+      [
+        [false, signOffKey(B.place, B.text)],
+        [false, carried.key],
+      ],
+    );
+    assert.deepEqual(addCarriedToSignOffIssue(once.body, [carried]), {
+      body: once.body,
+      added: [],
+    });
+  });
+
+  // 2
+  test('a check whose id the body already holds is not added again, and a body outside the fixed form gives null', () => {
+    const body = sectionBody(renderSignOffLine(A));
+    assert.deepEqual(addCarriedToSignOffIssue(body, [carried]), {
+      body,
+      added: [],
+    });
+    assert.equal(
+      addCarriedToSignOffIssue('not a Sign-off Issue', [carried]),
+      null,
+    );
+  });
+});
+
+describe('findSignOffIssue and a frozen body', () => {
+  // 1
+  test('a frozen body is skipped, so the next merge opens a fresh issue', () => {
+    const frozen = freezeSignOffBody(
+      sectionBody(renderSignOffLine(A)),
+      'v1.2.3',
+    );
+    assert.deepEqual(
+      findSignOffIssue(
+        [{ number: 4, body: frozen, author: { login: TRUSTED } }],
+        TRUSTED,
+      ),
+      { status: 'none' },
+    );
+  });
+
+  // 2
+  test('a body with two frozen lines does not parse, so it is still found and the train refuses to write it', () => {
+    const body = [
+      SIGNOFF_ISSUE_MARKER,
+      renderSignOffFrozen('v1.2.3'),
+      renderSignOffFrozen('v1.2.4'),
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+      renderSignOffLine(A),
+    ].join('\n');
+    assert.deepEqual(
+      findSignOffIssue(
+        [{ number: 4, body, author: { login: TRUSTED } }],
+        TRUSTED,
+      ),
+      { status: 'found', number: 4, body },
+    );
+    assert.equal(addToSignOffIssue(body, [B]), null);
+  });
+});
+
+describe('the carried comment (renderCarriedComment, parseCarriedComment)', () => {
+  const MARKER = '<!-- signoff-carried to=#42 version=v1.2.3 -->';
+
+  // 1
+  test('a rendered comment parses back to the issue it went to and its version, and names each carried id', () => {
+    const comment = renderCarriedComment(42, 'v1.2.3', [
+      '7:0123456789ab',
+      '8:ba9876543210',
+    ]);
+    assert.equal(comment.split('\n')[0], MARKER);
+    assert.deepEqual(parseCarriedComment(comment), {
+      to: 42,
+      version: 'v1.2.3',
+    });
+    assert.deepEqual(parseCarriedComment(`${MARKER}\r\nbody`), {
+      to: 42,
+      version: 'v1.2.3',
+    });
+    assert.ok(comment.includes('`7:0123456789ab`, `8:ba9876543210`'));
+  });
+
+  // 2
+  test('the first line must be exactly the marker: extra text, a bad version, #0, another case, a missing #, or leading junk is not a carried comment', () => {
+    const bad = [
+      `${MARKER} and more`,
+      '<!-- signoff-carried to=#42 version=v1.2 -->',
+      '<!-- signoff-carried to=#0 version=v1.2.3 -->',
+      '<!-- SIGNOFF-CARRIED to=#42 version=v1.2.3 -->',
+      `x ${MARKER}`,
+      '<!-- signoff-carried to=42 version=v1.2.3 -->',
+      '<!-- signoff-carried to=#42 version=1.2.3 -->',
+    ];
+    for (const body of bad) assert.equal(parseCarriedComment(body), null, body);
+  });
+
+  // 3
+  test('a marker that is not on the first line is ignored', () => {
+    assert.equal(parseCarriedComment(`Prose first.\n${MARKER}`), null);
+  });
+
+  // 4
+  test('renderCarriedComment throws for a version that is not vX.Y.Z', () => {
+    assert.throws(
+      () => renderCarriedComment(42, '1.2.3', []),
+      /not a release version/,
+    );
+  });
+});
+
+describe('signOffFrozenTitle', () => {
+  // 1
+  test('names the version the issue is frozen for', () => {
+    assert.equal(
+      signOffFrozenTitle('v1.2.3'),
+      'Sign-off: Person Checks for v1.2.3',
+    );
+    assert.equal(
+      SIGNOFF_ISSUE_TITLE,
+      'Sign-off: Person Checks for the next Cut',
+    );
   });
 });

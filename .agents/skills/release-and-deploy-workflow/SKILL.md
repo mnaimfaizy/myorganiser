@@ -131,7 +131,34 @@ The script will:
 7. Commit: `chore(release): vX.Y.Z`. If the sync, the staging or the commit fails, the script prints
    how to get back to a clean `main` (`git checkout -f main`, `git branch -D release/vX.Y.Z`)
    before a retry
-8. Push branch (if `--push`)
+8. Freeze the Cut's Sign-off Issue (below), before the push. If the freeze or its read-back fails
+   the script stops and does **not** push, even with `--push`
+9. Push branch (if `--push`)
+
+Before it makes the branch, `release:cut` reads the Sign-off Issues and refuses (also in
+`--dry-run`) when it cannot read them whole, when two open ones are unfrozen, or when the `gh`
+login is not the repository owner, since a frozen line written by any other login is read by the
+gate as forged. Run the Cut as the owner.
+
+### The Sign-off Issue at the Cut
+
+[ADR 0151](../../../docs/adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md)
+decision 7. In one write, `release:cut` retitles the open Sign-off Issue `Sign-off: Person Checks
+for vX.Y.Z` and adds its frozen line; the Merge Train's next write then finds no unfrozen issue and
+opens a fresh one, so each Cut's issue holds exactly its own work. `--dry-run` prints
+`[dry-run] would freeze Sign-off Issue #n …` and writes nothing.
+
+- **A Cut that never deployed.** A frozen, open issue whose Release has no tag on `origin` and no
+  carry comment is a Cut that never deployed. At the next Cut its unfinished checks (neither
+  ticked by the Maintainer nor waived, `staging` and `production` alike) are copied, unticked and
+  with their hidden ids, into the new Cut's issue in the same write; if there is no open issue,
+  one is created already frozen to hold them. Its own comment, `<!-- signoff-carried to=#n … -->`,
+  says where they went, and counts only from the owner's unedited comment. Tag a deployed Cut
+  (Phase 5) before cutting the next, or its open `production` checks look carried-from.
+- **A superseded issue stays open.** The Maintainer may close it by hand once its carry comment is
+  posted.
+- **A failed freeze** holds production on its own (an unfrozen issue's open `staging` check holds
+  the gate). The script prints the exact manual freeze, and the branch is not pushed.
 
 `RELEASE_NOTES.md` is a rolling file: the next release overwrites it. Authored prose survives on the
 GitHub Release page, which `publish-github-release.yml` builds from the file at the tagged commit.
@@ -224,6 +251,21 @@ The script will:
 
 Pushing the tag triggers `publish-github-release.yml`, which checks out the tagged commit and creates
 or updates the GitHub Release using `RELEASE_NOTES.md` as its body.
+
+### Close the Sign-off Issue
+
+The `production` Person Checks of the Cut can only be made once it is Released. When each is ticked
+or waived by the Maintainer, close the Cut's issue:
+
+```sh
+yarn release:signoff-close --version vX.Y.Z --dry-run   # says what it would do
+yarn release:signoff-close --version vX.Y.Z
+```
+
+It closes the issue frozen for `vX.Y.Z` only when the tag is on `origin` and every `production`
+check (any that was `production` in any revision) is ticked by the Maintainer, proven from the
+issue's edit history as the gate proves it, or waived; a `staging` check still open also keeps it
+open. Otherwise it lists what is open and writes nothing. Re-run it after each tick or waiver.
 
 ---
 
@@ -357,7 +399,7 @@ staging is the pre-release channel.
 - `.github/workflows/release-pr.yml` — auto release PR creator
 - `.github/workflows/publish-github-release.yml` — GitHub Release publisher (on tag push)
 - `tools/scripts/release.ts` — release script (`cut` + `tag` commands)
-- `package.json` — `release:cut`, `release:tag` script aliases
+- `package.json` — `release:cut`, `release:tag`, `release:signoff-close` script aliases
 - `.github/agents/release-notes.agent.md` — ReleaseNotes agent
 - `.github/agents/version-bump.agent.md` — VersionBump agent
 - `.github/agents/preflight-check.agent.md` — PreflightCheck agent

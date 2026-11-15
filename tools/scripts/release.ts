@@ -10,6 +10,17 @@ import {
   runOrAbandonCut,
 } from './lib/release-cut.ts';
 import {
+  executeClose,
+  executeCut,
+  planClose,
+  planCut,
+  closeExitCode,
+  renderClose,
+  renderCutPlan,
+  renderCutResult,
+} from './lib/signoff-cut.ts';
+import { currentRepository, ghSignOffCutIo } from './lib/signoff-github.ts';
+import {
   classifyCommit,
   releaseCommitPaths,
   resolveNotesPlan,
@@ -595,6 +606,7 @@ Usage:
   node tools/scripts/release.ts cut --version v1.2.3 [--push] [--dry-run]
     [--notes-from <path>] [--notes-file <path>] [--no-notes] [--no-version-bump]
   node tools/scripts/release.ts tag --version v1.2.3 [--push] [--dry-run]
+  node tools/scripts/release.ts close-signoff --version v1.2.3 [--dry-run]
 
 What it does:
   cut:
@@ -606,6 +618,12 @@ What it does:
     - regenerates the OpenAPI spec and API client (yarn openapi:sync), which
       carry that version, into the same commit; refuses to commit if the
       sync changed anything the commit would not carry
+    - freezes the open Sign-off Issue for the Cut (ADR 0151 decision 7): retitles it
+      with the version, adds the frozen line, and carries into it the unfinished
+      Person Checks of an earlier Cut that never deployed. Runs before the push,
+      and refuses (before the branch is made) when the issues cannot be read
+      whole or the gh login is not the repository owner. When the freeze or its
+      read-back fails the branch is NOT pushed, even with --push
     - optionally pushes the branch (with --push)
     - updates CHANGELOG.md with generated notes and commits it (default)
       - use --no-notes to skip
@@ -622,6 +640,12 @@ What it does:
         GitHub Release body, which publish-github-release.yml reads from the
         notes file at the tagged commit.
       - --notes-from cannot be combined with --no-notes.
+
+  close-signoff:
+    - closes the Sign-off Issue frozen for the version once its tag is on origin
+      and every Person Check on it is ticked or waived by the Maintainer. Run it
+      after the production deploy and tag, and again after each tick or waiver
+      until it closes. --dry-run says what it would do and writes nothing.
 
   tag:
     - checks clean working tree
@@ -656,13 +680,35 @@ if (args.help) {
 const command = args._[0];
 const version = normalizeVersion(args.version);
 
-if (!command || (command !== 'cut' && command !== 'tag')) {
+if (
+  !command ||
+  (command !== 'cut' && command !== 'tag' && command !== 'close-signoff')
+) {
   printHelp();
-  die('Missing command. Use: cut or tag');
+  die('Missing command. Use: cut, tag or close-signoff');
 }
 
 if (!version) {
   die('Missing --version. Example: --version v1.2.3');
+}
+
+function signOffIo() {
+  const repository = currentRepository();
+  if (!repository)
+    die(
+      'Refusing to continue: could not read the repository with `gh repo view`. Install and authenticate the GitHub CLI (`gh auth login`).',
+    );
+  return ghSignOffCutIo(repository as string);
+}
+
+// Reads and writes only the Sign-off Issue: no clean tree or branch needed.
+if (command === 'close-signoff') {
+  const io = signOffIo();
+  const plan = args.dryRun
+    ? { ...planClose(io, version), closed: false }
+    : executeClose(io, version);
+  console.log(renderClose(version, plan, Boolean(args.dryRun)).join('\n'));
+  process.exit(closeExitCode(plan, Boolean(args.dryRun)));
 }
 
 const releaseBranch = `release/${version}`;
@@ -699,6 +745,17 @@ if (command === 'cut') {
   assertOnBranch('main');
   assertUpToDateWithOrigin('main');
   assertStagingHostApplied(run('git rev-parse main'));
+
+  // The Sign-off Issue is read before anything is made, so a Cut that could
+  // not freeze it is refused rather than left half done. A dry run reads too,
+  // and refuses the same way.
+  const signOff = signOffIo();
+  const signOffPlan = planCut(signOff, version);
+  if (signOffPlan.status === 'refused')
+    die(`Refusing to Cut: ${signOffPlan.reason}.`);
+  if (args.dryRun)
+    for (const line of renderCutPlan(signOffPlan.plan))
+      console.log(`[dry-run] ${line}`);
 
   if (branchExists(releaseBranch)) {
     die(`Branch already exists: ${releaseBranch}`);
@@ -783,6 +840,16 @@ if (command === 'cut') {
     }
   }
 
+  // ADR 0151 decision 7: freeze the Cut's Sign-off Issue before the branch
+  // is pushed, since pushing it starts the dispatcher's production gate.
+  if (!args.dryRun) {
+    const frozen = executeCut(signOff, version);
+    const lines = renderCutResult(version, frozen);
+    if (!frozen.ok) die(lines.join('\n'));
+    for (const line of lines) console.log(line);
+    if (frozen.failures.length > 0) process.exitCode = 1;
+  }
+
   if (args.push) {
     const pushCmd = `git push -u origin ${releaseBranch}`;
     if (args.dryRun) {
@@ -807,7 +874,7 @@ if (command === 'cut') {
   console.log(
     'Next: run GitHub Actions → Deploy Production (manual) for this branch.',
   );
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 
 // command === 'tag'
@@ -843,3 +910,6 @@ if (args.push) {
 } else {
   console.log(`Next: git push origin ${version}`);
 }
+console.log(
+  `Then, once every Person Check on its Sign-off Issue is ticked or waived: node tools/scripts/release.ts close-signoff --version ${version}`,
+);

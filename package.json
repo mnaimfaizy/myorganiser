@@ -25,6 +25,7 @@
     "package:backend:api": "nx run backend:package",
     "release:cut": "node tools/scripts/release.ts cut",
     "release:tag": "node tools/scripts/release.ts tag",
+    "release:signoff-close": "node tools/scripts/release.ts close-signoff",
     "test:hygiene": "node tools/scripts/check-test-hygiene.ts",
     "component:hygiene": "node tools/scripts/check-component-hygiene.ts",
     "design:hygiene": "node tools/scripts/check-design-hygiene.ts",

@@ -18,7 +18,8 @@
  * A tick is parsed as a raw fact here. Whose tick counts, waivers and the
  * production gate are ADR 0151 decisions 8 and 9, and live in
  * `tools/scripts/lib/signoff-gate.ts`. The frozen line is rendered and parsed here; writing it
- * at the Cut, and the retitle, are decision 7 and live elsewhere.
+ * at the Cut, the retitle and the carry-forward are decision 7 and live in
+ * `tools/scripts/lib/signoff-cut.ts`.
  *
  * Pure apart from the `SignOffIo` it is handed: the `gh` calls live in
  * `tools/scripts/ci/merge-train.ts`.
@@ -49,6 +50,10 @@ export const SIGNOFF_ISSUE_LABEL = 'qa';
  * issue is found by its label, author and marker, so the Cut may retitle it.
  */
 export const SIGNOFF_ISSUE_TITLE = 'Sign-off: Person Checks for the next Cut';
+
+/** The title the Cut gives its Sign-off Issue when it freezes it (ADR 0151 decision 7). */
+export const signOffFrozenTitle = (version: string): string =>
+  `Sign-off: Person Checks for ${version}`;
 
 /** The heading of the section that holds the checks. */
 export const SIGNOFF_SECTION_HEADING = '### Person Checks';
@@ -127,15 +132,44 @@ export function renderSignOffLine(entry: SignOffEntry): string {
 
 /** The body of a new Sign-off Issue holding `entries`. */
 export function renderSignOffIssue(entries: readonly SignOffEntry[]): string {
+  return renderSignOffBody(entries.map(renderSignOffLine), null);
+}
+
+/**
+ * The body of a Sign-off Issue the Cut creates already frozen at `version`,
+ * holding checks carried forward (ADR 0151 decision 7). A created issue is
+ * never unfrozen, so it can never hold a deploy it was not meant to.
+ */
+export function renderFrozenSignOffIssue(
+  version: string,
+  checks: readonly SignOffCheck[],
+): string {
+  return renderSignOffBody(checks.map(renderCarriedLine), version);
+}
+
+function renderSignOffBody(
+  lines: readonly string[],
+  frozenVersion: string | null,
+): string {
   return [
     SIGNOFF_ISSUE_MARKER,
+    ...(frozenVersion === null ? [] : [renderSignOffFrozen(frozenVersion)]),
     'The `staging` and `production` Person Checks of merged work, gathered by the Merge Train for the next Cut (ADR 0151). Only the Maintainer ticks a check, or waives one with a `waive: <check> — <reason>` comment. An agent never does.',
     '',
     SIGNOFF_SECTION_HEADING,
     '',
-    ...entries.map(renderSignOffLine),
+    ...lines,
     '',
   ].join('\n');
+}
+
+/**
+ * A carried check's line, unticked, keeping the key from its original trailer.
+ * `renderSignOffLine` would hash the visible text again, and a text the
+ * Maintainer edited would then get a new id and lose its waivers.
+ */
+export function renderCarriedLine(check: SignOffCheck): string {
+  return `- [ ] [${check.place}] ${check.text} · #${check.pr} · [QA Report](${check.reportUrl}) ${trailer(check.pr, check.key)}`;
 }
 
 const ANY_HEADING_RE = /^#{1,6}\s/;
@@ -266,16 +300,91 @@ export function addToSignOffIssue(
     added.push(entry);
   }
   if (added.length === 0) return { body, added };
-  const inserted = [
-    ...(parsed.sectionEmpty ? [''] : []),
-    ...added.map(renderSignOffLine),
-  ];
-  const lines = [
+  return { body: insertLines(parsed, added.map(renderSignOffLine)), added };
+}
+
+function insertLines(parsed: ParsedLines, rendered: readonly string[]): string {
+  const inserted = [...(parsed.sectionEmpty ? [''] : []), ...rendered];
+  return [
     ...parsed.lines.slice(0, parsed.insertAt),
     ...inserted,
     ...parsed.lines.slice(parsed.insertAt),
-  ];
-  return { body: lines.join(parsed.eol), added };
+  ].join(parsed.eol);
+}
+
+/**
+ * Adds checks carried from an earlier Cut's issue, unticked and with their
+ * original keys, skipping any id the body already holds. `null` when the body
+ * is not in the fixed form.
+ */
+export function addCarriedToSignOffIssue(
+  body: string,
+  checks: readonly SignOffCheck[],
+): { body: string; added: SignOffCheck[] } | null {
+  const parsed = parseLines(body);
+  if (!parsed) return null;
+  const seen = new Set(parsed.checks.map((c) => lineKey(c.pr, c.key)));
+  const added: SignOffCheck[] = [];
+  for (const check of checks) {
+    const id = lineKey(check.pr, check.key);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    added.push(check);
+  }
+  if (added.length === 0) return { body, added };
+  return { body: insertLines(parsed, added.map(renderCarriedLine)), added };
+}
+
+/**
+ * The body frozen at the Cut `version`: the one frozen line goes right after
+ * the marker. `null` when the body is not in the fixed form or is already
+ * frozen, so a Cut never writes over a body it cannot read.
+ */
+export function freezeSignOffBody(
+  body: string,
+  version: string,
+): string | null {
+  const parsed = parseLines(body);
+  if (!parsed || parsed.frozen) return null;
+  return [
+    parsed.lines[0],
+    renderSignOffFrozen(version),
+    ...parsed.lines.slice(1),
+  ].join(parsed.eol);
+}
+
+const CARRIED_RE = new RegExp(
+  `^<!-- signoff-carried to=#([1-9]\\d*) version=(${RELEASE_VERSION}) -->$`,
+);
+
+/**
+ * The comment the Cut leaves on an earlier issue whose unfinished checks it
+ * carried into issue `to`, frozen for `version`. Its first line is the marker
+ * and the rest names the carried ids.
+ */
+export function renderCarriedComment(
+  to: number,
+  version: string,
+  ids: readonly string[],
+): string {
+  if (!isReleaseVersion(version))
+    throw new Error(`not a release version: ${version}`);
+  return [
+    `<!-- signoff-carried to=#${to} version=${version} -->`,
+    `The unfinished Person Checks of this Sign-off Issue were carried forward to #${to} (${version}): ${ids.length === 0 ? 'none' : ids.map((id) => `\`${id}\``).join(', ')}.`,
+  ].join('\n');
+}
+
+/**
+ * Where a comment says checks were carried to, by allow-list: the first line
+ * must be exactly the marker. Whose comment it is, is decided by the caller.
+ */
+export function parseCarriedComment(
+  body: string | null | undefined,
+): { to: number; version: string } | null {
+  const first = (body ?? '').split(/\r?\n/, 1)[0]?.trim() ?? '';
+  const m = CARRIED_RE.exec(first);
+  return m ? { to: Number(m[1]), version: m[2] } : null;
 }
 
 /** Whether an entry's text could forge or break a line's hidden trailer. */
@@ -301,7 +410,7 @@ export type SignOffIssueLookup =
  * The open Sign-off Issue among open `qa` issues: one the trusted login (the
  * viewer the train runs as) wrote, whose first line is the marker. An issue
  * anyone else wrote is not the train's, however it is labelled, so it is
- * never written to. Two or more is unreadable, naming them: the train writes
+ * never written to. A frozen one is skipped. Two or more unfrozen is unreadable, naming them: the train writes
  * to none rather than guess.
  */
 export function findSignOffIssue(
@@ -313,10 +422,13 @@ export function findSignOffIssue(
       status: 'unreadable',
       reason: 'the open `qa` issues could not be read',
     };
+  // A frozen issue belongs to its Cut: the next merge opens a fresh one.
   const own = candidates.filter(
     (issue) =>
       issue.author?.login === trustedLogin &&
-      (issue.body ?? '').split(/\r?\n/, 1)[0]?.trim() === SIGNOFF_ISSUE_MARKER,
+      (issue.body ?? '').split(/\r?\n/, 1)[0]?.trim() ===
+        SIGNOFF_ISSUE_MARKER &&
+      !parseSignOffIssue(issue.body)?.frozen,
   );
   if (own.length === 0) return { status: 'none' };
   if (own.length > 1)

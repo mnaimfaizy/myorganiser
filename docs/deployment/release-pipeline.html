@@ -1209,7 +1209,7 @@
               </text>
               <text class="nc" x="72" y="260">
                 creates + pushes release/vX.Y.Z, only if Staging is Host
-                Applied &#183; package.json:26, release.ts:668, :696-705
+                Applied &#183; package.json:26, release.ts:714, :742-762
               </text>
             </g>
             <path
@@ -1597,7 +1597,7 @@
               </text>
               <text class="nc" x="272" y="1180">
                 no commit, no files &#8212; asserts branch state first &#183;
-                release.ts:821-829
+                release.ts:888-896
               </text>
               <text class="nc" x="272" y="1194">
                 package.json:27
@@ -1702,7 +1702,13 @@
           must have started after that upload landed. There is no flag to
           skip this. Only then does it create + push
           <code>release/vX.Y.Z</code> (<code>package.json:26</code>,
-          <code>release.ts:668</code>, <code>:696-705</code>). The commit is
+          <code>release.ts:714</code>, <code>:742-762</code>). Before it creates
+          the branch it also reads the Sign-off Issues, and refuses &mdash;
+          with <code>--dry-run</code> too &mdash; when it cannot read them
+          whole or the <code>gh</code> login is not the repository owner
+          (<code>:749-758</code>). After the release commit and before the
+          push, it freezes the open Sign-off Issue for the version, and does
+          not push if that fails (<code>:846-848</code>). The commit is
           read from the upload run's name, and a scheduled run's name
           carries none (<code>deploy-staging.yml:19</code>), so the Cut
           refuses a scheduled upload until a <b>full</b> dispatch of
@@ -1883,8 +1889,8 @@
         <dd id="note-tag">
           Asserts it is on the release branch and up to date with origin, and
           that <code>package.json</code> matches the tag
-          (<code>release.ts:821-823</code>); refuses an existing tag
-          (<code>:825-827</code>); creates no commit and writes no files
+          (<code>release.ts:888-890</code>); refuses an existing tag
+          (<code>:892-894</code>); creates no commit and writes no files
           (<code>package.json:27</code>). A commit here would move the
           branch past the exact SHA CI verified and a reviewer approved.
           <code>vX.Y.Z</code> existing means that version reached production.
@@ -1945,7 +1951,7 @@
               creates + pushes <code>release/vX.Y.Z</code>, only if Staging
               is Host Applied at this commit
             </td>
-            <td class="cite">package.json:26, release.ts:668, :696-705</td>
+            <td class="cite">package.json:26, release.ts:714, :742-762</td>
           </tr>
           <tr class="fork">
             <td>4a</td>
@@ -1978,7 +1984,7 @@
             <td>6</td>
             <td><code>yarn release:tag --version vX.Y.Z --push</code></td>
             <td>annotated tag, no commit, no files</td>
-            <td class="cite">package.json:27, release.ts:821-829</td>
+            <td class="cite">package.json:27, release.ts:888-896</td>
           </tr>
           <tr>
             <td>7</td>
@@ -2147,11 +2153,11 @@
       <p>
         <code>release:tag</code> asserts it is on the release branch, up to
         date with origin, and that <code>package.json</code> matches the tag
-        (<code>release.ts:821-823</code>); refuses an existing tag
-        (<code>:825-827</code>); and creates no commits and writes no files
+        (<code>release.ts:888-890</code>); refuses an existing tag
+        (<code>:892-894</code>); and creates no commits and writes no files
         &mdash; a commit here would move the branch past the exact SHA that
         CI verified and a reviewer approved
-        (<code>:813-820</code>). <code>release:cut</code> has no way to tag
+        (<code>:880-887</code>). <code>release:cut</code> has no way to tag
         at all: there is no <code>--tag</code> flag. <code>vX.Y.Z</code>
         existing means that version reached production
         (<a href="../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md"
@@ -2177,7 +2183,7 @@
             <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>.
             The repo floor is <code>&gt;=22.18.0</code>
             (<code>package.json:7</code>). <code>release.ts</code> refuses a
-            major below 22 (<code>release.ts:25-33</code>). Three scopes, one
+            major below 22 (<code>release.ts:36-44</code>). Three scopes, one
             floor &mdash; not a single pinned number.
           </p>
         </div>
@@ -2262,7 +2268,7 @@
             <code>^v[0-9]+\.[0-9]+\.[0-9]+$</code>
             (<code>publish-github-release.yml:37</code>); and
             <code>/^v?(\d+)\.(\d+)\.(\d+)$/</code>
-            (<code>release.ts:169</code>), which rejects prerelease input
+            (<code>release.ts:180</code>), which rejects prerelease input
             outright.
           </p>
         </div>
@@ -2988,14 +2994,16 @@
       "release-pr.yml:6-8": { "file": ".github/workflows/release-pr.yml", "start": "push:", "end": "- 'release/v*'" },
       "release-pr.yml:36": { "file": ".github/workflows/release-pr.yml", "start": "if (!/^release\\/v\\d+\\.\\d+\\.\\d+$/.test(releaseBranch)) {" },
       "release-pr.yml:105-117": { "file": ".github/workflows/release-pr.yml", "start": "const mutation = `", "end": "core.info(`Enabled auto-merge for PR #${pr.number}`);" },
-      "release.ts:25-33": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
-      "release.ts:169": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
-      "release.ts:668": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
-      "release.ts:696-705": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
-      "release.ts:813-820": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },
-      "release.ts:821-823": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
-      "release.ts:821-829": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
-      "release.ts:825-827": { "file": "tools/scripts/release.ts", "start": "if (tagExists(version)) {", "end": "}" }
+      "release.ts:36-44": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
+      "release.ts:180": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
+      "release.ts:714": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
+      "release.ts:742-762": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
+      "release.ts:749-758": { "file": "tools/scripts/release.ts", "start": "// The Sign-off Issue is read before anything is made, so a Cut that could", "end": "console.log(`[dry-run] ${line}`);" },
+      "release.ts:846-848": { "file": "tools/scripts/release.ts", "start": "const frozen = executeCut(signOff, version);", "end": "if (!frozen.ok) die(lines.join('\\n'));" },
+      "release.ts:880-887": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },
+      "release.ts:888-890": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
+      "release.ts:888-896": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
+      "release.ts:892-894": { "file": "tools/scripts/release.ts", "start": "if (tagExists(version)) {", "end": "}" }
     }
   }
 </script>

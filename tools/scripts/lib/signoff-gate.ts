@@ -150,6 +150,16 @@ export function parseWaivers(
 }
 
 /**
+ * Whether a comment can be trusted as the Maintainer's words: written by the
+ * owner login with the OWNER association, not minimised, never edited.
+ */
+export const isOwnerComment = (comment: GateComment, owner: string): boolean =>
+  comment.authorAssociation === 'OWNER' &&
+  comment.author?.login === owner &&
+  !comment.isMinimized &&
+  !comment.lastEditedAt;
+
+/**
  * The waivers that count: only from a comment the owner login wrote with the
  * OWNER association, that is not minimised and was never edited (anyone
  * with write access can edit someone else's comment). Keyed by check id.
@@ -160,13 +170,7 @@ export function trustedWaivers(
 ): Map<string, string> {
   const waived = new Map<string, string>();
   for (const comment of comments) {
-    if (
-      comment.authorAssociation !== 'OWNER' ||
-      comment.author?.login !== owner ||
-      comment.isMinimized ||
-      comment.lastEditedAt
-    )
-      continue;
+    if (!isOwnerComment(comment, owner)) continue;
     for (const { id, reason } of parseWaivers(comment.body) ?? [])
       if (!waived.has(id)) waived.set(id, reason);
   }
@@ -249,6 +253,8 @@ export interface IssueProof {
   frozenAt: Set<string>;
   /** Every check id that was `[staging]` in any revision, with its latest text. */
   staging: Map<string, { pr: number; key: string; text: string }>;
+  /** Every check id that was `[production]` in any revision, with its latest text. */
+  production: Map<string, { pr: number; key: string; text: string }>;
   /** Check ids ticked in the current body, by whether the Maintainer made the tick. */
   ticked: Map<string, boolean>;
 }
@@ -275,6 +281,10 @@ export function proveIssue(
     };
   const frozenAt = new Set<string>();
   const staging = new Map<string, { pr: number; key: string; text: string }>();
+  const production = new Map<
+    string,
+    { pr: number; key: string; text: string }
+  >();
   const checked = new Map<string, boolean>();
   const byOwner = new Map<string, boolean>();
   let editors: (string | null)[] = [];
@@ -298,6 +308,12 @@ export function proveIssue(
       now.set(id, check.checked);
       if (check.place === 'staging' || staging.has(id))
         staging.set(id, { pr: check.pr, key: check.key, text: check.text });
+      if (check.place === 'production' || production.has(id))
+        production.set(id, {
+          pr: check.pr,
+          key: check.key,
+          text: check.text,
+        });
     }
     for (const id of new Set([...checked.keys(), ...now.keys()])) {
       const was = checked.get(id) ?? false;
@@ -317,7 +333,10 @@ export function proveIssue(
     const id = checkId(check.pr, check.key);
     if (check.checked) ticked.set(id, byOwner.get(id) ?? false);
   }
-  return { status: 'read', proof: { current, frozenAt, staging, ticked } };
+  return {
+    status: 'read',
+    proof: { current, frozenAt, staging, production, ticked },
+  };
 }
 
 /** The `staging` checks of one proven issue that are neither ticked by the Maintainer nor waived. */
@@ -326,11 +345,25 @@ export function openStagingChecks(
   proof: IssueProof,
   waived: ReadonlyMap<string, string>,
 ): OpenCheck[] {
+  return openChecks(issue, proof, waived, 'staging');
+}
+
+/**
+ * The checks of one proven issue that were `place` in any revision and are
+ * neither ticked by the Maintainer nor waived. The Cut reads the `production`
+ * ones to close the issue; the gate reads the `staging` ones to hold.
+ */
+export function openChecks(
+  issue: GateIssue,
+  proof: IssueProof,
+  waived: ReadonlyMap<string, string>,
+  place: 'staging' | 'production',
+): OpenCheck[] {
   const present = new Set(
     proof.current.checks.map((c) => checkId(c.pr, c.key)),
   );
   const open: OpenCheck[] = [];
-  for (const [id, check] of proof.staging) {
+  for (const [id, check] of proof[place]) {
     if (waived.has(id) || proof.ticked.get(id) === true) continue;
     const why: OpenWhy = !present.has(id)
       ? 'removed from the issue'

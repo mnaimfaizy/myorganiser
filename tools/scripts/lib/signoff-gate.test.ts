@@ -22,9 +22,13 @@ import {
   type GateDecision,
   type GateInput,
   type GateIssue,
+  isOwnerComment,
   type OpenCheck,
+  openChecks,
+  openStagingChecks,
   type OpenWhy,
   parseWaivers,
+  proveIssue,
   releaseVersion,
   renderGateDecision,
   revisionsOf,
@@ -1042,5 +1046,129 @@ describe('renderGateDecision', () => {
       renderGateDecision({ status: 'cannot-decide', reason: 'R' }),
       ['Production gate: held — it cannot decide: R.'],
     );
+  });
+});
+
+// ------------------------------------------------------- the Cut's reads
+
+describe('isOwnerComment (signoff-cut)', () => {
+  // 1
+  test('a comment counts as the owner’s only when the owner login wrote it with OWNER, unminimised and unedited', () => {
+    assert.equal(isOwnerComment(waiverComment(), OWNER), true);
+    assert.equal(
+      isOwnerComment(waiverComment({ author: { login: 'someone' } }), OWNER),
+      false,
+    );
+    assert.equal(
+      isOwnerComment(waiverComment({ authorAssociation: 'MEMBER' }), OWNER),
+      false,
+    );
+    assert.equal(
+      isOwnerComment(waiverComment({ isMinimized: true }), OWNER),
+      false,
+    );
+    assert.equal(
+      isOwnerComment(waiverComment({ lastEditedAt: at(1) }), OWNER),
+      false,
+    );
+  });
+
+  // 2
+  test('trustedWaivers keeps exactly the waivers of the comments isOwnerComment accepts, so it is unchanged by the helper', () => {
+    const waiveOf = (id: string): string => `waive: ${id} — ${REASON}`;
+    const comments = [
+      waiverComment({ body: waiveOf('1576:aaaaaaaaaaaa') }),
+      waiverComment({
+        author: { login: 'someone' },
+        body: waiveOf('1577:aaaaaaaaaaaa'),
+      }),
+      waiverComment({
+        authorAssociation: 'MEMBER',
+        body: waiveOf('1578:aaaaaaaaaaaa'),
+      }),
+      waiverComment({ isMinimized: true, body: waiveOf('1579:aaaaaaaaaaaa') }),
+      waiverComment({
+        lastEditedAt: at(1),
+        body: waiveOf('1580:aaaaaaaaaaaa'),
+      }),
+    ];
+    const accepted = comments.filter((c) => isOwnerComment(c, OWNER));
+    assert.deepEqual(
+      trustedWaivers(comments, OWNER),
+      new Map([['1576:aaaaaaaaaaaa', REASON]]),
+    );
+    assert.deepEqual(
+      trustedWaivers(comments, OWNER),
+      trustedWaivers(accepted, OWNER),
+    );
+  });
+});
+
+describe('the production checks of a proven issue (proveIssue, openChecks)', () => {
+  const proofOf = (issue: GateIssue) => {
+    const result = proveIssue(issue, OWNER);
+    if (result.status !== 'read') assert.fail(result.reason);
+    return result.proof;
+  };
+  const relabelled = (body: string, entry: SignOffEntry): string => {
+    const from = `- [ ] [${entry.place}] ${entry.text} · `;
+    assert.equal(body.split(from).length - 1, 1, from);
+    return body.replace(from, `- [ ] [staging] ${entry.text} · `);
+  };
+
+  // 1
+  test('a production check present in any revision stays in proof.production when a later revision relabels or removes it', () => {
+    const rev1 = frozenBody([A, B]);
+    const issue = historied([
+      { body: rev1, editor: OWNER },
+      { body: relabelled(rev1, B), editor: OWNER },
+      { body: frozenBody([A]), editor: OWNER },
+    ]);
+    const proof = proofOf(issue);
+    const id = checkId(B.pr, signOffKey(B.place, B.text));
+    assert.equal(proof.production.get(id)?.text, B.text);
+    assert.equal(proof.staging.get(id)?.text, B.text);
+    assert.equal(
+      proof.current.checks.some((c) => checkId(c.pr, c.key) === id),
+      false,
+    );
+  });
+
+  // 2
+  test('openChecks reads the production checks and openStagingChecks the staging ones, each by what is not ticked or waived', () => {
+    const issue = historied([
+      { body: frozenBody([A, B]), editor: OWNER },
+      { body: frozenBody([A]), editor: OWNER },
+    ]);
+    const proof = proofOf(issue);
+    assert.deepEqual(openChecks(issue, proof, new Map(), 'production'), [
+      openOf(B, 'removed from the issue'),
+    ]);
+    assert.deepEqual(openChecks(issue, proof, new Map(), 'staging'), [
+      openOf(A, 'not ticked'),
+    ]);
+    const waivedB = new Map([
+      [checkId(B.pr, signOffKey(B.place, B.text)), REASON],
+    ]);
+    assert.deepEqual(openChecks(issue, proof, waivedB, 'production'), []);
+  });
+
+  // 3
+  test('openStagingChecks is openChecks for staging, with or without a waiver', () => {
+    const ticked = setChecked(frozenBody([A, B]), B, true);
+    const issue = historied([
+      { body: frozenBody([A, B]), editor: OWNER },
+      { body: ticked, editor: 'collaborator' },
+    ]);
+    const proof = proofOf(issue);
+    const waivedA = new Map([
+      [checkId(A.pr, signOffKey(A.place, A.text)), REASON],
+    ]);
+    for (const waived of [new Map<string, string>(), waivedA]) {
+      assert.deepEqual(
+        openStagingChecks(issue, proof, waived),
+        openChecks(issue, proof, waived, 'staging'),
+      );
+    }
   });
 });
