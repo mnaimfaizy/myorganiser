@@ -135,6 +135,7 @@
     "review:concurrency:check": "node tools/scripts/check-review-concurrency.ts",
     "review:pages:check": "node tools/scripts/check-review-pages.ts",
     "deploy:pages:check": "node tools/scripts/check-deploy-pipeline.ts",
+    "signoff:gate": "node tools/scripts/ci/signoff-gate.ts",
     "host-apply:preflight": "node tools/scripts/host-apply-preflight.ts",
     "host-apply:workflow:check": "node tools/scripts/check-host-apply-workflow.ts",
     "feedback:release:mark": "node tools/scripts/mark-feedback-release.ts",

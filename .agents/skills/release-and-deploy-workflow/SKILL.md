@@ -162,10 +162,34 @@ production and waits for a human.
 A run reaches that prompt one of two ways:
 
 - **Automatically** — `Dispatch Production Deploy (latest release)` fires on creation of a
-  `release/vX.Y.Z` branch, finds the newest release branch, and dispatches the production deploy
-  against it. The Phase 2 push usually starts this for you.
+  `release/vX.Y.Z` branch, finds the newest release branch, runs the production gate (below), and
+  dispatches the production deploy against it. The Phase 2 push usually starts this for you.
 - **Manually** — Actions → `Deploy Production (manual)` → Run workflow, branch dropdown set to
   `release/vX.Y.Z`. The workflow rejects any ref that is not `refs/heads/release/*`.
+
+### The production gate (open `staging` Person Checks)
+
+Before it dispatches anything, the dispatcher runs `yarn signoff:gate`
+([command reference](../../../docs/agents/command-reference.md#release),
+[ADR 0151](../../../docs/adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md)
+decisions 8 and 9). It holds while the Cut's Sign-off Issue has a `staging` Person Check that the
+Maintainer has neither ticked nor waived, so no approval prompt appears for a held deploy.
+
+- **A red dispatcher run at the Cut is expected** while `staging` checks are open. Its log and
+  job summary name each open check and print the exact waiver line for it. Check each one on
+  Staging, tick it on the Sign-off Issue or waive it, then re-run the failed run.
+- **To waive**, the Maintainer comments on the Sign-off Issue, one line per check:
+  `waive: <pr>:<key> — <reason>` (`—`, `–`, `--` or `-`). A waiver with no reason, an edited
+  comment, or one from any other login counts for nothing; post a fresh comment instead.
+- **Only the Maintainer's own ticks and waivers count.** An agent never ticks a Person Check or
+  writes a waiver, and never re-runs a held dispatch to get past the gate.
+- **A Sign-off Issue the gate cannot read** (a deleted revision, a frozen line someone else
+  wrote, a body not in the fixed form) holds every deploy, because its history cannot be
+  rewritten. The run names the issue. The Maintainer checks it by hand, then fixes the body if
+  that is the cause, or closes it and removes its `qa` label so the gate stops reading it.
+- **Escape hatch:** the Maintainer may dispatch `Deploy Production (manual)` directly, which the
+  gate does not run in, the way a merge they start stays unblocked. It is theirs to choose; an
+  agent never takes it.
 
 Before approving, confirm:
 

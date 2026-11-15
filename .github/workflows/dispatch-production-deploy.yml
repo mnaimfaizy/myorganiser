@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
   actions: write
+  # The production gate reads the Cut's Sign-off Issue (ADR 0151 decision 8).
+  issues: read
 
 concurrency:
   group: dispatch-production-deploy
@@ -63,6 +65,23 @@ jobs:
 
           echo "Latest release branch: ${latest_branch}"
           echo "release_branch=${latest_branch}" >> "$GITHUB_OUTPUT"
+
+      # The production gate (ADR 0151 decisions 8 and 9): before anything is
+      # dispatched, hold while the Cut's Sign-off Issue has a `staging` Person
+      # Check the Maintainer has neither ticked nor waived. A held run fails
+      # here, naming each check and the `waive:` line for it, so Deploy
+      # Approval is never asked for. Tick or waive, then re-run this run.
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.18'
+
+      - name: Hold on open staging Person Checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ steps.find.outputs.release_branch }}
+        run: node tools/scripts/ci/signoff-gate.ts --release-branch "${RELEASE_BRANCH}"
 
       - name: Summary
         shell: bash

@@ -17,6 +17,7 @@ import {
   parseSignOffIssue,
   type QaReportComment,
   recordSignOff,
+  renderSignOffFrozen,
   renderSignOffIssue,
   renderSignOffLine,
   renderSignOffReport,
@@ -224,6 +225,7 @@ describe('Sign-off Issue format', () => {
         key: signOffKey(e.place, e.text),
         checked: false,
       })),
+      frozen: null,
     });
   });
 
@@ -318,6 +320,7 @@ describe('Sign-off Issue format', () => {
     ].join('\n');
     assert.deepEqual(parseSignOffIssue(body), {
       checks: [{ ...A, key: signOffKey(A.place, A.text), checked: false }],
+      frozen: null,
     });
   });
 
@@ -431,6 +434,239 @@ describe('Sign-off Issue format', () => {
     assert.equal(unsafeSignOffText('Check the <!-- thing'), true);
     assert.equal(unsafeSignOffText('Check the --> thing'), true);
     assert.equal(unsafeSignOffText('Check the invoice email'), false);
+  });
+});
+
+// ------------------------------------------------------------- frozen line
+
+describe('Sign-off Issue frozen line', () => {
+  const FROZEN = renderSignOffFrozen('v1.2.3');
+
+  // 1
+  test('renderSignOffFrozen renders the fixed frozen line, and throws for anything that is not a release version', () => {
+    assert.equal(FROZEN, '<!-- signoff-frozen version=v1.2.3 -->');
+    for (const version of ['1.2.3', 'v1.2', 'v1.2.3-rc.1']) {
+      assert.throws(
+        () => renderSignOffFrozen(version),
+        /not a release version/,
+        version,
+      );
+    }
+  });
+
+  // 2
+  test('a frozen line on the line after the marker parses with its version, and leaves the checks as they are without it', () => {
+    const plain = sectionBody(renderSignOffLine(A), renderSignOffLine(B));
+    const frozen = [
+      SIGNOFF_ISSUE_MARKER,
+      FROZEN,
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+      renderSignOffLine(A),
+      renderSignOffLine(B),
+    ].join('\n');
+    assert.equal(parseSignOffIssue(plain)?.frozen, null);
+    assert.deepEqual(parseSignOffIssue(frozen)?.frozen, { version: 'v1.2.3' });
+    assert.deepEqual(
+      parseSignOffIssue(frozen)?.checks,
+      parseSignOffIssue(plain)?.checks,
+    );
+  });
+
+  // 3
+  test('a frozen line among the Maintainer prose between the marker and the section is read', () => {
+    const body = [
+      SIGNOFF_ISSUE_MARKER,
+      'Prose before the freeze.',
+      FROZEN,
+      'Prose after it.',
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+      renderSignOffLine(A),
+    ].join('\n');
+    const parsed = parseSignOffIssue(body);
+    assert.deepEqual(parsed?.frozen, { version: 'v1.2.3' });
+    assert.deepEqual(
+      parsed?.checks.map((c) => c.key),
+      [signOffKey(A.place, A.text)],
+    );
+  });
+
+  // 4
+  test('a body with a second frozen line, a frozen line in or after the section, an indented or malformed frozen line is unparseable', () => {
+    const cases: [string, string][] = [
+      [
+        'two frozen lines before the section',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          FROZEN,
+          renderSignOffFrozen('v1.2.4'),
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+        ].join('\n'),
+      ],
+      [
+        'a frozen line inside the section',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+          FROZEN,
+          renderSignOffLine(A),
+        ].join('\n'),
+      ],
+      [
+        'a frozen line after the section',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+          renderSignOffLine(A),
+          '## Notes',
+          FROZEN,
+        ].join('\n'),
+      ],
+      [
+        'an indented frozen line',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          `  ${FROZEN}`,
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+        ].join('\n'),
+      ],
+      [
+        'a frozen line without version=',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          '<!-- signoff-frozen v1.2.3 -->',
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+        ].join('\n'),
+      ],
+      [
+        'a frozen line with an unprefixed version',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          '<!-- signoff-frozen version=1.2.3 -->',
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+        ].join('\n'),
+      ],
+      [
+        'a frozen line with trailing text',
+        [
+          SIGNOFF_ISSUE_MARKER,
+          `${FROZEN} trailing`,
+          '',
+          SIGNOFF_SECTION_HEADING,
+          '',
+        ].join('\n'),
+      ],
+    ];
+    for (const [why, body] of cases) {
+      assert.equal(parseSignOffIssue(body), null, why);
+    }
+  });
+
+  // 5
+  test('a frozen line inside a code fence before the section is content: it is ignored, and does not count as the frozen line', () => {
+    const fencedOnly = [
+      SIGNOFF_ISSUE_MARKER,
+      '```md',
+      FROZEN,
+      '```',
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+      renderSignOffLine(A),
+    ].join('\n');
+    assert.deepEqual(parseSignOffIssue(fencedOnly), {
+      checks: [{ ...A, key: signOffKey(A.place, A.text), checked: false }],
+      frozen: null,
+    });
+
+    const fencedPlusReal = [
+      SIGNOFF_ISSUE_MARKER,
+      '```md',
+      renderSignOffFrozen('v1.2.4'),
+      '```',
+      FROZEN,
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+    ].join('\n');
+    assert.deepEqual(parseSignOffIssue(fencedPlusReal)?.frozen, {
+      version: 'v1.2.3',
+    });
+  });
+
+  // 6
+  test('addToSignOffIssue keeps the frozen line exactly as it was, and adds the new entries to the section', () => {
+    const body = [
+      SIGNOFF_ISSUE_MARKER,
+      FROZEN,
+      '',
+      SIGNOFF_SECTION_HEADING,
+      '',
+      renderSignOffLine(A),
+    ].join('\n');
+    const next = addToSignOffIssue(body, [A, B]);
+    assert.ok(next);
+    assert.deepEqual(next.added, [B]);
+    assert.equal(
+      next.body,
+      [
+        SIGNOFF_ISSUE_MARKER,
+        FROZEN,
+        '',
+        SIGNOFF_SECTION_HEADING,
+        '',
+        renderSignOffLine(A),
+        renderSignOffLine(B),
+      ].join('\n'),
+    );
+    assert.deepEqual(parseSignOffIssue(next.body)?.frozen, {
+      version: 'v1.2.3',
+    });
+  });
+
+  // 7
+  test('the train never flips a box: a ticked, an upper-case ticked, and an unticked line keep their checkbox byte for byte, when entries are added and when they repeat', () => {
+    const menu = entryOf({ place: 'staging', text: 'Check the menu' }, 9);
+    const newEntry = entryOf(
+      { place: 'production', text: 'Check the ledger' },
+      11,
+    );
+    const xLine = renderSignOffLine(A).replace('- [ ]', '- [x]');
+    const upperLine = renderSignOffLine(B).replace('- [ ]', '- [X]');
+    const openLine = renderSignOffLine(menu);
+    const body = sectionBody(xLine, upperLine, openLine);
+
+    const withNew = addToSignOffIssue(body, [newEntry]);
+    assert.ok(withNew);
+    assert.deepEqual(withNew.added, [newEntry]);
+    assert.equal(
+      withNew.body,
+      sectionBody(xLine, upperLine, openLine, renderSignOffLine(newEntry)),
+    );
+    assert.deepEqual(
+      parseSignOffIssue(withNew.body)?.checks.map((c) => c.checked),
+      [true, true, false, false],
+    );
+
+    const repeat = addToSignOffIssue(body, [A, B, menu]);
+    assert.ok(repeat);
+    assert.deepEqual(repeat.added, []);
+    assert.equal(repeat.body, body);
   });
 });
 

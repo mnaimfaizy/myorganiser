@@ -16,8 +16,9 @@
  * after the Maintainer edits the visible text.
  *
  * A tick is parsed as a raw fact here. Whose tick counts, waivers and the
- * production gate are ADR 0151 decisions 8 and 9, and live elsewhere; so do
- * the freeze and retitle at the Cut (decision 7).
+ * production gate are ADR 0151 decisions 8 and 9, and live in
+ * `tools/scripts/lib/signoff-gate.ts`. The frozen line is rendered and parsed here; writing it
+ * at the Cut, and the retitle, are decision 7 and live elsewhere.
  *
  * Pure apart from the `SignOffIo` it is handed: the `gh` calls live in
  * `tools/scripts/ci/merge-train.ts`.
@@ -78,6 +79,30 @@ export interface SignOffCheck extends SignOffEntry {
 /** A parsed Sign-off Issue body. */
 export interface SignOffIssueBody {
   checks: SignOffCheck[];
+  /** The Cut the issue was frozen at, from its frozen line; null while it gathers for the next Cut. */
+  frozen: { version: string } | null;
+}
+
+/** A release version, `vX.Y.Z`: what a Cut is named by. */
+const RELEASE_VERSION = 'v\\d+\\.\\d+\\.\\d+';
+export const isReleaseVersion = (version: string): boolean =>
+  new RegExp(`^${RELEASE_VERSION}$`).test(version);
+
+const FROZEN_PREFIX = '<!-- signoff-frozen';
+const FROZEN_RE = new RegExp(
+  `^${FROZEN_PREFIX} version=(${RELEASE_VERSION}) -->$`,
+);
+
+/**
+ * The fixed line that marks a Sign-off Issue frozen at the Cut `version`
+ * (`vX.Y.Z`). It goes between the marker and the `### Person Checks`
+ * section; the Cut writes it (ADR 0151 decision 7), and the production gate
+ * finds the Cut's issue by it (decision 8).
+ */
+export function renderSignOffFrozen(version: string): string {
+  if (!isReleaseVersion(version))
+    throw new Error(`not a release version: ${version}`);
+  return `${FROZEN_PREFIX} version=${version} -->`;
 }
 
 /**
@@ -129,6 +154,7 @@ interface ParsedLines {
   insertAt: number;
   /** Whether the section so far holds only its heading. */
   sectionEmpty: boolean;
+  frozen: { version: string } | null;
 }
 
 function parseLines(body: string | null | undefined): ParsedLines | null {
@@ -141,12 +167,20 @@ function parseLines(body: string | null | undefined): ParsedLines | null {
   let fenced = false;
   let lastInSection = -1;
   let heading = -1;
+  let frozen: { version: string } | null = null;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index].trimEnd();
     // Fenced lines are content of whatever section holds them, never checks.
     if (FENCE_RE.test(line) || fenced) {
       if (FENCE_RE.test(line)) fenced = !fenced;
       if (state === 'in' && line !== '') lastInSection = index;
+      continue;
+    }
+    // The frozen line, by allow-list: exactly one, in the fixed form, before the section.
+    if (line.trimStart().startsWith(FROZEN_PREFIX)) {
+      const f = FROZEN_RE.exec(line);
+      if (!f || state !== 'before' || frozen) return null;
+      frozen = { version: f[1] };
       continue;
     }
     if (line === SIGNOFF_SECTION_HEADING) {
@@ -181,24 +215,33 @@ function parseLines(body: string | null | undefined): ParsedLines | null {
     checks,
     insertAt: lastInSection + 1,
     sectionEmpty: lastInSection === heading,
+    frozen,
   };
 }
 
 /**
  * Reads a Sign-off Issue body, or `null` when it is not one in the fixed
  * form: the marker not on the first line, no `### Person Checks` section, a
- * second one, an unclosed code fence, or a top-level list item in the section
+ * second one, an unclosed code fence, a top-level list item in the section
  * that is not exactly a rendered check line (a `local` Place, another
- * trailer, a Pull Request number that differs from its key's).
+ * trailer, a Pull Request number that differs from its key's), or a line
+ * starting `<!-- signoff-frozen` that is not exactly one frozen line before
+ * the section.
  */
 export function parseSignOffIssue(
   body: string | null | undefined,
 ): SignOffIssueBody | null {
   const parsed = parseLines(body);
-  return parsed ? { checks: parsed.checks } : null;
+  return parsed ? { checks: parsed.checks, frozen: parsed.frozen } : null;
 }
 
-const lineKey = (pr: number, key: string): string => `${pr}:${key}`;
+/**
+ * A check line's id, `<pr>:<key>`: what keeps a re-run from adding a line
+ * twice, and what a waiver names (ADR 0151 decision 9).
+ */
+export const signOffCheckId = (pr: number, key: string): string =>
+  `${pr}:${key}`;
+const lineKey = signOffCheckId;
 const entryKey = (entry: SignOffEntry): string =>
   lineKey(entry.pr, signOffKey(entry.place, entry.text));
 
