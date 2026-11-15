@@ -25,6 +25,7 @@
  * Run the tests with: node --test tools/scripts/lib/signoff-cut.test.ts
  */
 
+import { compareVersions, parseVersion } from './feedback-release.ts';
 import {
   type GateComment,
   type GateInput,
@@ -144,13 +145,9 @@ function load(read: SignOffRead): Loaded {
 
 const ownerOf = (read: SignOffRead): string => read.owner?.login ?? '';
 
-/** `[major, minor, patch]` of a `vX.Y.Z`. */
-const semver = (version: string): number[] =>
-  version.slice(1).split('.').map(Number);
 const isBefore = (a: string, b: string): boolean => {
-  const [x, y] = [semver(a), semver(b)];
-  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] < y[i];
-  return false;
+  const [x, y] = [parseVersion(a), parseVersion(b)];
+  return x !== null && y !== null && compareVersions(x, y) < 0;
 };
 
 // ----------------------------------------------------------------- plan

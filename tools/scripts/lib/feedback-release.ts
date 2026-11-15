@@ -26,14 +26,18 @@ export const MARK_RELEASE_PATH = '/api/v1/feedback/releases/mark';
 const CLOSING_REFERENCE =
   /(?<![\w/-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/gi;
 
-function parseVersion(tag: string): [number, number, number] | null {
+/** `[major, minor, patch]` of a `vX.Y.Z` tag, or null. */
+export function parseVersion(tag: string): [number, number, number] | null {
   const match = RELEASE_TAG.exec(tag);
   if (!match) return null;
   const [major, minor, patch] = match.slice(1).map(Number);
   return [major, minor, patch];
 }
 
-function compareVersions(a: readonly number[], b: readonly number[]): number {
+export function compareVersions(
+  a: readonly number[],
+  b: readonly number[],
+): number {
   for (let i = 0; i < 3; i += 1) {
     if (a[i] !== b[i]) return a[i] - b[i];
   }
