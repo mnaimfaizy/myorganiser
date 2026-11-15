@@ -111,6 +111,12 @@ export const NO_VERDICT_HEADING = '## Code review — no verdict';
  */
 export const findingMarker = (id: string): string =>
   `<!-- code-review:finding:v${REPORT_SCHEMA_VERSION}:${id} -->`;
+/**
+ * A finding marker at any report schema version, as a pattern source with no
+ * anchors or flags. Readers that must see an older version's thread too
+ * (`runs:ready`) build their pattern from this, so the marker's form has one home.
+ */
+export const FINDING_MARKER_ANY_VERSION_SOURCE = String.raw`<!-- code-review:finding:v\d+:[0-9a-f]+ -->`;
 /** Marks the one reply a thread gets when its finding is gone but the token cannot resolve it. */
 export const STALE_MARKER = '<!-- code-review:stale -->';
 const FINDING_MARKER_RE = new RegExp(

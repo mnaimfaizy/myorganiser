@@ -80,6 +80,13 @@ import {
   renderReviewTierRecord,
   REVIEW_TIER_RECORD_MARKER,
 } from './review-tier-record.ts';
+import {
+  type SignOffChecksRead,
+  emptySignOffReport,
+  parseSignOffIssue,
+  renderSignOffIssue,
+  renderSignOffLine,
+} from './signoff-issue.ts';
 
 const REPO_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -200,13 +207,29 @@ function templateMergeDanger(): string {
 const decisionLine = (body: string): string =>
   body.split('\n')[1].replace(/^\*\*[^*]*\*\*\s*/, '');
 
+/** The Sign-off Issue the fake GitHub holds, once one exists. */
+type StoredIssue = { number: number; body: string };
+
+/** The number the fake gives a Sign-off Issue it creates. */
+const NEW_ISSUE_NUMBER = 900;
+
+/** A Pull Request with no Sign-off checks: nothing to copy. */
+const NO_SIGNOFF_CHECKS: SignOffChecksRead = {
+  status: 'read',
+  checks: [],
+  reportUrl: '',
+  caveat: null,
+};
+
 /**
  * A fake GitHub for one `--auto` pass. Each Pull Request plays back a script
  * of snapshots, one per read; the last one repeats, and a `null` entry reads
  * as unreadable. Every write is recorded as a string; a comment write records
  * its decision line. The full body is kept once per Pull Request, and
  * `created` lists the Pull Requests whose comment was first posted, so a later
- * write that replaces the body is not in it.
+ * write that replaces the body is not in it. The Sign-off Issue has its own
+ * record, `signOffLog` and `checkAsks`, and `issue()` the stored issue; it
+ * is kept out of `writes`.
  */
 interface AutoFakeOptions {
   required?: string[];
@@ -215,6 +238,14 @@ interface AutoFakeOptions {
   /** When set, the Review Tier reads as this tier; otherwise it is unread. */
   tier?: ReviewTier;
   commentRefusals?: Set<number>;
+  /** Pull Requests whose first merge call GitHub refuses. */
+  mergeRefusals?: Set<number>;
+  /** The `staging` and `production` Person Checks of each Pull Request; none by default. */
+  checksFor?: Partial<Record<number, SignOffChecksRead>>;
+  /** The Sign-off Issue already open when the pass starts. */
+  issue?: StoredIssue | null;
+  /** When true, every Sign-off Issue write is refused. */
+  signOffRefusals?: boolean;
   /** When set, the Agent Verdict reads as this; otherwise it is unread. */
   agentVerdict?: (pr: number, headRefOid: string) => AgentVerdictFact;
   /** When set, the Review Tier reads as this, and `tier` is ignored. */
@@ -235,6 +266,10 @@ const fakeAutoIo = (
     mainCi = MAIN_GREEN,
     tier,
     commentRefusals = new Set<number>(),
+    mergeRefusals = new Set<number>(),
+    checksFor = {},
+    issue = null,
+    signOffRefusals = false,
     agentVerdict = () => UNREAD_AGENT_VERDICT,
     reviewTierFact,
     changedFiles = () => [],
@@ -249,6 +284,9 @@ const fakeAutoIo = (
   const created: number[] = [];
   const counts = { read: 0, mainCi: 0, mainPathMap: 0 };
   const changedFilesAsked: number[] = [];
+  const signOffLog: string[] = [];
+  const checkAsks: { pr: number; head: string }[] = [];
+  let stored: StoredIssue | null = issue ? { ...issue } : null;
   let clock = 0;
 
   const io: AutoTrainIo = {
@@ -267,7 +305,33 @@ const fakeAutoIo = (
     },
     merge: (pr, sha, method: MergeMethod) => {
       writes.push(`merge #${pr} @${sha.slice(0, 1)} ${method}`);
+      if (mergeRefusals.has(pr)) {
+        mergeRefusals.delete(pr);
+        return false;
+      }
       return true;
+    },
+    signOffChecks: (pr, headRefOid) => {
+      checkAsks.push({ pr, head: headRefOid });
+      return checksFor[pr] ?? NO_SIGNOFF_CHECKS;
+    },
+    findSignOffIssue: () => {
+      if (!stored) {
+        signOffLog.push('signoff-read none');
+        return { status: 'none' };
+      }
+      signOffLog.push(`signoff-read #${stored.number}`);
+      return { status: 'found', number: stored.number, body: stored.body };
+    },
+    writeSignOffIssue: (number, body) => {
+      const label = number === null ? 'new' : `#${number}`;
+      if (signOffRefusals) {
+        signOffLog.push(`signoff-write ${label} refused`);
+        return null;
+      }
+      signOffLog.push(`signoff-write ${label}`);
+      stored = { number: number ?? NEW_ISSUE_NUMBER, body };
+      return stored.number;
     },
     sleep: async () => {
       clock += clockStep;
@@ -309,6 +373,9 @@ const fakeAutoIo = (
     created,
     counts,
     changedFilesAsked,
+    signOffLog,
+    checkAsks,
+    issue: () => stored,
     readsOf: (pr: number) => reads.get(pr) ?? 0,
   };
 };
@@ -1480,6 +1547,7 @@ describe('renderAutoTrainResult', () => {
       held: [{ pr: 2, reason: 'x' }],
       mismatches: [],
       commentFailures: [],
+      ...emptySignOffReport(),
     };
     assert.equal(
       renderAutoTrainResult(result),
@@ -1502,6 +1570,7 @@ describe('renderAutoTrainResult', () => {
       held: [],
       mismatches: [],
       commentFailures: [],
+      ...emptySignOffReport(),
     };
     assert.equal(
       renderAutoTrainResult(result),
@@ -1523,6 +1592,7 @@ describe('renderAutoTrainResult', () => {
       held: [{ pr: 2, reason: 'x' }],
       mismatches: [{ pr: 2, reason: 'm' }],
       commentFailures: [3],
+      ...emptySignOffReport(),
     };
     assert.equal(
       renderAutoTrainResult(result),
@@ -2372,12 +2442,33 @@ const qaComment = (
   isMinimized = false,
 ): ReviewComment => ({ body, author: { login }, isMinimized });
 
-const qaHeader = (result: 'passed' | 'failed', commit: string, left = 0) =>
-  `QA Report: result=${result}; commit=${commit}; left-for-person=${left}`;
+/** A legacy header by default; a `deferred` count makes it the ADR 0151 form. */
+const qaHeader = (
+  result: 'passed' | 'failed',
+  commit: string,
+  left = 0,
+  deferred?: number,
+) =>
+  `QA Report: result=${result}; commit=${commit}; left-for-person=${left}${
+    deferred === undefined ? '' : `; deferred=${deferred}`
+  }`;
 
 /** A report comment as the Skill posts it: the marker, the header, the heading. */
 const qaReportText = (header: string) =>
   [QA_REPORT_MARKER, '', header, '', '## QA Report'].join('\n');
+
+/** A report whose Person Check lines sit under `### Left for a person`. */
+const qaReportWithChecks = (header: string, checkLines: string[]) =>
+  [
+    QA_REPORT_MARKER,
+    '',
+    header,
+    '',
+    '## QA Report',
+    '',
+    '### Left for a person',
+    ...checkLines,
+  ].join('\n');
 
 /** The fact for a passed report that names the commit given, with nothing left. */
 const currentPassed = (commit: string): QaReportFact => ({
@@ -2385,6 +2476,8 @@ const currentPassed = (commit: string): QaReportFact => ({
   result: 'passed',
   commit,
   leftForPerson: 0,
+  deferred: 0,
+  checks: [],
   staleness: { status: 'current' },
 });
 
@@ -2430,6 +2523,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
       result: 'failed',
       commit: HEAD,
       leftForPerson: 0,
+      deferred: 0,
+      checks: [],
       staleness: { status: 'current' },
     });
   });
@@ -2454,6 +2549,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2479,6 +2576,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2556,6 +2655,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: HEAD },
       },
     );
@@ -2577,6 +2678,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2595,6 +2698,59 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         reason:
           'the QA Report names `cccccccc`, which is no longer on the branch',
       },
+    );
+  });
+});
+
+describe('qaReportFromView: a new header carries its counts and checks through', () => {
+  test('the counts and the Person Check lines, in order, reach the fact', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(
+          qaReportWithChecks(qaHeader('passed', HEAD, 1, 2), [
+            '- [local] Confirm the banner',
+            '- [staging] Check the invoice email',
+            '- [production] Check the invoice PDF',
+          ]),
+        ),
+      ]),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 1,
+        deferred: 2,
+        checks: [
+          { place: 'local', text: 'Confirm the banner' },
+          { place: 'staging', text: 'Check the invoice email' },
+          { place: 'production', text: 'Check the invoice PDF' },
+        ],
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a legacy report carries no checks, and its count reads as local', () => {
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', HEAD, 2)))]),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 2,
+        deferred: 0,
+        checks: [],
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a new header whose counts disagree with its lines reads missing with the header reason', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportWithChecks(qaHeader('passed', HEAD, 1, 0), [])),
+      ]),
+      { status: 'missing', reason: QA_HEADER_REASON },
     );
   });
 });
@@ -2654,6 +2810,8 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
     result: 'passed',
     commit: OLDER_HEAD,
     leftForPerson: 0,
+    deferred: 0,
+    checks: [],
     staleness: { status: 'stale', byCommit: UPDATED_HEAD },
   };
   const holds: [string, QaReportFact, string][] = [
@@ -2664,31 +2822,37 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
       'the QA Report records a failure',
     ],
     [
-      'one item left for a person, in the singular',
+      'one local Person Check left for a person, in the singular',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 1,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 1 item for a person',
+      'the QA Report leaves 1 local Person Check for a person',
     ],
     [
-      'two items left for a person, in the plural',
+      'two local Person Checks left for a person, in the plural',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 2,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 2 items for a person',
+      'the QA Report leaves 2 local Person Checks for a person',
     ],
     [
       'a stale report, naming both short shas',
@@ -2718,6 +2882,8 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
         result: 'none-needed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       }),
       null,
@@ -2740,20 +2906,24 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
       'the QA Report records a failure',
     ],
     [
-      'two items left',
+      'two local Person Checks left',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 2,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 2 items for a person',
+      'the QA Report leaves 2 local Person Checks for a person',
     ],
     [
       'stale',
@@ -2762,6 +2932,8 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: UPDATED_HEAD },
       },
       'the QA Report is for `cccccccc`, and the branch commit `bbbbbbbb` came after it',
@@ -2791,6 +2963,8 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
           result: 'none-needed',
           commit: HEAD,
           leftForPerson: 0,
+          deferred: 0,
+          checks: [],
           staleness: { status: 'current' },
         },
       ],
@@ -2806,6 +2980,93 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         );
       });
     }
+  }
+});
+
+describe('decideAutoMerge: only a local Person Check holds the QA Report (ADR 0151)', () => {
+  const STAGING_AND_PRODUCTION = [
+    '- [staging] Check the invoice email',
+    '- [production] Check the invoice PDF',
+  ];
+  /** The decision for a head whose QA Report is `qaReport`, all else clear. */
+  const decideWith = (qaReport: QaReportFact, mode: 'on' | 'shadow') =>
+    decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'auto' },
+        agentVerdict: { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+        qaReport,
+      }),
+      mode,
+    );
+
+  for (const mode of ['on', 'shadow'] as const) {
+    const heldAction = mode === 'on' ? 'skip' : 'shadow-comment';
+
+    test(`${mode}: a report with only staging and production checks is allowed`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(
+              qaHeader('passed', HEAD, 0, 2),
+              STAGING_AND_PRODUCTION,
+            ),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, false);
+      assert.equal(decision.reason, `every fact holds for ${HEAD}`);
+    });
+
+    test(`${mode}: a local check holds with its reason, and the staging and production checks add nothing`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(qaHeader('passed', HEAD, 1, 2), [
+              '- [local] Confirm the banner',
+              ...STAGING_AND_PRODUCTION,
+            ]),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(
+        decision.reason,
+        'the QA Report leaves 1 local Person Check for a person',
+      );
+    });
+
+    test(`${mode}: a legacy report with two items holds with the local reason`, () => {
+      const decision = decideWith(
+        readQa([qaComment(qaReportText(qaHeader('passed', HEAD, 2)))]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(
+        decision.reason,
+        'the QA Report leaves 2 local Person Checks for a person',
+      );
+    });
+
+    test(`${mode}: a new header whose counts disagree with its lines holds with the header reason`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(
+              qaHeader('passed', HEAD, 1, 0),
+              STAGING_AND_PRODUCTION,
+            ),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(decision.reason, QA_HEADER_REASON);
+    });
   }
 });
 
@@ -2907,6 +3168,8 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
         result: 'passed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: LATER },
       } as QaReportFact,
       `the QA Report is for \`${HEAD.slice(0, 8)}\`, and the branch commit \`${LATER.slice(0, 8)}\` came after it`,
@@ -3126,6 +3389,455 @@ describe('runAutoTrain under on: the record an Auto-merge leaves (ADR 0148)', ()
     assert.equal(
       comments.get(1)?.split('\n')[1],
       `${SHADOW_COMMENT_LEAD} ${SHADOW_WOULD_MERGE} \`${HEAD}\``,
+    );
+  });
+});
+
+// ---------------------- the Sign-off Issue at an actual Auto-merge (ADR 0151 decision 6)
+
+const SIGNOFF_REPORT_URL = 'https://github.com/o/r/pull/1#issuecomment-1';
+const PR2_REPORT_URL = 'https://github.com/o/r/pull/2#issuecomment-2';
+const PR2_HEAD = 'b'.repeat(40);
+
+/** Pull Request 1's QA Report: one staging and one production check. */
+const TWO_CHECKS: SignOffChecksRead = {
+  status: 'read',
+  checks: [
+    { place: 'staging', text: 'Check the invoice email' },
+    { place: 'production', text: 'Confirm the tax line' },
+  ],
+  reportUrl: SIGNOFF_REPORT_URL,
+  caveat: null,
+};
+
+/** Pull Request 2's QA Report: one production check. */
+const PR2_CHECK: SignOffChecksRead = {
+  status: 'read',
+  checks: [{ place: 'production', text: 'Confirm the refund' }],
+  reportUrl: PR2_REPORT_URL,
+  caveat: null,
+};
+
+/** The checks a Sign-off Issue body holds, read back the way the train reads them. */
+const storedChecks = (body: string | undefined) =>
+  (parseSignOffIssue(body)?.checks ?? []).map(({ pr, place, text }) => ({
+    pr,
+    place,
+    text,
+  }));
+
+/** Every fact passes for the head it is read at, so an `on` pass merges. */
+const PASSING = {
+  tier: 'auto' as const,
+  agentVerdict: (_pr: number, headRefOid: string): AgentVerdictFact => ({
+    status: 'read',
+    verdict: 'approve',
+    reviewedOid: headRefOid,
+  }),
+  qaReportFact: (_pr: number, headRefOid: string): QaReportFact =>
+    currentPassed(headRefOid),
+};
+
+describe('runAutoTrain under on: the Sign-off Issue at an actual merge', () => {
+  test('an on merge creates the Sign-off Issue for the head it merged, and asks for no other head', async () => {
+    const { io, writes, signOffLog, checkAsks, issue } = fakeAutoIo(
+      {
+        1: [
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+        ],
+      },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(writes, [
+      'update #1 @a',
+      'merge #1 @b merge',
+      `comment #1 auto-merged at \`${UPDATED_HEAD}\``,
+    ]);
+    assert.deepEqual(checkAsks, [{ pr: 1, head: UPDATED_HEAD }]);
+    assert.deepEqual(signOffLog, ['signoff-read none', 'signoff-write new']);
+    assert.deepEqual(storedChecks(issue()?.body), [
+      { pr: 1, place: 'staging', text: 'Check the invoice email' },
+      { pr: 1, place: 'production', text: 'Confirm the tax line' },
+    ]);
+    assert.deepEqual(result.signOff, [
+      { pr: 1, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+    ]);
+    assert.deepEqual(result.signOffFailures, []);
+    assert.deepEqual(result.signOffNotes, []);
+  });
+
+  test('a refused merge writes the Sign-off Issue once, for the head that merged', async () => {
+    const { io, writes, signOffLog, checkAsks } = fakeAutoIo(
+      {
+        1: [
+          snapshot({ number: 1 }),
+          snapshot({ number: 1 }),
+          snapshot({ number: 1, headRefOid: UPDATED_HEAD }),
+        ],
+      },
+      { ...PASSING, mergeRefusals: new Set([1]), checksFor: { 1: TWO_CHECKS } },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(writes, [
+      'merge #1 @a merge',
+      'merge #1 @b merge',
+      `comment #1 auto-merged at \`${UPDATED_HEAD}\``,
+    ]);
+    assert.deepEqual(checkAsks, [{ pr: 1, head: UPDATED_HEAD }]);
+    assert.deepEqual(
+      signOffLog.filter((line) => line.startsWith('signoff-write')),
+      ['signoff-write new'],
+    );
+    assert.deepEqual(result.signOff, [
+      { pr: 1, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+    ]);
+  });
+
+  test('a shadow pass and an on dry run read and write no Sign-off Issue, and the shadow comment is still written', async () => {
+    const shadow = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    const shadowResult = await runAutoTrain(autoArgs('shadow', [1]), shadow.io);
+
+    assert.deepEqual(shadow.writes, [
+      `comment #1 would auto-merge at \`${HEAD}\``,
+    ]);
+    assert.deepEqual(shadow.checkAsks, []);
+    assert.deepEqual(shadow.signOffLog, []);
+    assert.equal(shadow.issue(), null);
+    assert.deepEqual(shadowResult.signOff, []);
+    assert.deepEqual(shadowResult.signOffFailures, []);
+    assert.deepEqual(shadowResult.signOffNotes, []);
+
+    const dry = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    const dryResult = await runAutoTrain(
+      autoArgs('on', [1], { dryRun: true }),
+      dry.io,
+    );
+
+    assert.deepEqual(dry.writes, []);
+    assert.deepEqual(dry.checkAsks, []);
+    assert.deepEqual(dry.signOffLog, []);
+    assert.equal(dry.issue(), null);
+    assert.deepEqual(dryResult.merged, []);
+    assert.deepEqual(dryResult.signOff, []);
+  });
+
+  test('a re-run over a Pull Request GitHub reports MERGED reads no checks and writes nothing', async () => {
+    const first = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    await runAutoTrain(autoArgs('on', [1]), first.io);
+    const storedBody = first.issue()?.body;
+
+    const rerun = fakeAutoIo(
+      { 1: [snapshot({ number: 1, state: 'MERGED' })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS }, issue: first.issue() },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), rerun.io);
+
+    assert.deepEqual(result.merged, []);
+    assert.deepEqual(result.held, [{ pr: 1, reason: '#1 is merged' }]);
+    assert.deepEqual(rerun.writes, []);
+    assert.deepEqual(rerun.checkAsks, []);
+    assert.deepEqual(rerun.signOffLog, []);
+    assert.equal(rerun.issue()?.body, storedBody);
+    assert.deepEqual(result.signOff, []);
+  });
+
+  test('a drive that finds the Pull Request MERGED after its first read writes no sign-off, and still lists it as merged', async () => {
+    // The first read is OPEN and passes every fact; the drive's next read is
+    // MERGED. The pass names the merge in `merged` (its outcome is `merged`),
+    // but no head is named, so no record, no Sign-off read and no write.
+    const { io, writes, signOffLog, checkAsks, issue, comments } = fakeAutoIo(
+      {
+        1: [snapshot({ number: 1 }), snapshot({ number: 1, state: 'MERGED' })],
+      },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(writes, []);
+    assert.equal(comments.size, 0);
+    assert.deepEqual(signOffLog, []);
+    assert.deepEqual(checkAsks, []);
+    assert.equal(issue(), null);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.signOffFailures, []);
+  });
+
+  test('a second pass that lets an OPEN Pull Request merge again adds no second line', async () => {
+    // The fake lets an OPEN Pull Request through again. GitHub would report it
+    // MERGED on the first read (the re-run test above); this one pins the
+    // line-level dedupe.
+    const first = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS } },
+    );
+    await runAutoTrain(autoArgs('on', [1]), first.io);
+    const storedBody = first.issue()?.body;
+
+    const rerun = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: TWO_CHECKS }, issue: first.issue() },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), rerun.io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(rerun.signOffLog, [`signoff-read #${NEW_ISSUE_NUMBER}`]);
+    assert.equal(rerun.issue()?.body, storedBody);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.signOffFailures, []);
+  });
+
+  test('a refused Sign-off write leaves each merge standing, lists its lines, and the next candidate still merges', async () => {
+    const { io, writes, signOffLog, comments } = fakeAutoIo(
+      {
+        1: [snapshot({ number: 1 })],
+        2: [snapshot({ number: 2, headRefOid: PR2_HEAD })],
+      },
+      {
+        ...PASSING,
+        checksFor: { 1: TWO_CHECKS, 2: PR2_CHECK },
+        signOffRefusals: true,
+      },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1, 2]), io);
+
+    assert.deepEqual(result.merged, [1, 2]);
+    assert.deepEqual(result.held, []);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.commentFailures, []);
+    assert.deepEqual(
+      result.signOffFailures.map(({ pr, reason, unwritten }) => ({
+        pr,
+        reason,
+        unwritten,
+      })),
+      [
+        {
+          pr: 1,
+          reason: 'the Sign-off Issue could not be created',
+          unwritten: [
+            renderSignOffLine({
+              pr: 1,
+              place: 'staging',
+              text: 'Check the invoice email',
+              reportUrl: SIGNOFF_REPORT_URL,
+            }),
+            renderSignOffLine({
+              pr: 1,
+              place: 'production',
+              text: 'Confirm the tax line',
+              reportUrl: SIGNOFF_REPORT_URL,
+            }),
+          ],
+        },
+        {
+          pr: 2,
+          reason: 'the Sign-off Issue could not be created',
+          unwritten: [
+            renderSignOffLine({
+              pr: 2,
+              place: 'production',
+              text: 'Confirm the refund',
+              reportUrl: PR2_REPORT_URL,
+            }),
+          ],
+        },
+      ],
+    );
+    // Each refused create is read back once, to see whether GitHub took it
+    // anyway; the read finds nothing, so each Pull Request fails with its lines.
+    assert.deepEqual(signOffLog, [
+      'signoff-read none',
+      'signoff-write new refused',
+      'signoff-read none',
+      'signoff-read none',
+      'signoff-write new refused',
+      'signoff-read none',
+    ]);
+    assert.equal(comments.get(1), renderAutoMergedComment(HEAD));
+    assert.equal(comments.get(2), renderAutoMergedComment(PR2_HEAD));
+    assert.deepEqual(writes, [
+      'merge #1 @a merge',
+      `comment #1 auto-merged at \`${HEAD}\``,
+      'merge #2 @b merge',
+      `comment #2 auto-merged at \`${PR2_HEAD}\``,
+    ]);
+  });
+
+  test('Sign-off checks that cannot be read merge the Pull Request, note the reason, and touch no issue', async () => {
+    const reason = 'there is no QA Report for this Pull Request';
+    const { io, writes, signOffLog, issue } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      { ...PASSING, checksFor: { 1: { status: 'missing', reason } } },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(writes, [
+      'merge #1 @a merge',
+      `comment #1 auto-merged at \`${HEAD}\``,
+    ]);
+    assert.deepEqual(signOffLog, []);
+    assert.equal(issue(), null);
+    assert.deepEqual(result.signOffNotes, [
+      {
+        pr: 1,
+        reason: `no Person Check added to the Sign-off Issue: ${reason}`,
+      },
+    ]);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.signOffFailures, []);
+  });
+});
+
+describe('runAutoTrain under on: a merge into a Sign-off Issue already open', () => {
+  test('an on merge adds its checks below the existing line, reading and writing the one issue, and creates none', async () => {
+    const { io, signOffLog, issue } = fakeAutoIo(
+      { 1: [snapshot({ number: 1 })] },
+      {
+        ...PASSING,
+        checksFor: { 1: TWO_CHECKS },
+        issue: {
+          number: 77,
+          body: renderSignOffIssue([
+            {
+              pr: 9,
+              place: 'production',
+              text: 'Confirm the old thing',
+              reportUrl: 'https://github.com/o/r/pull/9#issuecomment-9',
+            },
+          ]),
+        },
+      },
+    );
+    const result = await runAutoTrain(autoArgs('on', [1]), io);
+
+    assert.deepEqual(result.merged, [1]);
+    assert.deepEqual(signOffLog, [
+      'signoff-read #77',
+      'signoff-write #77',
+      'signoff-read #77',
+    ]);
+    assert.deepEqual(result.signOff, [
+      { pr: 1, issue: 77, created: false, added: 2 },
+    ]);
+    assert.deepEqual(storedChecks(issue()?.body), [
+      { pr: 9, place: 'production', text: 'Confirm the old thing' },
+      { pr: 1, place: 'staging', text: 'Check the invoice email' },
+      { pr: 1, place: 'production', text: 'Confirm the tax line' },
+    ]);
+  });
+});
+
+describe('renderAutoTrainResult: the Sign-off lines of an on pass', () => {
+  test('an append to an existing issue reads as added to #77, and a note names its Pull Request', () => {
+    const result: AutoTrainResult = {
+      mode: 'on',
+      dryRun: false,
+      merged: [1],
+      wouldMerge: [],
+      held: [],
+      mismatches: [],
+      commentFailures: [],
+      signOff: [{ pr: 1, issue: 77, created: false, added: 1 }],
+      signOffFailures: [],
+      signOffNotes: [{ pr: 2, reason: 'the QA Report copied is missing' }],
+    };
+    assert.equal(
+      renderAutoTrainResult(result),
+      [
+        'Auto-merge mode: on.',
+        'Merged: #1.',
+        'Would merge: none.',
+        'Held: none.',
+        'Sign-off Issue #77: added 1 Person Check from #1.',
+        'Note for #2: the QA Report copied is missing.',
+      ].join('\n'),
+    );
+  });
+
+  test('an on pass names its merges, the Sign-off line, and a refused write with its lines, and says nothing stopped', () => {
+    const unwritten = [
+      renderSignOffLine({
+        pr: 2,
+        place: 'staging',
+        text: 'Check the refund email',
+        reportUrl: PR2_REPORT_URL,
+      }),
+      renderSignOffLine({
+        pr: 2,
+        place: 'production',
+        text: 'Confirm the refund',
+        reportUrl: PR2_REPORT_URL,
+      }),
+    ];
+    const result: AutoTrainResult = {
+      mode: 'on',
+      dryRun: false,
+      merged: [1, 2],
+      wouldMerge: [],
+      held: [],
+      mismatches: [],
+      commentFailures: [],
+      signOff: [{ pr: 1, issue: NEW_ISSUE_NUMBER, created: true, added: 2 }],
+      signOffFailures: [
+        {
+          pr: 2,
+          reason: `the Sign-off Issue #${NEW_ISSUE_NUMBER} could not be edited`,
+          unwritten,
+        },
+      ],
+      signOffNotes: [],
+    };
+    assert.equal(
+      renderAutoTrainResult(result),
+      [
+        'Auto-merge mode: on.',
+        'Merged: #1, #2.',
+        'Would merge: none.',
+        'Held: none.',
+        `Sign-off Issue #${NEW_ISSUE_NUMBER}: added 2 Person Checks from #1 (created).`,
+        `Sign-off Issue not written for #2 (merged; the merge stands): the Sign-off Issue #${NEW_ISSUE_NUMBER} could not be edited. Add these lines by hand:`,
+        ...unwritten,
+      ].join('\n'),
+    );
+  });
+
+  test('a shadow result with empty Sign-off fields renders no Sign-off line', () => {
+    const result: AutoTrainResult = {
+      mode: 'shadow',
+      dryRun: false,
+      merged: [],
+      wouldMerge: [{ pr: 1, headRefOid: HEAD }],
+      held: [],
+      mismatches: [],
+      commentFailures: [],
+      ...emptySignOffReport(),
+    };
+    assert.equal(
+      renderAutoTrainResult(result),
+      [
+        'Auto-merge mode: shadow.',
+        'Merged: none.',
+        `Would merge: #1 at ${HEAD.slice(0, 8)}.`,
+        'Held: none.',
+      ].join('\n'),
     );
   });
 });

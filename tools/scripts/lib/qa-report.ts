@@ -14,22 +14,93 @@ export const QA_REPORT_MARKER = '<!-- qa-report -->';
 /** What a QA Report says happened. `none-needed` is "no manual QA needed". */
 export type QaResult = 'passed' | 'failed' | 'none-needed';
 
-/** The header of a QA Report: the result, the commit it names, the count left for a person. */
+/** Where a Person Check can be made (CONTEXT.md, ADR 0151). */
+export const PERSON_CHECK_PLACES = ['local', 'staging', 'production'] as const;
+export type PersonCheckPlace = (typeof PERSON_CHECK_PLACES)[number];
+
+/** One Person Check line under "Left for a person". */
+export interface PersonCheck {
+  place: PersonCheckPlace;
+  /** The line after `- [<place>] `, trimmed. Never blank. */
+  text: string;
+}
+
+/**
+ * The header of a QA Report: the result, the commit it names, and the Person
+ * Checks left for a person.
+ */
 export interface QaHeader {
   result: QaResult;
   /** The full, lowercase 40-character SHA QA ran on. */
   commit: string;
-  /** Items under "Left for a person"; 0 for `none-needed`. */
+  /**
+   * `local` Person Checks only; 0 for `none-needed`. This is the count an
+   * auto-merge holds on (ADR 0151).
+   */
   leftForPerson: number;
+  /** `staging` plus `production` Person Checks; never holds. 0 for a legacy header. */
+  deferred: number;
+  /**
+   * The parsed Person Check lines. EMPTY for a legacy header (no `deferred=`)
+   * and for `none-needed`: a legacy report's items carry no Place, are read as
+   * all `local`, and are not synthesised into entries, so a consumer copying
+   * deferred checks from an old report finds none.
+   */
+  checks: PersonCheck[];
 }
 
 // The two fixed forms the Skill prints. Strict on purpose: a short SHA, an
 // extra field, another order or another case is a header the train cannot
 // trust, so it does not parse.
 const REPORT_HEADER_RE =
-  /^QA Report: result=(passed|failed); commit=([0-9a-f]{40}); left-for-person=(0|[1-9]\d{0,5})$/;
+  /^QA Report: result=(passed|failed); commit=([0-9a-f]{40}); left-for-person=(0|[1-9]\d{0,5})(?:; deferred=(0|[1-9]\d{0,5}))?$/;
 const NONE_NEEDED_HEADER_RE =
   /^QA Report: no manual QA needed; commit=([0-9a-f]{40})$/;
+
+const SECTION_HEADING_RE = /^#{3}\s+Left for a person\s*$/;
+const ANY_HEADING_RE = /^#{1,6}\s/;
+const FENCE_RE = /^\s{0,3}(```|~~~)/;
+// A top-level list item: a bullet or number in column 0. Any indented line is a continuation.
+const LIST_ITEM_RE = /^(?:[-*+]|\d{1,9}[.)])(?:\s|$)/;
+// The one accepted Person Check line: `- [<place>] <text>`, single space each side.
+const PERSON_CHECK_RE = new RegExp(
+  `^- \\[(${PERSON_CHECK_PLACES.join('|')})\\] (\\S.*)$`,
+);
+
+/**
+ * The Person Checks under the first `### Left for a person` heading, outside
+ * code fences, up to the next heading. Allow-list: a top-level list item that
+ * is not exactly `- [local|staging|production] <text>` makes the section
+ * unreadable (`null`), as does a second such heading. Indented lines and
+ * non-list prose are ignored; a missing section is no checks.
+ */
+function parsePersonChecks(lines: string[]): PersonCheck[] | null {
+  const checks: PersonCheck[] = [];
+  let state: 'before' | 'in' | 'after' = 'before';
+  let fenced = false;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (FENCE_RE.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    if (SECTION_HEADING_RE.test(line)) {
+      if (state !== 'before') return null;
+      state = 'in';
+      continue;
+    }
+    if (state === 'in' && ANY_HEADING_RE.test(line)) {
+      state = 'after';
+      continue;
+    }
+    if (state !== 'in' || !LIST_ITEM_RE.test(line)) continue;
+    const m = PERSON_CHECK_RE.exec(line);
+    if (!m) return null;
+    checks.push({ place: m[1] as PersonCheckPlace, text: m[2].trim() });
+  }
+  return checks;
+}
 
 /**
  * Reads a QA Report comment. The marker must be the comment's first line (a
@@ -48,16 +119,69 @@ export function parseQaReport(
   if (header === undefined) return null;
   const report = REPORT_HEADER_RE.exec(header);
   if (report) {
+    const result = report[1] as 'passed' | 'failed';
+    const left = Number(report[3]);
+    // No `deferred=`: a legacy header. Every counted check is `local`; the
+    // lines carry no Place and are not read.
+    if (report[4] === undefined)
+      return {
+        result,
+        commit: report[2],
+        leftForPerson: left,
+        deferred: 0,
+        checks: [],
+      };
+    const checks = parsePersonChecks(lines);
+    if (!checks) return null;
+    const local = checks.filter((c) => c.place === 'local').length;
+    const deferred = Number(report[4]);
+    if (local !== left || checks.length - local !== deferred) return null;
     return {
-      result: report[1] as 'passed' | 'failed',
+      result,
       commit: report[2],
-      leftForPerson: Number(report[3]),
+      leftForPerson: left,
+      deferred,
+      checks,
     };
   }
   const none = NONE_NEEDED_HEADER_RE.exec(header);
   return none
-    ? { result: 'none-needed', commit: none[1], leftForPerson: 0 }
+    ? {
+        result: 'none-needed',
+        commit: none[1],
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      }
     : null;
+}
+
+/** The fields of a Pull Request comment the QA Report selection reads. */
+export interface QaReportCandidate {
+  body?: string | null;
+  author?: { login?: string | null } | null;
+  isMinimized?: boolean | null;
+}
+
+/**
+ * The QA Report the train trusts among a Pull Request's comments: the latest
+ * one the trusted login wrote, not outdated (minimised), whose first line is
+ * the marker. A QA session posts as the Maintainer, so a report from anyone
+ * else is a forgery. The latest is returned even when it does not parse, so a
+ * caller never falls back to an older report.
+ */
+export function latestTrustedQaReport<T extends QaReportCandidate>(
+  comments: readonly T[] | null | undefined,
+  trustedLogin: string,
+): T | undefined {
+  return (comments ?? [])
+    .filter(
+      (c) =>
+        c.author?.login === trustedLogin &&
+        !c.isMinimized &&
+        c.body?.split(/\r?\n/, 1)[0]?.trim() === QA_REPORT_MARKER,
+    )
+    .at(-1);
 }
 
 /** One commit of a Pull Request, as `gh api pulls/N/commits` returns it. */

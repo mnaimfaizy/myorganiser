@@ -27,6 +27,7 @@ const PAGE = 'docs/deployment/release-pipeline.html';
 const STAGING = '.github/workflows/deploy-staging.yml';
 const PRODUCTION = '.github/workflows/deploy-production.yml';
 const CUT_GUARD = 'tools/scripts/lib/staging-host-apply-guard.ts';
+const DISPATCHER = '.github/workflows/dispatch-production-deploy.yml';
 
 const FIXTURE_FILES = [
   PAGE,
@@ -419,4 +420,164 @@ test('fails when the mark job timeout moves, without touching the deploy timeout
   // The mark job is approval-gated but is not a deploy job, so the 45-minute
   // deploy-timeout key must not read it.
   assert.doesNotMatch(result.stderr, /productionDeployTimeoutMinutes/);
+});
+
+// ===== Production Sign-off gate (ADR 0151 decisions 8 and 9) =====
+
+// The dispatcher's gate step exactly as the workflow states it, blank line
+// included, so removing or relocating it is one exact-match edit.
+const GATE_STEP =
+  '      - name: Hold on open staging Person Checks\n' +
+  '        shell: bash\n' +
+  '        env:\n' +
+  '          GH_TOKEN: ${{ github.token }}\n' +
+  '          RELEASE_BRANCH: ${{ steps.find.outputs.release_branch }}\n' +
+  '        run: node tools/scripts/ci/signoff-gate.ts --release-branch "${RELEASE_BRANCH}"\n' +
+  '\n';
+
+test('fails when the dispatcher stops holding on the Sign-off Issue', (t) => {
+  const workspace = createWorkspace(t);
+  edit(workspace, DISPATCHER, GATE_STEP, '');
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherHoldsOnSignOff: page says true, source says false/,
+  );
+});
+
+test('fails when the gate step runs after the dispatch step', (t) => {
+  const workspace = createWorkspace(t);
+  // Moved to the end of the file, which is the end of the dispatch job: the
+  // workflow still runs the gate, but only after createWorkflowDispatch has
+  // already asked for Deploy Approval.
+  edit(workspace, DISPATCHER, GATE_STEP, '');
+  writeFixture(
+    workspace,
+    DISPATCHER,
+    readFixture(workspace, DISPATCHER) + GATE_STEP,
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherHoldsOnSignOff: page says true, source says false/,
+  );
+});
+
+for (const guard of ['if: false', 'continue-on-error: true']) {
+  test(`fails when the gate step is neutered by \`${guard}\``, (t) => {
+    const workspace = createWorkspace(t);
+    // Either line lets the run pass the gate without holding on a staging
+    // Person Check, so the step is present and the key still has to fail.
+    edit(
+      workspace,
+      DISPATCHER,
+      '      - name: Hold on open staging Person Checks\n',
+      `      - name: Hold on open staging Person Checks\n        ${guard}\n`,
+    );
+
+    const result = runChecker(workspace);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /dispatcherHoldsOnSignOff: page says true, source says false/,
+    );
+  });
+}
+
+test('fails when the gate script is only mentioned in a comment', (t) => {
+  const workspace = createWorkspace(t);
+  // The script name survives, but no `run:` line executes it. A matcher that
+  // searched the whole file, rather than the step's own `run:`, would pass.
+  edit(
+    workspace,
+    DISPATCHER,
+    '        run: node tools/scripts/ci/signoff-gate.ts --release-branch "${RELEASE_BRANCH}"\n',
+    '        # run: node tools/scripts/ci/signoff-gate.ts --release-branch "${RELEASE_BRANCH}"\n',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherHoldsOnSignOff: page says true, source says false/,
+  );
+});
+
+test('fails when the dispatcher drops issues: read from its permissions', (t) => {
+  const workspace = createWorkspace(t);
+  // Without the read the gate cannot see the Sign-off Issue; the step is still
+  // there and reads as held, so only the permission carries the drift.
+  edit(workspace, DISPATCHER, '  issues: read\n', '');
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherIssuesPermission: page says "read", source says "none"/,
+  );
+});
+
+test('fails when the dispatcher widens issues to write', (t) => {
+  const workspace = createWorkspace(t);
+  edit(workspace, DISPATCHER, '  issues: read\n', '  issues: write\n');
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherIssuesPermission: page says "read", source says "write"/,
+  );
+});
+
+for (const suffix of [' || true', ' ; exit 0']) {
+  test(`fails when the gate step's run line can exit 0 regardless (\`${suffix.trim()}\`)`, (t) => {
+    const workspace = createWorkspace(t);
+    // The gate's exit status is the hold. Appending anything that can make the
+    // line exit 0 keeps the script in the step, so only the exact run line
+    // reads as held.
+    edit(
+      workspace,
+      DISPATCHER,
+      '        run: node tools/scripts/ci/signoff-gate.ts --release-branch "${RELEASE_BRANCH}"\n',
+      `        run: node tools/scripts/ci/signoff-gate.ts --release-branch "\${RELEASE_BRANCH}"${suffix}\n`,
+    );
+
+    const result = runChecker(workspace);
+
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /dispatcherHoldsOnSignOff: page says true, source says false/,
+    );
+  });
+}
+
+test('fails when the dispatch step no longer calls createWorkflowDispatch', (t) => {
+  const workspace = createWorkspace(t);
+  // The dispatch step is the one that asks for Deploy Approval. Without the
+  // call there is nothing for the gate to precede, so the gate reads not held.
+  edit(
+    workspace,
+    DISPATCHER,
+    'await github.rest.actions.createWorkflowDispatch({',
+    'await github.rest.actions.createWorkflowDispatchRemoved({',
+  );
+
+  const result = runChecker(workspace);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /dispatcherHoldsOnSignOff: page says true, source says false/,
+  );
 });

@@ -949,10 +949,27 @@
       created, before CI finished on <code>release/vX.Y.Z</code>. Check CI on
       that branch yourself &mdash; nothing in this pipeline checks it for you
       (<code>dispatch-production-deploy.yml:7</code>,
-      <code>:19</code>, <code>:93-101</code>;
+      <code>:21</code>, <code>:112-120</code>;
       <a href="../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md"
         >ADR&nbsp;0028</a
       >, Consequences).
+    </p>
+    <p>
+      <b>A red Dispatch Production Deploy run at the Cut is expected</b> while
+      <code>staging</code> Person Checks are open on the Cut&rsquo;s Sign-off
+      Issue. Before it dispatches, the dispatcher runs a gate
+      (<code>dispatch-production-deploy.yml:79-84</code>, reading the issue
+      under <code>issues: read</code>, <code>dispatch-production-deploy.yml:13</code>)
+      that fails the run, dispatching nothing, until each such check is ticked
+      or waived by the Maintainer &mdash; so no Deploy Approval prompt is asked
+      for a held deploy. The run names each open check and the exact
+      <code>waive: &lt;pr&gt;:&lt;key&gt; &mdash; &lt;reason&gt;</code> comment
+      line for it. Tick each check, or comment the waiver on the Sign-off
+      Issue, then re-run the failed run. This is a check of facts, not an
+      approval: the one approval is still <code>environment: production</code>
+      (<a href="../adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md"
+      >ADR&nbsp;0151</a
+      >, decisions 8 and 9).
     </p>
   </div>
 
@@ -1045,9 +1062,13 @@
               simultaneous, independent
               consequences: a Release PR workflow that opens or updates a
               pull request back to main and tries to auto merge it, and a
-              Dispatch Production Deploy workflow that only dispatches the
-              production deploy, on the create event of the branch, with no
-              CI check performed anywhere in that chain. The dispatched
+              Dispatch Production Deploy workflow that, before it
+              dispatches the production deploy, runs a gate on the Sign-off
+              Issue: it fails the run, dispatching nothing, while any staging
+              Person Check is neither ticked nor waived by the Maintainer, so
+              Deploy Approval is never asked for a held deploy. It fires on
+              the create event of the branch, with no CI check performed
+              anywhere in that chain. The dispatched
               Deploy Production workflow validates the ref, resolves which
               release branch will actually be checked out, and reaches
               environment colon production, which is this diagram's one
@@ -1188,7 +1209,7 @@
               </text>
               <text class="nc" x="72" y="260">
                 creates + pushes release/vX.Y.Z, only if Staging is Host
-                Applied &#183; package.json:26, release.ts:668, :696-705
+                Applied &#183; package.json:26, release.ts:714, :742-762
               </text>
             </g>
             <path
@@ -1251,7 +1272,7 @@
               data-tip="dispatch"
               tabindex="0"
               role="button"
-              aria-label="Dispatch Production Deploy &#8212; dispatches the deploy, and only dispatches it"
+              aria-label="Dispatch Production Deploy &#8212; runs the Sign-off gate, then dispatches the deploy"
               aria-describedby="note-dispatch"
             >
               <rect class="box" x="460" y="344" width="360" height="70" rx="5" />
@@ -1260,10 +1281,10 @@
                 create release/vX.Y.Z &#8594; Dispatch
               </text>
               <text class="nc" x="472" y="381">
-                dispatches deploy-production.yml &#8212; does not deploy
+                gate on Sign-off Issue, then dispatches &#8212; no deploy
               </text>
               <text class="nc" x="472" y="396">
-                dispatch-production-deploy.yml:7, :19, :93-101
+                dispatch-production-deploy.yml:7, :21, :79-84, :112-120
               </text>
             </g>
             <g data-step="4" class="mk mk-nocheck" transform="translate(700,336)">
@@ -1576,7 +1597,7 @@
               </text>
               <text class="nc" x="272" y="1180">
                 no commit, no files &#8212; asserts branch state first &#183;
-                release.ts:821-829
+                release.ts:888-896
               </text>
               <text class="nc" x="272" y="1194">
                 package.json:27
@@ -1681,7 +1702,13 @@
           must have started after that upload landed. There is no flag to
           skip this. Only then does it create + push
           <code>release/vX.Y.Z</code> (<code>package.json:26</code>,
-          <code>release.ts:668</code>, <code>:696-705</code>). The commit is
+          <code>release.ts:714</code>, <code>:742-762</code>). Before it creates
+          the branch it also reads the Sign-off Issues, and refuses &mdash;
+          with <code>--dry-run</code> too &mdash; when it cannot read them
+          whole or the <code>gh</code> login is not the repository owner
+          (<code>:749-758</code>). After the release commit and before the
+          push, it freezes the open Sign-off Issue for the version, and does
+          not push if that fails (<code>:846-848</code>). The commit is
           read from the upload run's name, and a scheduled run's name
           carries none (<code>deploy-staging.yml:19</code>), so the Cut
           refuses a scheduled upload until a <b>full</b> dispatch of
@@ -1707,11 +1734,22 @@
         <dd id="note-dispatch">
           Fires on <code>create</code> of a branch matching
           <code>^release/v[0-9]+\.[0-9]+\.[0-9]+$</code>
-          (<code>dispatch-production-deploy.yml:7</code>, <code>:19</code>).
-          It calls <code>createWorkflowDispatch</code> against
+          (<code>dispatch-production-deploy.yml:7</code>, <code>:21</code>).
+          Before it dispatches, it runs a gate
+          (<code>dispatch-production-deploy.yml:79-84</code>) over the
+          Cut&rsquo;s Sign-off Issue, with <code>issues: read</code>
+          (<code>dispatch-production-deploy.yml:13</code>): while any
+          <code>staging</code> Person Check is neither ticked nor waived by
+          the Maintainer, the run fails and dispatches nothing, so Deploy
+          Approval is never asked for a held deploy
+          (<a href="../adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md"
+          >ADR&nbsp;0151</a
+      >, decisions 8 and 9). That is a check of
+          facts on the issue, not an approval and not a CI check. Otherwise
+          it calls <code>createWorkflowDispatch</code> against
           <code>deploy-production.yml</code>
-          (<code>dispatch-production-deploy.yml:93-101</code>) and
-          nothing else &mdash; its own job never runs a deploy step. Its
+          (<code>dispatch-production-deploy.yml:112-120</code>) &mdash; its
+          own job never runs a deploy step. Its
           previous name, <code>Deploy Production (latest release)</code>,
           read as though it did; that misreading is why it was renamed
           (ADR&nbsp;0028, Consequences). No step in this chain, or in the
@@ -1851,8 +1889,8 @@
         <dd id="note-tag">
           Asserts it is on the release branch and up to date with origin, and
           that <code>package.json</code> matches the tag
-          (<code>release.ts:821-823</code>); refuses an existing tag
-          (<code>:825-827</code>); creates no commit and writes no files
+          (<code>release.ts:888-890</code>); refuses an existing tag
+          (<code>:892-894</code>); creates no commit and writes no files
           (<code>package.json:27</code>). A commit here would move the
           branch past the exact SHA CI verified and a reviewer approved.
           <code>vX.Y.Z</code> existing means that version reached production.
@@ -1913,7 +1951,7 @@
               creates + pushes <code>release/vX.Y.Z</code>, only if Staging
               is Host Applied at this commit
             </td>
-            <td class="cite">package.json:26, release.ts:668, :696-705</td>
+            <td class="cite">package.json:26, release.ts:714, :742-762</td>
           </tr>
           <tr class="fork">
             <td>4a</td>
@@ -1931,7 +1969,7 @@
               <code>Dispatch Production Deploy</code> &#8594; dispatches the
               deploy
             </td>
-            <td class="cite">dispatch-production-deploy.yml:7, :19, :93-101</td>
+            <td class="cite">dispatch-production-deploy.yml:7, :21, :79-84, :112-120</td>
           </tr>
           <tr>
             <td>5</td>
@@ -1946,7 +1984,7 @@
             <td>6</td>
             <td><code>yarn release:tag --version vX.Y.Z --push</code></td>
             <td>annotated tag, no commit, no files</td>
-            <td class="cite">package.json:27, release.ts:821-829</td>
+            <td class="cite">package.json:27, release.ts:888-896</td>
           </tr>
           <tr>
             <td>7</td>
@@ -2115,11 +2153,11 @@
       <p>
         <code>release:tag</code> asserts it is on the release branch, up to
         date with origin, and that <code>package.json</code> matches the tag
-        (<code>release.ts:821-823</code>); refuses an existing tag
-        (<code>:825-827</code>); and creates no commits and writes no files
+        (<code>release.ts:888-890</code>); refuses an existing tag
+        (<code>:892-894</code>); and creates no commits and writes no files
         &mdash; a commit here would move the branch past the exact SHA that
         CI verified and a reviewer approved
-        (<code>:813-820</code>). <code>release:cut</code> has no way to tag
+        (<code>:880-887</code>). <code>release:cut</code> has no way to tag
         at all: there is no <code>--tag</code> flag. <code>vX.Y.Z</code>
         existing means that version reached production
         (<a href="../adr/0028-production-deploys-are-approval-gated-and-tags-are-receipts.md"
@@ -2145,7 +2183,7 @@
             <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>.
             The repo floor is <code>&gt;=22.18.0</code>
             (<code>package.json:7</code>). <code>release.ts</code> refuses a
-            major below 22 (<code>release.ts:25-33</code>). Three scopes, one
+            major below 22 (<code>release.ts:36-44</code>). Three scopes, one
             floor &mdash; not a single pinned number.
           </p>
         </div>
@@ -2224,13 +2262,13 @@
             (<code>deploy-production.yml:45</code>);
             the release-branch pattern in two spellings,
             <code>^release/v[0-9]+\.[0-9]+\.[0-9]+$</code>
-            (<code>dispatch-production-deploy.yml:40</code>, <code>:55</code>)
+            (<code>dispatch-production-deploy.yml:42</code>, <code>:57</code>)
             and <code>/^release\/v\d+\.\d+\.\d+$/</code>
             (<code>release-pr.yml:36</code>);
             <code>^v[0-9]+\.[0-9]+\.[0-9]+$</code>
             (<code>publish-github-release.yml:37</code>); and
             <code>/^v?(\d+)\.(\d+)\.(\d+)$/</code>
-            (<code>release.ts:169</code>), which rejects prerelease input
+            (<code>release.ts:180</code>), which rejects prerelease input
             outright.
           </p>
         </div>
@@ -2317,10 +2355,11 @@
 
   <footer class="foot">
     <div>
-      <b>Read from source on 2026-10-30</b>, from
+      <b>Read from source on 2026-11-15</b>, from
       <code>.github/workflows/ci.yml</code>,
       <code>deploy-staging.yml</code>, <code>deploy-production.yml</code>,
       <code>dispatch-production-deploy.yml</code>,
+      <code>tools/scripts/ci/signoff-gate.ts</code>,
       <code>release-pr.yml</code>, <code>publish-github-release.yml</code>,
       <code>tools/scripts/release.ts</code>, and <code>package.json</code>,
       with
@@ -2575,7 +2614,7 @@
       1: 'A push or PR lands on main or a release branch, and CI runs as one pass/fail box. Nobody decided anything yet.',
       2: 'Staging is uploaded once a day, off to the side, from the newest main commit whose CI is green. Applying that upload on the host is a separate, operator-triggered dispatch. It is not on the way to a Release — see panel 2.',
       3: 'The one human choice on this whole spine: a maintainer decides when to cut the release branch. Cutting now refuses unless Staging already holds this exact commit, Host Applied — if Staging’s last green host-apply is older than its last upload, release:cut refuses. A scheduled upload records no commit in its run name, so it cannot be Cut at all: dispatch Deploy Staging in full, not apply_only. There is no flag to skip this.',
-      4: 'One push, two simultaneous consequences. The dispatcher only dispatches — it does not check whether CI is green on the branch it just found.',
+      4: 'One push, two simultaneous consequences. Before it dispatches, the dispatcher holds on open staging Person Checks on the Sign-off Issue — a gate, not a CI check: it does not check whether CI is green on the branch it just found.',
       5: 'The workflow named "(manual)" started on workflow_dispatch — fired by the node one step back, not by a person.',
       6: 'validate rejects a non-release ref, then resolves which branch actually gets checked out. Panel 3 has the asymmetry in full.',
       7: 'Prepare Dependency Cache. Routine.',
@@ -2940,10 +2979,12 @@
       "deploy-staging.yml:587-596": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Probe the running build", "end": "--timeout-seconds 300" },
       "deploy-staging.yml:604-617": { "file": ".github/workflows/deploy-staging.yml", "start": "- name: Report install owed", "end": "exit 1" },
       "dispatch-production-deploy.yml:7": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "create:" },
-      "dispatch-production-deploy.yml:19": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/v')) }}" },
-      "dispatch-production-deploy.yml:40": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if [[ ! \"${CREATED_REF}\" =~ ^release/v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then" },
-      "dispatch-production-deploy.yml:55": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "| grep -E '^release/v[0-9]+\\.[0-9]+\\.[0-9]+$' \\" },
-      "dispatch-production-deploy.yml:93-101": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "await github.rest.actions.createWorkflowDispatch({", "end": "});" },
+      "dispatch-production-deploy.yml:21": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/v')) }}" },
+      "dispatch-production-deploy.yml:42": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "if [[ ! \"${CREATED_REF}\" =~ ^release/v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then" },
+      "dispatch-production-deploy.yml:57": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "| grep -E '^release/v[0-9]+\\.[0-9]+\\.[0-9]+$' \\" },
+      "dispatch-production-deploy.yml:13": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "issues: read" },
+      "dispatch-production-deploy.yml:79-84": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "- name: Hold on open staging Person Checks", "end": "run: node tools/scripts/ci/signoff-gate.ts --release-branch \"${RELEASE_BRANCH}\"" },
+      "dispatch-production-deploy.yml:112-120": { "file": ".github/workflows/dispatch-production-deploy.yml", "start": "await github.rest.actions.createWorkflowDispatch({", "end": "});" },
       "package.json:7": { "file": "package.json", "start": "\"node\": \">=22.18.0\"," },
       "package.json:26": { "file": "package.json", "start": "\"release:cut\": \"node tools/scripts/release.ts cut\"," },
       "package.json:27": { "file": "package.json", "start": "\"release:tag\": \"node tools/scripts/release.ts tag\"," },
@@ -2953,14 +2994,16 @@
       "release-pr.yml:6-8": { "file": ".github/workflows/release-pr.yml", "start": "push:", "end": "- 'release/v*'" },
       "release-pr.yml:36": { "file": ".github/workflows/release-pr.yml", "start": "if (!/^release\\/v\\d+\\.\\d+\\.\\d+$/.test(releaseBranch)) {" },
       "release-pr.yml:105-117": { "file": ".github/workflows/release-pr.yml", "start": "const mutation = `", "end": "core.info(`Enabled auto-merge for PR #${pr.number}`);" },
-      "release.ts:25-33": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
-      "release.ts:169": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
-      "release.ts:668": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
-      "release.ts:696-705": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
-      "release.ts:813-820": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },
-      "release.ts:821-823": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
-      "release.ts:821-829": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
-      "release.ts:825-827": { "file": "tools/scripts/release.ts", "start": "if (tagExists(version)) {", "end": "}" }
+      "release.ts:36-44": { "file": "tools/scripts/release.ts", "start": "function assertNodeVersion(): void {", "end": "}" },
+      "release.ts:180": { "file": "tools/scripts/release.ts", "start": "const match = /^v?(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(v);" },
+      "release.ts:714": { "file": "tools/scripts/release.ts", "start": "const releaseBranch = `release/${version}`;" },
+      "release.ts:742-762": { "file": "tools/scripts/release.ts", "start": "assertCleanTree();", "end": "}" },
+      "release.ts:749-758": { "file": "tools/scripts/release.ts", "start": "// The Sign-off Issue is read before anything is made, so a Cut that could", "end": "console.log(`[dry-run] ${line}`);" },
+      "release.ts:846-848": { "file": "tools/scripts/release.ts", "start": "const frozen = executeCut(signOff, version);", "end": "if (!frozen.ok) die(lines.join('\\n'));" },
+      "release.ts:880-887": { "file": "tools/scripts/release.ts", "start": "// command === 'tag'", "end": "// never deployed." },
+      "release.ts:888-890": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "assertPackageJsonVersionMatches(packageJsonVersion);" },
+      "release.ts:888-896": { "file": "tools/scripts/release.ts", "start": "assertOnBranch(releaseBranch);", "end": "const tagCmd = `git tag -a ${version} -m \"Release ${version}\"`;" },
+      "release.ts:892-894": { "file": "tools/scripts/release.ts", "start": "if (tagExists(version)) {", "end": "}" }
     }
   }
 </script>
@@ -2991,6 +3034,8 @@
     "ftpDeployTimeoutMs": 300000,
     "productionRefGuardPattern": "refs/heads/release/*",
     "dispatcherReleaseBranchPattern": "^release/v[0-9]+\\.[0-9]+\\.[0-9]+$",
+    "dispatcherHoldsOnSignOff": true,
+    "dispatcherIssuesPermission": "read",
     "publishReleaseTagPattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
     "cutGuardUploadJob": "deploy-backend",
     "cutGuardApplyJob": "host-apply",
