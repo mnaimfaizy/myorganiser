@@ -47,11 +47,18 @@ import {
   parseQaReport,
   type PersonCheck,
   qaStaleness,
-  QA_REPORT_MARKER,
+  latestTrustedQaReport,
   type PrCommit,
   type QaResult,
   type QaStaleness,
 } from './qa-report.ts';
+import {
+  emptySignOffReport,
+  recordSignOff,
+  renderSignOffReport,
+  type SignOffIo,
+  type SignOffReport,
+} from './signoff-issue.ts';
 
 /** The branch the train merges into, and whose ruleset it reads. */
 export const TRAIN_BASE = 'main';
@@ -350,8 +357,12 @@ export function parseTrainArgs(
   };
 }
 
-/** Everything the train does to the world, so the loop is asserted offline. */
-export interface TrainIo {
+/**
+ * Everything the train does to the world, so the loop is asserted offline.
+ * `SignOffIo` is the Sign-off Issue write at an actual merge (ADR 0151
+ * decision 6), and the read of the `staging` and `production` Person Checks it copies.
+ */
+export interface TrainIo extends SignOffIo {
   /** The required checks for `main`. */
   requiredChecks(): string[];
   /** One fresh read of one Pull Request, or null when it cannot be read. */
@@ -366,8 +377,11 @@ export interface TrainIo {
   log(line: string): void;
 }
 
-/** How a whole train ended. */
-export interface TrainResult {
+/**
+ * How a whole train ended. The Sign-off Issue fields record what each actual
+ * merge added to it; a failed write is listed there and the merge stands.
+ */
+export interface TrainResult extends SignOffReport {
   merged: number[];
   /** The Pull Request the train stopped at, and why; null when all merged. */
   stoppedAt: { pr: number; reason: string } | null;
@@ -392,9 +406,11 @@ export async function runTrain(
 ): Promise<TrainResult> {
   const required = io.requiredChecks();
   const merged: number[] = [];
+  const signOff = emptySignOffReport();
   const stop = (index: number, reason: string): TrainResult => {
     io.log(`stop: ${reason}`);
     return {
+      ...signOff,
       merged,
       stoppedAt: { pr: args.pullRequests[index], reason },
       notReached: args.pullRequests.slice(index + 1),
@@ -406,11 +422,11 @@ export async function runTrain(
 
   for (let index = 0; index < args.pullRequests.length; index += 1) {
     const pr = args.pullRequests[index];
-    const outcome = await drivePullRequest(pr, args, io, required);
+    const outcome = await drivePullRequest(pr, args, io, required, signOff);
     if (outcome.kind === 'stopped') return stop(index, outcome.reason);
     if (outcome.kind === 'merged') merged.push(pr);
   }
-  return { merged, stoppedAt: null, notReached: [] };
+  return { ...signOff, merged, stoppedAt: null, notReached: [] };
 }
 
 const couldNotReadReason = (pr: number): string => `#${pr} could not be read`;
@@ -436,12 +452,18 @@ type DriveOutcome =
  *
  * `beforeMerge` is asked, at the head about to merge, whether anything holds
  * it; a reason it returns ends the drive with no merge.
+ *
+ * A merge GitHub accepted adds the Pull Request's `staging` and `production` Person Checks to
+ * the Sign-off Issue, recorded in `signOff`. This is the only place that
+ * writes it, so a `shadow` pass, a dry run and a Pull Request found already
+ * merged never do, and nothing it reads or writes can hold or undo a merge.
  */
 async function drivePullRequest(
   pr: number,
   args: Pick<TrainArgs, 'method' | 'pollSeconds' | 'timeoutMinutes' | 'dryRun'>,
   io: TrainIo,
   required: readonly string[],
+  signOff: SignOffReport,
   beforeMerge?: (snapshot: PullRequestSnapshot) => string | null,
 ): Promise<DriveOutcome> {
   const stopped = (reason: string): DriveOutcome => ({
@@ -495,6 +517,7 @@ async function drivePullRequest(
         `#${pr}: required checks green on ${step.headRefOid.slice(0, 8)}, merging`,
       );
       if (io.merge(pr, step.headRefOid, args.method)) {
+        recordSignOff(pr, step.headRefOid, io, signOff);
         return { kind: 'merged', headRefOid: step.headRefOid };
       }
       // Refused: most often `main` moved between the read and the merge,
@@ -553,6 +576,7 @@ export function renderTrainResult(result: TrainResult): string {
       `Not reached: ${list(result.notReached)}.`,
     );
   }
+  lines.push(...renderSignOffReport(result));
   return lines.join('\n');
 }
 
@@ -946,13 +970,7 @@ export function qaReportFromView(
 ): QaReportFact {
   if (!view || !trustedLogin)
     return { status: 'missing', reason: 'the QA Report could not be read' };
-  const own = (view.comments ?? []).filter(
-    (c) =>
-      c.author?.login === trustedLogin &&
-      !c.isMinimized &&
-      c.body?.split(/\r?\n/, 1)[0]?.trim() === QA_REPORT_MARKER,
-  );
-  const latest = own.at(-1);
+  const latest = latestTrustedQaReport(view.comments, trustedLogin);
   if (!latest)
     return {
       status: 'missing',
@@ -1324,8 +1342,8 @@ export interface AutoTrainIo extends TrainIo {
   upsertShadowComment(pr: number, body: string): boolean;
 }
 
-/** How one `--auto` pass ended. */
-export interface AutoTrainResult {
+/** How one `--auto` pass ended. Only `on` merges, so only `on` fills the Sign-off fields. */
+export interface AutoTrainResult extends SignOffReport {
   mode: AutoMergeMode;
   dryRun: boolean;
   merged: number[];
@@ -1370,6 +1388,7 @@ export async function runAutoTrain(
     held: [],
     mismatches: [],
     commentFailures: [],
+    ...emptySignOffReport(),
   };
   const hold = (pr: number, reason: string) => {
     io.log(`#${pr}: held: ${reason}`);
@@ -1431,6 +1450,7 @@ export async function runAutoTrain(
         args,
         io,
         required,
+        result,
         (snapshot) => {
           const atHead = decideAutoMerge(
             factsFor(pr, snapshot, { status: 'green' }),
@@ -1570,5 +1590,6 @@ export function renderAutoTrainResult(result: AutoTrainResult): string {
         : `Shadow comment not written: ${list(result.commentFailures)}.`,
     );
   }
+  lines.push(...renderSignOffReport(result));
   return lines.join('\n');
 }

@@ -26,6 +26,12 @@ import {
   type PullRequestSnapshot,
   type TrainIo,
 } from './merge-train.ts';
+import {
+  type SignOffChecksRead,
+  emptySignOffReport,
+  parseSignOffIssue,
+  renderSignOffLine,
+} from './signoff-issue.ts';
 
 const REQUIRED = ['Lint', 'Test'];
 
@@ -283,9 +289,26 @@ test('the script exits 2 on a bad command line, before reaching GitHub', () => {
 
 // ------------------------------------------------------------- the loop
 
+/** The Sign-off Issue the fake GitHub holds, once one exists. */
+type StoredIssue = { number: number; body: string };
+
+/** The number the fake gives a Sign-off Issue it creates. */
+const NEW_ISSUE_NUMBER = 900;
+
+/** A Pull Request with no staging and production Person Checks: nothing to copy. */
+const NO_CHECKS: SignOffChecksRead = {
+  status: 'read',
+  checks: [],
+  reportUrl: '',
+  caveat: null,
+};
+
 /**
  * A fake GitHub. Each Pull Request plays back a script of snapshots, one per
- * read; the last one repeats. Every write is recorded.
+ * read; the last one repeats. Every merge, update and refusal is recorded in
+ * `writes`. The Sign-off Issue has its own record: `signOffLog` holds its reads
+ * and writes, `checkAsks` the `signOffChecks` calls, and `issue()` the
+ * stored issue.
  */
 const fakeIo = (
   scripts: Record<number, PullRequestSnapshot[]>,
@@ -293,15 +316,24 @@ const fakeIo = (
     required = REQUIRED,
     mergeRefusals = new Set<number>(),
     clockStep = 30_000,
+    checks = {},
+    issue = null,
+    signOffRefusals = false,
   }: {
     required?: string[];
     mergeRefusals?: Set<number>;
     clockStep?: number;
+    checks?: Partial<Record<number, SignOffChecksRead>>;
+    issue?: StoredIssue | null;
+    signOffRefusals?: boolean;
   } = {},
 ) => {
   const reads = new Map<number, number>();
   const writes: string[] = [];
   const log: string[] = [];
+  const signOffLog: string[] = [];
+  const checkAsks: { pr: number; head: string }[] = [];
+  let stored: StoredIssue | null = issue ? { ...issue } : null;
   let clock = 0;
   const io: TrainIo = {
     requiredChecks: () => required,
@@ -324,13 +356,42 @@ const fakeIo = (
       }
       return true;
     },
+    signOffChecks: (pr, headRefOid) => {
+      checkAsks.push({ pr, head: headRefOid });
+      return checks[pr] ?? NO_CHECKS;
+    },
+    findSignOffIssue: () => {
+      if (!stored) {
+        signOffLog.push('signoff-read none');
+        return { status: 'none' };
+      }
+      signOffLog.push(`signoff-read #${stored.number}`);
+      return { status: 'found', number: stored.number, body: stored.body };
+    },
+    writeSignOffIssue: (number, body) => {
+      const label = number === null ? 'new' : `#${number}`;
+      if (signOffRefusals) {
+        signOffLog.push(`signoff-write ${label} refused`);
+        return null;
+      }
+      signOffLog.push(`signoff-write ${label}`);
+      stored = { number: number ?? NEW_ISSUE_NUMBER, body };
+      return stored.number;
+    },
     sleep: async () => {
       clock += clockStep;
     },
     now: () => clock,
     log: (line) => log.push(line),
   };
-  return { io, writes, log };
+  return {
+    io,
+    writes,
+    log,
+    signOffLog,
+    checkAsks,
+    issue: () => stored,
+  };
 };
 
 const args = (
@@ -365,6 +426,9 @@ describe('runTrain', () => {
       merged: [1, 2],
       stoppedAt: null,
       notReached: [],
+      signOff: [],
+      signOffFailures: [],
+      signOffNotes: [],
     });
     assert.deepEqual(writes, [
       'merge #1 @a merge',
@@ -509,9 +573,318 @@ describe('runTrain', () => {
   });
 });
 
+// ------------------------------------- the Sign-off Issue at an actual merge
+
+const REPORT_URL = 'https://github.com/o/r/pull/7#issuecomment-1';
+const PR8_REPORT_URL = 'https://github.com/o/r/pull/8#issuecomment-2';
+
+/** Pull Request 7's QA Report: one staging and one production check. */
+const TWO_CHECKS: SignOffChecksRead = {
+  status: 'read',
+  checks: [
+    { place: 'staging', text: 'Check the invoice email' },
+    { place: 'production', text: 'Confirm the tax line' },
+  ],
+  reportUrl: REPORT_URL,
+  caveat: null,
+};
+
+/** Pull Request 8's QA Report: one production check. */
+const PR8_CHECK: SignOffChecksRead = {
+  status: 'read',
+  checks: [{ place: 'production', text: 'Confirm the refund' }],
+  reportUrl: PR8_REPORT_URL,
+  caveat: null,
+};
+
+/** The checks a Sign-off Issue body holds, read back the way the train reads them. */
+const storedChecks = (body: string | undefined) =>
+  (parseSignOffIssue(body)?.checks ?? []).map(({ pr, place, text }) => ({
+    pr,
+    place,
+    text,
+  }));
+
+describe('runTrain: the Sign-off Issue at an actual merge', () => {
+  test('an actual merge creates the Sign-off Issue for the head it merged', async () => {
+    const fake = fakeIo(
+      {
+        7: [
+          snapshot({ number: 7, mergeStateStatus: 'BEHIND' }),
+          snapshot({ number: 7, headRefOid: 'b'.repeat(40) }),
+        ],
+      },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    const result = await runTrain(args([7]), fake.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.deepEqual(fake.writes, ['update #7 @a', 'merge #7 @b merge']);
+    assert.deepEqual(fake.checkAsks, [{ pr: 7, head: 'b'.repeat(40) }]);
+    assert.deepEqual(fake.signOffLog, [
+      'signoff-read none',
+      'signoff-write new',
+    ]);
+    assert.deepEqual(storedChecks(fake.issue()?.body), [
+      { pr: 7, place: 'staging', text: 'Check the invoice email' },
+      { pr: 7, place: 'production', text: 'Confirm the tax line' },
+    ]);
+    assert.deepEqual(result.signOff, [
+      { pr: 7, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+    ]);
+    assert.deepEqual(result.signOffFailures, []);
+    assert.deepEqual(result.signOffNotes, []);
+  });
+
+  test('two merges in one train: the first creates the issue, the second edits it', async () => {
+    const fake = fakeIo(
+      {
+        7: [snapshot({ number: 7 })],
+        8: [snapshot({ number: 8 })],
+      },
+      { checks: { 7: TWO_CHECKS, 8: PR8_CHECK } },
+    );
+    const result = await runTrain(args([7, 8]), fake.io);
+    assert.deepEqual(result.merged, [7, 8]);
+    assert.deepEqual(
+      fake.signOffLog.filter((line) => line.startsWith('signoff-write')),
+      ['signoff-write new', `signoff-write #${NEW_ISSUE_NUMBER}`],
+    );
+    assert.deepEqual(result.signOff, [
+      { pr: 7, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+      { pr: 8, issue: NEW_ISSUE_NUMBER, created: false, added: 1 },
+    ]);
+    assert.deepEqual(storedChecks(fake.issue()?.body), [
+      { pr: 7, place: 'staging', text: 'Check the invoice email' },
+      { pr: 7, place: 'production', text: 'Confirm the tax line' },
+      { pr: 8, place: 'production', text: 'Confirm the refund' },
+    ]);
+  });
+
+  test('a Pull Request whose checks the Sign-off Issue already holds adds nothing twice', async () => {
+    // The fake lets an OPEN Pull Request through again. GitHub would report it
+    // MERGED, which the next test covers; this one pins the line-level dedupe.
+    const first = fakeIo(
+      { 7: [snapshot({ number: 7 })] },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    await runTrain(args([7]), first.io);
+    const storedBody = first.issue()?.body;
+
+    const rerun = fakeIo(
+      { 7: [snapshot({ number: 7 })] },
+      { checks: { 7: TWO_CHECKS }, issue: first.issue() },
+    );
+    const result = await runTrain(args([7]), rerun.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.deepEqual(rerun.signOffLog, [`signoff-read #${NEW_ISSUE_NUMBER}`]);
+    assert.equal(rerun.issue()?.body, storedBody);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.signOffFailures, []);
+  });
+
+  test('a re-run over a Pull Request GitHub reports MERGED reads no checks and writes nothing', async () => {
+    const first = fakeIo(
+      { 7: [snapshot({ number: 7 })] },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    await runTrain(args([7]), first.io);
+    const storedBody = first.issue()?.body;
+
+    const rerun = fakeIo(
+      { 7: [snapshot({ number: 7, state: 'MERGED' })] },
+      { checks: { 7: TWO_CHECKS }, issue: first.issue() },
+    );
+    const result = await runTrain(args([7]), rerun.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.deepEqual(rerun.checkAsks, []);
+    assert.deepEqual(rerun.signOffLog, []);
+    assert.equal(rerun.issue()?.body, storedBody);
+    assert.deepEqual(result.signOff, []);
+  });
+
+  test('a refused merge with Sign-off checks writes the Sign-off Issue once, for the head that merged', async () => {
+    const fake = fakeIo(
+      {
+        7: [
+          snapshot({ number: 7 }),
+          snapshot({ number: 7, headRefOid: 'c'.repeat(40) }),
+        ],
+      },
+      { mergeRefusals: new Set([7]), checks: { 7: TWO_CHECKS } },
+    );
+    const result = await runTrain(args([7]), fake.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.deepEqual(fake.writes, ['merge #7 @a merge', 'merge #7 @c merge']);
+    assert.deepEqual(fake.checkAsks, [{ pr: 7, head: 'c'.repeat(40) }]);
+    assert.deepEqual(fake.signOffLog, [
+      'signoff-read none',
+      'signoff-write new',
+    ]);
+    assert.deepEqual(result.signOff, [
+      { pr: 7, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+    ]);
+  });
+
+  test("a train that stops after a merge keeps that merge's Sign-off line and asks for nothing past the stop", async () => {
+    const fake = fakeIo(
+      {
+        7: [snapshot({ number: 7 })],
+        8: [
+          snapshot({ number: 8, checks: [{ name: 'Test', bucket: 'fail' }] }),
+        ],
+      },
+      { checks: { 7: TWO_CHECKS, 8: PR8_CHECK } },
+    );
+    const result = await runTrain(args([7, 8]), fake.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.equal(result.stoppedAt?.pr, 8);
+    assert.deepEqual(
+      fake.signOffLog.filter((line) => line.startsWith('signoff-write')),
+      ['signoff-write new'],
+    );
+    assert.deepEqual(result.signOff, [
+      { pr: 7, issue: NEW_ISSUE_NUMBER, created: true, added: 2 },
+    ]);
+    assert.deepEqual(fake.checkAsks, [{ pr: 7, head: 'a'.repeat(40) }]);
+  });
+
+  test('a Pull Request with no Sign-off checks merges and touches no issue', async () => {
+    const fake = fakeIo({ 7: [snapshot({ number: 7 })] });
+    const result = await runTrain(args([7]), fake.io);
+    assert.deepEqual(result, {
+      merged: [7],
+      stoppedAt: null,
+      notReached: [],
+      signOff: [],
+      signOffFailures: [],
+      signOffNotes: [],
+    });
+    assert.deepEqual(fake.writes, ['merge #7 @a merge']);
+    assert.deepEqual(fake.signOffLog, []);
+    assert.equal(fake.issue(), null);
+  });
+
+  test('a Pull Request with no QA Report merges, and the reason is noted', async () => {
+    const reason = 'there is no QA Report for this Pull Request';
+    const fake = fakeIo(
+      { 7: [snapshot({ number: 7 })] },
+      { checks: { 7: { status: 'missing', reason } } },
+    );
+    const result = await runTrain(args([7]), fake.io);
+    assert.deepEqual(result.merged, [7]);
+    assert.equal(result.stoppedAt, null);
+    assert.deepEqual(fake.writes, ['merge #7 @a merge']);
+    assert.deepEqual(fake.signOffLog, []);
+    assert.equal(result.signOffNotes.length, 1);
+    assert.equal(result.signOffNotes[0].pr, 7);
+    assert.deepEqual(result.signOffNotes, [
+      {
+        pr: 7,
+        reason: `no Person Check added to the Sign-off Issue: ${reason}`,
+      },
+    ]);
+    assert.deepEqual(result.signOff, []);
+    assert.deepEqual(result.signOffFailures, []);
+  });
+
+  test('a refused write does not stop the train: each merged Pull Request keeps its lines', async () => {
+    const fake = fakeIo(
+      {
+        7: [snapshot({ number: 7 })],
+        8: [snapshot({ number: 8 })],
+      },
+      { checks: { 7: TWO_CHECKS, 8: PR8_CHECK }, signOffRefusals: true },
+    );
+    const result = await runTrain(args([7, 8]), fake.io);
+    assert.deepEqual(result.merged, [7, 8]);
+    assert.equal(result.stoppedAt, null);
+    assert.equal(fake.issue(), null);
+    assert.deepEqual(result.signOff, []);
+    // Each PR: read (none), refused create, then the read-back that finds nothing.
+    assert.deepEqual(fake.signOffLog, [
+      'signoff-read none',
+      'signoff-write new refused',
+      'signoff-read none',
+      'signoff-read none',
+      'signoff-write new refused',
+      'signoff-read none',
+    ]);
+    assert.deepEqual(
+      result.signOffFailures.map(({ pr, unwritten }) => ({ pr, unwritten })),
+      [
+        {
+          pr: 7,
+          unwritten: [
+            renderSignOffLine({
+              pr: 7,
+              place: 'staging',
+              text: 'Check the invoice email',
+              reportUrl: REPORT_URL,
+            }),
+            renderSignOffLine({
+              pr: 7,
+              place: 'production',
+              text: 'Confirm the tax line',
+              reportUrl: REPORT_URL,
+            }),
+          ],
+        },
+        {
+          pr: 8,
+          unwritten: [
+            renderSignOffLine({
+              pr: 8,
+              place: 'production',
+              text: 'Confirm the refund',
+              reportUrl: PR8_REPORT_URL,
+            }),
+          ],
+        },
+      ],
+    );
+    assert.ok(
+      result.signOffFailures.every((failure) =>
+        /could not be created/.test(failure.reason),
+      ),
+    );
+  });
+
+  test('no Sign-off write without an actual merge: already merged, a dry run, or a stopped train', async () => {
+    const alreadyMerged = fakeIo(
+      { 7: [snapshot({ number: 7, state: 'MERGED' })] },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    await runTrain(args([7]), alreadyMerged.io);
+
+    const dryRun = fakeIo(
+      { 7: [snapshot({ number: 7 })] },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    await runTrain(args([7], { dryRun: true }), dryRun.io);
+
+    const stopped = fakeIo(
+      {
+        7: [
+          snapshot({ number: 7, checks: [{ name: 'Test', bucket: 'fail' }] }),
+        ],
+      },
+      { checks: { 7: TWO_CHECKS } },
+    );
+    const stoppedResult = await runTrain(args([7]), stopped.io);
+    assert.equal(stoppedResult.stoppedAt?.pr, 7);
+
+    for (const fake of [alreadyMerged, dryRun, stopped]) {
+      assert.deepEqual(fake.checkAsks, []);
+      assert.deepEqual(fake.signOffLog, []);
+      assert.equal(fake.issue(), null);
+    }
+  });
+});
+
 test('renderTrainResult names merged, stopped and unreached Pull Requests', () => {
   assert.equal(
     renderTrainResult({
+      ...emptySignOffReport(),
       merged: [1],
       stoppedAt: { pr: 2, reason: '#2 is a draft' },
       notReached: [3, 4],
@@ -519,7 +892,51 @@ test('renderTrainResult names merged, stopped and unreached Pull Requests', () =
     'Merged: #1.\nStopped at #2: #2 is a draft.\nNot reached: #3, #4.',
   );
   assert.equal(
-    renderTrainResult({ merged: [], stoppedAt: null, notReached: [] }),
+    renderTrainResult({
+      ...emptySignOffReport(),
+      merged: [],
+      stoppedAt: null,
+      notReached: [],
+    }),
     'Merged: none.',
+  );
+});
+
+test('renderTrainResult puts an unwritten Sign-off line under its merged Pull Request, and a written one on one line', () => {
+  const line = renderSignOffLine({
+    pr: 7,
+    place: 'staging',
+    text: 'Check the invoice email',
+    reportUrl: REPORT_URL,
+  });
+  assert.equal(
+    renderTrainResult({
+      ...emptySignOffReport(),
+      merged: [7],
+      stoppedAt: null,
+      notReached: [],
+      signOffFailures: [
+        {
+          pr: 7,
+          reason: 'the Sign-off Issue could not be created',
+          unwritten: [line],
+        },
+      ],
+    }),
+    [
+      'Merged: #7.',
+      'Sign-off Issue not written for #7 (merged; the merge stands): the Sign-off Issue could not be created. Add these lines by hand:',
+      line,
+    ].join('\n'),
+  );
+  assert.equal(
+    renderTrainResult({
+      ...emptySignOffReport(),
+      merged: [7],
+      stoppedAt: null,
+      notReached: [],
+      signOff: [{ pr: 7, issue: NEW_ISSUE_NUMBER, created: true, added: 2 }],
+    }),
+    `Merged: #7.\nSign-off Issue #${NEW_ISSUE_NUMBER}: added 2 Person Checks from #7 (created).`,
   );
 });

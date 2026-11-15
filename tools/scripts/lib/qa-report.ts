@@ -156,6 +156,34 @@ export function parseQaReport(
     : null;
 }
 
+/** The fields of a Pull Request comment the QA Report selection reads. */
+export interface QaReportCandidate {
+  body?: string | null;
+  author?: { login?: string | null } | null;
+  isMinimized?: boolean | null;
+}
+
+/**
+ * The QA Report the train trusts among a Pull Request's comments: the latest
+ * one the trusted login wrote, not outdated (minimised), whose first line is
+ * the marker. A QA session posts as the Maintainer, so a report from anyone
+ * else is a forgery. The latest is returned even when it does not parse, so a
+ * caller never falls back to an older report.
+ */
+export function latestTrustedQaReport<T extends QaReportCandidate>(
+  comments: readonly T[] | null | undefined,
+  trustedLogin: string,
+): T | undefined {
+  return (comments ?? [])
+    .filter(
+      (c) =>
+        c.author?.login === trustedLogin &&
+        !c.isMinimized &&
+        c.body?.split(/\r?\n/, 1)[0]?.trim() === QA_REPORT_MARKER,
+    )
+    .at(-1);
+}
+
 /** One commit of a Pull Request, as `gh api pulls/N/commits` returns it. */
 export interface PrCommit {
   sha: string;

@@ -47,3 +47,4 @@ A QA Report lists what it leaves for a person. ADR 0148 made every such item hol
 - An auto-merge is held only by checks that can be made before merge; `staging` and `production` checks reach the Sign-off Issue instead of blocking.
 - The QA Report header and line grammar are a contract: the train's parser and the Sign-off Issue's renderer share it, and the `finish-standalone-runs` Skill defines it once, and `qa-plan` links to it for the grammar.
 - A report written before this change holds exactly as before.
+- GitHub cannot update an issue body only if it is unchanged, so a tick made in the second before the train writes the Sign-off Issue can be lost; two open Sign-off Issues are reported and written to neither, never combined.

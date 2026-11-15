@@ -18,15 +18,22 @@
 // tools/scripts/lib/merge-train.ts, and its Contract Suite drives the whole
 // loop over fixtures.
 //
-// Exit 0 when every Pull Request merged, 1 when the train stopped, 2 when it
-// could not start.
+// Exit 0 when every Pull Request merged, 1 when the train stopped or when a
+// Pull Request merged but its Sign-off Issue write failed (the merge stands,
+// and the result prints the lines to add by hand), 2 when it could not start.
+//
+// After every merge GitHub accepts, in either train, the Pull Request's
+// `staging` and `production` Person Checks from the QA Report this login
+// wrote are added to the open Sign-off Issue, which is created when none is
+// open (ADR 0151 decision 6). `--dry-run`, and `--auto` under `shadow`,
+// merge nothing and write nothing there.
 //
 // `--auto` is Auto-merge (ADR 0148): the train decides each candidate by
 // itself from facts read for its head, under the mode in
 // tools/config/merge-train-auto-merge.json (`off`, `shadow`, `on`). A held
 // candidate is listed with its reason and the pass moves on. Exit 0 when the
-// pass finished, 1 when a marker comment (shadow decision or `on` record) could not be written, 2 when it
-// could not start.
+// pass finished, 1 when a marker comment (shadow decision or `on` record) or a
+// Sign-off Issue write could not be written, 2 when it could not start.
 //
 // Not a gate: it changes GitHub, never the tree, and runs only by hand.
 import { spawnSync } from 'node:child_process';
@@ -58,6 +65,14 @@ import {
   type PullRequestSnapshot,
   type TrainIo,
 } from '../lib/merge-train.ts';
+import {
+  SIGNOFF_ISSUE_LABEL,
+  SIGNOFF_ISSUE_TITLE,
+  signOffChecksFromView,
+  findSignOffIssue,
+  type QaReportComment,
+  type SignOffIssueCandidate,
+} from '../lib/signoff-issue.ts';
 import {
   cannotRun,
   ghJsonOrNull,
@@ -95,6 +110,51 @@ const currentRepository = (): string | null => {
     ? result.stdout.trim()
     : null;
 };
+
+/** The `gh` login the train runs as, so it edits only its own comments. */
+let cachedViewerLogin: string | null | undefined;
+const viewerLogin = (): string | null => {
+  if (cachedViewerLogin !== undefined) return cachedViewerLogin;
+  const result = runGh(['api', 'user', '-q', '.login']);
+  cachedViewerLogin =
+    result.status === 0 && result.stdout.trim() ? result.stdout.trim() : null;
+  return cachedViewerLogin;
+};
+
+const prCommits = (repository: string, pr: number) =>
+  prCommitsFromGh(
+    runGh([
+      'api',
+      '--paginate',
+      `repos/${repository}/pulls/${pr}/commits`,
+      '--jq',
+      '.[] | {sha: .sha, parents: [.parents[].sha]}',
+    ]),
+  );
+
+const isOnMain = (repository: string, sha: string) =>
+  onMainFromCompare(
+    runGh([
+      'api',
+      `repos/${repository}/compare/${TRAIN_BASE}...${sha}`,
+      '-q',
+      '.status',
+    ]),
+  );
+
+const prComments = (repository: string, pr: number) =>
+  ghJsonOrNull([
+    'pr',
+    'view',
+    String(pr),
+    '--repo',
+    repository,
+    '--json',
+    'comments',
+  ]) as { comments?: QaReportComment[] } | null;
+
+/** How many open `qa` issues one read lists; a full list is unreadable. */
+const SIGNOFF_ISSUE_LIST_LIMIT = 1000;
 
 /** The `gh`-backed TrainIo for one repository. */
 export function githubTrainIo(repository: string): TrainIo {
@@ -172,20 +232,77 @@ export function githubTrainIo(repository: string): TrainIo {
       new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
     now: () => Date.now(),
     log: (line) => console.log(`merge-train: ${line}`),
+    signOffChecks: (pr, head) =>
+      signOffChecksFromView(
+        prComments(repository, pr),
+        viewerLogin(),
+        head,
+        () => prCommits(repository, pr),
+        (sha) => isOnMain(repository, sha),
+      ),
+    findSignOffIssue: () => {
+      const open = ghJsonOrNull([
+        'issue',
+        'list',
+        '--repo',
+        repository,
+        '--label',
+        SIGNOFF_ISSUE_LABEL,
+        '--state',
+        'open',
+        '--limit',
+        String(SIGNOFF_ISSUE_LIST_LIMIT),
+        '--json',
+        'number,body,author',
+      ]) as SignOffIssueCandidate[] | null;
+      // A full page may have cut the Sign-off Issue off: unreadable, never
+      // "none", so the train does not open a second one.
+      return findSignOffIssue(
+        Array.isArray(open) && open.length < SIGNOFF_ISSUE_LIST_LIMIT
+          ? open
+          : null,
+        viewerLogin(),
+      );
+    },
+    // A blind replace: see `SignOffIo.writeSignOffIssue` for the tick race
+    // and the double create this accepts.
+    writeSignOffIssue: (number, body) => {
+      const result =
+        number === null
+          ? runGh([
+              'issue',
+              'create',
+              '--repo',
+              repository,
+              '--title',
+              SIGNOFF_ISSUE_TITLE,
+              '--label',
+              SIGNOFF_ISSUE_LABEL,
+              '--body',
+              body,
+            ])
+          : runGh([
+              'api',
+              '--method',
+              'PATCH',
+              `repos/${repository}/issues/${number}`,
+              '-f',
+              `body=${body}`,
+            ]);
+      if (result.status !== 0) {
+        console.error(`merge-train: Sign-off Issue: ${result.stderr.trim()}`);
+        return null;
+      }
+      if (number !== null) return number;
+      // `gh issue create` prints the new issue's URL.
+      const created = /\/issues\/([1-9]\d*)\s*$/.exec(result.stdout);
+      return created ? Number(created[1]) : null;
+    },
   };
 }
 
-/** The `gh` login the train runs as, so it edits only its own comments. */
-const viewerLogin = (): string | null => {
-  const result = runGh(['api', 'user', '-q', '.login']);
-  return result.status === 0 && result.stdout.trim()
-    ? result.stdout.trim()
-    : null;
-};
-
 /** The `gh`-backed AutoTrainIo. */
 export function githubAutoTrainIo(repository: string): AutoTrainIo {
-  let login: string | null | undefined;
   return {
     ...githubTrainIo(repository),
     mainCi: () =>
@@ -245,43 +362,16 @@ export function githubAutoTrainIo(repository: string): AutoTrainIo {
       ]) as { comments?: ReviewComment[] } | null;
       return agentVerdictFromView(view);
     },
-    qaReport: (pr, head) => {
-      if (login === undefined) login = viewerLogin();
-      return qaReportFromView(
-        ghJsonOrNull([
-          'pr',
-          'view',
-          String(pr),
-          '--repo',
-          repository,
-          '--json',
-          'comments',
-        ]) as { comments?: ReviewComment[] } | null,
-        login,
+    qaReport: (pr, head) =>
+      qaReportFromView(
+        prComments(repository, pr),
+        viewerLogin(),
         head,
-        () =>
-          prCommitsFromGh(
-            runGh([
-              'api',
-              '--paginate',
-              `repos/${repository}/pulls/${pr}/commits`,
-              '--jq',
-              '.[] | {sha: .sha, parents: [.parents[].sha]}',
-            ]),
-          ),
-        (sha) =>
-          onMainFromCompare(
-            runGh([
-              'api',
-              `repos/${repository}/compare/${TRAIN_BASE}...${sha}`,
-              '-q',
-              '.status',
-            ]),
-          ),
-      );
-    },
+        () => prCommits(repository, pr),
+        (sha) => isOnMain(repository, sha),
+      ),
     upsertShadowComment: (pr, body) => {
-      if (login === undefined) login = viewerLogin();
+      const login = viewerLogin();
       if (!login) return false;
       // Only a comment this login wrote is edited: a marker pasted into
       // someone else's comment is not the train's record.
@@ -360,12 +450,15 @@ async function main(argv: readonly string[]): Promise<number> {
       githubAutoTrainIo(repository),
     );
     console.log(renderAutoTrainResult(result));
-    return result.commentFailures.length > 0 ? 1 : 0;
+    return result.commentFailures.length > 0 ||
+      result.signOffFailures.length > 0
+      ? 1
+      : 0;
   }
 
   const result = await runTrain(parsed, githubTrainIo(repository));
   console.log(renderTrainResult(result));
-  return result.stoppedAt ? 1 : 0;
+  return result.stoppedAt || result.signOffFailures.length > 0 ? 1 : 0;
 }
 
 if (isMain(import.meta.url)) {
