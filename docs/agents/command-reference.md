@@ -7,6 +7,7 @@ The on-demand command catalogue for the root [Agent Guide](../../AGENTS.md#comma
 - Release (cut branch): `yarn release:cut --version vX.Y.Z --push --notes-file RELEASE_NOTES.md`.
 - Release (tag after production deploy): `yarn release:tag --version vX.Y.Z --push`.
 - Release dry-run (preview only): `yarn release:cut --version vX.Y.Z --dry-run`.
+- Production gate: `yarn signoff:gate --release-branch release/vX.Y.Z [--repository <owner/name>]` (holds a production deploy while the Cut's Sign-off Issue has a `staging` Person Check the Maintainer has neither ticked nor waived. It runs in `dispatch-production-deploy.yml` before the deploy is dispatched, and `yarn deploy:pages:check` fails if that step is removed, moved, made conditional or allowed to exit 0. A held run prints, for each open check, the waiver line the Maintainer can comment: `waive: <pr>:<key> — <reason>`. Exit 0 = allowed, 1 = held, naming each check, 2 = it cannot decide or a bad invocation; any non-zero exit holds the deploy. Read-only. Which ticks and waivers count, and how the Cut's issue is found, is [ADR 0151](../adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md) decisions 8 and 9 and its Consequences; the decision is pure in `tools/scripts/lib/signoff-gate.ts`, and the `gh api graphql` reads in `tools/scripts/ci/signoff-gate.ts` are untested.)
 
 ## Sub-agents and Skills
 

@@ -177,6 +177,45 @@ const timeoutMinutes = (path: string, jobId: string): number =>
       fail(`${path} job ${jobId} declares no timeout-minutes`))[1],
   );
 
+/** The workflow's top-level `permissions:` block, up to the next top-level key. */
+const permissionsBlock = (path: string): string => {
+  const source = read(path);
+  const at = source.match(/^permissions:\s*$/m);
+  if (!at || at.index === undefined)
+    fail(`${path} has no top-level permissions: key`);
+  const body = source.slice(at.index + at[0].length);
+  const next = body.search(/^\S/m);
+  return next === -1 ? body : body.slice(0, next);
+};
+
+/**
+ * The production gate's `run:` line (ADR 0151 decision 8), by allow-list:
+ * exactly the script and its one argument, so a suffix such as `|| true` or
+ * `; exit 0` that would let a held run pass reads as no gate at all.
+ */
+const SIGNOFF_GATE_SCRIPT =
+  /^\s*run:\s*node tools\/scripts\/ci\/signoff-gate\.ts --release-branch "\$\{RELEASE_BRANCH\}"\s*$/m;
+
+/**
+ * Whether the dispatcher holds on the Cut's Sign-off Issue before it
+ * dispatches: a step of the `dispatch` job runs the gate, unconditionally
+ * (no `if:` and no `continue-on-error:`), before the step that calls
+ * `createWorkflowDispatch`. Deleting, moving or neutering the step reads false.
+ */
+const dispatcherHoldsOnSignOff = (): boolean => {
+  const steps = jobBlock(DISPATCHER, 'dispatch').split(/^ {6}- /m);
+  const gate = steps.findIndex((step) => SIGNOFF_GATE_SCRIPT.test(step));
+  const dispatch = steps.findIndex((step) =>
+    /\bcreateWorkflowDispatch\(/.test(step),
+  );
+  return (
+    gate !== -1 &&
+    dispatch !== -1 &&
+    gate < dispatch &&
+    !/^\s*(?:if|continue-on-error):/m.test(steps[gate])
+  );
+};
+
 /** The Production job that marks a Release's Feedback Reports (ADR 0133). */
 const RELEASE_MARK_JOB = 'mark-feedback-release';
 
@@ -370,6 +409,16 @@ const EXTRACTORS = {
       /"\$tag"\s*=~\s*(\S+)\s*\]\]/,
       'the release-tag pattern in the publish workflow',
     ),
+
+  // The production gate (ADR 0151 decisions 8 and 9): the dispatcher reads
+  // the Cut's Sign-off Issue and holds while a `staging` Person Check is
+  // neither ticked nor waived, before it dispatches, so Deploy Approval is
+  // never asked for a held deploy. Removing the step, or the permission it
+  // reads the issue with, fails here.
+  dispatcherHoldsOnSignOff: () => dispatcherHoldsOnSignOff(),
+  dispatcherIssuesPermission: () =>
+    permissionsBlock(DISPATCHER).match(/^\s*issues:\s*(\S+)\s*$/m)?.[1] ??
+    'none',
 
   backendArtifactDir: () =>
     theOnly(
