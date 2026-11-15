@@ -143,15 +143,19 @@ One comment per Pull Request, starting with `<!-- qa-report -->`. Update it on a
 
 The line right after the marker is the **header**: the Merge Train reads it to decide an Auto-merge ([ADR 0148](../../../docs/adr/0148-the-merge-train-auto-merges-only-on-facts-it-reads-for-the-head-it-merges.md)). Keep it the first non-blank line after the marker, before the `## QA Report` heading, in exactly one of these two forms:
 
-- `QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>`, or `result=failed` in the same place. The commit is the full 40-character SHA QA ran on, in lowercase. `<n>` is the number of items under Left for a person, and must equal the number of items listed there. A **Not proven** scenario, and a **FAIL: pre-existing** scenario not yet filed as an issue, is listed under Left for a person and counted in `<n>`; once filed, a FAIL: pre-existing is written with its issue number and is no longer counted ([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)).
+- `QA Report: result=passed; commit=<40-hex sha>; left-for-person=<local n>; deferred=<staging+production n>`, or `result=failed` in the same place. The commit is the full 40-character SHA QA ran on, in lowercase. Every Person Check has a Place: `local`, `staging` or `production`. `<local n>` is the number of `local` items under Left for a person, and `<staging+production n>` the number of `staging` and `production` items there; both must equal the lines listed ([ADR 0151](../../../docs/adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md)). A **Not proven** scenario, and a **FAIL: pre-existing** scenario not yet filed as an issue, is listed under Left for a person with its Place and counted; once filed, a FAIL: pre-existing is written with its issue number and is no longer counted ([ADR 0147](../../../docs/adr/0147-a-qa-plans-scenarios-are-scripted-and-run-on-the-code-before-and-after-the-change.md)). A header without `deferred=` is the old form: the train reads every item as `local`.
 - `QA Report: no manual QA needed; commit=<40-hex sha>`, when the plan left nothing to verify by hand and no run was made.
+
+**The Person Check line.** Under `### Left for a person`, each Person Check is one top-level list item in exactly this grammar: `- [<place>] <text>`. `<place>` is `local`, `staging` or `production`, lowercase, in square brackets; one space after the dash and one after the bracket; `<text>` is non-blank and stays on that line (indent any continuation, by at least one space; a list item in column 0 is always read as a Person Check). A list item in any other form, such as `[Staging]`, `[prod]` or no Place, makes the whole report unparseable. Prose that is not a list item is ignored, so write `None.` when both counts are 0. The `staging` and `production` lines are the ones the Merge Train copies to the Sign-off Issue at merge, in a later slice ([ADR 0151](../../../docs/adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md)), so they must read on their own.
+
+**Who picks the Place.** The QA Plan picks each Person Check's Place (`qa-plan`). The Maintainer may change a Place in the batched decision, before the report is posted; the report carries the Place the Maintainer left.
 
 A header in any other form is unparseable, and an unparseable report holds the merge. The train reads only a report posted by the login it runs as, and only the latest one.
 
 ```md
 <!-- qa-report -->
 
-QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>
+QA Report: result=passed; commit=<40-hex sha>; left-for-person=<local n>; deferred=<staging+production n>
 
 ## QA Report
 
@@ -163,6 +167,8 @@ Run by an agent. Result: QA passed | Failures listed below
 ### Failures and how each was resolved
 
 ### Left for a person
+
+- [local|staging|production] <what a person must check>
 ```
 
 ### Request Transcript
@@ -173,7 +179,7 @@ A scenario whose `Capture:` line is `transcript` (an API change, with no screen 
 - If `yarn qa:redact` exits 1, it refused a field or URL parameter name it does not recognise as safe and printed nothing. Remove it from the calls, or, if it is safe, have it added to the allow-list in `tools/qa/lib/redact-transcript.ts`. Do not edit the output by hand to get past a refusal.
 - Never paste a call that did not go through `yarn qa:redact`, and never include a real person's token, cookie or Ciphertext: only the QA Account's.
 
-Say "QA passed" only when every scenario passed. An agent never marks a "Left for a person" item as passed, and those items do not block the report or the merge ([ADR 0048](../../../docs/adr/0048-a-qa-plan-carries-only-what-automation-does-not-prove.md)).
+Say "QA passed" only when every scenario passed. An agent never marks a "Left for a person" item as passed. Only a `local` item holds an Auto-merge, and no item blocks the report or a merge the Maintainer starts ([ADR 0048](../../../docs/adr/0048-a-qa-plan-carries-only-what-automation-does-not-prove.md)).
 
 ## Closing report
 

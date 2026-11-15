@@ -45,6 +45,7 @@ import {
 import { SUMMARY_AUTHOR_LOGIN } from '../review/publish.ts';
 import {
   parseQaReport,
+  type PersonCheck,
   qaStaleness,
   QA_REPORT_MARKER,
   type PrCommit,
@@ -918,7 +919,12 @@ export type QaReportFact =
       status: 'read';
       result: QaResult;
       commit: string;
+      /** `local` Person Checks only: the count the hold reads (ADR 0151). */
       leftForPerson: number;
+      /** `staging` plus `production` Person Checks; never holds. */
+      deferred: number;
+      /** Parsed Person Check lines; empty for a legacy header. */
+      checks: PersonCheck[];
       staleness: Exclude<QaStaleness, { status: 'unknown' }>;
     };
 
@@ -979,7 +985,7 @@ const qaReportHold = (fact: QaReportFact): string | null => {
   if (fact.staleness.status === 'stale')
     return `the QA Report is for \`${fact.commit.slice(0, 8)}\`, and the branch commit \`${fact.staleness.byCommit.slice(0, 8)}\` came after it`;
   return fact.leftForPerson > 0
-    ? `the QA Report leaves ${fact.leftForPerson} item${fact.leftForPerson === 1 ? '' : 's'} for a person`
+    ? `the QA Report leaves ${fact.leftForPerson} local Person Check${fact.leftForPerson === 1 ? '' : 's'} for a person`
     : null;
 };
 

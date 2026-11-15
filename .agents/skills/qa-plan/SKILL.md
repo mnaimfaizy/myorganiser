@@ -296,12 +296,13 @@ After the Execution record and before Sign-off, post one QA Report comment on th
 
 - `result=failed` exactly when `yarn qa:grade` prints "QA failed". Both "QA passed" headlines are `result=passed`.
 - `commit` is the full lowercase 40-character SHA of the Pull Request head QA ran on.
-- `left-for-person` equals the items listed under Left for a person, counting every Left for a person item, every **Not proven** scenario, and every **FAIL: pre-existing** scenario not yet filed as an issue.
+- `left-for-person` equals the `local` items listed under Left for a person, and `deferred` the `staging` and `production` ones, counting every Left for a person item, every **Not proven** scenario, and every **FAIL: pre-existing** scenario not yet filed as an issue.
+- **The plan picks each Person Check's Place** (`local`, `staging` or `production`): `local` when it can be made before merge, `staging` or `production` when it can only be made after. Each is listed as `- [<place>] <text>` (the grammar is in [The QA Report](../finish-standalone-runs/SKILL.md#the-qa-report)). The Maintainer may change a Place in the batched decision before the report is posted ([ADR 0151](../../../docs/adr/0151-a-person-check-has-a-place-and-only-a-local-one-holds-an-auto-merge.md)).
 
 ```md
 <!-- qa-report -->
 
-QA Report: result=passed; commit=<40-hex sha>; left-for-person=<n>
+QA Report: result=passed; commit=<40-hex sha>; left-for-person=<local n>; deferred=<staging+production n>
 
 ## QA Report
 
@@ -310,6 +311,8 @@ Run by an agent. Result: <the `yarn qa:grade` headline>
 Execution record: <link to the QA Plan Issue's Execution record>
 
 ### Left for a person
+
+- [local|staging|production] <what a person must check>
 ```
 
 The QA Plan Issue's Execution record stays the full record. Keep the report to the headline, the link, and the items left for a person.
@@ -408,7 +411,7 @@ Pull Request's merge-base and After is its head:
 - **Not proven.** Before does not show the defect, or cannot run. A fix scenario that passes on
   Before is Not proven, because a passing After then says nothing about the fix. The Maintainer
   decides whether to rewrite the scenario, accept it, or hold the Pull Request.
-- **Left for a person.** Unchanged: what the run could not judge.
+- **Left for a person.** What the run could not judge. Each is a Person Check, and the plan names its Place: `local`, `staging` or `production`.
 
 A fix scenario runs on Before and After. A feature scenario runs After only, and is re-run on the
 merge-base only after it fails.
@@ -507,5 +510,5 @@ Issue mode: in this file. PRD mode: authoritative copy lives on the QA Plan Issu
 - The headline came from `yarn qa:grade`, not from judgement.
 - Defects and automatable-residue follow-ups were filed as issues (follow-ups do not block sign-off).
 - QA Artifacts follow the Evidence section and each scenario's `Capture:` line.
-- In PRD mode, one QA Report with the Merge Train's header is on the Pull Request, with a `left-for-person` that matches the items listed.
+- In PRD mode, one QA Report with the Merge Train's header is on the Pull Request, with a `left-for-person` and `deferred` that match the items listed.
 - Sign-off checklist is ticked at the correct destination (QA Plan Issue vs `tmp/`).

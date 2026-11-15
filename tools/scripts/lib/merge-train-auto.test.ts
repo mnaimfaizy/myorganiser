@@ -2372,12 +2372,33 @@ const qaComment = (
   isMinimized = false,
 ): ReviewComment => ({ body, author: { login }, isMinimized });
 
-const qaHeader = (result: 'passed' | 'failed', commit: string, left = 0) =>
-  `QA Report: result=${result}; commit=${commit}; left-for-person=${left}`;
+/** A legacy header by default; a `deferred` count makes it the ADR 0151 form. */
+const qaHeader = (
+  result: 'passed' | 'failed',
+  commit: string,
+  left = 0,
+  deferred?: number,
+) =>
+  `QA Report: result=${result}; commit=${commit}; left-for-person=${left}${
+    deferred === undefined ? '' : `; deferred=${deferred}`
+  }`;
 
 /** A report comment as the Skill posts it: the marker, the header, the heading. */
 const qaReportText = (header: string) =>
   [QA_REPORT_MARKER, '', header, '', '## QA Report'].join('\n');
+
+/** A report whose Person Check lines sit under `### Left for a person`. */
+const qaReportWithChecks = (header: string, checkLines: string[]) =>
+  [
+    QA_REPORT_MARKER,
+    '',
+    header,
+    '',
+    '## QA Report',
+    '',
+    '### Left for a person',
+    ...checkLines,
+  ].join('\n');
 
 /** The fact for a passed report that names the commit given, with nothing left. */
 const currentPassed = (commit: string): QaReportFact => ({
@@ -2385,6 +2406,8 @@ const currentPassed = (commit: string): QaReportFact => ({
   result: 'passed',
   commit,
   leftForPerson: 0,
+  deferred: 0,
+  checks: [],
   staleness: { status: 'current' },
 });
 
@@ -2430,6 +2453,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
       result: 'failed',
       commit: HEAD,
       leftForPerson: 0,
+      deferred: 0,
+      checks: [],
       staleness: { status: 'current' },
     });
   });
@@ -2454,6 +2479,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2479,6 +2506,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2556,6 +2585,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: HEAD },
       },
     );
@@ -2577,6 +2608,8 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
     );
@@ -2595,6 +2628,59 @@ describe('qaReportFromView: the QA Report as the train reads it', () => {
         reason:
           'the QA Report names `cccccccc`, which is no longer on the branch',
       },
+    );
+  });
+});
+
+describe('qaReportFromView: a new header carries its counts and checks through', () => {
+  test('the counts and the Person Check lines, in order, reach the fact', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(
+          qaReportWithChecks(qaHeader('passed', HEAD, 1, 2), [
+            '- [local] Confirm the banner',
+            '- [staging] Check the invoice email',
+            '- [production] Check the invoice PDF',
+          ]),
+        ),
+      ]),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 1,
+        deferred: 2,
+        checks: [
+          { place: 'local', text: 'Confirm the banner' },
+          { place: 'staging', text: 'Check the invoice email' },
+          { place: 'production', text: 'Check the invoice PDF' },
+        ],
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a legacy report carries no checks, and its count reads as local', () => {
+    assert.deepEqual(
+      readQa([qaComment(qaReportText(qaHeader('passed', HEAD, 2)))]),
+      {
+        status: 'read',
+        result: 'passed',
+        commit: HEAD,
+        leftForPerson: 2,
+        deferred: 0,
+        checks: [],
+        staleness: { status: 'current' },
+      },
+    );
+  });
+
+  test('a new header whose counts disagree with its lines reads missing with the header reason', () => {
+    assert.deepEqual(
+      readQa([
+        qaComment(qaReportWithChecks(qaHeader('passed', HEAD, 1, 0), [])),
+      ]),
+      { status: 'missing', reason: QA_HEADER_REASON },
     );
   });
 });
@@ -2654,6 +2740,8 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
     result: 'passed',
     commit: OLDER_HEAD,
     leftForPerson: 0,
+    deferred: 0,
+    checks: [],
     staleness: { status: 'stale', byCommit: UPDATED_HEAD },
   };
   const holds: [string, QaReportFact, string][] = [
@@ -2664,31 +2752,37 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
       'the QA Report records a failure',
     ],
     [
-      'one item left for a person, in the singular',
+      'one local Person Check left for a person, in the singular',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 1,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 1 item for a person',
+      'the QA Report leaves 1 local Person Check for a person',
     ],
     [
-      'two items left for a person, in the plural',
+      'two local Person Checks left for a person, in the plural',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 2,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 2 items for a person',
+      'the QA Report leaves 2 local Person Checks for a person',
     ],
     [
       'a stale report, naming both short shas',
@@ -2718,6 +2812,8 @@ describe('the QA Report rule: what holds the merge and what passes', () => {
         result: 'none-needed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       }),
       null,
@@ -2740,20 +2836,24 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         result: 'failed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
       'the QA Report records a failure',
     ],
     [
-      'two items left',
+      'two local Person Checks left',
       {
         status: 'read',
         result: 'passed',
         commit: HEAD,
         leftForPerson: 2,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'current' },
       },
-      'the QA Report leaves 2 items for a person',
+      'the QA Report leaves 2 local Person Checks for a person',
     ],
     [
       'stale',
@@ -2762,6 +2862,8 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         result: 'passed',
         commit: OLDER_HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: UPDATED_HEAD },
       },
       'the QA Report is for `cccccccc`, and the branch commit `bbbbbbbb` came after it',
@@ -2791,6 +2893,8 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
           result: 'none-needed',
           commit: HEAD,
           leftForPerson: 0,
+          deferred: 0,
+          checks: [],
           staleness: { status: 'current' },
         },
       ],
@@ -2806,6 +2910,93 @@ describe('decideAutoMerge: the QA Report under on and shadow', () => {
         );
       });
     }
+  }
+});
+
+describe('decideAutoMerge: only a local Person Check holds the QA Report (ADR 0151)', () => {
+  const STAGING_AND_PRODUCTION = [
+    '- [staging] Check the invoice email',
+    '- [production] Check the invoice PDF',
+  ];
+  /** The decision for a head whose QA Report is `qaReport`, all else clear. */
+  const decideWith = (qaReport: QaReportFact, mode: 'on' | 'shadow') =>
+    decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'auto' },
+        agentVerdict: { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+        qaReport,
+      }),
+      mode,
+    );
+
+  for (const mode of ['on', 'shadow'] as const) {
+    const heldAction = mode === 'on' ? 'skip' : 'shadow-comment';
+
+    test(`${mode}: a report with only staging and production checks is allowed`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(
+              qaHeader('passed', HEAD, 0, 2),
+              STAGING_AND_PRODUCTION,
+            ),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, false);
+      assert.equal(decision.reason, `every fact holds for ${HEAD}`);
+    });
+
+    test(`${mode}: a local check holds with its reason, and the staging and production checks add nothing`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(qaHeader('passed', HEAD, 1, 2), [
+              '- [local] Confirm the banner',
+              ...STAGING_AND_PRODUCTION,
+            ]),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(
+        decision.reason,
+        'the QA Report leaves 1 local Person Check for a person',
+      );
+    });
+
+    test(`${mode}: a legacy report with two items holds with the local reason`, () => {
+      const decision = decideWith(
+        readQa([qaComment(qaReportText(qaHeader('passed', HEAD, 2)))]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(
+        decision.reason,
+        'the QA Report leaves 2 local Person Checks for a person',
+      );
+    });
+
+    test(`${mode}: a new header whose counts disagree with its lines holds with the header reason`, () => {
+      const decision = decideWith(
+        readQa([
+          qaComment(
+            qaReportWithChecks(
+              qaHeader('passed', HEAD, 1, 0),
+              STAGING_AND_PRODUCTION,
+            ),
+          ),
+        ]),
+        mode,
+      );
+      assert.equal(decision.held, true);
+      assert.equal(decision.action, heldAction);
+      assert.equal(decision.reason, QA_HEADER_REASON);
+    });
   }
 });
 
@@ -2907,6 +3098,8 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
         result: 'passed',
         commit: HEAD,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
         staleness: { status: 'stale', byCommit: LATER },
       } as QaReportFact,
       `the QA Report is for \`${HEAD.slice(0, 8)}\`, and the branch commit \`${LATER.slice(0, 8)}\` came after it`,

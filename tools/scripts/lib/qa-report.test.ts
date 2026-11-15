@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   parseQaReport,
+  type PersonCheck,
   type PrCommit,
   QA_REPORT_MARKER,
   qaStaleness,
@@ -51,26 +52,54 @@ function qaReportSection(): { prose: string; template: string } {
   };
 }
 
-/** Fills the Skill's placeholders the way a session would. */
-const fillPlaceholders = (text: string, leftForPerson: number): string =>
-  text.replaceAll('<40-hex sha>', SHA).replaceAll('<n>', String(leftForPerson));
+/**
+ * Fills a template the way a session would: the SHA, both counts (derived from
+ * the checks), and the placeholder Person Check bullet replaced by the checks
+ * it lists, or by `None.` when there are none.
+ */
+function fillTemplate(text: string, checks: PersonCheck[] = []): string {
+  const local = checks.filter((c) => c.place === 'local').length;
+  const deferred = checks.length - local;
+  const lines = text
+    .split('\n')
+    .flatMap((line) =>
+      line === '- [local|staging|production] <what a person must check>'
+        ? checks.length === 0
+          ? ['None.']
+          : checks.map((c) => `- [${c.place}] ${c.text}`)
+        : [line],
+    );
+  return lines
+    .join('\n')
+    .replaceAll('<40-hex sha>', SHA)
+    .replaceAll('<local n>', String(local))
+    .replaceAll('<staging+production n>', String(deferred));
+}
 
 describe('parseQaReport: the template the Skill prints', () => {
   test('the printed template parses as passed, with its commit and no item left', () => {
     const { template } = qaReportSection();
-    assert.deepEqual(parseQaReport(fillPlaceholders(template, 0)), {
+    assert.deepEqual(parseQaReport(fillTemplate(template)), {
       result: 'passed',
       commit: SHA,
       leftForPerson: 0,
+      deferred: 0,
+      checks: [],
     });
   });
 
-  test('the same template with two items left parses as passed with two left', () => {
+  test('the template with one local and one staging item parses with both counts and both lines', () => {
     const { template } = qaReportSection();
-    assert.deepEqual(parseQaReport(fillPlaceholders(template, 2)), {
+    const checks: PersonCheck[] = [
+      { place: 'local', text: 'Confirm the banner on a phone' },
+      { place: 'staging', text: 'Check the invoice email' },
+    ];
+    assert.deepEqual(parseQaReport(fillTemplate(template, checks)), {
       result: 'passed',
       commit: SHA,
-      leftForPerson: 2,
+      leftForPerson: 1,
+      deferred: 1,
+      checks,
     });
   });
 
@@ -99,23 +128,23 @@ describe('parseQaReport: the template the Skill prints', () => {
 
     const failedSpan = passedSpan.replace('result=passed', 'result=failed');
     assert.deepEqual(
-      parseQaReport(
-        reportBody(QA_REPORT_MARKER, '', fillPlaceholders(failedSpan, 0)),
-      ),
+      parseQaReport(reportBody(QA_REPORT_MARKER, '', fillTemplate(failedSpan))),
       {
         result: 'failed',
         commit: SHA,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
       },
     );
     assert.deepEqual(
-      parseQaReport(
-        reportBody(QA_REPORT_MARKER, '', fillPlaceholders(noneSpan, 0)),
-      ),
+      parseQaReport(reportBody(QA_REPORT_MARKER, '', fillTemplate(noneSpan))),
       {
         result: 'none-needed',
         commit: SHA,
         leftForPerson: 0,
+        deferred: 0,
+        checks: [],
       },
     );
   });
@@ -146,15 +175,26 @@ function qaPlanReportTemplate(): string {
 }
 
 describe('parseQaReport: the template the qa-plan Skill prints', () => {
-  test('parses as passed, with its commit and the items left', () => {
+  test('parses as passed, with its commit and the Person Checks left, split by place', () => {
+    const checks: PersonCheck[] = [
+      { place: 'local', text: 'Confirm the banner on a phone' },
+      { place: 'local', text: 'Confirm the reset link' },
+      { place: 'production', text: 'Check the invoice PDF' },
+    ];
     assert.deepEqual(
-      parseQaReport(fillPlaceholders(qaPlanReportTemplate(), 3)),
-      { result: 'passed', commit: SHA, leftForPerson: 3 },
+      parseQaReport(fillTemplate(qaPlanReportTemplate(), checks)),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 2,
+        deferred: 1,
+        checks,
+      },
     );
   });
 
   test('with result=failed it parses as failed', () => {
-    const failed = fillPlaceholders(qaPlanReportTemplate(), 0).replace(
+    const failed = fillTemplate(qaPlanReportTemplate()).replace(
       'result=passed',
       'result=failed',
     );
@@ -162,6 +202,8 @@ describe('parseQaReport: the template the qa-plan Skill prints', () => {
       result: 'failed',
       commit: SHA,
       leftForPerson: 0,
+      deferred: 0,
+      checks: [],
     });
   });
 });
@@ -171,7 +213,7 @@ describe('the Skills carry the Not proven rule', () => {
     const { prose } = qaReportSection();
     assert.match(prose, /\*\*Not proven\*\*/);
     assert.match(prose, /\*\*FAIL: pre-existing\*\*[^.]*not yet filed/);
-    assert.match(prose, /counted in `<n>`/);
+    assert.match(prose, /with its Place and counted/);
   });
 });
 
@@ -213,6 +255,10 @@ describe('parseQaReport: a header in any other form is unparseable', () => {
       'an unknown result',
       `QA Report: result=maybe; commit=${SHA}; left-for-person=0`,
     ],
+    [
+      'the deferred field before the left-for-person field',
+      `QA Report: result=passed; commit=${SHA}; deferred=0; left-for-person=0`,
+    ],
   ];
   for (const [name, header] of malformed) {
     test(`${name} is unparseable`, () => {
@@ -222,6 +268,22 @@ describe('parseQaReport: a header in any other form is unparseable', () => {
       );
     });
   }
+
+  test('a deferred count with a leading zero is unparseable, even when a line matches it', () => {
+    assert.equal(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          `QA Report: result=passed; commit=${SHA}; left-for-person=0; deferred=01`,
+          '',
+          '### Left for a person',
+          '- [staging] Check the invoice email',
+        ),
+      ),
+      null,
+    );
+  });
 
   test('a heading before the header makes the header not the first non-blank line', () => {
     const header = `QA Report: result=passed; commit=${SHA}; left-for-person=0`;
@@ -267,7 +329,467 @@ describe('parseQaReport: layout the Skill allows', () => {
   test('blank lines between the marker and the header are accepted', () => {
     assert.deepEqual(
       parseQaReport(reportBody(QA_REPORT_MARKER, '', '  ', header)),
-      { result: 'passed', commit: SHA, leftForPerson: 0 },
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+});
+
+// ------------------------------------ the Person Check section (ADR 0151)
+
+describe('parseQaReport: a new header and its Person Check section', () => {
+  const SECTION = '### Left for a person';
+  const newHeader = (left: number, deferred: number): string =>
+    `QA Report: result=passed; commit=${SHA}; left-for-person=${left}; deferred=${deferred}`;
+
+  test('local and deferred counts parse, with each check in order, its place and its trimmed text', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 2),
+          '',
+          '## QA Report',
+          '',
+          SECTION,
+          '',
+          '- [local] Confirm the banner   ',
+          '- [staging] Check the invoice email',
+          '- [production] Check the invoice PDF',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 1,
+        deferred: 2,
+        checks: [
+          { place: 'local', text: 'Confirm the banner' },
+          { place: 'staging', text: 'Check the invoice email' },
+          { place: 'production', text: 'Check the invoice PDF' },
+        ],
+      },
+    );
+  });
+
+  test('a local count that differs from the local lines is unparseable', () => {
+    assert.equal(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(2, 0),
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+        ),
+      ),
+      null,
+    );
+  });
+
+  test('a deferred count that differs from the staging and production lines is unparseable', () => {
+    assert.equal(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(0, 1),
+          '',
+          SECTION,
+          '- [staging] Check the invoice email',
+          '- [staging] Check the invoice PDF',
+        ),
+      ),
+      null,
+    );
+  });
+
+  test('a count above zero with no Person Check section is unparseable', () => {
+    assert.equal(
+      parseQaReport(
+        reportBody(QA_REPORT_MARKER, '', newHeader(1, 0), '', '## QA Report'),
+      ),
+      null,
+    );
+  });
+
+  test('a Person Check line beyond the counts is unparseable', () => {
+    assert.equal(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 0),
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+          '- [local] Confirm the reset link',
+        ),
+      ),
+      null,
+    );
+  });
+
+  test('zero counts parse with no section at all', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(QA_REPORT_MARKER, '', newHeader(0, 0), '', '## QA Report'),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('zero counts with None. under the section parse with no checks', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(QA_REPORT_MARKER, '', newHeader(0, 0), '', SECTION, 'None.'),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('zero counts with an empty section parse with no checks', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(0, 0),
+          '',
+          SECTION,
+          '',
+          '## QA Report',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('zero counts with plain prose under the section parse with no checks', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(0, 0),
+          '',
+          SECTION,
+          'Nothing left to check by hand.',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('prose under the section is ignored when the counts match the lines', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 0),
+          '',
+          SECTION,
+          'Check the banner on a phone.',
+          '- [local] Confirm the banner',
+          'Thanks.',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 1,
+        deferred: 0,
+        checks: [{ place: 'local', text: 'Confirm the banner' }],
+      },
+    );
+  });
+
+  const notAPersonCheck: [string, string][] = [
+    ['a capitalised Place', '- [Staging] Check the invoice email'],
+    ['an abbreviated Place', '- [prod] Check the invoice PDF'],
+    ['no Place', '- Check the invoice PDF'],
+    ['no space after the bracket', '- [staging]Check the invoice email'],
+    ['blank text', '- [staging]  '],
+    ['a star bullet', '* [local] Confirm the banner'],
+    ['a numbered bullet', '1. [local] Confirm the banner'],
+    ['two spaces after the dash', '-  [local] Confirm the banner'],
+    ['two spaces after the bracket', '- [local]  Confirm the banner'],
+  ];
+  for (const [name, line] of notAPersonCheck) {
+    test(`a top-level item with ${name} makes the whole report unparseable`, () => {
+      assert.equal(
+        parseQaReport(
+          reportBody(QA_REPORT_MARKER, '', newHeader(0, 0), '', SECTION, line),
+        ),
+        null,
+      );
+    });
+  }
+
+  test('an indented line under the section is a continuation, not a check, and is ignored', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(0, 0),
+          '',
+          SECTION,
+          '    - [staging] Check the invoice email',
+          '    - [Staging] Check the invoice PDF',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  // Only a column-0 line is a list item; the same text indented is continuation.
+  const itemText = ['- [bogus] x', '- x', '1. x'];
+  for (const indent of [1, 2, 3, 4]) {
+    for (const item of itemText) {
+      test(`a ${indent}-space indented "${item}" under the section is continuation and is ignored`, () => {
+        assert.deepEqual(
+          parseQaReport(
+            reportBody(
+              QA_REPORT_MARKER,
+              '',
+              newHeader(0, 0),
+              '',
+              SECTION,
+              `${' '.repeat(indent)}${item}`,
+            ),
+          ),
+          {
+            result: 'passed',
+            commit: SHA,
+            leftForPerson: 0,
+            deferred: 0,
+            checks: [],
+          },
+        );
+      });
+    }
+  }
+
+  for (const item of itemText) {
+    test(`"${item}" in column 0 under the section makes the whole report unparseable`, () => {
+      assert.equal(
+        parseQaReport(
+          reportBody(QA_REPORT_MARKER, '', newHeader(0, 0), '', SECTION, item),
+        ),
+        null,
+      );
+    });
+  }
+
+  test('lines and headings inside a code fence are not read', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 0),
+          '',
+          '```md',
+          SECTION,
+          '- [Staging] Example',
+          '```',
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 1,
+        deferred: 0,
+        checks: [{ place: 'local', text: 'Confirm the banner' }],
+      },
+    );
+  });
+
+  test('lines and headings inside a tilde fence are not read', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 0),
+          '',
+          '~~~md',
+          SECTION,
+          '- [Staging] Example',
+          '~~~',
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 1,
+        deferred: 0,
+        checks: [{ place: 'local', text: 'Confirm the banner' }],
+      },
+    );
+  });
+
+  test('a second Left for a person heading is unparseable, even after another heading', () => {
+    // The counts match both sections' items, so only the second heading can fail it.
+    assert.equal(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(2, 0),
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+          '## Notes',
+          SECTION,
+          '- [local] Confirm the reset link',
+        ),
+      ),
+      null,
+    );
+  });
+
+  test('the section ends at the next heading: items after it are neither counted nor read', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          newHeader(1, 0),
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+          '## Notes',
+          '- [local] Confirm the reset link',
+          '- nonsense',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 1,
+        deferred: 0,
+        checks: [{ place: 'local', text: 'Confirm the banner' }],
+      },
+    );
+  });
+});
+
+describe('parseQaReport: a legacy header and the no-manual-QA header', () => {
+  const SECTION = '### Left for a person';
+  const legacyHeader = `QA Report: result=passed; commit=${SHA}; left-for-person=2`;
+
+  test('a legacy header reads its count as local with no checks, even when its lines carry no Place', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          legacyHeader,
+          '',
+          SECTION,
+          '- first thing',
+          '- second thing',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 2,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('a legacy header does not read its lines: staging lines and a malformed line change nothing', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          legacyHeader,
+          '',
+          SECTION,
+          '- [staging] Check the invoice email',
+          '- [staging] Check the invoice PDF',
+          '- [Prod] bogus',
+        ),
+      ),
+      {
+        result: 'passed',
+        commit: SHA,
+        leftForPerson: 2,
+        deferred: 0,
+        checks: [],
+      },
+    );
+  });
+
+  test('a no-manual-QA header reads with no deferred count and no checks, even with a section under it', () => {
+    assert.deepEqual(
+      parseQaReport(
+        reportBody(
+          QA_REPORT_MARKER,
+          '',
+          `QA Report: no manual QA needed; commit=${SHA}`,
+          '',
+          SECTION,
+          '- [local] Confirm the banner',
+        ),
+      ),
+      {
+        result: 'none-needed',
+        commit: SHA,
+        leftForPerson: 0,
+        deferred: 0,
+        checks: [],
+      },
     );
   });
 });
