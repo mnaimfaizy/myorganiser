@@ -85,6 +85,15 @@ import {
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
 import {
+  AGENT_KINDS,
+  assertNoGitHubTokens,
+  providerEnvironment,
+} from '../tools/scripts/lib/sandcastle-provider-env.ts';
+import type {
+  AgentKind,
+  ClaudeAuthResolution,
+} from '../tools/scripts/lib/sandcastle-provider-env.ts';
+import {
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
 } from '../tools/scripts/lib/sandcastle-worktree-repair.ts';
@@ -642,9 +651,6 @@ const modelFlag = getArgValue('model');
 // (before we build worktrees and containers), and print the mode in the run header.
 
 type ClaudeAuthMode = 'subscription' | 'api';
-
-/** `null` = no credential needed (not a claude run). `'none'` = needed, absent. */
-type ClaudeAuthResolution = ClaudeAuthMode | 'none' | null;
 
 /**
  * Which Claude credential this run will use.
@@ -1413,8 +1419,6 @@ if (gateOnly) {
 
 // ─── Model routing ────────────────────────────────────────────────────────────
 
-type AgentKind = 'claude' | 'cursor' | 'copilot';
-
 function modelFor(issue: Issue): string {
   const labels = issue.labels.map((l) => l.name);
   if (labels.includes('complexity:high'))
@@ -1426,11 +1430,10 @@ function modelFor(issue: Issue): string {
 
 function resolveAgentKind(): AgentKind {
   const raw = (agentFlag ?? process.env.SANDCASTLE_AGENT ?? 'claude').trim();
-  if (raw === 'claude' || raw === 'cursor' || raw === 'copilot') {
-    return raw;
-  }
+  const kind = AGENT_KINDS.find((candidate) => candidate === raw);
+  if (kind) return kind;
 
-  fail(`Unknown agent "${raw}". Available: claude, cursor, copilot.`);
+  fail(`Unknown agent "${raw}". Available: ${AGENT_KINDS.join(', ')}.`);
 }
 
 function resolveModel(issue: Issue, agentKind: AgentKind): string {
@@ -1460,32 +1463,6 @@ function buildAgent(agentKind: AgentKind, model: string) {
     case 'copilot':
       return copilot(model);
   }
-}
-
-function providerEnvironment(): Record<string, string> {
-  // Exactly one Claude credential reaches the container — see resolveClaudeAuth.
-  // On cursor/copilot runs claudeAuth is null and neither is forwarded.
-  const claudeVariables =
-    claudeAuth === 'subscription'
-      ? ['CLAUDE_CODE_OAUTH_TOKEN']
-      : claudeAuth === 'api'
-        ? ['ANTHROPIC_API_KEY']
-        : [];
-
-  const variableNames = [
-    ...claudeVariables,
-    'CURSOR_API_KEY',
-    'COPILOT_GITHUB_TOKEN',
-    'GH_TOKEN',
-    'GITHUB_TOKEN',
-  ];
-
-  return Object.fromEntries(
-    variableNames.flatMap((variableName) => {
-      const value = process.env[variableName];
-      return value ? [[variableName, value]] : [];
-    }),
-  );
 }
 
 // Branch type is read off the issue's labels so the branch name says what the work
@@ -3279,27 +3256,35 @@ while (pendingSlices.length > 0) {
       );
     }
 
+    // Only the host pushes (ADR 0010): fail before any container exists if a
+    // GitHub token reached this record from any source (#1593).
+    const sandboxEnv: Record<string, string> = {
+      NX_DAEMON: 'false',
+      NX_ISOLATE_PLUGINS: 'false',
+      NX_SKIP_NX_CACHE: 'true',
+      // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
+      // resolve a "main worktree" root to share the cache across worktrees —
+      // a path that does not exist inside the container — and falls back to
+      // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
+      // resolution failure is still wasted work every run). See ADR 0036.
+      NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
+      NX_WORKSPACE_DATA_DIRECTORY: '/home/agent/workspace/.nx/workspace-data',
+      ...providerEnvironment({
+        agentKind,
+        claudeAuth,
+        env: process.env,
+      }),
+      ...YARN_CACHE_ENV,
+    };
+    assertNoGitHubTokens(sandboxEnv);
+
     const result = await finishedDespiteCleanup(
       issue,
       sliceBranch,
       run({
         agent,
         sandbox: docker({
-          env: {
-            NX_DAEMON: 'false',
-            NX_ISOLATE_PLUGINS: 'false',
-            NX_SKIP_NX_CACHE: 'true',
-            // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
-            // resolve a "main worktree" root to share the cache across worktrees —
-            // a path that does not exist inside the container — and falls back to
-            // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
-            // resolution failure is still wasted work every run). See ADR 0036.
-            NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
-            NX_WORKSPACE_DATA_DIRECTORY:
-              '/home/agent/workspace/.nx/workspace-data',
-            ...providerEnvironment(),
-            ...YARN_CACHE_ENV,
-          },
+          env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the
           // in-container install (below) is incremental and never re-downloads
           // across slices.
