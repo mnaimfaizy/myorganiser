@@ -679,6 +679,9 @@ leaked credential would end up.
 one (yarn, nx, prisma or git failing with a permission error), fall back to
 `capDrop: ['NET_RAW', 'MKNOD']` and record why here.
 
+**CPUs are capped.** The same call passes `cpus: 8`, so a runaway build cannot take every core of
+the Docker VM (12 on the Maintainer's host). Raise it if the test slice gets slower.
+
 Because the marker is read by the shared hook script rather than by harness config, all three
 harnesses (Claude, Cursor, Copilot) inherit this without separate wiring. Behavior in both modes
 is pinned by `tools/scripts/copilot-hooks/pre-tool-use.test.ts`.
