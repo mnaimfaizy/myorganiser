@@ -3304,6 +3304,10 @@ while (pendingSlices.length > 0) {
       run({
         agent,
         sandbox: docker({
+          // The image ensureSandboxImage built and checked. Unnamed, Sandcastle
+          // derives "sandcastle:<folder name>", which only matches from a
+          // folder called "myorganiser".
+          imageName: SANDBOX_IMAGE,
           env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the
           // in-container install (below) is incremental and never re-downloads

@@ -154,6 +154,19 @@ test('the sandcastle env example forwards no GitHub token and no gh-in-sandbox b
   assert.match(example, /COPILOT_GITHUB_TOKEN=/);
 });
 
+test('every docker() sandbox names the image the dispatch builds, not the working folder', () => {
+  const main = readFileSync(join(REPO_ROOT, '.sandcastle/main.mts'), 'utf8');
+  // Sandcastle derives an unnamed image from the repository folder name
+  // ("sandcastle:<folder>"), so a dispatch from any folder not called
+  // "myorganiser" (a linked worktree, say) looked for an image nobody built.
+  const calls = [...main.matchAll(/\bdocker\(\{([\s\S]*?)\n {8}\}\)/g)];
+  assert.ok(calls.length > 0, 'the docker() call was not found');
+  for (const [, body] of calls) {
+    assert.match(body, /imageName: SANDBOX_IMAGE,/);
+  }
+  assert.doesNotMatch(main, /\bdocker\(\)/);
+});
+
 test('main.mts selects through this module and runs the guard', () => {
   const main = readFileSync(join(REPO_ROOT, '.sandcastle/main.mts'), 'utf8');
   assert.match(main, /sandcastle-provider-env\.ts/);
