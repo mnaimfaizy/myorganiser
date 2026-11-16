@@ -627,7 +627,7 @@ const waitForQuota = process.argv.includes('--wait-for-quota');
 let quotaWaitsTaken = 0;
 
 // Opt-in, per ADR 0036: without it, output stays byte-for-byte what it is today — one
-// flat log per slice. Sandcastle 0.12.0 already captures every sub-agent transcript to
+// flat log per slice. Sandcastle 0.14.0 already captures every sub-agent transcript to
 // the host unconditionally (see captureSubagentTraces below); this flag only decides
 // whether main.mts relocates and summarizes what was already captured.
 const traceSubagents = process.argv.includes('--trace-subagents');
@@ -2879,7 +2879,7 @@ function logRunUsage(
 }
 
 // ─── Sub-agent traces (--trace-subagents) ──────────────────────────────────────
-// Sandcastle 0.12.0's Claude Code provider captures every sub-agent transcript to the
+// Sandcastle 0.14.0's Claude Code provider captures every sub-agent transcript to the
 // host automatically and unconditionally — RunResult.iterations[].sessionFilePath
 // already points at the captured main session, and its sibling
 // <sessionId>/subagents/agent-*.jsonl files are captured the same way, with no flag
