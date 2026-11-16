@@ -3329,7 +3329,7 @@ while (pendingSlices.length > 0) {
           // as a plain user and needs none (ADR 0152 keeps credentials out of
           // the container; this narrows what a compromised process can do in it).
           capDrop: ['ALL'],
-          // Cap a runaway build at 8 of Docker's 12 CPUs, leaving the host headroom.
+          // Cap a runaway build at 8 CPUs, leaving the host headroom.
           cpus: 8,
           env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the

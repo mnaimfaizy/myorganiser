@@ -690,7 +690,7 @@ pre-commit. The prompt asks the agent to format and lint first; the host gate an
 `format:check --all` back it up. Do not force hooks on: that undoes 0.14's read-only mount.
 
 **CPUs are capped.** The same call passes `cpus: 8`, so a runaway build cannot take every core of
-the Docker VM (12 on the Maintainer's host). Raise it if the test slice gets slower.
+the Docker VM. Raise it if the test slice gets slower.
 
 Because the marker is read by the shared hook script rather than by harness config, all three
 harnesses (Claude, Cursor, Copilot) inherit this without separate wiring. Behavior in both modes
