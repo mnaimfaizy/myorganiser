@@ -1,6 +1,5 @@
 import { claudeCode, copilot, cursor, run } from '@ai-hero/sandcastle';
 import { docker } from '@ai-hero/sandcastle/sandboxes/docker';
-import dotenv from 'dotenv';
 import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -84,6 +83,7 @@ import {
   STANDALONE_HANDOFF_LABELS,
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
+import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
 import {
   AGENT_KINDS,
   assertNoGitHubTokens,
@@ -100,8 +100,6 @@ import {
 
 const REPO = 'mnaimfaizy/myorganiser';
 const SANDBOX_IMAGE = 'sandcastle:myorganiser';
-
-dotenv.config({ path: join(process.cwd(), '.sandcastle', '.env') });
 
 type AgentModelPolicy = {
   orchestrators: {
@@ -516,8 +514,15 @@ Flags:
 Work branches are named <type>/<issue-number>-<slug>, with <type> derived from the
 issue's labels (see AGENTS.md "Branch naming"). PRD slices use slice/<n>-<slug>.
 
+Credentials and settings come from, highest first: a 1Password Environment
+(OP_ENVIRONMENT_ID, read in memory), your shell, then the gitignored
+.sandcastle/secrets.env. Do not create .sandcastle/.env: Sandcastle forwards
+every key in it into the sandbox, so the dispatch refuses to start when it
+holds one. See docs/sandcastle/RUNBOOK.md.
+
 Environment:
-  .sandcastle/.env is loaded automatically.
+  OP_ENVIRONMENT_ID   1Password Environment holding the variables below
+  OP_CLI              Path to a specific 1Password CLI binary
   SANDCASTLE_AGENT
   SANDCASTLE_MODEL
   SANDCASTLE_CLAUDE_MODEL
@@ -542,6 +547,21 @@ Claude auth (see docs/sandcastle/RUNBOOK.md):
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   printHelp();
   process.exit(0);
+}
+
+// Host credentials: a 1Password Environment, then the shell, then the gitignored
+// .sandcastle/secrets.env. Refuses first when the file Sandcastle forwards
+// wholesale into every sandbox holds a key (#1593). Everything below reads
+// process.env, so the merged record is applied there once, here.
+try {
+  const hostEnvironment = loadHostEnv({
+    sandcastleDir: join(process.cwd(), '.sandcastle'),
+    shell: process.env,
+  });
+  Object.assign(process.env, hostEnvironment.env);
+  console.log(`Credentials from: ${hostEnvironment.sources}`);
+} catch (error) {
+  fail((error as Error).message);
 }
 
 const USAGE =
@@ -656,7 +676,7 @@ type ClaudeAuthMode = 'subscription' | 'api';
  * Which Claude credential this run will use.
  *
  * `preview` softens the MISSING-credential paths from a hard exit to `'none'`, so a
- * `--dry-run` can still show the plan on a machine where the 1Password injection was
+ * `--dry-run` can still show the plan on a machine where no credential source was
  * never set up. It reports the gap rather than hiding it — a preview that cannot say
  * "this run would not authenticate" is worse than one that dies. A malformed
  * SANDCASTLE_CLAUDE_AUTH still fails outright either way: that is a typo, not an
@@ -703,14 +723,14 @@ function resolveClaudeAuth(
     'No Claude credential found. Set one of:\n' +
       '  CLAUDE_CODE_OAUTH_TOKEN  — `claude setup-token` on the host (Pro/Max plan)\n' +
       '  ANTHROPIC_API_KEY        — metered API billing\n' +
-      'See docs/sandcastle/RUNBOOK.md. Both are normally injected via 1Password.',
+      'See docs/sandcastle/RUNBOOK.md. Both normally come from a 1Password Environment.',
   );
 }
 
 const agentKind = resolveAgentKind();
 // --gate-only launches no agent, so it must not demand an agent credential. It is
 // the path a maintainer runs by hand to re-check a feature branch, often on a
-// machine where the 1Password injection was never set up.
+// machine where no credential source was ever set up.
 // Neither --gate-only nor --dry-run launches an agent, so neither may demand an
 // agent credential. --gate-only needs none at all; --dry-run previews the plan and
 // reports the missing credential instead of dying on it.

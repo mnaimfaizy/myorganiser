@@ -29,28 +29,43 @@ pipeline.
 4. **Secrets:** Prefer a 1Password Environment. The Environment CLI integration is
    currently beta and is not included in the stable Homebrew cask. Install the beta
    cask (it conflicts with the stable cask):
+
    ```bash
    brew uninstall --cask 1password-cli
    brew install --cask 1password-cli@beta
    op --version                         # should include -beta
    op environment --help
    ```
+
    Enable 1Password's desktop-app integration and copy the Environment ID from
    **Developer > View Environments**. Then run dispatch with `OP_ENVIRONMENT_ID`:
+
    ```bash
    export OP_ENVIRONMENT_ID=<your-1password-environment-id>
-   corepack yarn dispatch-agents:1password --prd <issue-number>
+   corepack yarn dispatch-agents --prd <issue-number>
    # or:
-   corepack yarn dispatch-waves:1password --prd <issue-number>
+   corepack yarn dispatch-waves --prd <issue-number>
    ```
-   The CLI authenticates through the unlocked 1Password desktop app and injects the
-   Environment variables only into the dispatch process. Do not put API keys in
-   `.sandcastle/.env`. The legacy dotenv workflow remains available for local-only
-   setups, but `.sandcastle/.env` is ignored and must never be committed.
+
+   The dispatch reads the Environment itself (`op environment read`, authenticating
+   through the unlocked 1Password desktop app), in memory on the host: nothing is
+   written to disk and no value is printed. `OP_ENVIRONMENT_ID` is not a secret, so it
+   may instead live in `.sandcastle/secrets.env`; a value in your shell wins.
+
+   Host credentials come from, highest first: the 1Password Environment, your shell,
+   then the gitignored `.sandcastle/secrets.env` (copy `.sandcastle/secrets.env.example`).
+   Only host code reads them, and only the selected agent's one credential reaches the
+   sandbox ([ADR 0152](../adr/0152-host-credentials-have-three-sources-and-the-forwarded-env-file-must-stay-empty.md)).
+   **Never create `.sandcastle/.env`:** Sandcastle forwards every key listed in it into
+   the sandbox, whichever agent runs, so `dispatch-agents` and `dispatch-waves` refuse
+   to start when it holds a key. A GitHub token (`GH_TOKEN`, `GITHUB_TOKEN`) is never
+   forwarded for any agent, and the dispatch fails before a container starts if one
+   reaches the sandbox environment. Only the host pushes (ADR 0010).
+
 5. The `sandcastle:myorganiser` image builds automatically on first run if missing. It
    already bakes in Claude Code, Cursor, and GitHub Copilot CLI so the `--agent` flag only
    switches which provider Sandcastle launches. Which Claude Code it carries is set in the
-   environment, next to the other `SANDCASTLE_*` variables (see `.sandcastle/.env.example`),
+   environment, next to the other `SANDCASTLE_*` variables (see `.sandcastle/secrets.env.example`),
    so changing it needs no commit:
    - `SANDCASTLE_CLAUDE_CODE_UPDATE=auto` (the default) follows the latest release. Each
      dispatch asks the installer's release channel for the current version.
@@ -227,7 +242,7 @@ Two guard rails, because this is the only mode where no human named the work:
 interactive Claude Code sessions, and any `complexity:high` issue routes to `claude-opus-5-5`. Check
 the `--dry-run` output before committing to a large batch.
 
-Provider switching is optional: the default agent can live in `.sandcastle/.env` as
+Provider switching is optional: the default agent can live in `.sandcastle/secrets.env` (or the 1Password Environment) as
 `SANDCASTLE_AGENT=claude|cursor|copilot`. Per-provider model defaults can also live there
 (`SANDCASTLE_CLAUDE_MODEL`, `SANDCASTLE_CURSOR_MODEL`, `SANDCASTLE_COPILOT_MODEL`), and
 `--model` always overrides them for a single run. Claude keeps the existing complexity-based

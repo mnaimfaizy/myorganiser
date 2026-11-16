@@ -145,7 +145,7 @@ test('the guard refuses each forbidden variable, naming it', () => {
 
 test('the sandcastle env example forwards no GitHub token and no gh-in-sandbox block', () => {
   const example = readFileSync(
-    join(REPO_ROOT, '.sandcastle/.env.example'),
+    join(REPO_ROOT, '.sandcastle/secrets.env.example'),
     'utf8',
   );
   assert.doesNotMatch(example, /^\s*#?\s*GH_TOKEN=/m);

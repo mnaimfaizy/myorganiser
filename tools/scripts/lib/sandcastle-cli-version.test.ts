@@ -32,7 +32,7 @@ test('the Dockerfile takes the version as a build arg, not a hard-coded pin', ()
 });
 
 test('both variables are documented in the sandcastle env example', () => {
-  const example = read('.sandcastle/.env.example');
+  const example = read('.sandcastle/secrets.env.example');
   assert.match(example, /SANDCASTLE_CLAUDE_CODE_UPDATE=/);
   assert.match(example, /SANDCASTLE_CLAUDE_CODE_VERSION=/);
 });
