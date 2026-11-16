@@ -5,6 +5,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+import {
+  addPeakContext,
+  peakContextCell,
+} from './lib/sandcastle-context-window.ts';
+
 /** One usage record, from either the JSONL file or a parsed legacy log line. */
 interface AgentUsageRecord {
   timestamp?: string | null;
@@ -19,6 +24,8 @@ interface AgentUsageRecord {
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   outputTokens?: number;
+  peakContextTokens?: number;
+  contextWindowLimit?: number | null;
   source?: string;
 }
 
@@ -31,6 +38,10 @@ interface UsageTotals {
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
   outputTokens: number;
+  /** Largest context window any run reached, in tokens; 0 when none reported one. */
+  peakContextTokens: number;
+  /** The limit reported with that peak, or null. */
+  contextWindowLimit: number | null;
 }
 
 const repoRoot = process.cwd();
@@ -136,6 +147,7 @@ function addUsage(target: UsageTotals, record: AgentUsageRecord): void {
   target.runs += 1;
   target.iterations += record.iterations ?? 0;
   target.telemetryIterations += record.telemetryIterations ?? 0;
+  addPeakContext(target, record);
   if (!record.available) {
     target.unavailableRuns += 1;
     return;
@@ -156,6 +168,8 @@ function emptyTotals(): UsageTotals {
     cacheCreationInputTokens: 0,
     cacheReadInputTokens: 0,
     outputTokens: 0,
+    peakContextTokens: 0,
+    contextWindowLimit: null,
   };
 }
 
@@ -177,7 +191,7 @@ function aggregate(
 function markdownRows(groups: Record<string, UsageTotals>): string[] {
   return Object.entries(groups).map(
     ([key, totals]) =>
-      `| ${key} | ${totals.runs} | ${totals.iterations} | ${totals.telemetryIterations} | ${totals.unavailableRuns} | ${totals.inputTokens} | ${totals.cacheCreationInputTokens} | ${totals.cacheReadInputTokens} | ${totals.outputTokens} |`,
+      `| ${key} | ${totals.runs} | ${totals.iterations} | ${totals.telemetryIterations} | ${totals.unavailableRuns} | ${totals.inputTokens} | ${totals.cacheCreationInputTokens} | ${totals.cacheReadInputTokens} | ${totals.outputTokens} | ${peakContextCell(totals)} |`,
   );
 }
 
@@ -251,14 +265,14 @@ async function main() {
       '',
       '## By workflow',
       '',
-      '| Workflow | Runs | Iterations | Iterations with telemetry | Runs unavailable | Input | Cache write | Cache read | Output |',
-      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+      '| Workflow | Runs | Iterations | Iterations with telemetry | Runs unavailable | Input | Cache write | Cache read | Output | Peak context |',
+      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
       ...markdownRows(summary.byWorkflow),
       '',
       '## By harness and model',
       '',
-      '| Harness:model | Runs | Iterations | Iterations with telemetry | Runs unavailable | Input | Cache write | Cache read | Output |',
-      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+      '| Harness:model | Runs | Iterations | Iterations with telemetry | Runs unavailable | Input | Cache write | Cache read | Output | Peak context |',
+      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
       ...markdownRows(summary.byModel),
       '',
       '## Cost note',

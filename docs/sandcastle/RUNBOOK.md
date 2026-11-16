@@ -255,6 +255,10 @@ corepack yarn agents:usage:report
 corepack yarn agents:usage:report -- --prd <issue-number>
 ```
 
+Each run's log line and the report's "Peak context" column show the largest context window an
+iteration reached (Sandcastle 0.14 `IterationResult.contextWindow`), with the model's limit when
+the agent reports one; `n/a` when it reports none.
+
 Model defaults are governed by `tools/config/agent-model-policy.json`; check current provider
 catalogs with `corepack yarn agents:models:audit`.
 
@@ -673,6 +677,20 @@ it instead. The image sets `MYORGANISER_SANDBOX=1`, which
 still blocked. The container's filesystem is disposable, but the transcript is not — it is
 written to `.sandcastle/logs/` on the host and fed back into model context, so that is where a
 leaked credential would end up.
+
+**Capabilities are dropped.** `docker()` in `.sandcastle/main.mts` passes `capDrop: ['ALL']`
+(Sandcastle 0.14), so the container runs with no Linux capabilities. If a future image step needs
+one (yarn, nx, prisma or git failing with a permission error), fall back to
+`capDrop: ['NET_RAW', 'MKNOD']` and record why here.
+
+**Git hooks do not run in the sandbox (seen in the #1584 and #1607 runs).** The read-only
+`.git/config` stops `postinstall: husky` from setting `core.hooksPath`, `.husky/_` is never created,
+and the shared config still points at a host path the container lacks, so an agent's commit skips
+pre-commit. The prompt asks the agent to format and lint first; the host gate and CI
+`format:check --all` back it up. Do not force hooks on: that undoes 0.14's read-only mount.
+
+**CPUs are capped.** The same call passes `cpus: 8`, so a runaway build cannot take every core of
+the Docker VM. Raise it if the test slice gets slower.
 
 Because the marker is read by the shared hook script rather than by harness config, all three
 harnesses (Claude, Cursor, Copilot) inherit this without separate wiring. Behavior in both modes

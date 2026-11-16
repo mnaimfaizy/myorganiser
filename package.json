@@ -483,7 +483,7 @@
     }
   },
   "devDependencies": {
-    "@ai-hero/sandcastle": "0.12.0",
+    "@ai-hero/sandcastle": "0.14.0",
     "@babel/core": "7.28.6",
     "@babel/preset-react": "7.28.5",
     "@driimus/nx-plugin-openapi": "3.1.2",

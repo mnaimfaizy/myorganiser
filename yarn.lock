@@ -12,22 +12,31 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-hero/sandcastle@npm:0.12.0":
-  version: 0.12.0
-  resolution: "@ai-hero/sandcastle@npm:0.12.0"
+"@ai-hero/sandcastle@npm:0.14.0":
+  version: 0.14.0
+  resolution: "@ai-hero/sandcastle@npm:0.14.0"
   dependencies:
     "@clack/prompts": "npm:^1.1.0"
   peerDependencies:
-    "@daytona/sdk": ^0.164.0
+    "@daytona/sdk": ">=0.164.0 <1.0.0"
+    "@fly/sprites": ">=0.2.4 <1.0.0"
     "@vercel/sandbox": ">=1.0.0"
+    e2b: ">=2.62.0 <3.0.0"
+    modal: ">=0.11.0 <1.0.0"
   peerDependenciesMeta:
     "@daytona/sdk":
       optional: true
+    "@fly/sprites":
+      optional: true
     "@vercel/sandbox":
+      optional: true
+    e2b:
+      optional: true
+    modal:
       optional: true
   bin:
     sandcastle: dist/main.js
-  checksum: 10c0/dff31c6f7a73dd0b30a302800027e8eef24255a82345ae9887a6180411cb3218f2ba9ca6721e1c1ed4ff20e7d6fc210a312fd8b4f1dfbf03737c10ba25ff622f
+  checksum: 10c0/d2a59d3c031068c8987870fa81eeb418df2eb08bd982b083a21b7993ef8c763d1bd73cb556633feb1547ea4455d0da83a4c1628af375a0802a744f3606837fb2
   languageName: node
   linkType: hard
 
@@ -5907,7 +5916,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@myorganiser/source@workspace:."
   dependencies:
-    "@ai-hero/sandcastle": "npm:0.12.0"
+    "@ai-hero/sandcastle": "npm:0.14.0"
     "@babel/core": "npm:7.28.6"
     "@babel/preset-react": "npm:7.28.5"
     "@craftzdog/react-native-buffer": "npm:6.1.2"
