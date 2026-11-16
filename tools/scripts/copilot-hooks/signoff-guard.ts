@@ -25,6 +25,27 @@ const GH_COMMENT_WRITE = new RegExp(
   `${GH_COMMAND}(?:issue\\s+comment\\b|(?=${GH_API_SEND})api\\b[^|;&\\n]*/comments\\b)`,
 );
 
+/** A `gh` call that can rewrite an issue body: `gh issue edit` or a sending `gh api`. */
+const GH_BODY_EDIT = new RegExp(
+  `${GH_COMMAND}(?:issue\\s+edit\\b|${GH_API_SEND})`,
+);
+
+/**
+ * A `gh` call that reads an issue: `gh issue view`, or a `gh api` call on
+ * `…/issues/<n>` that sends nothing (no field, input or write method).
+ */
+const GH_ISSUE_READ = new RegExp(
+  `${GH_COMMAND}(?:issue\\s+view\\b|api\\b(?![^|;&\\n)]*\\s(?:-[fF]|--field|--raw-field|--input|-X\\s*(?:PATCH|POST|PUT)|--method[=\\s]+(?:PATCH|POST|PUT))\\b)[^|;&\\n)]*/issues/\\d+(?![\\w/]))`,
+);
+
+/**
+ * A body the command builds at run time, which this guard cannot see: a
+ * command substitution, or stdin (`--body-file -`, `-F -`, `--input -`,
+ * `key=@-`).
+ */
+const RUN_TIME_BODY =
+  /\$\(|`|(?:--body-file|--input|\s-F)[=\s]+-(?=\s|$)|=@-(?=\s|$|["'])/;
+
 /**
  * A line that starts `waive:`. Looser on purpose than the production gate's
  * `WAIVER_RE` in `tools/scripts/lib/signoff-gate.ts`, so a malformed waiver is
@@ -41,8 +62,9 @@ const WAIVER_LINE = /(?:^|\n|\\n|["'=])[ \t]*waive[ \t]*:/i;
 const MAX_BODY_FILE_BYTES = 256 * 1024;
 
 /**
- * Refuses an agent's shell command that writes a Sign-off Issue body or posts
- * a `waive:` comment (ADR 0151). The production gate trusts a tick or a waiver
+ * Refuses an agent's shell command that writes a Sign-off Issue body, rewrites
+ * an issue body from its own current text, or posts a `waive:` comment
+ * (ADR 0151). The production gate trusts a tick or a waiver
  * by the owner's login, and an agent acting for the Maintainer writes as that
  * login too, so the gate cannot tell them apart; this guard stops the agent's
  * tool call instead.
@@ -62,6 +84,16 @@ export function getSignoffWriteReason(command: string): string | null {
     if (writesComment && WAIVER_LINE.test(text)) {
       return 'Posting a `waive:` comment is blocked: only the Maintainer waives a Person Check (ADR 0151). Ask the Maintainer to waive it.';
     }
+  }
+
+  // A tick made by reading a body and writing it back edited never shows the
+  // marker, so a run-time body rebuilt from an issue read is refused whole.
+  if (
+    GH_BODY_EDIT.test(command) &&
+    RUN_TIME_BODY.test(command) &&
+    GH_ISSUE_READ.test(command)
+  ) {
+    return 'Rewriting an issue body from its own current text is blocked: the hook cannot see whether it is a Sign-off Issue, where only the Maintainer ticks a Person Check (ADR 0151). Write the new body to a file and pass it with `--body-file`.';
   }
 
   return null;

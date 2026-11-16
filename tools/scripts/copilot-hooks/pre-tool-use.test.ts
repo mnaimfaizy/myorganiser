@@ -610,6 +610,40 @@ describe('pre-tool-use hook', () => {
       );
     });
 
+    // A tick built at run time never shows the marker in the command, so an
+    // issue body read and written back in one command is refused whole.
+    const TICK = String.raw`sed 's/\[ \]/[x]/'`;
+    for (const command of [
+      `gh issue edit 42 --body "$(gh issue view 42 --json body -q .body | ${TICK})"`,
+      `gh issue view 42 --json body -q .body | ${TICK} | gh issue edit 42 --body-file -`,
+      `gh api -X PATCH repos/o/r/issues/42 -f body="$(gh api repos/o/r/issues/42 -q .body | ${TICK})"`,
+    ]) {
+      it(`should deny rewriting an issue body from its own text: \`${command.slice(0, 40)}…\``, () => {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          shellPayload('Bash', command),
+          /rewrit/i,
+        );
+      });
+    }
+
+    it('should allow an issue body built from a local file at run time', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', 'gh issue edit 1599 --body "$(cat notes.md)"'),
+      );
+    });
+
+    it('should allow an issue body write to an issue path from a local file', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          'gh api -X PATCH repos/o/r/issues/1599 -f body="$(cat notes.md)"',
+        ),
+      );
+    });
+
     for (const script of [
       'node tools/scripts/ci/merge-train.ts',
       'corepack yarn release:cut',
