@@ -31,12 +31,16 @@ import {
   SHADOW_COMMENT_MARKER,
   SHADOW_HELD,
   SHADOW_WOULD_MERGE,
+  EFFECTIVE_TIER_HUMAN,
+  EFFECTIVE_TIER_UNNAMED,
   agentVerdictFrom,
   agentVerdictFromView,
+  autoMergeFactsFor,
   autoMergeHolds,
   changedFilesFromGh,
   checksOnCurrentHead,
   decideAutoMerge,
+  effectiveTierFrom,
   fetchOnce,
   mainCiFromRuns,
   onMainFromCompare,
@@ -180,6 +184,7 @@ const facts = (overrides: Partial<AutoMergeFacts> = {}): AutoMergeFacts => ({
   reviewTier: UNREAD_REVIEW_TIER,
   pathGuard: { status: 'clear' },
   agentVerdict: UNREAD_AGENT_VERDICT,
+  effectiveTier: { status: 'none' },
   qaReport: UNREAD_QA_REPORT,
   door: { status: 'absent' },
   ...overrides,
@@ -1045,7 +1050,12 @@ describe('the Agent Verdict rule', () => {
             },
           ],
         }),
-        { status: 'read', verdict: 'approve', reviewedOid: HEAD },
+        {
+          status: 'read',
+          verdict: 'approve',
+          reviewedOid: HEAD,
+          effectiveTier: null,
+        },
       );
     });
 
@@ -1500,6 +1510,7 @@ describe('runAutoTrain', () => {
           status: 'read',
           verdict: 'approve',
           reviewedOid: OLDER_HEAD,
+          effectiveTier: 'auto',
         }),
       },
     );
@@ -1524,6 +1535,7 @@ describe('runAutoTrain', () => {
           status: 'read',
           verdict: 'approve',
           reviewedOid: headRefOid,
+          effectiveTier: 'auto',
         }),
       },
     );
@@ -3093,6 +3105,7 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
           status: 'read',
           verdict: 'approve',
           reviewedOid: headRefOid,
+          effectiveTier: 'auto',
         }),
         qaReportFact: (_pr, headRefOid) => currentPassed(headRefOid),
       },
@@ -3135,6 +3148,7 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
             status: 'read',
             verdict: 'approve',
             reviewedOid: headRefOid,
+            effectiveTier: 'auto',
           };
         },
         qaReportFact: (_pr, headRefOid) => {
@@ -3198,6 +3212,7 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
             status: 'read',
             verdict: 'approve',
             reviewedOid: headRefOid,
+            effectiveTier: 'auto',
           }),
           qaReportFact: (_pr, headRefOid) =>
             headRefOid === HEAD ? currentPassed(HEAD) : fact,
@@ -3228,6 +3243,7 @@ describe('runAutoTrain under on: the facts for each head it would merge', () => 
           status: 'read',
           verdict: 'approve',
           reviewedOid: HEAD,
+          effectiveTier: 'auto',
         }),
         qaReportFact: (_pr, headRefOid) => currentPassed(headRefOid),
       },
@@ -3251,6 +3267,7 @@ describe('runAutoTrain under on: the record an Auto-merge leaves (ADR 0148)', ()
     status: 'read',
     verdict: 'approve',
     reviewedOid: headRefOid,
+    effectiveTier: 'auto',
   });
   const passedAt = (_pr: number, headRefOid: string): QaReportFact =>
     currentPassed(headRefOid);
@@ -3433,6 +3450,7 @@ const PASSING = {
     status: 'read',
     verdict: 'approve',
     reviewedOid: headRefOid,
+    effectiveTier: 'auto',
   }),
   qaReportFact: (_pr: number, headRefOid: string): QaReportFact =>
     currentPassed(headRefOid),
@@ -3892,5 +3910,174 @@ describe('qaReportFromView: a named commit, a main merge after it, and isOnMain 
       status: 'missing',
       reason: `it could not be checked whether \`${MAIN_SIDE.slice(0, 8)}\` is on \`main\``,
     });
+  });
+});
+
+// The code review's effective tier (issue #1601): the Review Tier record is
+// the tier of the diff, and the code review may tighten it (no spec source, a
+// tightening run fact). Auto-merge holds unless both are auto or agent.
+describe('the effective Review Tier rule', () => {
+  const APPROVED_ON_HEAD: AgentVerdictFact = {
+    status: 'read',
+    verdict: 'approve',
+    reviewedOid: HEAD,
+  };
+
+  test('an effective tier of human holds even when the record says agent', () => {
+    const holds = autoMergeHolds(
+      facts({
+        reviewTier: { status: 'read', tier: 'agent' },
+        agentVerdict: APPROVED_ON_HEAD,
+        effectiveTier: { status: 'read', tier: 'human' },
+      }),
+    );
+    assert.deepEqual(holds, [EFFECTIVE_TIER_HUMAN, NOT_READ.qaReport]);
+  });
+
+  for (const tier of ['auto', 'agent'] as const) {
+    test(`an effective tier of ${tier} adds no hold`, () => {
+      const holds = autoMergeHolds(
+        facts({
+          reviewTier: { status: 'read', tier: 'agent' },
+          agentVerdict: APPROVED_ON_HEAD,
+          effectiveTier: { status: 'read', tier },
+        }),
+      );
+      assert.deepEqual(holds, [NOT_READ.qaReport]);
+    });
+  }
+
+  test('an approving summary that names no tier holds, failing closed', () => {
+    assert.deepEqual(effectiveTierFrom(APPROVED_ON_HEAD, HEAD), {
+      status: 'missing',
+      reason: EFFECTIVE_TIER_UNNAMED,
+    });
+  });
+
+  test('no summary adds no effective-tier hold beside the Agent Verdict one', () => {
+    const holds = autoMergeHolds(
+      facts({
+        reviewTier: { status: 'read', tier: 'agent' },
+        agentVerdict: AGENT_VERDICT_UNREADABLE,
+        effectiveTier: effectiveTierFrom(AGENT_VERDICT_UNREADABLE, HEAD),
+      }),
+    );
+    assert.deepEqual(holds, [
+      'the Agent Verdict could not be read (no code-review summary comment)',
+      NOT_READ.qaReport,
+    ]);
+  });
+
+  // The effective tier counts only when its summary reviewed the head being
+  // merged (Maintainer Review on #1601); the Agent Verdict rule holds the rest.
+  const STALE_HUMAN: AgentVerdictFact = {
+    status: 'read',
+    verdict: 'approve',
+    reviewedOid: OLDER_HEAD,
+    effectiveTier: 'human',
+  };
+
+  test('a stale summary adds no effective-tier reason beside the Agent Verdict one', () => {
+    const holds = autoMergeHolds(
+      facts({
+        reviewTier: { status: 'read', tier: 'agent' },
+        agentVerdict: STALE_HUMAN,
+        effectiveTier: effectiveTierFrom(STALE_HUMAN, HEAD),
+      }),
+    );
+    assert.deepEqual(holds, [
+      `the Agent Verdict approved \`${OLDER_HEAD.slice(0, 8)}\`, not the head \`${HEAD.slice(0, 8)}\``,
+      NOT_READ.qaReport,
+    ]);
+  });
+
+  test("a stale summary's human tier does not hide a one-way Door mismatch", () => {
+    const decision = decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'agent' },
+        agentVerdict: STALE_HUMAN,
+        effectiveTier: effectiveTierFrom(STALE_HUMAN, HEAD),
+        door: { status: 'one-way' },
+      }),
+      'shadow',
+    );
+    assert.equal(
+      decision.mismatch,
+      'the Merge Danger Door is one-way but the Review Tier is agent',
+    );
+  });
+
+  test('a one-way Door is no mismatch when the effective tier is human', () => {
+    const decision = decideAutoMerge(
+      facts({
+        reviewTier: { status: 'read', tier: 'agent' },
+        agentVerdict: APPROVED_ON_HEAD,
+        effectiveTier: { status: 'read', tier: 'human' },
+        door: { status: 'one-way' },
+      }),
+      'shadow',
+    );
+    assert.equal(decision.mismatch, null);
+  });
+
+  // The summary as the publisher posts it, `- tier:` line and all.
+  const summaryWith = (tierLine: string | null) => ({
+    comments: [
+      {
+        body: summaryBody({
+          rendered: [
+            verdictHeading('approve'),
+            '',
+            '- range: `1ae74a3...97ef3d6`',
+            ...(tierLine === null ? [] : [tierLine]),
+            '- spec: none (tightened to review:human)',
+          ].join('\n'),
+          headSha: HEAD,
+          runUrl: 'https://example.invalid/run/9',
+        }),
+        author: { login: SUMMARY_AUTHOR_LOGIN },
+      },
+    ],
+  });
+
+  test('the reader carries the tier a no-spec summary was tightened to', () => {
+    const verdict = agentVerdictFromView(summaryWith('- tier: review:human'));
+    assert.deepEqual(verdict, {
+      status: 'read',
+      verdict: 'approve',
+      reviewedOid: HEAD,
+      effectiveTier: 'human',
+    });
+  });
+
+  test('an interactive or absent tier line reads as no tier', () => {
+    for (const line of ['- tier: interactive', null]) {
+      const verdict = agentVerdictFromView(summaryWith(line));
+      assert.equal(
+        verdict.status === 'read' ? verdict.effectiveTier : 'not read',
+        null,
+        String(line),
+      );
+    }
+  });
+
+  test('autoMergeFactsFor carries a tightened summary through to a hold', () => {
+    const decision = decideAutoMerge(
+      autoMergeFactsFor(
+        {
+          reviewTier: () => ({ status: 'read', tier: 'agent' }),
+          changedFiles: () => [],
+          qaReport: () => UNREAD_QA_REPORT,
+          agentVerdict: () =>
+            agentVerdictFromView(summaryWith('- tier: review:human')),
+        },
+        1,
+        snapshot({ number: 1 }),
+        { status: 'green' },
+        { mainCi: MAIN_GREEN, mainPathMap: null },
+      ),
+      'shadow',
+    );
+    assert.match(decision.reason, /effective Review Tier is human/);
   });
 });

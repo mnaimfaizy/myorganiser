@@ -6,6 +6,8 @@ accepted
 
 Amends [ADR 0144](0144-a-batch-of-pull-requests-merges-through-the-merge-train-not-the-admin-bypass.md) with a mode in which the Merge Train starts itself, and [ADR 0048](0048-a-qa-plan-carries-only-what-automation-does-not-prove.md) on what an item left for a person means when nobody is merging. Puts into effect the merge rules [ADR 0070](0070-a-review-tier-is-a-fact-about-the-diff-and-a-gate-tier-is-a-decision-about-the-work.md) item 1 wrote for `review:auto` and `review:agent`, which no merge has applied until now: the Maintainer started every one.
 
+Amended by [#1601](https://github.com/mnaimfaizy/myorganiser/issues/1601): decision 3 used to read only the Review Tier job output, which is computed from the diff alone. It now also reads the code review's effective tier, which [ADR 0123](0123-a-review-reports-facts-about-its-own-run-are-read-from-the-transcript.md) item 5 can tighten toward `human`.
+
 ## Context
 
 `finish-standalone-runs` and `orchestrate` end by handing the Maintainer a `yarn merge:train <pr>…` command. Of the last 100 merged Pull Requests, 31 were `review:agent` and 1 was `review:auto`. So about a third of merges wait on a person whose review ADR 0070 already said they do not need.
@@ -17,7 +19,7 @@ PrAuthor now writes a Merge Danger section in every Pull Request description. It
 1. **Auto-merge runs in the Merge Train, as `yarn merge:train --auto <pr>…`.** The rules below are pure in `tools/scripts/lib/merge-train.ts`. The session that builds the merge order passes the candidates in that order and applies no rule itself. A candidate that fails a rule is skipped with its reason, and the train moves on. The stop-at-first-red behaviour of ADR 0144 still applies to a train the Maintainer starts.
 2. **It runs from the agent session, on the Maintainer's `gh` login.** No GitHub Actions workflow and no new credential. A merge made with a workflow's `GITHUB_TOKEN` does not start the `push` workflows on `main`.
 3. **A Pull Request may auto-merge only when every fact below holds for the head being merged:**
-   - Its Review Tier job output is `auto` or `agent`. The label is not read.
+   - Its Review Tier job output is `auto` or `agent`, and so is the code review's effective tier, read from the `- tier:` line of the same trusted summary the Agent Verdict is read from (ADR 0123 item 5 tightens it for a missing spec source or a run fact). A summary for this head that names no tier holds; a one-way Door mismatch uses the stricter of the two. The label is not read.
    - Its Agent Verdict is `approve`. For `review:auto` this is ADR 0070's rule. For `review:agent` it is stricter than ADR 0070's rule (no Blocking finding), until decision 6 relaxes it.
    - Its QA Report says QA passed with no item left for a person, or it records that no manual QA was needed. Only a commit written on the branch makes the report stale. The train's own merge of `main` into the branch does not, because the required checks on the updated head cover that merge.
    - Its Merge Danger Door does not say `one-way`. Only that line is read. A missing section, a missing line, or `two-way` changes nothing, so Merge Danger can hold a merge back but never allow one. A `one-way` Door on an `auto` or `agent` Pull Request is reported as a mismatch, for the Maintainer to correct either PrAuthor or `tools/config/review-tier-paths.json`.

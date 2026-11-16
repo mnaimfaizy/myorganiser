@@ -976,6 +976,13 @@ export const computeVerdict = (
 };
 
 /**
+ * The summary line that states the effective tier, `- tier: review:<tier>`
+ * (or `interactive`). The renderer writes it and the Merge Train reads it
+ * (issue #1601), so the two share this one lead.
+ */
+export const REPORT_TIER_LEAD = '- tier: ';
+
+/**
  * The effective tier is the pinned tier moved toward a human by up to two
  * steps: one when the report has no spec source, and one when any tightening
  * fact holds about the run (ADR 0123 item 5). However many tightening facts

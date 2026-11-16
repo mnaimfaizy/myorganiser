@@ -186,11 +186,16 @@ export interface ReviewRead {
   reviewedOid: string | null;
 }
 
-/** What the last of `summaries` says; the shape both readers share. */
-const readSummary = (summaries: ReviewComment[]): ReviewRead => {
-  if (summaries.length === 0)
+/** The body of the last of `summaries`, the current review; null when none. */
+const latestBody = (summaries: ReviewComment[]): string | null => {
+  const latest = summaries.at(-1);
+  return latest ? String(latest.body ?? '') : null;
+};
+
+/** What one summary body says; the shape both readers share. */
+const readSummary = (body: string | null): ReviewRead => {
+  if (body === null)
     return { outcome: 'unreviewed', verdict: null, reviewedOid: null };
-  const body = String(summaries.at(-1)!.body ?? '');
   const reviewedOid = reviewedOidOf(body);
   for (const [heading, verdict] of HEADING_TO_VERDICT) {
     if (body.includes(heading))
@@ -227,7 +232,7 @@ const summariesOf = (comments: ReviewComment[] = []): ReviewComment[] =>
  */
 export const parseReviewOutcome = (
   comments: ReviewComment[] = [],
-): ReviewRead => readSummary(summariesOf(comments));
+): ReviewRead => readSummary(latestBody(summariesOf(comments)));
 
 /**
  * The same read, for a decision (Auto-merge, ADR 0148): only a comment the
@@ -235,11 +240,18 @@ export const parseReviewOutcome = (
  * marker, a heading and a SHA, so text alone is not a fact.
  */
 export const readTrustedReview = (comments: ReviewComment[] = []): ReviewRead =>
-  readSummary(
-    summariesOf(comments).filter(
-      (c) => c.author?.login === SUMMARY_AUTHOR_LOGIN,
-    ),
-  );
+  readSummary(trustedSummaryBody(comments));
+
+const trustedSummariesOf = (comments: ReviewComment[]): ReviewComment[] =>
+  summariesOf(comments).filter((c) => c.author?.login === SUMMARY_AUTHOR_LOGIN);
+
+/**
+ * The body of the summary `readTrustedReview` reads, or null when there is
+ * none: the one comment a decision may read further facts from (issue #1601).
+ */
+export const trustedSummaryBody = (
+  comments: ReviewComment[] = [],
+): string | null => latestBody(trustedSummariesOf(comments));
 
 /**
  * A reference a fix names as the origin of the defect: a Pull Request, or a
