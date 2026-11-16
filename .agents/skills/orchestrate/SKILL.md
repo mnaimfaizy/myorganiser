@@ -117,6 +117,8 @@ When a Delegation stops, read its report and log, then check them against its br
 
 **Writes as the human.** The Chief of Staff makes them, never a Delegation. The one exception is a `dispatch-agents` run's own status labels and completion comment, which that tool writes by design ([ADR 0010](../../../docs/adr/0010-sandcastle-local-only-integration.md)). That covers issue comments, `## Maintainer Review` notes, new issues, label changes and closing issues. Show each `## Maintainer Review` and post it only after the human approves its exact text. Make routine writes under the kinds the plan approved, and list each one in the next report. Post a Delegation's draft word for word, then tell the Delegation it is done. A decision recorded only in a Pull Request is invisible to the spec reviewer and to `dispatch-agents`, which read only the issue body, the brief and `## Maintainer Review` ([ADR 0137](../../../docs/adr/0137-an-issue-is-specified-by-its-body-and-its-trusted-triage-brief.md)). Record each answer there.
 
+**Label moves.** When a Delegation's Pull Request opens, its issue drops `status:in-progress` and `ready-for-agent` and gains `ready-for-human`, never `status:done`. When the Pull Request merges, search open issues for a `Blocked by` or `Blocks` edge naming it; each such issue drops `status:blocked` and gets a comment saying it was unblocked. Both are routine writes for the Dispatch Plan.
+
 **Relaying a Decision Request.** Restate it so it stands alone: name the issue and what was found, give the options with their costs, and put the recommendation first. Relay the answer to the Delegation along with what it means for its next step.
 
 ### When a Delegation stalls or fails
