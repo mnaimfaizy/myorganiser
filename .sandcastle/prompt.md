@@ -18,6 +18,7 @@ You are implementing a vertical slice for MyOrganiser.
 - Never run `git worktree prune`. Every worktree's admin entry names a host path this sandbox cannot see, so prune deletes your own worktree's registration while leaving the files. Remove a worktree you added yourself with `git worktree remove <path>`.
 - **Required:** once deterministic checks (jest/tsc/eslint) are green and **before** the final commit, invoke the `/code-review` Skill exactly once for the Slice, act on its findings, then re-run the focused checks. Once per Slice — not after every specialist hop.
 - Commit via the `commit-change-workflow` Skill: stage the intended paths, have the `Commit` sub-agent draft the message from the **staged** diff, then run `corepack yarn ai:commit --message-file <path>`. Do not hand-write the message and do not run `git commit` directly.
+- Git hooks do not run in this sandbox (`.git/config` is read-only, so Husky cannot install them), so the pre-commit format and lint step does not happen for you. Before staging, run `corepack yarn format:write --uncommitted` and the focused `corepack yarn nx lint <project>` for each project you changed, and fix what they report.
 - Do NOT push and do NOT open a PR — the sandbox has no credentials. Just commit locally; the orchestrator integrates your branch into the feature branch on the host.
 
 # Task

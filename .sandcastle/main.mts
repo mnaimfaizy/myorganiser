@@ -56,6 +56,10 @@ import {
   unfinishedDependencies,
 } from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 import {
+  describeContextWindow,
+  summariseContextWindow,
+} from '../tools/scripts/lib/sandcastle-context-window.ts';
+import {
   parseSubagentTranscript,
   formatSubagentIndex,
   formatTokens,
@@ -623,7 +627,7 @@ const waitForQuota = process.argv.includes('--wait-for-quota');
 let quotaWaitsTaken = 0;
 
 // Opt-in, per ADR 0036: without it, output stays byte-for-byte what it is today — one
-// flat log per slice. Sandcastle 0.12.0 already captures every sub-agent transcript to
+// flat log per slice. Sandcastle 0.14.0 already captures every sub-agent transcript to
 // the host unconditionally (see captureSubagentTraces below); this flag only decides
 // whether main.mts relocates and summarizes what was already captured.
 const traceSubagents = process.argv.includes('--trace-subagents');
@@ -2810,6 +2814,17 @@ function logRunUsage(
     }
   };
 
+  const contextWindow = summariseContextWindow(result.iterations);
+  const contextNote = contextWindow
+    ? ` ${describeContextWindow(contextWindow, formatTokens)}.`
+    : '';
+  const contextRecord = contextWindow
+    ? {
+        peakContextTokens: contextWindow.peakTokens,
+        contextWindowLimit: contextWindow.limit,
+      }
+    : {};
+
   const usage = result.iterations.flatMap((iteration, index) =>
     iteration.usage ? [{ index, ...iteration.usage }] : [],
   );
@@ -2819,9 +2834,10 @@ function logRunUsage(
       available: false,
       iterations: result.iterations.length,
       telemetryIterations: 0,
+      ...contextRecord,
     });
     writeLog(
-      `  [#${issueNumber}] ${agentKind}:${model} usage unavailable (the provider did not return token telemetry).`,
+      `  [#${issueNumber}] ${agentKind}:${model} usage unavailable (the provider did not return token telemetry).${contextNote}`,
     );
     return;
   }
@@ -2850,6 +2866,7 @@ function logRunUsage(
     telemetryIterations: usage.length,
     iterationUsage: usage,
     ...totals,
+    ...contextRecord,
   });
   writeLog(
     `  [#${issueNumber}] ${agentKind}:${model} tokens (sum of each iteration's ` +
@@ -2857,12 +2874,12 @@ function logRunUsage(
       `input ${formatTokens(totals.inputTokens)}, ` +
       `cache-write ${formatTokens(totals.cacheCreationInputTokens)}, ` +
       `cache-read ${formatTokens(totals.cacheReadInputTokens)}, ` +
-      `output ${formatTokens(totals.outputTokens)}.`,
+      `output ${formatTokens(totals.outputTokens)}.${contextNote}`,
   );
 }
 
 // ─── Sub-agent traces (--trace-subagents) ──────────────────────────────────────
-// Sandcastle 0.12.0's Claude Code provider captures every sub-agent transcript to the
+// Sandcastle 0.14.0's Claude Code provider captures every sub-agent transcript to the
 // host automatically and unconditionally — RunResult.iterations[].sessionFilePath
 // already points at the captured main session, and its sibling
 // <sessionId>/subagents/agent-*.jsonl files are captured the same way, with no flag
@@ -3308,6 +3325,12 @@ while (pendingSlices.length > 0) {
           // derives "sandcastle:<folder name>", which only matches from a
           // folder called "myorganiser".
           imageName: SANDBOX_IMAGE,
+          // Drop every Linux capability: the agent installs, builds and commits
+          // as a plain user and needs none (ADR 0152 keeps credentials out of
+          // the container; this narrows what a compromised process can do in it).
+          capDrop: ['ALL'],
+          // Cap a runaway build at 8 CPUs, leaving the host headroom.
+          cpus: 8,
           env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the
           // in-container install (below) is incremental and never re-downloads
