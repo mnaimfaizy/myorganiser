@@ -3308,6 +3308,10 @@ while (pendingSlices.length > 0) {
           // derives "sandcastle:<folder name>", which only matches from a
           // folder called "myorganiser".
           imageName: SANDBOX_IMAGE,
+          // Drop every Linux capability: the agent installs, builds and commits
+          // as a plain user and needs none (ADR 0152 keeps credentials out of
+          // the container; this narrows what a compromised process can do in it).
+          capDrop: ['ALL'],
           env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the
           // in-container install (below) is incremental and never re-downloads

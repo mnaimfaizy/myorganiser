@@ -674,6 +674,11 @@ still blocked. The container's filesystem is disposable, but the transcript is n
 written to `.sandcastle/logs/` on the host and fed back into model context, so that is where a
 leaked credential would end up.
 
+**Capabilities are dropped.** `docker()` in `.sandcastle/main.mts` passes `capDrop: ['ALL']`
+(Sandcastle 0.14), so the container runs with no Linux capabilities. If a future image step needs
+one (yarn, nx, prisma or git failing with a permission error), fall back to
+`capDrop: ['NET_RAW', 'MKNOD']` and record why here.
+
 Because the marker is read by the shared hook script rather than by harness config, all three
 harnesses (Claude, Cursor, Copilot) inherit this without separate wiring. Behavior in both modes
 is pinned by `tools/scripts/copilot-hooks/pre-tool-use.test.ts`.
