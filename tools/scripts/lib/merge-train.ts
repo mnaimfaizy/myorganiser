@@ -24,16 +24,19 @@
 
 import {
   readTrustedReview,
+  trustedSummaryBody,
   type ReviewComment,
   type ReviewOutcome,
   type ReviewRead,
 } from '../review/escaped-defects.ts';
-import type { Verdict } from '../review/schema.ts';
+import { REPORT_TIER_LEAD, type Verdict } from '../review/schema.ts';
 import { sep } from 'node:path';
 
 import {
   assertPathMap,
   humanRuleFor,
+  isReviewTier,
+  maxTier,
   REVIEW_TIER_PATHS_CONFIG,
   type ReviewTier,
   type ReviewTierPathMap,
@@ -42,6 +45,7 @@ import {
   parseReviewTierRecord,
   isReviewTierRecordBody,
 } from './review-tier-record.ts';
+import { escapeRegExp } from './workflow-yaml.ts';
 import { SUMMARY_AUTHOR_LOGIN } from '../review/publish.ts';
 import {
   parseQaReport,
@@ -647,6 +651,18 @@ export type { ReviewTier };
 export type ReviewTierFact = MissingFact | { status: 'read'; tier: ReviewTier };
 
 /**
+ * The code review's effective tier, from the summary the Agent Verdict is read
+ * from (issue #1601): the record's tier moved toward a human when the review
+ * had no spec source or a tightening run fact held (ADR 0123 item 5). `none`
+ * is no readable summary at all, which the Agent Verdict rule already holds
+ * for. The summary's head is checked there too, so a stale tier never counts.
+ */
+export type EffectiveTierFact =
+  | MissingFact
+  | { status: 'none' }
+  | { status: 'read'; tier: ReviewTier };
+
+/**
  * The fact for `gh pr view --json comments` output: the record the Review
  * Tier workflow posted for `head` (#1526). Only a comment its own login wrote
  * counts, an outdated (minimised) one does not, and the latest wins. No
@@ -867,7 +883,40 @@ export function pathGuardFrom(
  */
 export type AgentVerdictFact =
   | MissingFact
-  | { status: 'read'; verdict: Verdict; reviewedOid: string | null };
+  | {
+      status: 'read';
+      verdict: Verdict;
+      reviewedOid: string | null;
+      /**
+       * The summary's `- tier:` line (issue #1601); null when it names none.
+       * `runs:ready` reads the same fact and ignores this field.
+       */
+      effectiveTier?: ReviewTier | null;
+    };
+
+/** The held reason for a summary that names no effective tier. */
+export const EFFECTIVE_TIER_UNNAMED =
+  'the code-review summary names no effective Review Tier';
+
+/** The held reason for a code review whose effective tier is human. */
+export const EFFECTIVE_TIER_HUMAN =
+  "the code review's effective Review Tier is human";
+
+/**
+ * The effective tier the Agent Verdict's summary carries for `head` (issue
+ * #1601). A summary for another head names no fact here: its staleness is the
+ * Agent Verdict rule's to hold on.
+ */
+export function effectiveTierFrom(
+  verdict: AgentVerdictFact,
+  head: string,
+): EffectiveTierFact {
+  if (verdict.status === 'missing' || verdict.reviewedOid !== head)
+    return { status: 'none' };
+  return verdict.effectiveTier
+    ? { status: 'read', tier: verdict.effectiveTier }
+    : { status: 'missing', reason: EFFECTIVE_TIER_UNNAMED };
+}
 
 /**
  * Why each verdict that is not `approve` holds (ADR 0148 decision 3; ADR
@@ -917,7 +966,27 @@ export function agentVerdictFromView(
   view: { comments?: ReviewComment[] } | null,
 ): AgentVerdictFact {
   if (!view) return AGENT_VERDICT_UNREADABLE;
-  return agentVerdictFrom(readTrustedReview(view.comments ?? []));
+  const comments = view.comments ?? [];
+  const fact = agentVerdictFrom(readTrustedReview(comments));
+  if (fact.status !== 'read') return fact;
+  return {
+    ...fact,
+    effectiveTier: effectiveTierOfSummary(trustedSummaryBody(comments)),
+  };
+}
+
+const SUMMARY_TIER_RE = new RegExp(
+  '^' + escapeRegExp(REPORT_TIER_LEAD) + String.raw`review:([a-z]+)\s*$`,
+  'm',
+);
+
+/**
+ * The tier a summary's `- tier: review:<tier>` line names (issue #1601); null
+ * for `interactive`, no line, or a tier the train does not know.
+ */
+function effectiveTierOfSummary(body: string | null): ReviewTier | null {
+  const tier = body === null ? undefined : SUMMARY_TIER_RE.exec(body)?.[1];
+  return isReviewTier(tier) ? tier : null;
 }
 
 const agentVerdictHold = (
@@ -1030,6 +1099,7 @@ export interface AutoMergeFacts {
   reviewTier: ReviewTierFact;
   pathGuard: PathGuardFact;
   agentVerdict: AgentVerdictFact;
+  effectiveTier: EffectiveTierFact;
   qaReport: QaReportFact;
   door: DoorFact;
 }
@@ -1116,6 +1186,12 @@ export const AUTO_MERGE_RULES = {
         : null,
   agentVerdict: (fact: AgentVerdictFact, head: string): string | null =>
     agentVerdictHold(fact, head),
+  effectiveTier: (fact: EffectiveTierFact): string | null =>
+    fact.status === 'missing'
+      ? fact.reason
+      : fact.status === 'read' && fact.tier === 'human'
+        ? EFFECTIVE_TIER_HUMAN
+        : null,
   qaReport: (fact: QaReportFact): string | null => qaReportHold(fact),
   door: (fact: DoorFact): string | null =>
     fact.status === 'one-way'
@@ -1201,6 +1277,21 @@ export function autoMergeHolds(facts: AutoMergeFacts): string[] {
 }
 
 /**
+ * The stricter of the record's tier and the code review's effective tier
+ * (issue #1601); null when the record is not read.
+ * An effective tier that is not read leaves the record's tier standing: its
+ * own rule already holds the merge.
+ */
+function stricterTier(
+  record: ReviewTierFact,
+  effective: EffectiveTierFact,
+): ReviewTier | null {
+  if (record.status !== 'read') return null;
+  if (effective.status !== 'read') return record.tier;
+  return maxTier(record.tier, effective.tier);
+}
+
+/**
  * The Auto-merge decision for one candidate (ADR 0148 decision 3). Every
  * fact can hold a merge back and none can allow one alone: it merges only
  * when no rule holds.
@@ -1209,12 +1300,10 @@ export function decideAutoMerge(
   facts: AutoMergeFacts,
   mode: AutoMergeMode,
 ): AutoMergeDecision {
-  const tier = facts.reviewTier;
+  const tier = stricterTier(facts.reviewTier, facts.effectiveTier);
   const mismatch =
-    facts.door.status === 'one-way' &&
-    tier.status === 'read' &&
-    tier.tier !== 'human'
-      ? `the Merge Danger Door is one-way but the Review Tier is ${tier.tier}`
+    facts.door.status === 'one-way' && tier !== null && tier !== 'human'
+      ? `the Merge Danger Door is one-way but the Review Tier is ${tier}`
       : null;
   const pass = AUTO_MERGE_MODE_PASS[mode];
   if (!pass.decides) {
@@ -1370,13 +1459,15 @@ export function autoMergeFactsFor(
   requiredChecks: RequiredChecksFact,
   { mainCi, mainPathMap }: AutoMergePassFacts,
 ): AutoMergeFacts {
+  const agentVerdict = io.agentVerdict(pr, snapshot.headRefOid);
   return {
     headRefOid: snapshot.headRefOid,
     mainCi,
     requiredChecks,
     reviewTier: io.reviewTier(pr, snapshot.headRefOid),
     pathGuard: pathGuardFrom(io.changedFiles(pr), mainPathMap),
-    agentVerdict: io.agentVerdict(pr, snapshot.headRefOid),
+    agentVerdict,
+    effectiveTier: effectiveTierFrom(agentVerdict, snapshot.headRefOid),
     qaReport: io.qaReport(pr, snapshot.headRefOid),
     door: readDoor(snapshot.body),
   };
