@@ -28,9 +28,15 @@ export type {
 } from './lib/vault/vaultHandle';
 export * from './lib/vault/localVaultRevision';
 export * from './lib/vault/passphrasePolicy';
-// The Passkey Unlock policy and its browser Platform Adapter. The wrapping
-// record's storage stays internal: every function here names an owner first,
-// for the same reason the Vault Handle does (ADR 0047, ADR 0136).
+// The Passkey Unlock policy and its browser Platform Adapter. Read and write
+// stay behind owner-first functions (ADR 0047, ADR 0136); tests seed records
+// through the key helper and the record fixture, which writes nothing.
+export {
+  PASSKEY_UNLOCK_RECORD_VERSION,
+  passkeyUnlockStorageKey,
+} from './lib/vault/passkeyUnlockStorage';
+export type { PasskeyUnlockRecord } from './lib/vault/passkeyUnlockStorage';
+export { passkeyUnlockRecordFixture } from './lib/vault/passkeyUnlockRecordFixture';
 export {
   PASSKEY_PRF_OUTPUT_LENGTH,
   PASSKEY_USER_VERIFICATION,

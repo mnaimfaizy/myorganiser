@@ -7,7 +7,11 @@ import {
   type AuthUser,
   type RestoreSessionOutcome,
 } from '@myorganiser/auth';
-import { isPasskeyUnlockEnrolled } from '@myorganiser/web-vault';
+import {
+  isPasskeyUnlockEnrolled,
+  passkeyUnlockRecordFixture,
+  passkeyUnlockStorageKey,
+} from '@myorganiser/web-vault';
 import { useEffect } from 'react';
 
 import RootLayout from '../src/app/layout';
@@ -19,20 +23,10 @@ const OWNER_B = 'user-b';
 // auth-session-storage-adapter.ts). Not exported, so it is named here.
 const CURRENT_USER_KEY = 'myorganiser_user';
 
-function recordKey(owner: string): string {
-  return `myorganiser_passkey_unlock_v1:${owner}`;
-}
-
 function seedRecord(owner: string): void {
   localStorage.setItem(
-    recordKey(owner),
-    JSON.stringify({
-      version: 1,
-      owner,
-      credentialId: 'Y3JlZC1pZA==',
-      prfSalt: 'c2FsdC1ieXRlcw==',
-      wrappedMasterKey: { iv: 'aXYtYnl0ZXM=', ciphertext: 'Y2lwaGVy' },
-    }),
+    passkeyUnlockStorageKey(owner),
+    JSON.stringify(passkeyUnlockRecordFixture(owner)),
   );
 }
 
@@ -131,7 +125,7 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
       expect(await restore).toEqual({ kind: 'session_cleared' });
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
   });
 
   it('removes only the refused owner record and keeps another User on the device', async () => {
@@ -149,7 +143,7 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
       await restore;
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
     expect(isPasskeyUnlockEnrolled(OWNER_B)).toBe(true);
   });
 
@@ -167,7 +161,9 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
       expect(await restore).toEqual({ kind: 'not_restored' });
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
+    expect(
+      localStorage.getItem(passkeyUnlockStorageKey(OWNER_A)),
+    ).not.toBeNull();
     expect(authSession.getCurrentUser()?.id).toBe(OWNER_A);
   });
 
@@ -192,7 +188,9 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
     // no owner, not because of the reason guard; the guard is covered by the
     // refresh_rejected tests above.
     expect(authSession.getAccessToken()).toBeUndefined();
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
+    expect(
+      localStorage.getItem(passkeyUnlockStorageKey(OWNER_A)),
+    ).not.toBeNull();
   });
 
   it('keeps the record when the refused restore has no owner to remove', async () => {
@@ -209,7 +207,9 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
       expect(await restore).toEqual({ kind: 'session_cleared' });
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
+    expect(
+      localStorage.getItem(passkeyUnlockStorageKey(OWNER_A)),
+    ).not.toBeNull();
   });
 
   it('registers the other-window sign-out listener before the child effect starts the restore', async () => {
@@ -235,6 +235,6 @@ describe('root layout ended-session passkey cleanup on a cold-load restore', () 
     });
 
     expect(storageListenerAtRestoreStart).toBe(true);
-    expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
   });
 });
