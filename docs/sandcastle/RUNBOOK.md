@@ -255,6 +255,10 @@ corepack yarn agents:usage:report
 corepack yarn agents:usage:report -- --prd <issue-number>
 ```
 
+Each run's log line and the report's "Peak context" column show the largest context window an
+iteration reached (Sandcastle 0.14 `IterationResult.contextWindow`), with the model's limit when
+the agent reports one; `n/a` when it reports none.
+
 Model defaults are governed by `tools/config/agent-model-policy.json`; check current provider
 catalogs with `corepack yarn agents:models:audit`.
 

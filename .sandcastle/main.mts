@@ -56,6 +56,10 @@ import {
   unfinishedDependencies,
 } from '../tools/scripts/lib/sandcastle-slice-selection.ts';
 import {
+  describeContextWindow,
+  summariseContextWindow,
+} from '../tools/scripts/lib/sandcastle-context-window.ts';
+import {
   parseSubagentTranscript,
   formatSubagentIndex,
   formatTokens,
@@ -2810,6 +2814,17 @@ function logRunUsage(
     }
   };
 
+  const contextWindow = summariseContextWindow(result.iterations);
+  const contextNote = contextWindow
+    ? ` ${describeContextWindow(contextWindow, formatTokens)}.`
+    : '';
+  const contextRecord = contextWindow
+    ? {
+        peakContextTokens: contextWindow.peakTokens,
+        contextWindowLimit: contextWindow.limit,
+      }
+    : {};
+
   const usage = result.iterations.flatMap((iteration, index) =>
     iteration.usage ? [{ index, ...iteration.usage }] : [],
   );
@@ -2819,9 +2834,10 @@ function logRunUsage(
       available: false,
       iterations: result.iterations.length,
       telemetryIterations: 0,
+      ...contextRecord,
     });
     writeLog(
-      `  [#${issueNumber}] ${agentKind}:${model} usage unavailable (the provider did not return token telemetry).`,
+      `  [#${issueNumber}] ${agentKind}:${model} usage unavailable (the provider did not return token telemetry).${contextNote}`,
     );
     return;
   }
@@ -2850,6 +2866,7 @@ function logRunUsage(
     telemetryIterations: usage.length,
     iterationUsage: usage,
     ...totals,
+    ...contextRecord,
   });
   writeLog(
     `  [#${issueNumber}] ${agentKind}:${model} tokens (sum of each iteration's ` +
@@ -2857,7 +2874,7 @@ function logRunUsage(
       `input ${formatTokens(totals.inputTokens)}, ` +
       `cache-write ${formatTokens(totals.cacheCreationInputTokens)}, ` +
       `cache-read ${formatTokens(totals.cacheReadInputTokens)}, ` +
-      `output ${formatTokens(totals.outputTokens)}.`,
+      `output ${formatTokens(totals.outputTokens)}.${contextNote}`,
   );
 }
 
