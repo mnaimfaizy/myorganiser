@@ -683,15 +683,11 @@ leaked credential would end up.
 one (yarn, nx, prisma or git failing with a permission error), fall back to
 `capDrop: ['NET_RAW', 'MKNOD']` and record why here.
 
-**Git hooks do not run in the sandbox (Husky, checked in the #1584 and #1607 runs).** With 0.14 the
-host `.git/config` is read-only inside the container, so `postinstall: husky` cannot run
-`git config core.hooksPath` and creates no `.husky/_`. The shared config still carries
-`core.hooksPath` pointing at the host path (`/Volumes/.../.husky/_`), which does not exist in the
-container, so git finds no hooks and the pre-commit step (format, markdown/docs checks, lint,
-`gates:run`) does not run for an agent's commit. Three things back this up: the prompt tells the
-agent to run `format:write --uncommitted` and the focused lint before `ai:commit`, the host gate
-runs lint, test and build before a slice is accepted, and CI runs `format:check --all`. Do not
-try to force hooks on in the sandbox; that undoes the read-only mount 0.14 added.
+**Git hooks do not run in the sandbox (seen in the #1584 and #1607 runs).** The read-only
+`.git/config` stops `postinstall: husky` from setting `core.hooksPath`, `.husky/_` is never created,
+and the shared config still points at a host path the container lacks, so an agent's commit skips
+pre-commit. The prompt asks the agent to format and lint first; the host gate and CI
+`format:check --all` back it up. Do not force hooks on: that undoes 0.14's read-only mount.
 
 **CPUs are capped.** The same call passes `cpus: 8`, so a runaway build cannot take every core of
 the Docker VM (12 on the Maintainer's host). Raise it if the test slice gets slower.
