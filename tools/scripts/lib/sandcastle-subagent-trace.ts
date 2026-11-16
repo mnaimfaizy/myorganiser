@@ -1,7 +1,7 @@
 /**
  * Pure parsing/formatting for `--trace-subagents`.
  *
- * Sandcastle 0.12.0's Claude Code provider captures every sub-agent transcript to the
+ * Sandcastle 0.14.0's Claude Code provider captures every sub-agent transcript to the
  * host automatically, unconditionally, as part of ordinary session capture — see
  * `captureToHost` in `@ai-hero/sandcastle`, which enumerates
  * `<sessionId>/subagents/agent-*.jsonl` inside the sandbox and copies each file to
