@@ -11,7 +11,12 @@ import {
   onSessionEnded,
   type AuthUser,
 } from '@myorganiser/auth';
-import { isPasskeyUnlockEnrolled } from '@myorganiser/web-vault';
+import {
+  isPasskeyUnlockEnrolled,
+  PASSKEY_UNLOCK_RECORD_VERSION,
+  passkeyUnlockStorageKey,
+  type PasskeyUnlockRecord,
+} from '@myorganiser/web-vault';
 
 import {
   EndedSessionPasskeyCleanup,
@@ -25,21 +30,15 @@ const mockOnSessionEnded = onSessionEnded as jest.MockedFunction<
 const OWNER_A = 'user-a';
 const OWNER_B = 'user-b';
 
-function recordKey(owner: string): string {
-  return `myorganiser_passkey_unlock_v1:${owner}`;
-}
-
 function seedRecord(owner: string): void {
-  localStorage.setItem(
-    recordKey(owner),
-    JSON.stringify({
-      version: 1,
-      owner,
-      credentialId: 'Y3JlZC1pZA==',
-      prfSalt: 'c2FsdC1ieXRlcw==',
-      wrappedMasterKey: { iv: 'aXYtYnl0ZXM=', ciphertext: 'Y2lwaGVy' },
-    }),
-  );
+  const record = {
+    version: PASSKEY_UNLOCK_RECORD_VERSION,
+    owner,
+    credentialId: 'Y3JlZC1pZA==',
+    prfSalt: 'c2FsdC1ieXRlcw==',
+    wrappedMasterKey: { iv: 'aXYtYnl0ZXM=', ciphertext: 'Y2lwaGVy' },
+  } satisfies PasskeyUnlockRecord;
+  localStorage.setItem(passkeyUnlockStorageKey(owner), JSON.stringify(record));
 }
 
 function userFor(id: string): AuthUser {
@@ -67,8 +66,8 @@ describe('removePasskeyUnlockForEndedSession', () => {
       owner: OWNER_A,
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
-    expect(localStorage.getItem(recordKey(OWNER_B))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_B))).not.toBeNull();
     expect(isPasskeyUnlockEnrolled(OWNER_B)).toBe(true);
   });
 
@@ -77,8 +76,8 @@ describe('removePasskeyUnlockForEndedSession', () => {
       removePasskeyUnlockForEndedSession({ reason: 'refresh_rejected' }),
     ).not.toThrow();
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
-    expect(localStorage.getItem(recordKey(OWNER_B))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_B))).not.toBeNull();
   });
 
   it('removes nothing when the session ended because another window signed out', () => {
@@ -87,8 +86,8 @@ describe('removePasskeyUnlockForEndedSession', () => {
       owner: OWNER_A,
     });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
-    expect(localStorage.getItem(recordKey(OWNER_B))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_B))).not.toBeNull();
   });
 
   it('does not throw when the browser refuses the removal', () => {
@@ -110,7 +109,7 @@ describe('removePasskeyUnlockForEndedSession', () => {
       removeItem.mockRestore();
     }
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).not.toBeNull();
   });
 });
 
@@ -144,8 +143,8 @@ describe('EndedSessionPasskeyCleanup', () => {
 
     listener({ reason: 'refresh_rejected', owner: OWNER_A });
 
-    expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
-    expect(localStorage.getItem(recordKey(OWNER_B))).not.toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
+    expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_B))).not.toBeNull();
   });
 
   describe.each([401, 403])(
@@ -179,8 +178,8 @@ describe('EndedSessionPasskeyCleanup', () => {
 
         expect(result).toEqual({ kind: 'session_cleared' });
         expect(refreshToken).toHaveBeenCalledTimes(1);
-        expect(localStorage.getItem(recordKey(OWNER_A))).toBeNull();
-        expect(localStorage.getItem(recordKey(OWNER_B))).not.toBeNull();
+        expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_A))).toBeNull();
+        expect(localStorage.getItem(passkeyUnlockStorageKey(OWNER_B))).not.toBeNull();
       });
     },
   );
