@@ -12,6 +12,7 @@ import {
   SHELL_TOOL_NAMES,
   stripHeredocBodies,
 } from './lib.ts';
+import { getSignoffWriteReason } from './signoff-guard.ts';
 
 /** Read-only tools across harnesses. Not mutating, but they can exfiltrate. */
 const READ_TOOL_NAMES = new Set<string>([
@@ -431,6 +432,13 @@ async function main() {
   }
 
   if (SHELL_TOOL_NAMES.has(toolName)) {
+    // Heredoc bodies are kept: a Sign-off body or a waiver piped into `gh`
+    // through one is exactly what this guard must see.
+    const signoffReason = getSignoffWriteReason(extractCommand(toolInput));
+    if (signoffReason) {
+      denyTool(signoffReason);
+    }
+
     // Same reasoning as the write guard: a heredoc body that *names* an env
     // file is prose, not a read of it. Actual secret values in that body are
     // still caught by secret-scan.ts, which scans content on purpose.

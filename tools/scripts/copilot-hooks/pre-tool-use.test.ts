@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   PRE_TOOL_USE_HOOK,
@@ -467,5 +470,154 @@ describe('pre-tool-use hook', () => {
         /generated api client/i,
       );
     });
+  });
+
+  describe('Sign-off Issue guard (ADR 0151)', () => {
+    // A Sign-off Issue's body starts with this marker (signoff-issue.ts); a
+    // check id is `<pr>:<12 hex>` (signoff-gate.ts).
+    const SIGNED_OFF_BODY =
+      '<!-- signoff-issue -->\\n- [x] sign in on staging `1590:3f9a0c1d2e4b`';
+    const WAIVER = 'waive: 1590:3f9a0c1d2e4b — checked by hand';
+
+    /** Runs `check` with a temporary body file holding `content`. */
+    function withBodyFile(content: string, check: (path: string) => void) {
+      const dir = mkdtempSync(join(tmpdir(), 'signoff-guard-'));
+      const bodyFile = join(dir, 'body.md');
+      writeFileSync(bodyFile, content);
+      try {
+        check(bodyFile);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    it('should deny an agent editing a Sign-off Issue body to tick a check', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `gh issue edit 1600 --body "${SIGNED_OFF_BODY}"`),
+        /sign-off issue/i,
+      );
+    });
+
+    it('should deny an agent posting a waiver comment', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `gh issue comment 1600 --body "${WAIVER}"`),
+        /waive/i,
+      );
+    });
+
+    for (const command of [
+      `gh -R o/r issue comment 1600 --body "${WAIVER}"`,
+      `gh --repo=o/r issue comment 1600 --body "${WAIVER}"`,
+      `GH_REPO=o/r gh issue comment 1600 --body "${WAIVER}"`,
+      `env GH_REPO=o/r gh issue comment 1600 --body "${WAIVER}"`,
+      `/opt/homebrew/bin/gh issue comment 1600 --body "${WAIVER}"`,
+      `{ gh issue comment 1600 --body "${WAIVER}"; }`,
+      `! gh issue comment 1600 --body "${WAIVER}"`,
+      `if true; then gh issue comment 1600 --body "${WAIVER}"; fi`,
+    ]) {
+      it(`should deny a waiver comment written as \`${command.slice(0, 32)}…\``, () => {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          shellPayload('Bash', command),
+          /waive/i,
+        );
+      });
+    }
+
+    it('should allow an issue body that quotes the waiver form', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          `gh issue create --title "Waivers" --body "The form:\\n${WAIVER}"`,
+        ),
+      );
+    });
+
+    it('should allow an agent editing an unrelated issue body', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          'gh issue edit 1599 --body "- [x] Fix the login copy"',
+        ),
+      );
+    });
+
+    it('should allow an agent reading a Sign-off Issue', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          'gh issue view 1600 --json body -q .body | grep "<!-- signoff-issue -->"',
+        ),
+      );
+    });
+
+    it('should deny a Sign-off Issue body passed in a body file', () => {
+      withBodyFile(SIGNED_OFF_BODY.replaceAll('\\n', '\n'), (bodyFile) => {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          shellPayload('Bash', `gh issue edit 1600 --body-file ${bodyFile}`),
+          /sign-off issue/i,
+        );
+      });
+    });
+
+    it('should deny a waiver sent through gh api from a file', () => {
+      withBodyFile(`${WAIVER}\n`, (bodyFile) => {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          shellPayload(
+            'Bash',
+            `gh api repos/o/r/issues/1600/comments -F body=@${bodyFile}`,
+          ),
+          /waive/i,
+        );
+      });
+    });
+
+    it('should deny a waiver piped to gh through a heredoc', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          `cd repo && gh issue comment 1600 --body-file - <<'EOF'\n${WAIVER}\nEOF`,
+        ),
+        /waive/i,
+      );
+    });
+
+    it('should allow a comment that mentions waiving mid-sentence', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          'gh issue comment 1599 --body "The Maintainer can waive: see ADR 0151."',
+        ),
+      );
+    });
+
+    it('should allow a command that only quotes a gh call, such as a test fixture', () => {
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload(
+          'Bash',
+          `python3 - <<'PY'\nfixture = 'gh issue comment 1600 --body "${WAIVER}"'\nPY`,
+        ),
+      );
+    });
+
+    for (const script of [
+      'node tools/scripts/ci/merge-train.ts',
+      'corepack yarn release:cut',
+      'corepack yarn release:signoff-close',
+    ]) {
+      it(`should allow the script path \`${script}\``, () => {
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('Bash', script));
+      });
+    }
   });
 });
