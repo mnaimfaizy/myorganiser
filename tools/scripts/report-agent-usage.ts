@@ -5,6 +5,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+import {
+  addPeakContext,
+  peakContextCell,
+} from './lib/sandcastle-context-window.ts';
+
 /** One usage record, from either the JSONL file or a parsed legacy log line. */
 interface AgentUsageRecord {
   timestamp?: string | null;
@@ -142,10 +147,7 @@ function addUsage(target: UsageTotals, record: AgentUsageRecord): void {
   target.runs += 1;
   target.iterations += record.iterations ?? 0;
   target.telemetryIterations += record.telemetryIterations ?? 0;
-  if ((record.peakContextTokens ?? 0) > target.peakContextTokens) {
-    target.peakContextTokens = record.peakContextTokens ?? 0;
-    target.contextWindowLimit = record.contextWindowLimit ?? null;
-  }
+  addPeakContext(target, record);
   if (!record.available) {
     target.unavailableRuns += 1;
     return;
@@ -184,13 +186,6 @@ function aggregate(
   return Object.fromEntries(
     [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)),
   );
-}
-
-function peakContextCell(totals: UsageTotals): string {
-  if (totals.peakContextTokens === 0) return 'n/a';
-  return totals.contextWindowLimit
-    ? `${totals.peakContextTokens} of ${totals.contextWindowLimit}`
-    : String(totals.peakContextTokens);
 }
 
 function markdownRows(groups: Record<string, UsageTotals>): string[] {

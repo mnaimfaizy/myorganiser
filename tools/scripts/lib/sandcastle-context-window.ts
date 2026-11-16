@@ -41,3 +41,35 @@ export function describeContextWindow(
   const percent = Math.round((window.peakTokens / window.limit) * 100);
   return `peak context ${peak} of ${formatTokens(window.limit)} (${percent}%)`;
 }
+
+/** The context-window part of a usage record, as `agent-usage.jsonl` stores it. */
+export interface PeakContextRecord {
+  peakContextTokens?: number;
+  contextWindowLimit?: number | null;
+}
+
+/** Running peak across the runs of a report group; 0 tokens means none reported. */
+export interface PeakContextTotals {
+  peakContextTokens: number;
+  contextWindowLimit: number | null;
+}
+
+/** Keep the largest peak, with the limit reported alongside that peak. */
+export function addPeakContext(
+  target: PeakContextTotals,
+  record: PeakContextRecord,
+): void {
+  const peak = record.peakContextTokens ?? 0;
+  if (peak > target.peakContextTokens) {
+    target.peakContextTokens = peak;
+    target.contextWindowLimit = record.contextWindowLimit ?? null;
+  }
+}
+
+/** The report cell: "84 of 200", "84" without a limit, "n/a" with no reading. */
+export function peakContextCell(totals: PeakContextTotals): string {
+  if (totals.peakContextTokens === 0) return 'n/a';
+  return totals.contextWindowLimit
+    ? `${totals.peakContextTokens} of ${totals.contextWindowLimit}`
+    : String(totals.peakContextTokens);
+}

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  addPeakContext,
   describeContextWindow,
+  peakContextCell,
   summariseContextWindow,
 } from './sandcastle-context-window.ts';
 
@@ -43,5 +45,29 @@ test('describeContextWindow omits the share without a limit', () => {
   assert.equal(
     describeContextWindow({ peakTokens: 84, limit: null }, plain),
     'peak context 84',
+  );
+});
+
+test('addPeakContext keeps the largest peak with the limit from that run', () => {
+  const totals = { peakContextTokens: 0, contextWindowLimit: null };
+  addPeakContext(totals, { peakContextTokens: 50, contextWindowLimit: 200 });
+  addPeakContext(totals, { peakContextTokens: 90 });
+  addPeakContext(totals, { peakContextTokens: 70, contextWindowLimit: 1000 });
+  addPeakContext(totals, {});
+  assert.deepEqual(totals, { peakContextTokens: 90, contextWindowLimit: null });
+});
+
+test('peakContextCell renders limit, no limit, and no reading', () => {
+  assert.equal(
+    peakContextCell({ peakContextTokens: 84, contextWindowLimit: 200 }),
+    '84 of 200',
+  );
+  assert.equal(
+    peakContextCell({ peakContextTokens: 84, contextWindowLimit: null }),
+    '84',
+  );
+  assert.equal(
+    peakContextCell({ peakContextTokens: 0, contextWindowLimit: null }),
+    'n/a',
   );
 });
