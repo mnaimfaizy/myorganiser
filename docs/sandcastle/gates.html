@@ -1420,7 +1420,7 @@
   <section class="panel" aria-labelledby="hero-h">
     <div class="phead">
       <h2 id="hero-h">One gate, two callers</h2>
-      <span class="src">main.mts:2159-2442</span>
+      <span class="src">main.mts:2156-2439</span>
     </div>
     <div class="pbody">
       <div class="chips">
@@ -2118,7 +2118,7 @@
   <section class="panel" aria-labelledby="scope-h">
     <div class="phead">
       <h2 id="scope-h">Two scopes, because the targets have different blast radii</h2>
-      <span class="src">main.mts:279-289, :328-331, :2174-2188</span>
+      <span class="src">main.mts:286-296, :335-338, :2171-2185</span>
     </div>
     <div class="pbody">
       <p>
@@ -2288,7 +2288,7 @@
   <section class="panel" aria-labelledby="modes-h">
     <div class="phead">
       <h2 id="modes-h">The two modes, side by side</h2>
-      <span class="src">main.mts:2288-2338, :2421-2425, :2429-2437</span>
+      <span class="src">main.mts:2285-2335, :2418-2422, :2426-2434</span>
     </div>
     <div class="pbody">
       <div class="scrollx">
@@ -2356,7 +2356,7 @@
         on the PR &mdash; while costing one container install per slice.
         <span class="small muted"
           >&mdash; <code>runFeatureGate</code> docblock,
-          <code>main.mts:2432-2434</code></span
+          <code>main.mts:2429-2431</code></span
         >
       </blockquote>
 
@@ -2432,7 +2432,7 @@
   <section class="panel" aria-labelledby="red-h">
     <div class="phead">
       <h2 id="red-h">Reading a red gate</h2>
-      <span class="src">main.mts:2392-2393, :3418-3490, :3581-3603</span>
+      <span class="src">main.mts:2389-2390, :3427-3499, :3590-3612</span>
     </div>
     <div class="pbody">
       <ol class="chain">
@@ -2476,8 +2476,9 @@
         <p>
           <code>SLICE_GATE</code> is checked as the very first statement of
           <code>runGate</code>, before targets, before scopes, before the
-          container. With <code>off</code> left in
-          <code>.sandcastle/.env</code>, a <code>--gate-only</code> run prints
+          container. With <code>off</code> left in your shell, your 1Password
+          Environment or <code>.sandcastle/secrets.env</code>, a
+          <code>--gate-only</code> run prints
           <b>PASS</b>, comments <b>passed</b> on the PRD issue, and exits
           <code>0</code> without resolving a single project. The log line
           &ldquo;gate disabled &mdash; integrating without verification&rdquo;
@@ -2491,7 +2492,7 @@
   <section class="panel" aria-labelledby="tier-h">
     <div class="phead">
       <h2 id="tier-h">Two different things are called a gate</h2>
-      <span class="src">main.mts:2442 &middot; ADR 0012</span>
+      <span class="src">main.mts:2439 &middot; ADR 0012</span>
     </div>
     <div class="pbody">
       <p>
@@ -3385,62 +3386,62 @@
 {
   "note": "Citation anchors for docs/sandcastle/gates.html, re-verified on 2026-09-30 against .sandcastle/main.mts. Every continuation range is written as a bare :NNN so findCitations sees it — a comma-separated number without a leading colon is a claim nothing checks.",
   "anchors": {
-    "main.mts:2159-2442": {
+    "main.mts:2156-2439": {
       "file": ".sandcastle/main.mts",
       "start": "function runGate(",
       "end": "return runGate(featureBranch, prdGateBase, featureBranch);"
     },
-    "main.mts:279-289": {
+    "main.mts:286-296": {
       "file": ".sandcastle/main.mts",
       "start": "* Maps the files a slice changed (between base and head) to the Nx projects that",
       "end": "* `affectedProjects` instead."
     },
-    "main.mts:328-331": {
+    "main.mts:335-338": {
       "file": ".sandcastle/main.mts",
       "start": "* The Nx projects a slice affects: the projects whose own files changed PLUS every",
       "end": "* and that consumer's own files never changed."
     },
-    "main.mts:2174-2188": {
+    "main.mts:2171-2185": {
       "file": ".sandcastle/main.mts",
       "start": "const targets = (process.env.SLICE_GATE_TARGETS || 'lint test build').trim();",
       "end": "const changed = changedProjects(base, head);"
     },
-    "main.mts:2288-2338": {
+    "main.mts:2285-2335": {
       "file": ".sandcastle/main.mts",
       "start": "// Validate this slice INSIDE the Linux container (cross-platform: WSL2, native",
       "end": "teeRunnerArgs(logPath, 'docker', ["
     },
-    "main.mts:2421-2425": {
+    "main.mts:2418-2422": {
       "file": ".sandcastle/main.mts",
       "start": "* Gate ONE slice against its base. Retained for standalone runs, where the work",
       "end": "return runGate(`#${issue.number}`, baseRef, sliceBranch, issue.number);"
     },
-    "main.mts:2429-2437": {
+    "main.mts:2426-2434": {
       "file": ".sandcastle/main.mts",
       "start": "* Gate the whole PRD once, on the integrated feature branch, against the ref the",
       "end": "function runFeatureGate(featureBranch: string): boolean {"
     },
-    "main.mts:2432-2434": {
+    "main.mts:2429-2431": {
       "file": ".sandcastle/main.mts",
       "start": "* This is the gate that matters. A per-slice gate can only see one slice against",
       "end": "* and fail on the PR — while costing one container install per slice. Gating"
     },
-    "main.mts:2392-2393": {
+    "main.mts:2389-2390": {
       "file": ".sandcastle/main.mts",
       "start": "const ok = gate.status === 0;",
       "end": "console.log(`  [${label}] gate: ${ok ? 'PASS' : 'FAIL'}.`);"
     },
-    "main.mts:3418-3490": {
+    "main.mts:3427-3499": {
       "file": ".sandcastle/main.mts",
       "start": "const outcome = judgeRunOutcome(",
       "end": "unblockDependents(issue);"
     },
-    "main.mts:3581-3603": {
+    "main.mts:3590-3612": {
       "file": ".sandcastle/main.mts",
       "start": "'edit',",
       "end": ");"
     },
-    "main.mts:2442": {
+    "main.mts:2439": {
       "file": ".sandcastle/main.mts",
       "start": "return runGate(featureBranch, prdGateBase, featureBranch);"
     }

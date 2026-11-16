@@ -1,6 +1,5 @@
 import { claudeCode, copilot, cursor, run } from '@ai-hero/sandcastle';
 import { docker } from '@ai-hero/sandcastle/sandboxes/docker';
-import dotenv from 'dotenv';
 import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -84,6 +83,16 @@ import {
   STANDALONE_HANDOFF_LABELS,
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
+import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
+import {
+  AGENT_KINDS,
+  assertNoGitHubTokens,
+  providerEnvironment,
+} from '../tools/scripts/lib/sandcastle-provider-env.ts';
+import type {
+  AgentKind,
+  ClaudeAuthResolution,
+} from '../tools/scripts/lib/sandcastle-provider-env.ts';
 import {
   isCleanupOnlyFailure,
   repairOrphanedWorktree,
@@ -91,8 +100,6 @@ import {
 
 const REPO = 'mnaimfaizy/myorganiser';
 const SANDBOX_IMAGE = 'sandcastle:myorganiser';
-
-dotenv.config({ path: join(process.cwd(), '.sandcastle', '.env') });
 
 type AgentModelPolicy = {
   orchestrators: {
@@ -507,8 +514,15 @@ Flags:
 Work branches are named <type>/<issue-number>-<slug>, with <type> derived from the
 issue's labels (see AGENTS.md "Branch naming"). PRD slices use slice/<n>-<slug>.
 
+Credentials and settings come from, highest first: a 1Password Environment
+(OP_ENVIRONMENT_ID, read in memory), your shell, then the gitignored
+.sandcastle/secrets.env. Do not create .sandcastle/.env: Sandcastle forwards
+every key in it into the sandbox, so the dispatch refuses to start when it
+holds one. See docs/sandcastle/RUNBOOK.md.
+
 Environment:
-  .sandcastle/.env is loaded automatically.
+  OP_ENVIRONMENT_ID   1Password Environment holding the variables below
+  OP_CLI              Path to a specific 1Password CLI binary
   SANDCASTLE_AGENT
   SANDCASTLE_MODEL
   SANDCASTLE_CLAUDE_MODEL
@@ -533,6 +547,21 @@ Claude auth (see docs/sandcastle/RUNBOOK.md):
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   printHelp();
   process.exit(0);
+}
+
+// Host credentials: a 1Password Environment, then the shell, then the gitignored
+// .sandcastle/secrets.env. Refuses first when the file Sandcastle forwards
+// wholesale into every sandbox holds a key (#1593). Everything below reads
+// process.env, so the merged record is applied there once, here.
+try {
+  const hostEnvironment = loadHostEnv({
+    sandcastleDir: join(process.cwd(), '.sandcastle'),
+    shell: process.env,
+  });
+  Object.assign(process.env, hostEnvironment.env);
+  console.log(`Credentials from: ${hostEnvironment.sources}`);
+} catch (error) {
+  fail((error as Error).message);
 }
 
 const USAGE =
@@ -643,14 +672,11 @@ const modelFlag = getArgValue('model');
 
 type ClaudeAuthMode = 'subscription' | 'api';
 
-/** `null` = no credential needed (not a claude run). `'none'` = needed, absent. */
-type ClaudeAuthResolution = ClaudeAuthMode | 'none' | null;
-
 /**
  * Which Claude credential this run will use.
  *
  * `preview` softens the MISSING-credential paths from a hard exit to `'none'`, so a
- * `--dry-run` can still show the plan on a machine where the 1Password injection was
+ * `--dry-run` can still show the plan on a machine where no credential source was
  * never set up. It reports the gap rather than hiding it — a preview that cannot say
  * "this run would not authenticate" is worse than one that dies. A malformed
  * SANDCASTLE_CLAUDE_AUTH still fails outright either way: that is a typo, not an
@@ -697,14 +723,14 @@ function resolveClaudeAuth(
     'No Claude credential found. Set one of:\n' +
       '  CLAUDE_CODE_OAUTH_TOKEN  — `claude setup-token` on the host (Pro/Max plan)\n' +
       '  ANTHROPIC_API_KEY        — metered API billing\n' +
-      'See docs/sandcastle/RUNBOOK.md. Both are normally injected via 1Password.',
+      'See docs/sandcastle/RUNBOOK.md. Both normally come from a 1Password Environment.',
   );
 }
 
 const agentKind = resolveAgentKind();
 // --gate-only launches no agent, so it must not demand an agent credential. It is
 // the path a maintainer runs by hand to re-check a feature branch, often on a
-// machine where the 1Password injection was never set up.
+// machine where no credential source was ever set up.
 // Neither --gate-only nor --dry-run launches an agent, so neither may demand an
 // agent credential. --gate-only needs none at all; --dry-run previews the plan and
 // reports the missing credential instead of dying on it.
@@ -1413,8 +1439,6 @@ if (gateOnly) {
 
 // ─── Model routing ────────────────────────────────────────────────────────────
 
-type AgentKind = 'claude' | 'cursor' | 'copilot';
-
 function modelFor(issue: Issue): string {
   const labels = issue.labels.map((l) => l.name);
   if (labels.includes('complexity:high'))
@@ -1426,11 +1450,10 @@ function modelFor(issue: Issue): string {
 
 function resolveAgentKind(): AgentKind {
   const raw = (agentFlag ?? process.env.SANDCASTLE_AGENT ?? 'claude').trim();
-  if (raw === 'claude' || raw === 'cursor' || raw === 'copilot') {
-    return raw;
-  }
+  const kind = AGENT_KINDS.find((candidate) => candidate === raw);
+  if (kind) return kind;
 
-  fail(`Unknown agent "${raw}". Available: claude, cursor, copilot.`);
+  fail(`Unknown agent "${raw}". Available: ${AGENT_KINDS.join(', ')}.`);
 }
 
 function resolveModel(issue: Issue, agentKind: AgentKind): string {
@@ -1460,32 +1483,6 @@ function buildAgent(agentKind: AgentKind, model: string) {
     case 'copilot':
       return copilot(model);
   }
-}
-
-function providerEnvironment(): Record<string, string> {
-  // Exactly one Claude credential reaches the container — see resolveClaudeAuth.
-  // On cursor/copilot runs claudeAuth is null and neither is forwarded.
-  const claudeVariables =
-    claudeAuth === 'subscription'
-      ? ['CLAUDE_CODE_OAUTH_TOKEN']
-      : claudeAuth === 'api'
-        ? ['ANTHROPIC_API_KEY']
-        : [];
-
-  const variableNames = [
-    ...claudeVariables,
-    'CURSOR_API_KEY',
-    'COPILOT_GITHUB_TOKEN',
-    'GH_TOKEN',
-    'GITHUB_TOKEN',
-  ];
-
-  return Object.fromEntries(
-    variableNames.flatMap((variableName) => {
-      const value = process.env[variableName];
-      return value ? [[variableName, value]] : [];
-    }),
-  );
 }
 
 // Branch type is read off the issue's labels so the branch name says what the work
@@ -3279,27 +3276,39 @@ while (pendingSlices.length > 0) {
       );
     }
 
+    // Only the host pushes (ADR 0010): fail before any container exists if a
+    // GitHub token reached this record from any source (#1593).
+    const sandboxEnv: Record<string, string> = {
+      NX_DAEMON: 'false',
+      NX_ISOLATE_PLUGINS: 'false',
+      NX_SKIP_NX_CACHE: 'true',
+      // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
+      // resolve a "main worktree" root to share the cache across worktrees —
+      // a path that does not exist inside the container — and falls back to
+      // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
+      // resolution failure is still wasted work every run). See ADR 0036.
+      NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
+      NX_WORKSPACE_DATA_DIRECTORY: '/home/agent/workspace/.nx/workspace-data',
+      ...providerEnvironment({
+        agentKind,
+        claudeAuth,
+        env: process.env,
+      }),
+      ...YARN_CACHE_ENV,
+    };
+    assertNoGitHubTokens(sandboxEnv);
+
     const result = await finishedDespiteCleanup(
       issue,
       sliceBranch,
       run({
         agent,
         sandbox: docker({
-          env: {
-            NX_DAEMON: 'false',
-            NX_ISOLATE_PLUGINS: 'false',
-            NX_SKIP_NX_CACHE: 'true',
-            // Pin the cache to the bind-mounted worktree itself. Unset, Nx tries to
-            // resolve a "main worktree" root to share the cache across worktrees —
-            // a path that does not exist inside the container — and falls back to
-            // .nx/cache-local / .nx/workspace-data-local (both gitignored, but the
-            // resolution failure is still wasted work every run). See ADR 0036.
-            NX_CACHE_DIRECTORY: '/home/agent/workspace/.nx/cache',
-            NX_WORKSPACE_DATA_DIRECTORY:
-              '/home/agent/workspace/.nx/workspace-data',
-            ...providerEnvironment(),
-            ...YARN_CACHE_ENV,
-          },
+          // The image ensureSandboxImage built and checked. Unnamed, Sandcastle
+          // derives "sandcastle:<folder name>", which only matches from a
+          // folder called "myorganiser".
+          imageName: SANDBOX_IMAGE,
+          env: sandboxEnv,
           // Bind-mount the shared, content-addressable Yarn global cache so the
           // in-container install (below) is incremental and never re-downloads
           // across slices.

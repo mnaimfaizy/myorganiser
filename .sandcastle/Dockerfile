@@ -99,7 +99,7 @@ RUN curl https://cursor.com/install -fsS | bash
 
 # Claude Code's version is a build arg, not a pin in this file. The dispatcher
 # chooses it from SANDCASTLE_CLAUDE_CODE_UPDATE / SANDCASTLE_CLAUDE_CODE_VERSION
-# (.sandcastle/.env.example), passes the exact version here, and rebuilds an
+# (.sandcastle/secrets.env.example), passes the exact version here, and rebuilds an
 # image whose `claude --version` differs. A plain `docker build` gets latest.
 # The CLI's own auto-updater is off: updates happen at dispatch, so the version
 # each slice log names is the one the agent ran. See

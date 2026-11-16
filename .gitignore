@@ -46,6 +46,7 @@ testem.log
 
 # Sandcastle
 .sandcastle/.env
+.sandcastle/secrets.env
 .sandcastle/logs/
 .sandcastle/worktrees/
 .sandcastle/patches/

@@ -3,7 +3,7 @@
  * reported in the slice log.
  *
  * Two variables, set wherever the other `SANDCASTLE_*` ones are (the 1Password
- * Environment, or `.sandcastle/.env`), so changing the CLI never needs a commit:
+ * Environment, or `.sandcastle/secrets.env`), so changing the CLI never needs a commit:
  *
  *   SANDCASTLE_CLAUDE_CODE_UPDATE   auto | manual. Unset means auto, or manual
  *                                   when a version is set.

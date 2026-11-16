@@ -17,18 +17,16 @@
  *
  * Usage: npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number>
  */
-import dotenv from 'dotenv';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
 import { planWaveForwarding } from '../tools/scripts/lib/sandcastle-resume.ts';
 import {
   blockedBy,
   findDependencyCycles,
   formatCycle,
 } from '../tools/scripts/lib/sandcastle-slice-selection.ts';
-
-dotenv.config({ path: join(process.cwd(), '.sandcastle', '.env') });
 
 const REPO = 'mnaimfaizy/myorganiser';
 
@@ -52,8 +50,11 @@ Flags:
   (--fresh is refused here — discard one slice with dispatch-agents instead)
   --help                 Show this help text
 
-Environment:
-  .sandcastle/.env is loaded automatically.
+Credentials and settings come from, highest first: a 1Password Environment
+(OP_ENVIRONMENT_ID, read in memory), your shell, then the gitignored
+.sandcastle/secrets.env. Do not create .sandcastle/.env: Sandcastle forwards
+every key in it into the sandbox, so the dispatch refuses to start when it
+holds one. See docs/sandcastle/RUNBOOK.md.
 `);
 }
 
@@ -73,6 +74,20 @@ function ghSilent(args: string[]): void {
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   printHelp();
   process.exit(0);
+}
+
+// Same credential sources and the same refusal as dispatch-agents (#1593). The
+// merged record goes into process.env, which every spawned dispatch inherits.
+try {
+  Object.assign(
+    process.env,
+    loadHostEnv({
+      sandcastleDir: join(process.cwd(), '.sandcastle'),
+      shell: process.env,
+    }).env,
+  );
+} catch (error) {
+  fail((error as Error).message);
 }
 
 const prdFlag = process.argv.indexOf('--prd');
