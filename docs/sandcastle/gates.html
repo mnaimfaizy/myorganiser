@@ -2476,8 +2476,9 @@
         <p>
           <code>SLICE_GATE</code> is checked as the very first statement of
           <code>runGate</code>, before targets, before scopes, before the
-          container. With <code>off</code> left in
-          <code>.sandcastle/.env</code>, a <code>--gate-only</code> run prints
+          container. With <code>off</code> left in your shell, your 1Password
+          Environment or <code>.sandcastle/secrets.env</code>, a
+          <code>--gate-only</code> run prints
           <b>PASS</b>, comments <b>passed</b> on the PRD issue, and exits
           <code>0</code> without resolving a single project. The log line
           &ldquo;gate disabled &mdash; integrating without verification&rdquo;
