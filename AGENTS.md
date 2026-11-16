@@ -101,6 +101,8 @@ The Cloud Agent VM has **no Docker**; `.cursor/install.sh` and `.cursor/start.sh
 - `CONTEXT.md` is the domain glossary — read it before changing domain language, and sharpen or extend a term it already carries instead of redefining it. A new term touching encrypted data must say whether it means plaintext (client-only) or ciphertext (server-storable).
 - Code fanning out over a domain enum reaches one `as const satisfies Record<EnumType, …>` table; it does not re-enumerate the members in an object literal, an if-chain, or a list of `if` statements. `yarn enum:fanout:check` enforces it for guarded enums ([ADR 0053](docs/adr/0053-a-fan-out-over-a-domain-enum-is-pinned-at-its-call-site.md)).
 - Before issuing 3 or more consecutive read/search operations to locate something in the codebase, stop and delegate to `CodeExplorer` (`.github/agents/explore.agent.md`) with an Explore Request: a `Goal` sentence, optionally `Known Locations`, `Search Hints`, `Supplied Evidence` (output of a command you ran for it — it has no shell), `Depth` (`quick` or `thorough`), `Out of Scope`, and `Expected Output`.
+- The repository is every agent's memory. When something is worth remembering, propose where it belongs in these instructions, a Skill, or an ADR, and add it once the human confirms; save to a harness's own memory only what the human approves there.
+- Treat a refused tool call (a hook or a permission check) as the human's decision: stop, report what was refused, and ask, even when it looks like a false positive. The same effect reached another way still counts as the refused action.
 - Keep `.github/agents` as the canonical Sub-agent body source. Keep `CodeExplorer` in `.cursor/agents/explore.md` on `model: composer-2.5`.
 
 ## Workflows
