@@ -69,3 +69,13 @@ export const VAULT_ABSENT_EVIDENCE_GATE_VIEWS = {
   VaultAbsentEvidence['kind'],
   VaultAbsentEvidenceGateView
 >;
+
+/**
+ * What a reader shows while Vault Absent Evidence is still `checking`. One
+ * sentence shared by the gate's checking screen and Dashboard Home, so the two
+ * cannot drift apart. The gate keeps its own frame title; Home uses this one.
+ */
+export const VAULT_ABSENT_EVIDENCE_CHECKING_VIEW = {
+  title: 'Checking for your vault',
+  description: 'Checking whether your vault is already on the server…',
+} as const;

@@ -37,7 +37,10 @@ import { useOptionalVaultSession } from './session';
 import { useLocalVaultRevision } from './useLocalVaultRevision';
 import { ABSENT_EVIDENCE_WITHOUT_OWNER } from './useVaultAbsentEvidence';
 import { CLAIM_EVIDENCE_WITHOUT_OWNER } from './useVaultClaimEvidence';
-import { VAULT_ABSENT_EVIDENCE_GATE_VIEWS } from './vaultAbsentEvidenceGateView';
+import {
+  VAULT_ABSENT_EVIDENCE_CHECKING_VIEW,
+  VAULT_ABSENT_EVIDENCE_GATE_VIEWS,
+} from './vaultAbsentEvidenceGateView';
 import { VAULT_CLAIM_EVIDENCE_GATE_VIEWS } from './vaultClaimEvidenceGateView';
 import { VaultReplaceOffer } from './VaultReplaceOffer';
 
@@ -609,7 +612,7 @@ export function VaultGate(props: VaultGateProps) {
           }
         >
           <p className="text-sm text-muted-foreground">
-            Checking whether your vault is already on the server…
+            {VAULT_ABSENT_EVIDENCE_CHECKING_VIEW.description}
           </p>
         </VaultGateFrame>
       );

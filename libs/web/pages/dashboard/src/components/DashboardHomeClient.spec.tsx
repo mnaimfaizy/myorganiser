@@ -35,13 +35,23 @@ jest.mock('../home/components/HomeDesktop', () => ({
   }: {
     view: {
       unlocked: boolean;
-      vaultPrompt: { heroActions: readonly { label: string }[] } | null;
+      vaultPrompt: {
+        heroLine: string;
+        cardTitle: string;
+        heroActions: readonly { label: string }[];
+      } | null;
     };
   }) => (
     <div
       data-testid="home-desktop"
       data-unlocked={String(view.unlocked)}
       data-hero-action={view.vaultPrompt?.heroActions[0]?.label ?? ''}
+      data-hero-actions={
+        view.vaultPrompt?.heroActions.map((action) => action.label).join('|') ??
+        ''
+      }
+      data-hero-line={view.vaultPrompt?.heroLine ?? ''}
+      data-card-title={view.vaultPrompt?.cardTitle ?? ''}
     />
   ),
 }));
@@ -73,6 +83,7 @@ import { useIsMobileState } from '@myorganiser/web-ui';
 import {
   useOptionalVaultSession,
   useVaultSyncStatus,
+  VAULT_HOME_WITHHELD_COPY,
 } from '@myorganiser/web-vault-ui';
 import { useHomeSummary } from '../home/hooks/use-home-summary';
 import { useLatestBackupSummary } from '../home/hooks/use-latest-backup-summary';
@@ -90,7 +101,12 @@ const lock = jest.fn();
 
 type AbsentEvidence =
   | { status: 'checking' }
-  | { status: 'settled'; result: { kind: 'no-server-vault' } };
+  | {
+      status: 'settled';
+      result:
+        | { kind: 'no-server-vault' }
+        | { kind: 'server-holds-vault'; serverMeta: never };
+    };
 
 function stubVault({
   unlocked,
@@ -277,6 +293,44 @@ describe('DashboardHomeClient', () => {
     expect(screen.getByTestId('home-desktop')).toHaveAttribute(
       'data-hero-action',
       'Open vault',
+    );
+  });
+
+  it('shows Getting your vault back, then Unlock vault, on a fresh profile whose vault is on the server', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    const serverHolds = VAULT_HOME_WITHHELD_COPY['server-holds-vault'];
+    // The serverMeta is only carried through; Home reads the kind alone.
+    stubVault({
+      unlocked: false,
+      status: 'absent',
+      absentEvidence: {
+        status: 'settled',
+        result: { kind: 'server-holds-vault', serverMeta: {} as never },
+      },
+    });
+
+    const { rerender } = render(<DashboardHomeClient />);
+
+    const desktop = screen.getByTestId('home-desktop');
+    expect(desktop).toHaveAttribute('data-hero-action', 'Open vault');
+    expect(desktop).toHaveAttribute('data-card-title', serverHolds.title);
+    expect(desktop).toHaveAttribute(
+      'data-card-title',
+      'Getting your vault back',
+    );
+    expect(desktop).toHaveAttribute('data-hero-line', serverHolds.description);
+    expect(desktop.getAttribute('data-hero-actions')).not.toContain(
+      'Create your vault',
+    );
+
+    // Vault Reconcile's download lands the owned Vault, still locked.
+    stubVault({ unlocked: false, status: 'owned' });
+    rerender(<DashboardHomeClient />);
+
+    const reconciled = screen.getByTestId('home-desktop');
+    expect(reconciled).toHaveAttribute('data-hero-action', 'Unlock vault');
+    expect(reconciled.getAttribute('data-hero-actions')).not.toContain(
+      'Create your vault',
     );
   });
 

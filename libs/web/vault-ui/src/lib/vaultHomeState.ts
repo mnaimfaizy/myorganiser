@@ -17,7 +17,10 @@ import type {
 } from '@myorganiser/web-vault';
 
 import type { VaultAbsentEvidenceState } from './useVaultAbsentEvidence';
-import { VAULT_ABSENT_EVIDENCE_GATE_VIEWS } from './vaultAbsentEvidenceGateView';
+import {
+  VAULT_ABSENT_EVIDENCE_CHECKING_VIEW,
+  VAULT_ABSENT_EVIDENCE_GATE_VIEWS,
+} from './vaultAbsentEvidenceGateView';
 
 /**
  * The states Home renders. `create` is reachable only from an absent device
@@ -101,14 +104,11 @@ export interface VaultHomeWithheldCopy {
 
 /**
  * The words for each withheld state. The three settled ones are the vault
- * page's own titles and descriptions, read rather than copied; `checking`
- * matches the sentence `VaultGate` shows while the question is out.
+ * page's own titles and descriptions, and `checking` is the sentence
+ * `VaultGate` shows while the question is out — all read, never copied.
  */
 export const VAULT_HOME_WITHHELD_COPY = {
-  checking: {
-    title: 'Checking for your vault',
-    description: 'Checking whether your vault is already on the server…',
-  },
+  checking: VAULT_ABSENT_EVIDENCE_CHECKING_VIEW,
   'server-holds-vault': {
     title: VAULT_ABSENT_EVIDENCE_GATE_VIEWS['server-holds-vault'].title,
     description:

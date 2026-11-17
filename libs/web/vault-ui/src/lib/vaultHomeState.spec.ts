@@ -18,7 +18,10 @@ import {
   type VaultHomeState,
 } from './vaultHomeState';
 import type { VaultAbsentEvidenceState } from './useVaultAbsentEvidence';
-import { VAULT_ABSENT_EVIDENCE_GATE_VIEWS } from './vaultAbsentEvidenceGateView';
+import {
+  VAULT_ABSENT_EVIDENCE_CHECKING_VIEW,
+  VAULT_ABSENT_EVIDENCE_GATE_VIEWS,
+} from './vaultAbsentEvidenceGateView';
 
 type SettledKind = VaultAbsentEvidence['kind'];
 
@@ -172,11 +175,16 @@ describe('VAULT_HOME_WITHHELD_COPY', () => {
     },
   );
 
-  test('checking copy is the exact sentence shown while the server question is out', () => {
-    expect(VAULT_HOME_WITHHELD_COPY.checking).toEqual({
-      title: 'Checking for your vault',
-      description: 'Checking whether your vault is already on the server…',
-    });
+  test('checking copy is the shared checking view, pinned to the exact sentence', () => {
+    expect(VAULT_HOME_WITHHELD_COPY.checking).toEqual(
+      VAULT_ABSENT_EVIDENCE_CHECKING_VIEW,
+    );
+    expect(VAULT_ABSENT_EVIDENCE_CHECKING_VIEW.title).toBe(
+      'Checking for your vault',
+    );
+    expect(VAULT_HOME_WITHHELD_COPY.checking.description).toBe(
+      'Checking whether your vault is already on the server…',
+    );
   });
 
   test('no withheld title or description tells the User they are locked out', () => {
