@@ -30,8 +30,19 @@ jest.mock('../home/hooks/use-youtube-home', () => ({
 // The layouts are covered by their own specs. Here each stands in as a marker
 // that exposes the view and the lock wiring the client hands it.
 jest.mock('../home/components/HomeDesktop', () => ({
-  HomeDesktop: ({ view }: { view: { unlocked: boolean } }) => (
-    <div data-testid="home-desktop" data-unlocked={String(view.unlocked)} />
+  HomeDesktop: ({
+    view,
+  }: {
+    view: {
+      unlocked: boolean;
+      vaultPrompt: { heroActions: readonly { label: string }[] } | null;
+    };
+  }) => (
+    <div
+      data-testid="home-desktop"
+      data-unlocked={String(view.unlocked)}
+      data-hero-action={view.vaultPrompt?.heroActions[0]?.label ?? ''}
+    />
   ),
 }));
 
@@ -77,15 +88,27 @@ const HEALTHY_SYNC = {
 
 const lock = jest.fn();
 
+type AbsentEvidence =
+  | { status: 'checking' }
+  | { status: 'settled'; result: { kind: 'no-server-vault' } };
+
 function stubVault({
   unlocked,
   syncStatus = null,
+  status = 'owned',
+  absentEvidence = { status: 'checking' },
 }: {
   unlocked: boolean;
   syncStatus?: typeof HEALTHY_SYNC | null;
+  status?: 'owned' | 'absent';
+  absentEvidence?: AbsentEvidence;
 }) {
-  const handle = { isUnlocked: unlocked };
-  (useOptionalVaultSession as jest.Mock).mockReturnValue({ handle, lock });
+  const handle = { isUnlocked: unlocked, vaultStatus: () => status };
+  (useOptionalVaultSession as jest.Mock).mockReturnValue({
+    handle,
+    lock,
+    absentEvidence,
+  });
   (useVaultSyncStatus as jest.Mock).mockReturnValue({
     status: syncStatus,
     retry: jest.fn(),
@@ -208,5 +231,64 @@ describe('DashboardHomeClient', () => {
 
     expect(useHomeSummary).toHaveBeenLastCalledWith(lockedHandle);
     expect(useLatestBackupSummary).toHaveBeenLastCalledWith(false);
+  });
+
+  it('offers Unlock vault when this device holds a locked Vault', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    stubVault({ unlocked: false, status: 'owned' });
+
+    render(<DashboardHomeClient />);
+
+    expect(screen.getByTestId('home-desktop')).toHaveAttribute(
+      'data-hero-action',
+      'Unlock vault',
+    );
+  });
+
+  it('offers Create your vault once the server has proved it holds no Vault', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    stubVault({
+      unlocked: false,
+      status: 'absent',
+      absentEvidence: {
+        status: 'settled',
+        result: { kind: 'no-server-vault' },
+      },
+    });
+
+    render(<DashboardHomeClient />);
+
+    expect(screen.getByTestId('home-desktop')).toHaveAttribute(
+      'data-hero-action',
+      'Create your vault',
+    );
+  });
+
+  it('offers only Open vault while the server question is still out', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    stubVault({
+      unlocked: false,
+      status: 'absent',
+      absentEvidence: { status: 'checking' },
+    });
+
+    render(<DashboardHomeClient />);
+
+    expect(screen.getByTestId('home-desktop')).toHaveAttribute(
+      'data-hero-action',
+      'Open vault',
+    );
+  });
+
+  it('offers only Open vault, never create, when there is no Vault Session yet', () => {
+    (useIsMobileState as jest.Mock).mockReturnValue(false);
+    (useOptionalVaultSession as jest.Mock).mockReturnValue(null);
+
+    render(<DashboardHomeClient />);
+
+    expect(screen.getByTestId('home-desktop')).toHaveAttribute(
+      'data-hero-action',
+      'Open vault',
+    );
   });
 });

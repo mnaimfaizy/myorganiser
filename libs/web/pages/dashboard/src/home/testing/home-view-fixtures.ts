@@ -69,7 +69,7 @@ export function buildFixtureView(
   return buildHomeView({
     now: FIXTURE_NOW,
     firstName: 'Ada',
-    unlocked: true,
+    vault: 'unlocked',
     summary: POPULATED_SUMMARY,
     backup: { status: 'empty' },
     youtube: { visible: false, state: { status: 'disconnected' } },

@@ -433,7 +433,7 @@ What proves an Unclaimed Local Vault belongs to the signed-in User. Server Vault
 _Avoid_: vault proof, ownership check, claim credential
 
 **Vault Absent Evidence**:
-What proves whether the server holds a Vault for the signed-in User, when this device holds none of its own. Narrower than Vault Claim Evidence: an absent Local Vault has no Vault Meta to compare a server answer against, so the question is only whether the server holds one at all, never whether it is the same one. It withholds the offer to create a Vault — the single most destructive control in the product — while that question is outstanding, and it never downloads or writes anything itself; the wrapping that follows a server-holding answer is Vault Reconcile's write ([ADR 0066](docs/adr/0066-a-convergence-pass-runs-freely-and-only-the-question-is-suppressed.md), decision point 4).
+What proves whether the server holds a Vault for the signed-in User, when this device holds none of its own. Narrower than Vault Claim Evidence: an absent Local Vault has no Vault Meta to compare a server answer against, so the question is only whether the server holds one at all, never whether it is the same one. It withholds the offer to create a Vault — the single most destructive control in the product — while that question is outstanding, and Dashboard Home reads the same answer before it offers anything that leads to Vault creation. It never downloads or writes anything itself; the wrapping that follows a server-holding answer is Vault Reconcile's write ([ADR 0066](docs/adr/0066-a-convergence-pass-runs-freely-and-only-the-question-is-suppressed.md), decision point 4).
 _Avoid_: vault existence check, server vault check, absence proof
 
 **Claim Offer**:

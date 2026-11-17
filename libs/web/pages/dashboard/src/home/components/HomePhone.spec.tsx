@@ -28,6 +28,7 @@ import {
   useVaultLockState,
 } from '@myorganiser/web-vault-ui';
 import { useRouter } from 'next/navigation';
+import { VAULT_HOME_WITHHELD_COPY } from '@myorganiser/web-vault-ui';
 import { HomePhone } from './HomePhone';
 import {
   buildFixtureView,
@@ -125,7 +126,7 @@ describe('HomePhone', () => {
     render(
       <HomePhone
         view={buildFixtureView({
-          unlocked: false,
+          vault: 'locked',
           summary: null,
           backup: { status: 'pending' },
         })}
@@ -153,6 +154,75 @@ describe('HomePhone', () => {
       screen.queryByRole('button', { name: 'Quick add' }),
     ).not.toBeInTheDocument();
   });
+
+  it('offers Create your vault with a Not set up chip and no lock chip when the server holds no Vault', () => {
+    const { container } = render(
+      <HomePhone
+        view={buildFixtureView({
+          vault: 'create',
+          summary: null,
+          backup: { status: 'pending' },
+        })}
+        onLock={onLock}
+      />,
+    );
+
+    const card = screen.getByRole('region', { name: 'Set up your vault' });
+    expect(
+      within(card).getByRole('link', { name: 'Create your vault' }),
+    ).toHaveAttribute('href', '/dashboard/vault');
+    expect(
+      within(card).queryByRole('link', { name: 'Unlock' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('banner')).getByText('Not set up'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Locked')).not.toBeInTheDocument();
+    expect(screen.queryByText(/recovery key/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Lock vault' }),
+    ).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/lock/i);
+  });
+
+  it.each([
+    'checking',
+    'server-holds-vault',
+    'postponed',
+    'session-lost',
+  ] as const)(
+    'offers only Open vault, with no create control, recovery key or chip while the Vault is %s',
+    (vault) => {
+      const { container } = render(
+        <HomePhone
+          view={buildFixtureView({
+            vault,
+            summary: null,
+            backup: { status: 'pending' },
+          })}
+          onLock={onLock}
+        />,
+      );
+
+      const card = screen.getByRole('region', {
+        name: VAULT_HOME_WITHHELD_COPY[vault].title,
+      });
+      expect(
+        within(card).getByRole('link', { name: 'Open vault' }),
+      ).toHaveAttribute('href', '/dashboard/vault');
+      expect(
+        screen.queryByRole('link', { name: /create/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/recovery key/i)).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole('banner')).queryByText(/locked|not set up/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Lock vault' }),
+      ).not.toBeInTheDocument();
+      expect(container.textContent).not.toMatch(/lock/i);
+    },
+  );
 
   it('shows the Today card as nothing due, with no progressbar, when no tasks are due', () => {
     render(

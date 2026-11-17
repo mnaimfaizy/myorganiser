@@ -1,3 +1,8 @@
+import {
+  VAULT_HOME_WITHHELD_COPY,
+  type VaultHomeState,
+  type VaultHomeWithheldState,
+} from '@myorganiser/web-vault-ui';
 import type {
   HomeDueTask,
   HomeRenewal,
@@ -27,6 +32,20 @@ const TWO_DAYS_AGO = new Date(
 
 const LOCKED_HERO =
   "Your vault is locked. Unlock it to see what's due, your lists and your spending.";
+
+/** The Vault states Home withholds creation from: copy and one Open vault link. */
+const WITHHELD_VAULT_STATES: readonly VaultHomeWithheldState[] = [
+  'checking',
+  'server-holds-vault',
+  'postponed',
+  'session-lost',
+];
+
+/** Every state where the Vault is not open and Home must not say "locked". */
+const ABSENT_VAULT_STATES: readonly VaultHomeState[] = [
+  'create',
+  ...WITHHELD_VAULT_STATES,
+];
 
 const EMPTY_SUMMARY: HomeSummaryData = {
   tasks: {
@@ -110,7 +129,7 @@ function viewInput(overrides: Partial<HomeViewInput> = {}): HomeViewInput {
   return {
     now: NOW,
     firstName: 'Ada',
-    unlocked: true,
+    vault: 'unlocked',
     summary: POPULATED,
     backup: { status: 'empty' },
     youtube: { visible: false, state: { status: 'disconnected' } },
@@ -208,7 +227,7 @@ describe('buildHomeView', () => {
   it('replaces the hero, progress, Today card and rows with locked copy even when a summary exists', () => {
     const view = buildHomeView(
       viewInput({
-        unlocked: false,
+        vault: 'locked',
         synced: false,
         youtube: { visible: true, state: loadedYouTube(1, 0) },
       }),
@@ -241,7 +260,7 @@ describe('buildHomeView', () => {
   );
 
   it('seals every space except YouTube when locked, and marks the vault as locked', () => {
-    const view = buildHomeView(viewInput({ unlocked: false }));
+    const view = buildHomeView(viewInput({ vault: 'locked' }));
 
     expect(view.spaces.map((entry) => entry.key)).toEqual([
       'tasks',
@@ -286,14 +305,153 @@ describe('buildHomeView', () => {
     });
   });
 
-  it.each<[boolean, boolean, HomeSpaceKey[]]>([
+  it('keeps the locked prompt exactly as it was before the vault states', () => {
+    const view = buildHomeView(viewInput({ vault: 'locked' }));
+
+    expect(view.unlocked).toBe(false);
+    expect(view.vaultPrompt).toEqual({
+      heroLine: LOCKED_HERO,
+      heroActions: [
+        { label: 'Unlock vault', href: '/dashboard/vault' },
+        { label: 'Use recovery key', href: '/dashboard/vault' },
+      ],
+      cardTitle: 'Vault locked',
+      cardCaption: 'Your data stays encrypted on this device',
+      cardAction: { label: 'Unlock', href: '/dashboard/vault' },
+      cardSecondaryAction: {
+        label: 'Use recovery key instead',
+        href: '/dashboard/vault',
+      },
+      headerChip: 'Locked',
+      sealedSpace: {
+        summary: 'Encrypted · unlock to view',
+        pill: { label: 'Locked', tone: 'neutral' },
+        meta: 'Encrypted',
+        phonePill: { label: 'Locked', tone: 'neutral' },
+      },
+      vaultSpace: {
+        summary: 'Unlock to use your spaces',
+        pill: { label: 'Locked', tone: 'warning' },
+        meta: 'Encrypted',
+        phonePill: { label: 'Locked', tone: 'neutral' },
+      },
+    });
+  });
+
+  it('has no vault prompt while the Vault is open', () => {
+    const view = buildHomeView(viewInput({ vault: 'unlocked' }));
+
+    expect(view.unlocked).toBe(true);
+    expect(view.vaultPrompt).toBeNull();
+  });
+
+  it('offers only Create your vault when the server holds no Vault, and no progress or rows', () => {
+    const view = buildHomeView(
+      viewInput({ vault: 'create', summary: POPULATED }),
+    );
+
+    expect(view.unlocked).toBe(false);
+    expect(view.vaultPrompt).toMatchObject({
+      heroLine: 'Set up your encrypted vault to start using your spaces.',
+      heroActions: [{ label: 'Create your vault', href: '/dashboard/vault' }],
+      cardTitle: 'Set up your vault',
+      cardAction: { label: 'Create your vault', href: '/dashboard/vault' },
+      cardSecondaryAction: null,
+      headerChip: 'Not set up',
+    });
+    expect(view.summaryPending).toBe(false);
+    expect(view.progress).toBeNull();
+    expect(view.todayTitle).toBe('');
+    expect(view.dueRows).toEqual([]);
+    expect(view.renewalRows).toEqual([]);
+  });
+
+  it.each<VaultHomeWithheldState>(WITHHELD_VAULT_STATES)(
+    'withholds creation while the Vault is %s: one Open vault link and the vault page copy',
+    (vault) => {
+      const view = buildHomeView(viewInput({ vault, summary: POPULATED }));
+
+      expect(view.unlocked).toBe(false);
+      expect(view.heroLine).toBe(VAULT_HOME_WITHHELD_COPY[vault].description);
+      expect(view.vaultPrompt).toMatchObject({
+        heroActions: [{ label: 'Open vault', href: '/dashboard/vault' }],
+        cardTitle: VAULT_HOME_WITHHELD_COPY[vault].title,
+        cardAction: { label: 'Open vault', href: '/dashboard/vault' },
+        cardSecondaryAction: null,
+        headerChip: null,
+      });
+      const actionLabels = [
+        ...(view.vaultPrompt?.heroActions.map((action) => action.label) ?? []),
+        view.vaultPrompt?.cardAction.label ?? '',
+        view.vaultPrompt?.cardSecondaryAction?.label ?? '',
+      ];
+      expect(actionLabels.some((label) => /create/i.test(label))).toBe(false);
+      expect(view.summaryPending).toBe(false);
+      expect(view.progress).toBeNull();
+      expect(view.todayTitle).toBe('');
+      expect(view.dueRows).toEqual([]);
+      expect(view.renewalRows).toEqual([]);
+    },
+  );
+
+  it.each<VaultHomeState>(ABSENT_VAULT_STATES)(
+    'says nothing about a lock anywhere on Home while the Vault is %s',
+    (vault) => {
+      const view = buildHomeView(
+        viewInput({
+          vault,
+          youtube: { visible: true, state: loadedYouTube(1, 2) },
+        }),
+      );
+      const prompt = view.vaultPrompt;
+      const texts = [
+        view.heroLine,
+        view.todayTitle,
+        view.todayMeta,
+        ...(prompt === null
+          ? []
+          : [
+              prompt.heroLine,
+              ...prompt.heroActions.map((action) => action.label),
+              prompt.cardTitle,
+              prompt.cardCaption,
+              prompt.cardAction.label,
+              prompt.cardSecondaryAction?.label ?? '',
+              prompt.headerChip ?? '',
+            ]),
+        ...view.spaces.flatMap((entry) => [
+          entry.summary,
+          entry.meta,
+          entry.pill?.label ?? '',
+          entry.phonePill?.label ?? '',
+        ]),
+      ];
+
+      expect(texts.filter((text) => /lock/i.test(text))).toEqual([]);
+      expect(texts.filter((text) => /recovery/i.test(text))).toEqual([]);
+    },
+  );
+
+  it.each<VaultHomeState>(ABSENT_VAULT_STATES)(
+    'leaves the YouTube tile as it is while the Vault is %s',
+    (vault) => {
+      const youtube = { visible: true, state: loadedYouTube(1, 2) };
+
+      const view = buildHomeView(viewInput({ vault, youtube }));
+      const open = buildHomeView(viewInput({ vault: 'unlocked', youtube }));
+
+      expect(space(view, 'youtube')).toEqual(space(open, 'youtube'));
+    },
+  );
+
+  it.each<[VaultHomeState, boolean, HomeSpaceKey[]]>([
     [
-      true,
+      'unlocked',
       false,
       ['tasks', 'groceries', 'subscriptions', 'addresses', 'mobile', 'vault'],
     ],
     [
-      true,
+      'unlocked',
       true,
       [
         'tasks',
@@ -306,7 +464,7 @@ describe('buildHomeView', () => {
       ],
     ],
     [
-      false,
+      'locked',
       true,
       [
         'tasks',
@@ -319,11 +477,11 @@ describe('buildHomeView', () => {
       ],
     ],
   ])(
-    'orders spaces with YouTube between Mobile numbers and Vault (unlocked %s, YouTube visible %s)',
-    (unlocked, youtubeVisible, expected) => {
+    'orders spaces with YouTube between Mobile numbers and Vault (vault %s, YouTube visible %s)',
+    (vault, youtubeVisible, expected) => {
       const view = buildHomeView(
         viewInput({
-          unlocked,
+          vault,
           youtube: {
             visible: youtubeVisible,
             state: { status: 'disconnected' },

@@ -28,7 +28,7 @@ export function HomePhoneHeader({ view, onLock }: HomePhoneHeaderProps) {
           {view.firstName}
         </h1>
       </div>
-      {view.unlocked ? (
+      {view.vaultPrompt === null ? (
         <>
           {view.synced && (
             <span className={`${CHIP} bg-trust-soft text-trust-text`}>
@@ -48,10 +48,15 @@ export function HomePhoneHeader({ view, onLock }: HomePhoneHeaderProps) {
           />
         </>
       ) : (
-        <span className={`${CHIP} bg-warning-soft text-warning-text`}>
-          <span aria-hidden="true" className="size-2 rounded-full bg-warning" />
-          Locked
-        </span>
+        view.vaultPrompt.headerChip !== null && (
+          <span className={`${CHIP} bg-warning-soft text-warning-text`}>
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full bg-warning"
+            />
+            {view.vaultPrompt.headerChip}
+          </span>
+        )
       )}
     </header>
   );

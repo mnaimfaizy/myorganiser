@@ -37,7 +37,7 @@ export function HomeHero({ view }: HomeHeroProps) {
         <p className="m-0 text-body text-navy-muted-foreground">
           {view.heroLine}
         </p>
-        {view.unlocked ? (
+        {view.vaultPrompt === null ? (
           <>
             {view.progress && (
               <div className="flex max-w-[420px] flex-col gap-1.5">
@@ -67,12 +67,22 @@ export function HomeHero({ view }: HomeHeroProps) {
           </>
         ) : (
           <div className="mt-1.5 flex flex-wrap gap-3">
-            <Button variant="brand" asChild>
-              <Link href="/dashboard/vault">Unlock vault</Link>
-            </Button>
-            <Button variant="outline" className={OUTLINE_ON_NAVY} asChild>
-              <Link href="/dashboard/vault">Use recovery key</Link>
-            </Button>
+            {view.vaultPrompt.heroActions.map((action, index) =>
+              index === 0 ? (
+                <Button key={action.label} variant="brand" asChild>
+                  <Link href={action.href}>{action.label}</Link>
+                </Button>
+              ) : (
+                <Button
+                  key={action.label}
+                  variant="outline"
+                  className={OUTLINE_ON_NAVY}
+                  asChild
+                >
+                  <Link href={action.href}>{action.label}</Link>
+                </Button>
+              ),
+            )}
           </div>
         )}
       </div>

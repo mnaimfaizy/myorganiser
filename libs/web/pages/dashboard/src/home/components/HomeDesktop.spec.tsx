@@ -245,7 +245,7 @@ describe('HomeDesktop', () => {
     render(
       <HomeDesktop
         view={buildFixtureView({
-          unlocked: false,
+          vault: 'locked',
           summary: null,
           backup: { status: 'pending' },
         })}
@@ -265,4 +265,61 @@ describe('HomeDesktop', () => {
     // Five sealed spaces plus the Vault space, each with a Locked pill.
     expect(screen.getAllByText('Locked')).toHaveLength(6);
   });
+
+  it('offers Create your vault and no unlock link when the server holds no Vault', () => {
+    const { container } = render(
+      <HomeDesktop
+        view={buildFixtureView({
+          vault: 'create',
+          summary: null,
+          backup: { status: 'pending' },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Create your vault' }),
+    ).toHaveAttribute('href', '/dashboard/vault');
+    expect(
+      screen.queryByRole('link', { name: 'Unlock vault' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Use recovery key' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Locked')).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/lock/i);
+  });
+
+  it.each([
+    'checking',
+    'server-holds-vault',
+    'postponed',
+    'session-lost',
+  ] as const)(
+    'offers only Open vault, with no create control or recovery key, while the Vault is %s',
+    (vault) => {
+      const { container } = render(
+        <HomeDesktop
+          view={buildFixtureView({
+            vault,
+            summary: null,
+            backup: { status: 'pending' },
+          })}
+        />,
+      );
+
+      expect(screen.getByRole('link', { name: 'Open vault' })).toHaveAttribute(
+        'href',
+        '/dashboard/vault',
+      );
+      expect(
+        screen.queryByRole('link', { name: /create/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /create/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/recovery key/i)).not.toBeInTheDocument();
+      expect(container.textContent).not.toMatch(/lock/i);
+    },
+  );
 });

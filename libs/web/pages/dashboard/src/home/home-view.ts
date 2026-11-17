@@ -1,5 +1,10 @@
 import { formatMoney, formatUsd } from '@myorganiser/core';
 import type { IllustrationKind } from '@myorganiser/web-ui';
+import {
+  VAULT_HOME_WITHHELD_COPY,
+  type VaultHomeState,
+  type VaultHomeWithheldState,
+} from '@myorganiser/web-vault-ui';
 import { formatDistanceStrict, isValid } from 'date-fns';
 import {
   formatDateCaption,
@@ -104,7 +109,8 @@ export interface YouTubeHome {
 export interface HomeViewInput {
   now: Date;
   firstName: string | null;
-  unlocked: boolean;
+  /** The one Home vault state every surface reads (`deriveVaultHomeState`). */
+  vault: VaultHomeState;
   /** Null until the vault blobs have been read. */
   summary: HomeSummaryData | null;
   backup: BackupState;
@@ -113,13 +119,48 @@ export interface HomeViewInput {
   synced: boolean;
 }
 
+/** A link Home offers about the Vault. Every one leads to the vault page. */
+export interface HomeVaultAction {
+  label: string;
+  href: string;
+}
+
+/**
+ * What Home says about a Vault that is not open: the desktop hero's sentence
+ * and buttons, the phone card, the phone header chip and the sealed tiles.
+ * One per Home vault state, so no surface keeps locked wording while another
+ * changes.
+ */
+export interface HomeVaultPrompt {
+  /** The desktop hero sentence. */
+  heroLine: string;
+  /** The desktop hero buttons; the first is the primary one. */
+  heroActions: readonly HomeVaultAction[];
+  /** The phone card's headline. */
+  cardTitle: string;
+  /** The phone card's line under the headline. */
+  cardCaption: string;
+  /** The phone card's full-width button. */
+  cardAction: HomeVaultAction;
+  /** The phone card's secondary text link, or null for none. */
+  cardSecondaryAction: HomeVaultAction | null;
+  /** The phone header chip, or null for none. */
+  headerChip: string | null;
+  /** The five data spaces' fields. */
+  sealedSpace: SpaceFields;
+  /** The Vault tile's fields. */
+  vaultSpace: SpaceFields;
+}
+
 export interface HomeView {
   unlocked: boolean;
+  /** The not-open treatment, or null while the Vault is unlocked. */
+  vaultPrompt: HomeVaultPrompt | null;
   summaryPending: boolean;
   firstName: string;
   greeting: string;
   dateCaption: string;
-  /** The desktop hero sentence, or the locked prompt. */
+  /** The desktop hero sentence, or the vault prompt's sentence. */
   heroLine: string;
   /** Today's progress, or null when there is nothing due to measure. */
   progress: { done: number; total: number } | null;
@@ -179,7 +220,7 @@ const DATA_SPACE_ORDER: readonly HomeSpaceKey[] = [
 ];
 
 /** The per-state fields of a space: everything except its fixed identity. */
-type SpaceFields = Omit<HomeSpace, 'key' | 'kind' | 'title' | 'href'>;
+export type SpaceFields = Omit<HomeSpace, 'key' | 'kind' | 'title' | 'href'>;
 
 /** Tiles in order: data spaces, then YouTube when visible, then Vault. */
 function assembleSpaces(
@@ -228,8 +269,105 @@ function renewalsHeroPart(count: number): string {
   return `${count} subscriptions renew this week`;
 }
 
-const LOCKED_HERO_LINE =
-  "Your vault is locked. Unlock it to see what's due, your lists and your spending.";
+const VAULT_HREF = '/dashboard/vault';
+
+const OPEN_VAULT: HomeVaultAction = { label: 'Open vault', href: VAULT_HREF };
+
+/** Today's locked treatment, unchanged: owned, unclaimed or owner-mismatch. */
+const LOCKED_PROMPT: HomeVaultPrompt = {
+  heroLine:
+    "Your vault is locked. Unlock it to see what's due, your lists and your spending.",
+  heroActions: [
+    { label: 'Unlock vault', href: VAULT_HREF },
+    { label: 'Use recovery key', href: VAULT_HREF },
+  ],
+  cardTitle: 'Vault locked',
+  cardCaption: 'Your data stays encrypted on this device',
+  cardAction: { label: 'Unlock', href: VAULT_HREF },
+  cardSecondaryAction: {
+    label: 'Use recovery key instead',
+    href: VAULT_HREF,
+  },
+  headerChip: 'Locked',
+  sealedSpace: {
+    summary: 'Encrypted · unlock to view',
+    pill: neutral('Locked'),
+    meta: 'Encrypted',
+    phonePill: neutral('Locked'),
+  },
+  vaultSpace: {
+    summary: 'Unlock to use your spaces',
+    pill: warning('Locked'),
+    meta: 'Encrypted',
+    phonePill: neutral('Locked'),
+  },
+};
+
+/**
+ * No Vault here and the server proved it holds none. Home only links to the
+ * vault page; `VaultGate`'s create form stays the one creation path.
+ */
+const CREATE_PROMPT: HomeVaultPrompt = {
+  heroLine: 'Set up your encrypted vault to start using your spaces.',
+  heroActions: [{ label: 'Create your vault', href: VAULT_HREF }],
+  cardTitle: 'Set up your vault',
+  cardCaption: 'Your data is encrypted on this device before it is saved',
+  cardAction: { label: 'Create your vault', href: VAULT_HREF },
+  cardSecondaryAction: null,
+  headerChip: 'Not set up',
+  sealedSpace: {
+    summary: 'Set up your vault to use this space',
+    pill: NO_PILL,
+    meta: 'Needs a vault',
+    phonePill: NO_PILL,
+  },
+  vaultSpace: {
+    summary: 'Set up your vault to use your spaces',
+    pill: warning('Not set up'),
+    meta: 'Not set up',
+    phonePill: neutral('Not set up'),
+  },
+};
+
+/**
+ * No Vault here and no proof the server holds none: the vault page's own
+ * words, one link to it, and nothing that leads to creation.
+ */
+function withheldPrompt(state: VaultHomeWithheldState): HomeVaultPrompt {
+  const { title, description } = VAULT_HOME_WITHHELD_COPY[state];
+  return {
+    heroLine: description,
+    heroActions: [OPEN_VAULT],
+    cardTitle: title,
+    cardCaption: description,
+    cardAction: OPEN_VAULT,
+    cardSecondaryAction: null,
+    headerChip: null,
+    sealedSpace: {
+      summary: 'Encrypted',
+      pill: NO_PILL,
+      meta: 'Encrypted',
+      phonePill: NO_PILL,
+    },
+    vaultSpace: {
+      summary: title,
+      pill: NO_PILL,
+      meta: title,
+      phonePill: NO_PILL,
+    },
+  };
+}
+
+/** Pinned per Home vault state (ADR 0053); null while the Vault is open. */
+const HOME_VAULT_PROMPTS = {
+  unlocked: null,
+  locked: LOCKED_PROMPT,
+  create: CREATE_PROMPT,
+  checking: withheldPrompt('checking'),
+  'server-holds-vault': withheldPrompt('server-holds-vault'),
+  postponed: withheldPrompt('postponed'),
+  'session-lost': withheldPrompt('session-lost'),
+} as const satisfies Record<VaultHomeState, HomeVaultPrompt | null>;
 
 /** Space tiles for an unlocked vault, once the blobs are read. */
 function unlockedSpaces(
@@ -428,14 +566,12 @@ function youtubeFields(state: YouTubeState): SpaceFields {
   }
 }
 
-/** Space tiles for a locked vault: everything except YouTube is sealed. */
-function lockedSpaces(youtube: YouTubeHome): HomeSpace[] {
-  const sealed: SpaceFields = {
-    summary: 'Encrypted · unlock to view',
-    pill: neutral('Locked'),
-    meta: 'Encrypted',
-    phonePill: neutral('Locked'),
-  };
+/** Space tiles for a Vault that is not open: everything except YouTube is sealed. */
+function sealedSpaces(
+  prompt: HomeVaultPrompt,
+  youtube: YouTubeHome,
+): HomeSpace[] {
+  const sealed = prompt.sealedSpace;
   const fields: Record<HomeSpaceKey, SpaceFields> = {
     tasks: sealed,
     groceries: sealed,
@@ -443,12 +579,7 @@ function lockedSpaces(youtube: YouTubeHome): HomeSpace[] {
     addresses: sealed,
     mobile: sealed,
     youtube: youtubeFields(youtube.state),
-    vault: {
-      summary: 'Unlock to use your spaces',
-      pill: warning('Locked'),
-      meta: 'Encrypted',
-      phonePill: neutral('Locked'),
-    },
+    vault: prompt.vaultSpace,
   };
   return assembleSpaces(fields, youtube.visible);
 }
@@ -475,13 +606,15 @@ function phoneTodayMeta(summary: HomeSummaryData | null): string {
 
 /** Builds the whole Home view from the inputs. */
 export function buildHomeView(input: HomeViewInput): HomeView {
-  const { now, summary, unlocked, youtube, backup } = input;
+  const { now, summary, youtube, backup } = input;
+  const vaultPrompt = HOME_VAULT_PROMPTS[input.vault];
+  const unlocked = vaultPrompt === null;
   const summaryPending = unlocked && summary === null;
   const firstName = input.firstName ?? 'there';
 
   let heroLine: string;
-  if (!unlocked) {
-    heroLine = LOCKED_HERO_LINE;
+  if (vaultPrompt !== null) {
+    heroLine = vaultPrompt.heroLine;
   } else if (summary === null) {
     heroLine = 'Loading…';
   } else {
@@ -496,9 +629,10 @@ export function buildHomeView(input: HomeViewInput): HomeView {
         }
       : null;
 
-  const spaces = unlocked
-    ? unlockedSpaces(summary, backup, now, youtube)
-    : lockedSpaces(youtube);
+  const spaces =
+    vaultPrompt === null
+      ? unlockedSpaces(summary, backup, now, youtube)
+      : sealedSpaces(vaultPrompt, youtube);
 
   const dueRows: HomeDueRow[] = [];
   const renewalRows: HomeRenewalRow[] = [];
@@ -546,6 +680,7 @@ export function buildHomeView(input: HomeViewInput): HomeView {
 
   return {
     unlocked,
+    vaultPrompt,
     summaryPending,
     firstName,
     greeting: getGreeting(now),
