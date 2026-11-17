@@ -118,7 +118,8 @@ export type VaultSessionContextValue = {
   claimEvidence: VaultClaimEvidenceState;
   /**
    * Whether the server holds a Vault for this User while this device holds
-   * none. Its one reader is `VaultGate`'s `absent` branch; it lives beside the
+   * none. Its readers are `VaultGate`'s `absent` branch and Dashboard Home
+   * (through `deriveVaultHomeState`); it lives beside the
    * claim check because the two are the same shape and splitting them across
    * the session and the gate would leave nothing to explain the split.
    */

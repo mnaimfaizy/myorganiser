@@ -2,9 +2,9 @@ import { IconButton } from '@myorganiser/web-ui';
 import { Plus } from 'lucide-react';
 
 import type { HomeView } from '../home-view';
-import { HomeLockedCard } from './HomeLockedCard';
 import { HomePhoneHeader } from './HomePhoneHeader';
 import { HomeTodayCard } from './HomeTodayCard';
+import { HomeVaultCard } from './HomeVaultCard';
 import { InstallStrip } from './InstallStrip';
 import { QuickAddMenu } from './QuickAddMenu';
 import { SpaceTile } from './SpaceTile';
@@ -23,7 +23,11 @@ export function HomePhone({ view, onLock }: HomePhoneProps) {
   return (
     <div className="flex flex-col gap-4 px-4 pt-3 pb-24">
       <HomePhoneHeader view={view} onLock={onLock} />
-      {view.unlocked ? <HomeTodayCard view={view} /> : <HomeLockedCard />}
+      {view.vaultPrompt === null ? (
+        <HomeTodayCard view={view} />
+      ) : (
+        <HomeVaultCard prompt={view.vaultPrompt} />
+      )}
       <InstallStrip />
       <section
         aria-labelledby="home-phone-spaces-title"

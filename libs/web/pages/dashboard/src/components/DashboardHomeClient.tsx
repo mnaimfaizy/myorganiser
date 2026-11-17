@@ -3,6 +3,8 @@
 import { getCurrentUser } from '@myorganiser/auth';
 import { useIsMobileState } from '@myorganiser/web-ui';
 import {
+  ABSENT_EVIDENCE_WITHOUT_OWNER,
+  deriveVaultHomeState,
   describeVaultSyncStatus,
   useOptionalVaultSession,
   useVaultSyncStatus,
@@ -48,10 +50,16 @@ export function DashboardHomeClient() {
     status !== null &&
     describeVaultSyncStatus(status).label === null;
 
+  const vault = deriveVaultHomeState({
+    status: handle?.vaultStatus() ?? null,
+    unlocked,
+    absentEvidence: session?.absentEvidence ?? ABSENT_EVIDENCE_WITHOUT_OWNER,
+  });
+
   const view = buildHomeView({
     now,
     firstName: user?.firstName ?? null,
-    unlocked,
+    vault,
     summary,
     backup,
     youtube,
