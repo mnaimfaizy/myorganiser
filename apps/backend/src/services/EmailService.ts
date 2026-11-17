@@ -12,10 +12,15 @@ export interface EmailMessage {
   attachments?: MailAttachment[];
 }
 
+// cPanel's Passenger keeps only stderr in the app root (`stderr.log`); stdout
+// is dropped unless a Passenger log file is configured. A failed send must
+// reach a log the operator can read, so errors and warnings go to stderr.
 const logger = winston.createLogger({
   level: 'debug',
   format: winston.format.json(),
-  transports: [new winston.transports.Console()],
+  transports: [
+    new winston.transports.Console({ stderrLevels: ['error', 'warn'] }),
+  ],
 });
 
 interface EmailOptions {
@@ -40,14 +45,16 @@ class EmailService {
     this.transporter = nodemailer.createTransport(options);
   }
 
+  // No callback: given one, nodemailer returns undefined, the `await` resolves
+  // at once, and a delivery failure never reaches the caller.
   public async sendMail(mailOptions: SendMailOptions): Promise<void> {
-    await this.transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        logger.error(error);
-      } else {
-        logger.info('Email sent: ' + info.response);
-      }
-    });
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      logger.info('Email sent: ' + info.response);
+    } catch (error) {
+      logger.error(error);
+      throw error;
+    }
   }
 }
 

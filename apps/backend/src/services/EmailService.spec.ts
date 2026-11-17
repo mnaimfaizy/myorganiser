@@ -14,6 +14,10 @@ jest.mock('nodemailer');
 const mockNodemailer = jest.mocked(nodemailer);
 // EmailService builds its logger once at module load; grab that instance here.
 const mockLogger = jest.mocked(winston.createLogger).mock.results[0].value;
+// The Console transport is constructed at the same module-load time, so its
+// options are captured here too (beforeEach's clearAllMocks would drop them).
+const consoleTransportOptions = jest.mocked(winston.transports.Console).mock
+  .calls[0][0];
 
 describe('EmailService', () => {
   let mockSendMail: jest.Mock;
@@ -32,11 +36,8 @@ describe('EmailService', () => {
     process.env.EMAIL_SENDER = 'noreply@example.com';
     process.env.DEFAULT_EMAIL_PROVIDER = 'smtp';
 
-    // Mock transporter and sendMail
-    mockSendMail = jest.fn((mailOptions, callback) => {
-      // Call callback synchronously with success response
-      callback(null, { response: 'OK' });
-    });
+    // Mock transporter and sendMail (promise API: no callback argument)
+    mockSendMail = jest.fn().mockResolvedValue({ response: 'OK' });
 
     mockTransporter = {
       sendMail: mockSendMail,
@@ -185,7 +186,7 @@ describe('EmailService', () => {
 
       await sendEmail('user@example.com', 'Subject', message);
 
-      expect(mockNodemailer.createTransport).toHaveBeenCalled();
+      expect(mockNodemailer.createTransport).toHaveBeenCalledTimes(1);
       expect(mockSendMail).toHaveBeenCalledTimes(1);
     });
 
@@ -252,36 +253,46 @@ describe('EmailService', () => {
     });
   });
 
-  describe('sendEmail delivery failure', () => {
-    it('should resolve successfully even when transporter callback receives an error', async () => {
-      // This test pins current behavior: sendEmail resolves (does not reject)
-      // when the underlying transporter.sendMail callback reports a delivery error.
-      // See issue #409.
+  describe('sendEmail delivery outcome', () => {
+    const message: EmailMessage = {
+      html: '<p>Test</p>',
+      text: 'Test',
+    };
+
+    it('should call transporter.sendMail with a single argument and no callback', async () => {
+      await sendEmail('user@example.com', 'Subject', message);
+
+      expect(mockSendMail.mock.calls[0]).toHaveLength(1);
+    });
+
+    it('should log the SMTP response once the send succeeds', async () => {
+      await sendEmail('user@example.com', 'Subject', message);
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Email sent: OK');
+    });
+
+    it('should reject with the transporter error when delivery fails', async () => {
       const deliveryError = new Error('SMTP connection failed');
-      mockSendMail = jest.fn((mailOptions, callback) => {
-        // Simulate a delivery failure by calling callback with an error
-        callback(deliveryError, null);
-      });
+      mockSendMail.mockRejectedValue(deliveryError);
 
-      mockTransporter = {
-        sendMail: mockSendMail,
-      };
-
-      mockNodemailer.createTransport.mockReturnValue(mockTransporter);
-
-      const message: EmailMessage = {
-        html: '<p>Test</p>',
-        text: 'Test',
-      };
-
-      // This should not throw or reject, even though the callback received an error
       await expect(
         sendEmail('user@example.com', 'Subject', message),
-      ).resolves.toBeUndefined();
+      ).rejects.toBe(deliveryError);
 
       expect(mockSendMail).toHaveBeenCalledTimes(1);
       expect(mockLogger.error).toHaveBeenCalledTimes(1);
       expect(mockLogger.error).toHaveBeenCalledWith(deliveryError);
+      expect(mockLogger.info).not.toHaveBeenCalledWith(
+        expect.stringContaining('Email sent'),
+      );
+    });
+  });
+
+  describe('logger configuration', () => {
+    it('should send the Console transport output to stderr for error and warn levels', () => {
+      expect(consoleTransportOptions).toEqual({
+        stderrLevels: ['error', 'warn'],
+      });
     });
   });
 });

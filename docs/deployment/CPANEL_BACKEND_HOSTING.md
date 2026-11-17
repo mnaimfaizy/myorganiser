@@ -226,9 +226,19 @@ for your own account and confirm the message arrives from `EMAIL_SENDER`.
   `package.json`, `package-lock.json`, **and** `prisma/`.
 - Pending migrations or a stale client: dispatch Host Apply.
 
+### No email arrives
+
+- Read `stderr.log` in `<APP_ROOT>`: a failed SMTP send is logged there as a
+  JSON `error` line, and the request that sent it answers `500`.
+- Most failures are configuration: `MAIL_HOST` set to `mail.<domain>` instead
+  of the server hostname, `MAIL_PORT=465` without `MAIL_SECURE=true`, or a
+  wrong `MAIL_USERNAME` / `MAIL_PASSWORD`.
+
 ### Node app won't start
 
-- Read `stderr.log` / `stdout.log` in `<APP_ROOT>`.
+- Read `stderr.log` in `<APP_ROOT>`. Passenger writes only stderr there; the
+  app's stdout (info logs such as `Sending mail to - …`) is kept only if a
+  **Passenger log file** is set on the app in **Setup Node.js App**.
 - Missing environment variables, especially `DATABASE_URL` and the JWT secrets.
 - Missing dependencies: dispatch Host Apply, which re-runs `npm ci --omit=dev`.
 

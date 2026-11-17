@@ -16,7 +16,11 @@ export const decodeToken = (
     const decoded = jwt.verify(token, secret);
     return decoded;
   } catch (err) {
-    console.error(err);
+    // Expiry is a normal outcome every caller handles (re-issue a verification
+    // mail, refresh a session), so logging it only buries real errors.
+    if (!(err instanceof TokenExpiredError)) {
+      console.error(err);
+    }
     if (err instanceof TokenExpiredError) {
       return err as TokenExpiredError;
     } else if (err instanceof JsonWebTokenError) {
