@@ -3,8 +3,9 @@
  *
  * A thin translation from `PasskeyPlatform` to `navigator.credentials`. Every
  * rule lives in `passkeyUnlock.ts`; this file only shapes requests and reads
- * the `prf` extension result. It is exercised on real devices and by the
- * Playwright virtual authenticator, not by Jest.
+ * the `prf` extension result. Jest covers that translation against a stubbed
+ * `navigator.credentials`; real WebAuthn runs only on real devices and under
+ * the Playwright virtual authenticator.
  *
  * The relying party id is left to the browser's default — the page's own
  * domain — on create and get alike, so the two always agree.
@@ -23,11 +24,15 @@ import {
 const RELYING_PARTY_NAME = 'MyOrganiser';
 const CEREMONY_TIMEOUT_MS = 120_000;
 
-/** The `prf` extension's client output, which not every lib.dom version types. */
+/**
+ * The `prf` extension's client output, which not every lib.dom version types.
+ * `first` is `unknown` because a passkey provider extension may answer in
+ * place of the browser and break the spec's BufferSource shape.
+ */
 type PrfExtensionOutput = {
   prf?: {
     enabled?: boolean;
-    results?: { first?: ArrayBuffer | ArrayBufferView };
+    results?: { first?: unknown };
   };
 };
 
@@ -46,14 +51,52 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-function toBytes(
-  value: ArrayBuffer | ArrayBufferView | undefined,
-): Uint8Array | null {
-  if (value === undefined) return null;
-  if (value instanceof ArrayBuffer) return new Uint8Array(value.slice(0));
-  return new Uint8Array(
-    value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength),
+function isByte(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 255
   );
+}
+
+/**
+ * A copy of a PRF result's bytes, or null when it holds none.
+ *
+ * The spec returns a BufferSource (an `ArrayBuffer` or a view over one). The
+ * 1Password browser extension returns a plain array of byte values instead
+ * (its issue FS-5593), so an array whose every element is a byte is accepted
+ * too. Anything else is no PRF output — never a throw, so a malformed result
+ * after a created passkey ends as `unsupported` and the passkey is abandoned.
+ * Length is not checked here: `passkeyUnlock.ts` owns that rule.
+ */
+export function prfOutputBytes(value: unknown): Uint8Array | null {
+  try {
+    if (value instanceof ArrayBuffer) return new Uint8Array(value.slice(0));
+    if (ArrayBuffer.isView(value)) {
+      return new Uint8Array(
+        value.buffer.slice(
+          value.byteOffset,
+          value.byteOffset + value.byteLength,
+        ),
+      );
+    }
+  } catch {
+    // A detached buffer holds no bytes to read.
+    return null;
+  }
+  if (Array.isArray(value) && value.length > 0 && isByteArray(value)) {
+    return Uint8Array.from(value);
+  }
+  return null;
+}
+
+/** Every index holds a byte; unlike `every`, a hole fails. */
+function isByteArray(values: readonly unknown[]): values is number[] {
+  for (let index = 0; index < values.length; index += 1) {
+    if (!isByte(values[index])) return false;
+  }
+  return true;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -78,11 +121,21 @@ function credentialsContainer(): CredentialsContainer {
   return navigator.credentials;
 }
 
+/**
+ * The credential's `prf` output, or undefined when it reports none. A
+ * provider that throws here reports no PRF output rather than failing the
+ * ceremony, so a just-created passkey is still abandoned.
+ */
 function prfOutputOf(
   credential: PublicKeyCredential,
 ): PrfExtensionOutput['prf'] {
-  const results = credential.getClientExtensionResults() as PrfExtensionOutput;
-  return results.prf;
+  try {
+    const results =
+      credential.getClientExtensionResults() as PrfExtensionOutput;
+    return results?.prf;
+  } catch {
+    return undefined;
+  }
 }
 
 function asPublicKeyCredential(
@@ -144,7 +197,7 @@ async function createCredential(
   );
 
   const prf = prfOutputOf(credential);
-  const prfOutput = toBytes(prf?.results?.first);
+  const prfOutput = prfOutputBytes(prf?.results?.first);
   return {
     credentialId: new Uint8Array(credential.rawId.slice(0)),
     prfEnabled: prf?.enabled === true || prfOutput !== null,
@@ -195,7 +248,9 @@ async function getAssertionUnchecked(
       },
     }),
   );
-  return { prfOutput: toBytes(prfOutputOf(credential)?.results?.first) };
+  return {
+    prfOutput: prfOutputBytes(prfOutputOf(credential)?.results?.first),
+  };
 }
 
 async function abandonCredential(credentialId: Uint8Array): Promise<void> {
