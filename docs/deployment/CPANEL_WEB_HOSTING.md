@@ -338,7 +338,9 @@ panel. Re-check `/sw.js` after changing the app's settings in the panel.
 
 ### Node app won't start
 
-- Read `stderr.log` / `stdout.log` in `<WEB_APP_ROOT>`.
+- Read `stderr.log` in `<WEB_APP_ROOT>`. Passenger writes only stderr there;
+  stdout is kept only if a **Passenger log file** is set on the app in
+  **Setup Node.js App**.
 - The startup file must be exactly `server.js`.
 - Dependencies missing: **Run NPM Install**, then restart.
 
