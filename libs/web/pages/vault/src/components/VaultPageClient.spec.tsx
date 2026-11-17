@@ -10,6 +10,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
  */
 const mockExportVaultNow = jest.fn<Promise<boolean>, []>();
 
+/**
+ * The gate's mount and unmount, so a test can tell whether the page kept the
+ * gate mounted (and with it the unacknowledged Recovery Key) or replaced it.
+ */
+const mockVaultGateMounted = jest.fn<void, []>();
+const mockVaultGateUnmounted = jest.fn<void, []>();
+
+/** Set per test: whether the stubbed gate has passed and renders its unlocked children. */
+const mockVaultGateState = { passed: false };
+
 // Mock useVaultDisabledState at its module path so the real useVaultOperationAvailability
 // (which imports it from the same file) will use the mock when it calls useVaultDisabledState().
 jest.mock('../hooks/useVaultDisabledState.ts', () => ({
@@ -47,6 +57,28 @@ jest.mock('@myorganiser/web-vault-ui', () => {
   const actual = jest.requireActual('@myorganiser/web-vault-ui');
   return {
     ...actual,
+    // Stands in for the gate. Its own screens are out of scope here; what the page
+    // owes is where the gate sits and when it mounts. Children render only once the
+    // gate has passed, as they do for the real gate.
+    VaultGate: ({
+      title,
+      children,
+    }: {
+      title: string;
+      children: (ctx: { handle: null }) => ReactNode;
+    }) => {
+      const { useEffect } = jest.requireActual<typeof import('react')>('react');
+      useEffect(() => {
+        mockVaultGateMounted();
+        return () => mockVaultGateUnmounted();
+      }, []);
+      return (
+        <div data-testid="vault-gate">
+          <h1>{title}</h1>
+          {mockVaultGateState.passed ? children({ handle: null }) : null}
+        </div>
+      );
+    },
     useOptionalVaultSession: () => ({
       masterKeyBytes: null,
       setMasterKeyBytes: jest.fn(),
@@ -133,6 +165,7 @@ jest.mock('./CloudBackupLiveCard', () => ({
   ),
 }));
 
+import type { ReactNode } from 'react';
 import { VaultPageClient } from './VaultPageClient';
 import { useIsMobile } from '@myorganiser/web-ui';
 import {
@@ -172,6 +205,7 @@ describe('VaultPageClient', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVaultGateState.passed = false;
     delete process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     (useGoogleIdentityScript as jest.Mock).mockReturnValue('loading');
     setDisabledState('locked');
@@ -389,21 +423,24 @@ describe('VaultPageClient', () => {
   });
 
   describe('Heading and layout', () => {
-    test('renders exactly one h1 for each of the enabled, locked, and no-local-vault states', () => {
-      const cases: Array<[string, string]> = [
-        ['enabled', 'Your vault is unlocked'],
-        ['locked', 'Unlock your vault'],
-        ['no-local-vault', 'Vault'],
-        ['signed-out', 'Vault'],
+    test('renders exactly one h1 for each of the enabled, locked, no-local-vault, and signed-out states', () => {
+      // The gate is the hero for no-local-vault and supplies its own h1 ("Vault"),
+      // so the sr-only page heading is not rendered beside it.
+      const cases: Array<[string, string, boolean]> = [
+        ['enabled', 'Your vault is unlocked', false],
+        ['locked', 'Unlock your vault', false],
+        ['no-local-vault', 'Vault', true],
+        ['signed-out', 'Vault', false],
       ];
 
-      for (const [state, title] of cases) {
+      for (const [state, title, inGate] of cases) {
         setDisabledState(state);
         const { unmount } = render(<VaultPageClient />);
 
         const h1s = screen.getAllByRole('heading', { level: 1 });
         expect(h1s).toHaveLength(1);
         expect(h1s[0].textContent).toBe(title);
+        expect(Boolean(screen.queryByTestId('vault-gate'))).toBe(inGate);
 
         unmount();
       }
@@ -434,6 +471,116 @@ describe('VaultPageClient', () => {
         screen.queryByText('Encrypted cloud backup'),
       ).not.toBeInTheDocument();
       expect(screen.getAllByTestId('remove-vault-button')).toHaveLength(1);
+    });
+  });
+
+  describe('VaultGate hero for no-local-vault and creation', () => {
+    test('below md, no-local-vault renders the gate as the hero', () => {
+      (useIsMobile as jest.Mock).mockReturnValue(true);
+      setDisabledState('no-local-vault');
+
+      render(<VaultPageClient />);
+
+      expect(screen.getByTestId('vault-gate')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Access' }),
+      ).toBeInTheDocument();
+    });
+
+    test('no-local-vault still shows the policy reason in the backup section (ADR 0068)', () => {
+      setDisabledState('no-local-vault');
+
+      render(<VaultPageClient />);
+
+      expect(screen.getByTestId('vault-gate')).toBeInTheDocument();
+      expect(
+        screen.getByText('There is no vault on this device to back up.'),
+      ).toBeInTheDocument();
+    });
+
+    test('keeps the gate mounted when creation moves the state from no-local-vault to locked', () => {
+      setDisabledState('no-local-vault');
+      const { rerender } = render(<VaultPageClient />);
+      expect(mockVaultGateMounted).toHaveBeenCalledTimes(1);
+
+      setDisabledState('locked');
+      rerender(<VaultPageClient />);
+
+      expect(screen.getByTestId('vault-gate')).toBeInTheDocument();
+      expect(mockVaultGateMounted).toHaveBeenCalledTimes(1);
+      expect(mockVaultGateUnmounted).not.toHaveBeenCalled();
+      expect(
+        screen.queryByTestId('vault-unlock-submit'),
+      ).not.toBeInTheDocument();
+    });
+
+    test('keeps the gate mounted when creation moves the state from no-local-vault to enabled', () => {
+      setDisabledState('no-local-vault');
+      const { rerender } = render(<VaultPageClient />);
+
+      setDisabledState('enabled');
+      rerender(<VaultPageClient />);
+
+      expect(screen.getByTestId('vault-gate')).toBeInTheDocument();
+      expect(mockVaultGateUnmounted).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole('heading', {
+          level: 1,
+          name: 'Your vault is unlocked',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    test('once the gate passes, the enabled hero renders on its own and the gate unmounts', () => {
+      setDisabledState('no-local-vault');
+      const { rerender } = render(<VaultPageClient />);
+      setDisabledState('enabled');
+      rerender(<VaultPageClient />);
+      expect(screen.getByTestId('vault-gate')).toBeInTheDocument();
+
+      mockVaultGateState.passed = true;
+      rerender(<VaultPageClient />);
+
+      expect(screen.queryByTestId('vault-gate')).not.toBeInTheDocument();
+      expect(mockVaultGateUnmounted).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'Your vault is unlocked',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    test('signing out clears the latch: no gate on signed-out, and a later locked arrival shows the unlock card', () => {
+      setDisabledState('no-local-vault');
+      const { rerender } = render(<VaultPageClient />);
+
+      setDisabledState('signed-out');
+      rerender(<VaultPageClient />);
+
+      expect(screen.queryByTestId('vault-gate')).not.toBeInTheDocument();
+      expect(mockVaultGateUnmounted).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Vault' }),
+      ).toBeInTheDocument();
+
+      setDisabledState('locked');
+      rerender(<VaultPageClient />);
+
+      expect(screen.queryByTestId('vault-gate')).not.toBeInTheDocument();
+      expect(screen.getByTestId('vault-unlock-submit')).toBeInTheDocument();
+    });
+
+    test('locked and enabled arrivals never show the gate', () => {
+      for (const state of ['locked', 'enabled']) {
+        setDisabledState(state);
+        const { unmount } = render(<VaultPageClient />);
+
+        expect(screen.queryByTestId('vault-gate')).not.toBeInTheDocument();
+
+        unmount();
+      }
+      expect(mockVaultGateMounted).not.toHaveBeenCalled();
     });
   });
 

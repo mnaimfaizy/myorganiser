@@ -18,7 +18,8 @@ import { PHONE_VIEWPORT, signInToShell, tabBar } from './helpers/shellLayout';
  *
  * The three Vault states:
  * - no vault: the stubbed GET /vault is 404, so the server is proven to hold
- *   none and Home offers Create your vault, a link to the vault page;
+ *   none and Home offers Create your vault, a link to the vault page, which
+ *   opens the create form (the vault is not created here);
  * - owned and locked: the same owner after creating and unlocking a vault,
  *   then locking it from Home's lock control. Home stays mounted, so the
  *   locked treatment is checked on the page it was unlocked on;
@@ -102,7 +103,7 @@ test.describe('Home layout (E2E)', () => {
   test.describe('Home layout at 1440px (E2E)', () => {
     test.use({ viewport: DESKTOP_VIEWPORT });
 
-    test('no-vault Home offers Create your vault in place of the locked hero, and no horizontal overflow', async ({
+    test('no-vault Home offers Create your vault in place of the locked hero, and no horizontal overflow, and the link opens the vault create form', async ({
       page,
     }) => {
       test.setTimeout(120000);
@@ -150,6 +151,21 @@ test.describe('Home layout (E2E)', () => {
       );
 
       await expectNoHorizontalOverflow(page, 'Home without a vault at 1440px');
+
+      await createLink.click();
+      await expect(page).toHaveURL(/\/dashboard\/vault\/?$/, {
+        timeout: 30000,
+      });
+      await expect(
+        page.getByRole('button', {
+          name: 'Create encrypted vault',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('#setup-passphrase')).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Unlock vault', exact: true }),
+      ).toHaveCount(0);
     });
 
     test('unlocked Home has landmarks, zero-state copy, space links, the quick-add menu, and no horizontal overflow, then locks back to the locked Home', async ({
@@ -252,7 +268,7 @@ test.describe('Home layout (E2E)', () => {
   test.describe('Home layout at 390px (E2E)', () => {
     test.use({ viewport: PHONE_VIEWPORT });
 
-    test('no-vault Home offers Create your vault in the set-up card, with no FAB and no horizontal overflow', async ({
+    test('no-vault Home offers Create your vault in the set-up card, with no FAB and no horizontal overflow, and the link opens the vault create form', async ({
       page,
     }) => {
       test.setTimeout(120000);
@@ -265,9 +281,11 @@ test.describe('Home layout (E2E)', () => {
       });
       await expect(setUp).toBeVisible({ timeout: 30000 });
       await expectOnlyH1(page, FIRST_NAME);
-      await expect(
-        setUp.getByRole('link', { name: 'Create your vault', exact: true }),
-      ).toHaveAttribute('href', '/dashboard/vault');
+      const setUpCreateLink = setUp.getByRole('link', {
+        name: 'Create your vault',
+        exact: true,
+      });
+      await expect(setUpCreateLink).toHaveAttribute('href', '/dashboard/vault');
       await expect(
         page.getByRole('region', { name: 'Vault locked', exact: true }),
       ).toHaveCount(0);
@@ -296,6 +314,21 @@ test.describe('Home layout (E2E)', () => {
       ).toHaveCount(0);
 
       await expectNoHorizontalOverflow(page, 'Home without a vault at 390px');
+
+      await setUpCreateLink.click();
+      await expect(page).toHaveURL(/\/dashboard\/vault\/?$/, {
+        timeout: 30000,
+      });
+      await expect(
+        page.getByRole('button', {
+          name: 'Create encrypted vault',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('#setup-passphrase')).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Unlock vault', exact: true }),
+      ).toHaveCount(0);
     });
 
     test('unlocked Home has the Today card, the Lock vault control, the quick-add FAB menu, and no horizontal overflow, then locks back to the locked card', async ({
