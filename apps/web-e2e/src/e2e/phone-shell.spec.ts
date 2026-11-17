@@ -133,11 +133,16 @@ test.describe('Phone shell (E2E)', () => {
     await expect(
       bar.getByRole('link', { name: 'Vault', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
-    // With no Local Vault the page's only heading is its sr-only h1. Wait for
-    // that, then for the always-rendered Export card, and count the h1s.
+    // With no Local Vault the vault gate's setup form is the hero. The gate's
+    // checking frame has a bare "Vault" h1 first, so wait for the setup h1,
+    // then for the always-rendered Export card, and count the h1s.
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Vault', exact: true }),
-    ).toBeVisible();
+      page.getByRole('heading', {
+        level: 1,
+        name: 'Vault: Set encryption passphrase',
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30000 });
     await expect(
       page.getByText('Export encrypted vault', { exact: true }),
     ).toBeVisible();

@@ -96,8 +96,18 @@ test.describe('Vault page layout (E2E)', () => {
       await gotoStable(page, '/dashboard/vault');
       await waitForDashboardReady(page);
 
-      // The hero is an sr-only h1 until the vault state resolves.
-      await expectSingleH1(page, 'Vault');
+      // With no Local Vault the vault gate's setup form is the hero. The gate
+      // shows a checking frame first, and its h1 is the bare "Vault", so wait
+      // for the setup h1 before counting the h1s.
+      await expect(
+        page.getByRole('heading', {
+          level: 1,
+          name: 'Vault: Set encryption passphrase',
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 30000 });
+      await expect(page.locator('#setup-passphrase')).toBeVisible();
+      await expectSingleH1(page, 'Vault: Set encryption passphrase');
 
       for (const name of SECTION_H2S) {
         await expect(
