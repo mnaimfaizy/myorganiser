@@ -62,7 +62,7 @@ Note: these are VS Code workspace skills stored in `.agents/skills`. They are in
 
 Third-party skills come in two scopes, and the scope decides everything (ADR 0030).
 
-**Project scope** installs into this directory and is committed — an **Upstream-Owned Skill**. Never hand-edit one; refresh it with `npx skills update -p` and commit the diff. `skills-lock.json` is the registry, and `yarn skills:map:check` reads it to tell upstream-owned directories from repo-native ones. Four skills are in this tier: `codebase-design`, `handoff`, `modern-web-guidance`, `prototype`.
+**Project scope** installs into this directory and is committed — an **Upstream-Owned Skill**. Never hand-edit one; refresh it with `npx skills update -p` and commit the diff. `skills-lock.json` is the registry, and `yarn skills:map:check` reads it to tell upstream-owned directories from repo-native ones. `EXTERNAL_SKILLS.md` lists the skills in this tier; `yarn skills:map:check` holds that list and `skills-lock.json` in step.
 
 **Personal scope** is no longer approved. A skill on one developer's machine cannot be updated, reviewed, or vouched for by this repo, and the thirteen personal-scope recommendations went four months with nobody installing any of them while two died upstream (ADR 0032). For fast-moving framework knowledge, run `upstream-brief` — it audits repo-owned instructions against official docs for the Ecosystems you name, anchored to what is installed, and keeps the result here, under review.
 
