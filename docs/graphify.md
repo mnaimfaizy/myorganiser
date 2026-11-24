@@ -35,7 +35,14 @@ Always confirm a graph result against the actual file before trusting it — the
 
 ### From a linked worktree
 
-`.mcp.json` starts the server on `graphify-out/graph.json`, a path relative to the session's working
+In Codex, the trusted project MCP configuration starts `graphify-mcp` with the
+primary checkout's absolute `graphify-out/graph.json` path. Install the pinned
+MCP build below and make its executable available on the Codex process's
+`PATH`. The Codex tools are `get_neighbors` and `god_nodes`. An absent index
+produces a tool response with the expected path. Build the graph in the primary
+checkout using [Build the graph](#build-the-graph) to enable lookup.
+
+In Claude Code, `.mcp.json` starts the server on `graphify-out/graph.json`, a path relative to the session's working
 directory. A linked worktree has no `graphify-out/` — the graph belongs to the primary checkout — so
 every tool call answers `graph.json not found`. Pass `project_path` with the primary checkout's
 absolute path on the call and it answers from that graph. `CodeExplorer` is told to retry this way;
@@ -137,7 +144,7 @@ The harness-specific parts (tool names) use the `<!-- harness:... -->` mechanism
 
 ## Harness registration
 
-Registered in all four harnesses. The MCP server itself is harness-agnostic — plain stdio JSON-RPC —
+Registered in five harnesses. The MCP server itself is harness-agnostic — plain stdio JSON-RPC —
 so only the registration differs, and the formats are **not** interchangeable. Each was checked
 against that harness's own docs rather than copied from `.mcp.json`.
 
@@ -147,6 +154,7 @@ against that harness's own docs rather than copied from `.mcp.json`.
 | Copilot / VS Code | `.vscode/mcp.json`                      | `servers`     | `graphify/*` in `.github/agents/explore.agent.md`        |
 | Cursor            | `.cursor/mcp.json`                      | `mcpServers`  | none — Cursor subagents inherit the parent agent's tools |
 | Gemini CLI        | `.gemini/settings.json` (project scope) | `mcpServers`  | `mcp_graphify_*` in `.gemini/agents/explore.md`          |
+| Codex             | `.codex/config.toml` (trusted project)  | `mcp_servers` | `get_neighbors` and `god_nodes`                          |
 
 Two caveats:
 
@@ -157,7 +165,7 @@ Two caveats:
   (google-gemini/gemini-cli#17005, #19599). CodeExplorer is told to fall back to Glob/Grep and note
   it under Scope, so this degrades rather than breaks.
 
-All four share the same local prerequisite: `uv tool install "graphifyy[mcp]==0.9.43"` plus one
+The harnesses share the same local prerequisite: `uv tool install "graphifyy[mcp]==0.9.43"` plus one
 manual graph build (below). Without it a harness simply has no graphify tools, which is the
 documented fallback path, not a failure.
 

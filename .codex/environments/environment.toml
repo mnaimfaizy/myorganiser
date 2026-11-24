@@ -1,0 +1,23 @@
+version = 1
+name = "MyOrganiser"
+
+[setup]
+script = ""
+
+[setup.win32]
+script = '''
+corepack yarn install --immutable
+exit $LASTEXITCODE
+'''
+
+[[actions]]
+name = "Start backend"
+icon = "run"
+command = "corepack yarn start:backend"
+platform = "win32"
+
+[[actions]]
+name = "Start web"
+icon = "run"
+command = "corepack yarn start:web"
+platform = "win32"
