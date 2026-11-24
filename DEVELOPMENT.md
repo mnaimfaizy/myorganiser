@@ -189,6 +189,26 @@ explicitly with `$implement` or `$orchestrate`.
 
 For the optional structural index, see [Graphify from a linked worktree](docs/graphify.md#from-a-linked-worktree).
 
+#### Review and verify the interactive guard hooks
+
+Open the worktree as a trusted project. In Codex Desktop on Windows, use
+**Review hooks** in the composer or open **Settings > Hooks**. In the CLI,
+run `/hooks`. Review the two commands from `.codex/hooks.json` and the
+shared scripts they invoke before trusting them. Codex skips new or changed
+hook definitions until you accept them. Review shared script changes as part
+of updating the worktree too. In a linked worktree, Codex can load hook
+definitions from the primary checkout. If the hooks are missing from the
+review list, check that the primary checkout contains the definitions.
+The commands run the shared guards from the worktree you opened.
+[Codex hook trust](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+
+In that session, ask Codex to run `git status --short` and add a plain-text file
+under `tmp/`. Both should proceed under your normal sandbox and approval policy.
+Then ask Codex to use its patch tool to add a harmless test file under
+`libs/app-api-client/src/`. The hook should refuse the patch before creating
+the file. The focused contract suites exercise synthetic credential inputs and
+the Sign-off Issue body-file guard without sending any GitHub writes.
+
 ## Starting Local Development Dependencies and Services
 
 ### Starting Dependencies (Docker)

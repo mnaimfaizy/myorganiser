@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   PRE_TOOL_USE_HOOK,
+  CODEX_HOOK_ARGS,
+  codexPayload,
+  expectCodexDenial,
+  runHookRaw,
   expectAllowed,
   expectDenied,
   runHook,
@@ -25,6 +29,68 @@ const API_SPECS_AGENTS = 'libs/api-specs/AGENTS.md';
 const PRIVATE_SSH_KEY = `keys/${['id', 'rsa'].join('_')}`;
 
 describe('pre-tool-use hook', () => {
+  describe('Codex tools', () => {
+    it('blocks a PowerShell write to generated code', () => {
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload(
+          'Bash',
+          'Set-Content libs\\app-api-client\\src\\index.ts example',
+        ),
+        /generated api client/i,
+      );
+    });
+
+    it('blocks a patch targeting a generated path relative to a nested workdir', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Add File: src/synthetic.ts',
+        '+example',
+        '*** End Patch',
+      ].join('\r\n');
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload(
+          'apply_patch',
+          patch,
+          join(process.cwd(), 'libs', 'app-api-client'),
+        ),
+        /generated api client/i,
+      );
+    });
+
+    it('blocks moving a file into a protected directory', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Update File: src/example.ts',
+        '*** Move to: libs/app-api-client/src/example.ts',
+        '*** End Patch',
+      ].join('\n');
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload('apply_patch', patch),
+        /generated api client/i,
+      );
+    });
+
+    it('defers on a patch that mentions generated code in its content', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Add File: notes.md',
+        '+*** Update File: libs/app-api-client/src/index.ts',
+        '*** End Patch',
+      ].join('\n');
+      const result = runHookRaw(
+        PRE_TOOL_USE_HOOK,
+        codexPayload('apply_patch', patch),
+        {
+          args: CODEX_HOOK_ARGS,
+        },
+      );
+      assert.deepEqual(result, { status: 0, stdout: '', stderr: '' });
+    });
+  });
+
   describe('read guard for read tools', () => {
     it('should deny reading an environment file', () => {
       expectDenied(
@@ -490,6 +556,50 @@ describe('pre-tool-use hook', () => {
         rmSync(dir, { recursive: true, force: true });
       }
     }
+
+    it('blocks a Sign-off Issue body file relative to the Codex tool cwd', () => {
+      withBodyFile(SIGNED_OFF_BODY, (bodyFile) => {
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload(
+            'Bash',
+            'gh issue edit 1600 --body-file body.md',
+            dirname(bodyFile),
+          ),
+          /sign-off issue/i,
+        );
+      });
+    });
+
+    it('blocks a Codex waiver passed through a quoted body-file path', () => {
+      withBodyFile('', (bodyFile) => {
+        const waiverFile = join(dirname(bodyFile), 'waiver body.md');
+        writeFileSync(waiverFile, WAIVER);
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload(
+            'Bash',
+            "gh issue comment 1600 --body-file 'waiver body.md'",
+            dirname(bodyFile),
+          ),
+          /waive/i,
+        );
+      });
+    });
+
+    it('defers on an ordinary Codex issue write with a body file', () => {
+      withBodyFile('Ordinary update', (bodyFile) => {
+        const event = codexPayload(
+          'Bash',
+          'gh issue edit 1599 --body-file body.md',
+          dirname(bodyFile),
+        );
+        const result = runHookRaw(PRE_TOOL_USE_HOOK, event, {
+          args: CODEX_HOOK_ARGS,
+        });
+        assert.deepEqual(result, { status: 0, stdout: '', stderr: '' });
+      });
+    });
 
     it('should deny an agent editing a Sign-off Issue body to tick a check', () => {
       expectDenied(

@@ -1,5 +1,8 @@
+import { isAbsolute, resolve } from 'node:path';
+
 import {
   allowTool,
+  CODEX_HOOK,
   COMMAND_KEYS,
   denyTool,
   extractCommand,
@@ -296,7 +299,7 @@ function getProtectedPathReason(text: string): string | null {
   return null;
 }
 
-function inspectPatchText(text: string): string | null {
+function inspectPatchText(text: string, cwd?: string): string | null {
   const lines = text.split(/\r?\n/);
 
   for (const line of lines) {
@@ -308,7 +311,8 @@ function inspectPatchText(text: string): string | null {
       continue;
     }
 
-    const reason = getProtectedPathReason(match[1] ?? match[2] ?? '');
+    const target = match[1];
+    const reason = getProtectedPathReason(cwd ? resolve(cwd, target) : target);
     if (reason) {
       return reason;
     }
@@ -365,7 +369,11 @@ function inspectNode(node: unknown, key = ''): string | null {
   return null;
 }
 
-function inspectToolInput(toolName: string, toolInput: unknown): string | null {
+function inspectToolInput(
+  toolName: string,
+  toolInput: unknown,
+  cwd?: string,
+): string | null {
   if (!toolName) {
     return null;
   }
@@ -376,7 +384,7 @@ function inspectToolInput(toolName: string, toolInput: unknown): string | null {
     toolName === 'patch'
   ) {
     if (typeof toolInput === 'string') {
-      return inspectPatchText(toolInput);
+      return inspectPatchText(toolInput, cwd);
     }
 
     return getProtectedPathReason(JSON.stringify(toolInput ?? {}));
@@ -413,6 +421,11 @@ async function main() {
   const payload = await readPayloadOrExit();
   const toolName = getToolName(payload);
   const toolInput = getToolInput(payload);
+  // Resolve relative paths against the tool cwd reported by Codex.
+  const cwd =
+    CODEX_HOOK && typeof payload?.cwd === 'string' && isAbsolute(payload.cwd)
+      ? payload.cwd
+      : undefined;
 
   if (READ_TOOL_NAMES.has(toolName)) {
     const readReason =
@@ -434,7 +447,7 @@ async function main() {
   if (SHELL_TOOL_NAMES.has(toolName)) {
     // Heredoc bodies are kept: a Sign-off body or a waiver piped into `gh`
     // through one is exactly what this guard must see.
-    const signoffReason = getSignoffWriteReason(extractCommand(toolInput));
+    const signoffReason = getSignoffWriteReason(extractCommand(toolInput), cwd);
     if (signoffReason) {
       denyTool(signoffReason);
     }
@@ -450,7 +463,7 @@ async function main() {
     }
   }
 
-  const reason = inspectToolInput(toolName, toolInput);
+  const reason = inspectToolInput(toolName, toolInput, cwd);
   if (!reason) {
     allowTool();
   }
