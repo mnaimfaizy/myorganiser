@@ -20,6 +20,11 @@ import {
   validateToolMap,
   writeGrant,
 } from './lib/agent-tool-grants.ts';
+import {
+  CODEX_ROLE_DIRECTORY,
+  codexAdapter,
+  readCodexGrant,
+} from './lib/codex-agent-adapter.ts';
 import { renderHarnessSections } from './lib/harness-sections.ts';
 
 const repoRoot = process.cwd();
@@ -58,6 +63,11 @@ interface HarnessSyncConfig {
 }
 
 const HARNESS_CONFIG: Record<string, HarnessSyncConfig> = {
+  codex: {
+    dir: path.join(repoRoot, CODEX_ROLE_DIRECTORY),
+    extension: '.toml',
+    nameTransform: (name) => name,
+  },
   claude: {
     dir: path.join(repoRoot, '.claude', 'agents'),
     extension: '.md',
@@ -251,6 +261,13 @@ async function loadCanonicalAgents(): Promise<CanonicalAgent[]> {
       sourcePath: path.relative(repoRoot, fullPath),
     });
   }
+  const names = new Set<string>();
+  for (const agent of agents) {
+    const name = agent.canonicalMeta.name.toLowerCase();
+    if (names.has(name))
+      throw new Error(`Duplicate Codex role name: ${agent.canonicalMeta.name}`);
+    names.add(name);
+  }
   return agents;
 }
 
@@ -281,7 +298,7 @@ async function syncHarness(
   prune: boolean,
 ): Promise<HarnessReport> {
   const cfg = HARNESS_CONFIG[harness];
-  await fs.mkdir(cfg.dir, { recursive: true });
+  if (mode === 'apply') await fs.mkdir(cfg.dir, { recursive: true });
 
   const existingEntries = await readDirSafe(cfg.dir);
   const existingFiles = existingEntries
@@ -323,6 +340,51 @@ async function syncHarness(
       canonical.slug,
       TOOL_MAP,
     );
+    if (harness === 'codex') {
+      const rel = path.relative(repoRoot, targetPath);
+      const model = MODEL_POLICY.agents?.[canonical.slug]?.models?.codex;
+      if (typeof model !== 'string' || !model || !('tools' in desiredGrant)) {
+        throw new Error(
+          `Missing Codex model or tool grant for ${canonical.slug}`,
+        );
+      }
+      const desired = codexAdapter(
+        canonical.canonicalMeta.name,
+        canonical.canonicalMeta.description,
+        model,
+        desiredBody,
+        desiredGrant,
+      );
+      const current = existingContent?.replaceAll('\r\n', '\n');
+      if (current === desired) {
+        report.unchanged.push(rel);
+        continue;
+      }
+      if (current !== undefined) {
+        try {
+          const before = readCodexGrant(current);
+          if (!grantsEqual(before, desiredGrant)) {
+            report.toolDrift.push({
+              path: rel,
+              before,
+              after: desiredGrant,
+              change: describeGrantChange(before, desiredGrant),
+            });
+          }
+        } catch {
+          report.malformed.push(rel);
+          continue;
+        }
+        report.drifted.push(rel);
+      } else {
+        report.missing.push(rel);
+      }
+      if (mode === 'apply') {
+        await fs.writeFile(targetPath, desired, 'utf8');
+        (current === undefined ? report.created : report.updated).push(rel);
+      }
+      continue;
+    }
     if (!existingContent) {
       const frontmatter = buildFrontmatter(
         harness,
@@ -389,7 +451,7 @@ async function syncHarness(
   }
 
   for (const fileName of existingFiles) {
-    const slug = fileName.replace(/\.md$/, '');
+    const slug = fileName.slice(0, -cfg.extension.length);
     if (!canonicalSlugs.has(slug)) {
       const targetPath = path.join(cfg.dir, fileName);
       const rel = path.relative(repoRoot, targetPath);
@@ -493,8 +555,8 @@ async function main() {
 
   if (hasMalformed(reports)) {
     console.error(
-      '\nERROR: the files marked ! have unreadable frontmatter and were left untouched.\n' +
-        'Fix their `---` delimited frontmatter by hand, then re-run. This script will not\n' +
+      '\nERROR: the files marked ! have unreadable adapter metadata and were left untouched.\n' +
+        'Repair their metadata, then re-run. This script will not\n' +
         'regenerate frontmatter for an existing file — doing so would discard its hand-written keys.',
     );
     process.exitCode = 1;

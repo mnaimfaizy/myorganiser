@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+import { CODEX_ROLE_DIRECTORY } from './lib/codex-agent-adapter.ts';
 import { errorMessage } from './lib/error-message.ts';
 
 const repoRoot = process.cwd();
@@ -20,6 +21,10 @@ interface HarnessPathConfig {
 }
 
 const HARNESS_PATHS: Record<string, HarnessPathConfig> = {
+  codex: {
+    dir: path.join(repoRoot, CODEX_ROLE_DIRECTORY),
+    fileName: (slug) => `${slug}.toml`,
+  },
   copilot: {
     dir: path.join(repoRoot, '.github', 'agents'),
     fileName: (slug) => `${slug}.agent.md`,
@@ -128,7 +133,19 @@ async function main() {
       const content = await fs.readFile(filePath, 'utf8');
       let desired: string;
       try {
-        desired = replaceModel(content, expected);
+        if (harness === 'codex') {
+          if (
+            typeof expected !== 'string' ||
+            !/^model = "[^"\r\n]+"\r?$/m.test(content)
+          )
+            throw new Error('missing single Codex model');
+          desired = content.replace(
+            /^model = "[^"\r\n]+"/m,
+            'model = ' + JSON.stringify(expected),
+          );
+        } else {
+          desired = replaceModel(content, expected);
+        }
       } catch (error) {
         throw new Error(`${relativePath}: ${errorMessage(error)}`);
       }
@@ -144,7 +161,9 @@ async function main() {
 
   console.log(`Sub-agent model sync mode: ${mode}`);
   console.log(`  policy: ${path.relative(repoRoot, policyPath)}`);
-  console.log(`  assignments checked: ${slugs.length * 4}`);
+  console.log(
+    `  assignments checked: ${slugs.length * Object.keys(HARNESS_PATHS).length}`,
+  );
   console.log(`  drifted: ${drifted.length}`);
   if (mode === 'apply') console.log(`  updated: ${updated.length}`);
   for (const file of drifted) console.log(`    ~ ${file}`);

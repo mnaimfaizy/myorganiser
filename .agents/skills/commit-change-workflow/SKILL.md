@@ -44,7 +44,7 @@ The `Commit` sub-agent must stay read-only. Do not ask it to stage, commit, or f
 ## Workflow
 
 1. Inspect git state and finish staging as above.
-2. Call the `Commit` sub-agent to draft the Conventional Commit message from the staged diff.
+2. In Codex, run `node tools/scripts/ai/codex-role-launcher.ts Commit "Draft a Conventional Commit message from the staged changes."`. In other Harnesses, call the `Commit` sub-agent. If the launcher fails or cannot verify its restrictions, stop and report the failure.
 3. Write the drafted message to a temporary file.
 4. Run:
 

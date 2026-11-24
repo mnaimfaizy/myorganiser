@@ -45,7 +45,7 @@ Humans (or CI) may still run `yarn ai:create-pr` with no `--title` / `--body-fil
 ## Workflow
 
 1. Confirm the current branch is not the base branch (`main` / default). If it is, stop. On a PRD's feature branch, apply [the Outcome Check](../../../docs/agents/outcome-check.md) to its slices first.
-2. Call the `PrAuthor` sub-agent to draft the title, Surface Labels, merge base, and body from `merge-base..HEAD` plus linked issues (`#N` in commits and `issue/N-…` / `feat/N-…` branch names).
+2. In Codex, run `node tools/scripts/ai/codex-role-launcher.ts PrAuthor "Draft the pull request from the current branch."`. In other Harnesses, call the `PrAuthor` sub-agent. For an explicit base branch, insert `--base <branch>` before the task text. If the launcher fails or cannot verify its restrictions, stop and report the failure.
 3. If `PrAuthor` returns `ON_BASE_BRANCH:` or `NO_BRANCH_COMMITS:`, stop and report that line. Do not run `ai:create-pr`.
 4. Parse the draft: the first line is `TITLE: <text>`; an optional `LABELS: <a,b>` line follows; then `MERGE-BASE: <sha>`; the body starts at the first `##` heading. Write the body to a temporary file — the header lines stay out of it.
 5. If `MERGE-BASE:` is absent, stop. Report that the draft carries no proof of branch inspection and re-run `PrAuthor`. Do not compute the SHA on its behalf; that defeats the gate.
