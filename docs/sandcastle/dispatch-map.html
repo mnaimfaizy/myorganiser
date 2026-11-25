@@ -2932,7 +2932,9 @@
             killed; then it is tagged. The <b>tag</b> is the load-bearing half:
             it keeps the commit reachable after a later
             <code>git branch -D</code>. Nothing in it has passed a
-            deterministic check.
+            deterministic check. The commit, the tag and the branch-equals-tag
+            check must all succeed; if any fails, preservation is reported as
+            failed and the run never waits on that slice.
           </dd>
 
           <dt>Print the log tail</dt>
@@ -2962,7 +2964,7 @@
   <section class="panel" aria-labelledby="modes-h">
     <div class="phead">
       <h2 id="modes-h">Three modes</h2>
-      <span class="src">main.mts:886-1059, :999-1005, :3462-3534</span>
+      <span class="src">main.mts:889-1062, :1002-1008, :3531-3603</span>
     </div>
     <div class="pbody">
       <div class="scrollx">
@@ -3089,7 +3091,7 @@
   <section class="panel" aria-labelledby="gate-h">
     <div class="phead">
       <h2 id="gate-h">The gate &mdash; two project scopes</h2>
-      <span class="src">main.mts:278-339, :1965-2177</span>
+      <span class="src">main.mts:281-342, :1978-2246</span>
     </div>
     <div class="pbody">
       <p>
@@ -3390,8 +3392,13 @@
         <li>
           The reset time <b>parsed</b>. Only
           <code>resets [at] H[:MM](am|pm) (UTC)</code> is accepted; a bare local
-          time is ambiguous across machines.
+          time is ambiguous across machines. A reset that is not in the future
+          exits too.
           <span class="mk mk-fc">FAIL-CLOSED</span>
+        </li>
+        <li>
+          The interrupted work was preserved as a verified checkpoint, or the
+          run left none. A failed commit, tag or check never waits.
         </li>
         <li>Fewer than <b>2</b> waits already taken this run.</li>
         <li>
@@ -3444,7 +3451,7 @@
     <div class="phead">
       <h2 id="cont-h">What crosses the container boundary</h2>
       <span class="src"
-        >main.mts:1317-1339, :2969-2983 &middot; .sandcastle/Dockerfile</span
+        >main.mts:1320-1342, :3038-3052 &middot; .sandcastle/Dockerfile</span
       >
     </div>
     <div class="pbody">
@@ -3578,7 +3585,7 @@
   <section class="panel" aria-labelledby="routing-h">
     <div class="phead">
       <h2 id="routing-h">Routing: labels in, behaviour out</h2>
-      <span class="src">main.mts:1454-1460, :1505-1529, :2556-2560</span>
+      <span class="src">main.mts:1457-1463, :1508-1532, :2625-2629</span>
     </div>
     <div class="pbody">
       <p class="small">
@@ -3759,6 +3766,7 @@
     "assertedFromExports": {
       "resumeQuotaMaxWaitsPerRun": 2,
       "resumeQuotaMaxWaitMs": 21600000,
+      "orchestratorQuotaWaitMarginMs": 300000,
       "resumeDiscardFlag": "--fresh",
       "resumeMaintainerNoteMarker": "## Maintainer Review",
       "resumeSliceLogRunStartMarker": "--- Run started:",
@@ -3787,7 +3795,6 @@
       "orchestratorPrdIssueListLimit": 100,
       "orchestratorSweepIssueListLimit": 200,
       "orchestratorCheckpointTagPattern": "wip/<issue>-checkpoint",
-      "orchestratorQuotaWaitMarginMs": 300000,
       "gateDefaultTargets": "lint test build",
       "gateContainerTimeoutMs": 3600000,
       "wavesSliceListLimit": 100
@@ -3799,52 +3806,52 @@
   {
     "note": "Expected-content anchors for file:line citations on this page, verified 2026-09-30 against .sandcastle/main.mts, .sandcastle/dispatch-waves.mts, and tools/scripts/lib/sandcastle-resume.ts. See ADR 0085.",
     "anchors": {
-      "main.mts:886-1059": {
+      "main.mts:889-1062": {
         "file": ".sandcastle/main.mts",
         "start": "`  [#${completed.number}] #${dependentNumber} still blocked by ${unfinished",
         "end": "// label is NOT explained that way stays out: it means something this code cannot"
       },
-      "main.mts:999-1005": {
+      "main.mts:1002-1008": {
         "file": ".sandcastle/main.mts",
         "start": "'issue',",
         "end": "'title,body',"
       },
-      "main.mts:278-339": {
+      "main.mts:281-342": {
         "file": ".sandcastle/main.mts",
         "start": "}",
         "end": "/**"
       },
-      "main.mts:1965-2177": {
+      "main.mts:1978-2246": {
         "file": ".sandcastle/main.mts",
         "start": "`Refs #${issue.number}`,",
         "end": "): boolean {"
       },
-      "main.mts:1317-1339": {
+      "main.mts:1320-1342": {
         "file": ".sandcastle/main.mts",
         "start": "// run whose sub-agent behaviour you most want to read. A mount sidesteps the ordering",
         "end": "// Absent, no mount is added and CodeExplorer falls back to Glob/Grep as already"
       },
-      "main.mts:2969-2983": {
+      "main.mts:3038-3052": {
         "file": ".sandcastle/main.mts",
         "start": "* Sessions are selected by mtime against the moment this run started rather than by id.",
         "end": "'.sandcastle',"
       },
-      "main.mts:1454-1460": {
+      "main.mts:1457-1463": {
         "file": ".sandcastle/main.mts",
         "start": "function modelFor(issue: Issue): string {",
         "end": "return sandcastleModels.claudeByComplexity.low;"
       },
-      "main.mts:1505-1529": {
+      "main.mts:1508-1532": {
         "file": ".sandcastle/main.mts",
         "start": "// does, not merely which issue it came from — see AGENTS.md \"Branch naming\". First",
         "end": "return 'chore';"
       },
-      "main.mts:3462-3534": {
+      "main.mts:3531-3603": {
         "file": ".sandcastle/main.mts",
         "start": "const outcome = judgeRunOutcome(",
         "end": "unblockDependents(issue);"
       },
-      "main.mts:2556-2560": {
+      "main.mts:2625-2629": {
         "file": ".sandcastle/main.mts",
         "start": "function resolveGate(issue: Issue): 'mechanical' | 'standard' | 'full' {",
         "end": "return 'standard';"

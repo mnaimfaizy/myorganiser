@@ -204,6 +204,9 @@ const EXPORT_RESOLVERS: Record<string, () => unknown> = {
   resumeQuotaMaxWaits: () => resume.MAX_QUOTA_WAITS,
   resumeQuotaMaxWaitsPerRun: () => resume.MAX_QUOTA_WAITS,
   resumeQuotaMaxWaitMs: () => resume.MAX_WAIT_MS,
+  // One exported margin: the orchestrator's sleep and the resume library both use it.
+  orchestratorQuotaWaitMarginMs: () => resume.QUOTA_WAIT_MARGIN_MS,
+  resumeQuotaWaitMarginMs: () => resume.QUOTA_WAIT_MARGIN_MS,
   resumeLimitMatcherCountClaude: () => resume.LIMIT_MATCHERS?.claude?.length,
   resumeLimitMatcherCountCursor: () => resume.LIMIT_MATCHERS?.cursor?.length,
   resumeLimitMatcherCountCopilot: () => resume.LIMIT_MATCHERS?.copilot?.length,
@@ -328,12 +331,6 @@ const AFFECTED_TIMEOUT: SourceAssertion = {
   re: /^\s*\{ encoding: 'utf8', windowsHide: true, timeout: (\d+) \},$/gm,
   t: num,
 };
-const QUOTA_MARGIN: SourceAssertion = {
-  file: MAIN,
-  in: 'main',
-  re: /^\s*const sleepMs = Math\.max\(untilMs, 0\) \+ (\d+) \* (\d+) \* (\d+);$/gm,
-  t: (m: RegExpMatchArray) => Number(m[1]) * Number(m[2]) * Number(m[3]),
-};
 /** prdGateBase drives both the feature-gate scope and the bisect command the page prints. */
 const prdBase = () => {
   const m = mainSrc.match(/^const prdGateBase = gitRefExists\('([^']+)'\)/m);
@@ -389,8 +386,6 @@ const SOURCE_ASSERTIONS: Record<string, SourceAssertion> = {
     re: /^\s*'--state',\n\s*'open',\n\s*'--json',\n\s*'number,title,state,labels,body',\n\s*'--limit',\n\s*'(\d+)',$/gm,
     t: num,
   },
-  orchestratorQuotaWaitMarginMs: QUOTA_MARGIN,
-  resumeQuotaWaitMarginMs: QUOTA_MARGIN,
   gateContainerTimeoutMs: {
     file: MAIN,
     in: 'main',

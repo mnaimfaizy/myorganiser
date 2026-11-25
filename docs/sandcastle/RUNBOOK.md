@@ -535,7 +535,12 @@ run — a third turns one PRD into more than a day of wall clock.
 
 It deliberately does **not** wait when:
 
-- the reset time cannot be read — a guessed sleep either wastes hours or wakes into the same wall;
+- the reset time cannot be read, or is not in the future — a guessed sleep either wastes hours or
+  wakes into the same wall;
+- the interrupted work could not be committed, tagged and verified as a checkpoint — the run says
+  why and leaves the branch and worktree for inspection. A run that left no work at all still waits
+  and redispatches. After a wait, the slice resumes only if its branch and tag still point at the
+  checkpoint;
 - the provider's limit format is unknown to us. Only Claude Code has an observed format today;
   `cursor` and `copilot` classify as `unknown` and always preserve-and-exit instead. That is
   intended, not a gap — adding a matcher for a message we have never seen risks parking a run for

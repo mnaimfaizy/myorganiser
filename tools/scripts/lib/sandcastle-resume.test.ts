@@ -15,6 +15,8 @@ import {
   formatWaitWindow,
   classifyRunFailure,
   decideWaitPolicy,
+  decideQuotaWaitAfterPreservation,
+  QUOTA_WAIT_MARGIN_MS,
   parseResetTime,
   tailLines,
   RESUME_GUARDRAILS,
@@ -486,6 +488,76 @@ test('never sleeps blind when the reset time could not be read', () => {
 
   assert.equal(decision.action, 'exit');
   assert.match(decision.reason, /reset time could not be read/);
+});
+
+test('never sleeps on an invalid reset date', () => {
+  const decision = decideWaitPolicy({
+    classification: limitHit(new Date(Number.NaN)),
+    waitEnabled: true,
+    waitsTaken: 0,
+    now: NOW,
+  });
+
+  assert.equal(decision.action, 'exit');
+  assert.match(decision.reason, /reset time could not be read/);
+});
+
+test('never waits on a reset at or before now, and says why', () => {
+  for (const resetAt of [new Date(NOW.getTime() - 60_000), new Date(NOW)]) {
+    const decision = decideWaitPolicy({
+      classification: limitHit(resetAt),
+      waitEnabled: true,
+      waitsTaken: 0,
+      now: NOW,
+    });
+
+    assert.equal(decision.action, 'exit');
+    assert.match(decision.reason, /not in the future/);
+  }
+});
+
+test('the wait margin is five minutes', () => {
+  assert.equal(QUOTA_WAIT_MARGIN_MS, 5 * 60 * 1000);
+});
+
+test('failed preservation turns a wait into an exit that names the failure', () => {
+  const wait = decideWaitPolicy({
+    classification: limitHit(new Date('2026-08-20T04:30:00Z')),
+    waitEnabled: true,
+    waitsTaken: 0,
+    now: NOW,
+  });
+  assert.equal(wait.action, 'wait');
+
+  const failed = decideQuotaWaitAfterPreservation(
+    { kind: 'failed', reason: 'git tag failed' },
+    wait,
+  );
+  assert.equal(failed.action, 'exit');
+  assert.equal(failed.until, undefined);
+  assert.match(failed.reason, /could not be preserved \(git tag failed\)/);
+});
+
+test('a preserved checkpoint or a run with no work keeps the wait decision', () => {
+  // A run that left nothing ahead of the base still waits and redispatches, as
+  // before preservation became part of the decision.
+  const wait = decideWaitPolicy({
+    classification: limitHit(new Date('2026-08-20T04:30:00Z')),
+    waitEnabled: true,
+    waitsTaken: 0,
+    now: NOW,
+  });
+  assert.deepEqual(
+    decideQuotaWaitAfterPreservation({ kind: 'nothing-to-preserve' }, wait),
+    wait,
+  );
+  assert.deepEqual(
+    decideQuotaWaitAfterPreservation(
+      { kind: 'preserved', checkpoint: { sha: 'abc1234' } },
+      wait,
+    ),
+    wait,
+  );
 });
 
 test('never waits on an unknown provider even with waiting enabled', () => {

@@ -688,8 +688,16 @@ export function decideWaitPolicy({
 
   // Never sleep blind. An unreadable timestamp means the format changed or the
   // message was truncated; guessing a window is worse than stopping.
-  if (!(classification.resetAt instanceof Date)) {
+  if (
+    !(classification.resetAt instanceof Date) ||
+    !Number.isFinite(classification.resetAt.getTime())
+  ) {
     return exit('the reset time could not be read from the limit message');
+  }
+
+  // A reset at or before now is stale evidence, not a window to wait out.
+  if (classification.resetAt.getTime() <= now.getTime()) {
+    return exit('the reset time is not in the future');
   }
 
   if (waitsTaken >= maxWaits) {
@@ -710,6 +718,35 @@ export function decideWaitPolicy({
     action: 'wait',
     until: classification.resetAt,
     reason: `provider limit resets at ${classification.resetAt.toISOString()}`,
+  };
+}
+
+/**
+ * Added past a stated reset: waking exactly on it risks meeting the same wall and
+ * burning one of the waits for nothing.
+ */
+export const QUOTA_WAIT_MARGIN_MS = 5 * 60 * 1000;
+
+/** What the crash path managed to do with an interrupted slice's work. */
+export type SlicePreservation<C> =
+  | { readonly kind: 'preserved'; readonly checkpoint: C }
+  | { readonly kind: 'nothing-to-preserve' }
+  | { readonly kind: 'failed'; readonly reason: string };
+
+/**
+ * Combine the wait policy with what preservation achieved. Work that could not be
+ * committed, tagged, or verified is never slept on: a wait would leave it exposed to
+ * the next dispatch. A run that left no work waits as before and redispatches.
+ */
+export function decideQuotaWaitAfterPreservation<C>(
+  preservation: SlicePreservation<C>,
+  decision: WaitPolicyDecision,
+): WaitPolicyDecision {
+  if (preservation.kind !== 'failed') return decision;
+  return {
+    action: 'exit',
+    until: undefined,
+    reason: `the interrupted work could not be preserved (${preservation.reason})`,
   };
 }
 
