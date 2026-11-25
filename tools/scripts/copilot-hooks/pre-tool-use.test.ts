@@ -206,6 +206,163 @@ describe('pre-tool-use hook', () => {
     });
   });
 
+  describe('env accessor in code is not an environment file (#1640)', () => {
+    const ACCESSOR_COMMANDS = [
+      'node -e "console.log(process.env.HOME)"',
+      `node -e "console.log(process.env['HOME'])"`,
+      'node -e "console.log(Object.keys(process.env))"',
+      'node -e "console.log(import.meta.env.MODE)"',
+      'node -e "console.log(Deno.env.get(\'X\'))"',
+      'node -e "console.log(PROCESS.ENV.HOME)"',
+      'cat tools/scripts/lib/sandcastle-provider-env.ts',
+    ];
+    const ACCESSOR_WRITES = [
+      `sed -i 's/a/process.env.X/' tools/scripts/lib/sandcastle-provider-env.ts`,
+      `echo "const x = process.env.X;" > tools/scripts/lib/sandcastle-provider-env.ts`,
+      `echo "import.meta.env.MODE" >> src/app/page.tsx`,
+    ];
+
+    it('should allow shell reads whose text mentions the env accessor', () => {
+      for (const command of ACCESSOR_COMMANDS) {
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('Bash', command));
+      }
+    });
+
+    it('should allow shell writes whose text mentions the env accessor', () => {
+      for (const command of ACCESSOR_WRITES) {
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('Bash', command));
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('PowerShell', command));
+      }
+    });
+
+    it('should allow structured paths to an env-named source file', () => {
+      for (const tool_name of ['Read', 'Edit', 'Write']) {
+        expectAllowed(PRE_TOOL_USE_HOOK, {
+          tool_name,
+          tool_input: {
+            file_path: 'tools/scripts/lib/sandcastle-provider-env.ts',
+            content: 'const x = process.env.X;',
+          },
+        });
+      }
+    });
+
+    it('should still deny a read of the accessor next to a real env file', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `node -e "process.env.X" && cat ${ENV_FILE}`),
+        /environment/i,
+      );
+    });
+
+    it('should still deny the env example next to a real env file', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `cat ${ENV_EXAMPLE} ${ENV_FILE}`),
+        /environment/i,
+      );
+    });
+  });
+
+  describe('real environment file reads stay denied (#1640)', () => {
+    const ENV_PATHS = [
+      '.env',
+      '.env.local',
+      'apps/backend/.env',
+      'apps\\backend\\.env',
+      'foo.env',
+      // Only process, import.meta, Deno and Bun are exempt accessor roots, so
+      // names that merely contain ".env." stay refused.
+      'prod.env.bak',
+      'backend.env.local',
+      'foo.env.bak',
+      'config/process.env',
+      // Accepted false positive: a non-listed accessor looks like a file name.
+      'ctx.env.X',
+    ];
+
+    it('should deny structured reads of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          { tool_name: 'Read', tool_input: { file_path } },
+          /environment/i,
+        );
+      }
+    });
+
+    it('should deny shell reads of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const command of [
+          `cat ${file_path}`,
+          `type ${file_path}`,
+          `Get-Content ${file_path}`,
+          `Get-Content -Path "${file_path}"`,
+        ]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            shellPayload('Bash', command),
+            /environment/i,
+          );
+        }
+      }
+    });
+  });
+
+  describe('real environment file writes stay denied (#1640)', () => {
+    const ENV_PATHS = [
+      '.env',
+      '.env.local',
+      'apps/backend/.env',
+      'foo.env',
+      'prod.env.bak',
+      'backend.env.local',
+      'foo.env.bak',
+      'config/process.env',
+      // Accepted false positive: a non-listed accessor looks like a file name.
+      'ctx.env.X',
+    ];
+
+    it('should deny structured writes of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const tool_name of ['Write', 'Edit']) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name, tool_input: { file_path, content: 'x' } },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny shell writes of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const command of [
+          `echo x > ${file_path}`,
+          `cp x ${file_path}`,
+          `sed -i s/a/b/ ${file_path}`,
+        ]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            shellPayload('Bash', command),
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should allow writing the env example file', () => {
+      expectAllowed(PRE_TOOL_USE_HOOK, {
+        tool_name: 'Write',
+        tool_input: { file_path: ENV_EXAMPLE, content: 'X=' },
+      });
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `echo X= > ${ENV_EXAMPLE}`),
+      );
+    });
+  });
+
   describe('write guard', () => {
     it('should deny redirecting output into an environment file', () => {
       expectDenied(

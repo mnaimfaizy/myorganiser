@@ -82,13 +82,74 @@ const PATH_KEYS = new Set<string>([
   'targets',
 ]);
 
-/** A path rule: matched against normalized text, unless `exclude` says otherwise. */
+/**
+ * A path rule, matched against normalized text. A rule supplies either a
+ * `pattern` or a `matcher` for logic a single regex cannot express.
+ */
 interface PathRule {
-  pattern: RegExp;
+  pattern?: RegExp;
+  matcher?: (normalized: string) => boolean;
   reason: string;
-  exclude?: (normalized: string) => boolean;
   /** Checked against structured path arguments only, never raw command text. */
   pathOnly?: boolean;
+}
+
+function ruleMatches(rule: PathRule, normalized: string): boolean {
+  if (rule.matcher) {
+    return rule.matcher(normalized);
+  }
+
+  return rule.pattern?.test(normalized) ?? false;
+}
+
+/** Characters that end a shell word or a code expression around a path. */
+const TOKEN_SEPARATORS = /[\s"'`=;|&<>(){}[\],!$]+/;
+
+/**
+ * Code accessors for the process environment. They name a runtime object, not a
+ * file, so such an accessor in a command is not a read of an environment file.
+ * Only these roots are exempt, as a word of their own or inside a path-like word
+ * (never as its last segment, which is a file name). Anything else containing
+ * `.env` stays refused (`prod.env.bak`, `foo.env`, `config/<root>.env`).
+ * Accepted false positive: `ctx.env.X` and other non-listed accessors.
+ */
+const ENV_ACCESSOR = /^(?:process|import\.meta|deno|bun)\.env(?:\.|$)/;
+
+/** An env file name: `.env`, `.env.local`, `foo.env`. `.env.example` is allowed. */
+const ENV_SEGMENT = /\.env(?:$|[^a-z0-9])/;
+const ENV_EXAMPLE_SEGMENT = /\.env\.example(?:$|[^a-z0-9])/;
+
+/**
+ * True when normalized text names an environment file. Judged per word, so a
+ * `.env.example` next to a real `.env` does not excuse it, and the env accessor
+ * in code does not count. Shared by the read and write guards.
+ */
+function mentionsEnvFile(normalized: string): boolean {
+  for (const token of normalized.split(TOKEN_SEPARATORS)) {
+    if (!token.includes('.env')) {
+      continue;
+    }
+
+    const segments = token.split('/');
+    const last = segments.length - 1;
+
+    for (const [index, segment] of segments.entries()) {
+      // An accessor may sit inside a sed expression (`s/a/<accessor>/`), but
+      // the final segment of a slashed token is a file name: not exempt.
+      const isAccessor =
+        ENV_ACCESSOR.test(segment) && (last === 0 || index < last);
+
+      if (
+        !isAccessor &&
+        ENV_SEGMENT.test(segment) &&
+        !ENV_EXAMPLE_SEGMENT.test(segment)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -133,9 +194,7 @@ const WORKFLOW_PROTECTED_PATTERNS: PathRule[] = [
  */
 const SECRET_WRITE_PATTERNS: PathRule[] = [
   {
-    pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized: string) =>
-      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
+    matcher: mentionsEnvFile,
     reason:
       'Direct edits to environment files are blocked. Keep secrets in local env files or managed secret storage.',
   },
@@ -181,9 +240,7 @@ const PROTECTED_PATTERNS = SANDBOX
  */
 const SECRET_READ_PATTERNS: PathRule[] = [
   {
-    pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized: string) =>
-      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
+    matcher: mentionsEnvFile,
     reason:
       'Reading environment files is blocked. They hold live credentials — read `.env.example` for the shape, or ask the user for the specific value.',
   },
@@ -227,11 +284,7 @@ function getSecretReadReason(
       continue;
     }
 
-    if (typeof rule.exclude === 'function' && rule.exclude(normalized)) {
-      continue;
-    }
-
-    if (rule.pattern.test(normalized)) {
+    if (ruleMatches(rule, normalized)) {
       return rule.reason;
     }
   }
@@ -287,11 +340,7 @@ function getProtectedPathReason(text: string): string | null {
   const normalized = normalizeText(text);
 
   for (const rule of PROTECTED_PATTERNS) {
-    if (typeof rule.exclude === 'function' && rule.exclude(normalized)) {
-      continue;
-    }
-
-    if (rule.pattern.test(normalized)) {
+    if (ruleMatches(rule, normalized)) {
       return rule.reason;
     }
   }
