@@ -23,7 +23,7 @@
  * Pure: it takes the env as an argument, so it is tested without Docker.
  */
 
-export const AGENT_KINDS = ['claude', 'cursor', 'copilot'] as const;
+export const AGENT_KINDS = ['claude', 'cursor', 'copilot', 'codex'] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
 /** `null` = not a claude run. `'none'` = a credential was needed and absent. */
@@ -40,6 +40,7 @@ const STATIC_PROVIDER_VARIABLES = {
   claude: [],
   cursor: ['CURSOR_API_KEY'],
   copilot: ['COPILOT_GITHUB_TOKEN'],
+  codex: [],
 } as const satisfies Record<AgentKind, readonly string[]>;
 
 /** The one Claude credential `resolveClaudeAuth` chose, as a variable name. */

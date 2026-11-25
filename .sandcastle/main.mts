@@ -88,6 +88,7 @@ import {
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
 import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
+import { assertReviewedHookEnforcement } from '../tools/scripts/lib/reviewed-hook-snapshot.ts';
 import {
   AGENT_KINDS,
   assertNoGitHubTokens,
@@ -732,6 +733,13 @@ function resolveClaudeAuth(
 }
 
 const agentKind = resolveAgentKind();
+if (agentKind === 'codex' && !dryRun && !gateOnly) {
+  try {
+    assertReviewedHookEnforcement();
+  } catch (error) {
+    fail((error as Error).message);
+  }
+}
 // --gate-only launches no agent, so it must not demand an agent credential. It is
 // the path a maintainer runs by hand to re-check a feature branch, often on a
 // machine where no credential source was ever set up.
@@ -1475,6 +1483,8 @@ function resolveModel(issue: Issue, agentKind: AgentKind): string {
       return (
         process.env.SANDCASTLE_COPILOT_MODEL ?? sandcastleModels.copilotDefault
       );
+    case 'codex':
+      return process.env.SANDCASTLE_CODEX_MODEL ?? 'gpt-6.2-sol';
   }
 }
 
@@ -1486,6 +1496,8 @@ function buildAgent(agentKind: AgentKind, model: string) {
       return cursor(model);
     case 'copilot':
       return copilot(model);
+    case 'codex':
+      return assertReviewedHookEnforcement();
   }
 }
 

@@ -113,6 +113,11 @@ Windows-native dispatch (from PowerShell, repo on `D:\`) works but is ~29 min/in
 
 ## Running a dispatch
 
+Codex is available for dispatch plan previews only. A real Codex dispatch
+refuses before launch while subscription authentication and reviewed-hook
+enforcement remain unverified. Do not treat a successful preview or a stored
+login as proof of either boundary. Existing provider defaults are unchanged.
+
 ```bash
 corepack yarn dispatch-agents --prd <issue-number>   # all ready AFK slices, one by one
 corepack yarn dispatch-waves  --prd <issue-number>   # dependency-ordered across waves

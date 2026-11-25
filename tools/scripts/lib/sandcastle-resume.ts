@@ -479,7 +479,7 @@ export const LIMIT_CLASSIFICATIONS = Object.freeze({
 export type LimitClassificationKind =
   (typeof LIMIT_CLASSIFICATIONS)[keyof typeof LIMIT_CLASSIFICATIONS];
 
-export type AgentKind = 'claude' | 'cursor' | 'copilot';
+export type AgentKind = 'claude' | 'cursor' | 'copilot' | 'codex';
 
 /**
  * Per-provider matchers over a log tail.
@@ -497,6 +497,7 @@ export const LIMIT_MATCHERS: Readonly<Record<AgentKind, readonly RegExp[]>> =
     ]),
     cursor: Object.freeze([]),
     copilot: Object.freeze([]),
+    codex: Object.freeze([]),
   });
 
 /**
