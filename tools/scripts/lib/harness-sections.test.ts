@@ -110,6 +110,28 @@ test('rejects an inline marker that would otherwise leak to every harness', () =
   );
 });
 
+test('supports antigravity harness markers', () => {
+  assert.ok(KNOWN_HARNESSES.includes('antigravity'));
+  const body = [
+    'Shared intro.',
+    '',
+    '<!-- harness:antigravity -->',
+    'Antigravity only.',
+    '<!-- /harness -->',
+    '',
+    'Shared outro.',
+  ].join('\n');
+
+  assert.equal(
+    renderHarnessSections(body, 'antigravity'),
+    'Shared intro.\n\nAntigravity only.\n\nShared outro.',
+  );
+  assert.equal(
+    renderHarnessSections(body, 'gemini'),
+    'Shared intro.\n\nShared outro.',
+  );
+});
+
 test('rejects an unknown target harness', () => {
   assert.throws(
     () => renderHarnessSections('x', 'windsurf'),

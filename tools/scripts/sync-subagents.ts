@@ -63,6 +63,16 @@ interface HarnessSyncConfig {
 }
 
 const HARNESS_CONFIG: Record<string, HarnessSyncConfig> = {
+  antigravity: {
+    dir: path.join(repoRoot, '.agents', 'plugins', 'myorganiser', 'agents'),
+    extension: '.md',
+    nameTransform: (name, slug) => {
+      if (slug === 'explore') return 'code-explorer';
+      if (slug === 'research') return 'myorganiser-research';
+      if (slug === 'e2e-planner') return 'e2e-planner';
+      return toKebab(name);
+    },
+  },
   codex: {
     dir: path.join(repoRoot, CODEX_ROLE_DIRECTORY),
     extension: '.toml',
@@ -170,6 +180,7 @@ function buildFrontmatter(
   slug: string,
   canonicalMeta: CanonicalMeta,
   grant: Grant,
+  roles: string[],
 ): string {
   const cfg = HARNESS_CONFIG[harness];
   const name = cfg.nameTransform(canonicalMeta.name, slug);
@@ -182,6 +193,22 @@ function buildFrontmatter(
   const description = canonicalMeta.description.replace(/\s+/g, ' ').trim();
   // formatGrant is newline-terminated (or empty); split into lines for join.
   const grantLines = formatGrant(harness, grant).split('\n').filter(Boolean);
+
+  if (harness === 'antigravity') {
+    return [
+      '---',
+      `name: ${name}`,
+      'description: >',
+      `  ${description}`,
+      'subagent: true',
+      'mainAgent: false',
+      `model: ${model}`,
+      ...(roles.includes('graphify/*') ? ['inheritMcp: true'] : []),
+      ...grantLines,
+      '---',
+      '',
+    ].join('\n');
+  }
 
   if (harness === 'gemini') {
     return [
@@ -391,6 +418,7 @@ async function syncHarness(
         canonical.slug,
         canonical.canonicalMeta,
         desiredGrant,
+        canonical.roles,
       );
       // The blank line after `---` is what prettier expects; without it every
       // file this script rewrites fails `nx format:check`.

@@ -37,6 +37,7 @@
 
 /** Harness names a marker may address. `copilot` is `.github/agents` itself. */
 export const KNOWN_HARNESSES = Object.freeze([
+  'antigravity',
   'claude',
   'codex',
   'copilot',

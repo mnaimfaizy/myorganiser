@@ -1,0 +1,6 @@
+{
+  "name": "myorganiser",
+  "displayName": "MyOrganiser Workspace",
+  "version": "1.0.0",
+  "description": "Workspace plugin for MyOrganiser: Graphify MCP index, PreToolUse security guardrails, and synced specialist subagents."
+}

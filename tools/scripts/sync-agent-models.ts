@@ -21,6 +21,10 @@ interface HarnessPathConfig {
 }
 
 const HARNESS_PATHS: Record<string, HarnessPathConfig> = {
+  antigravity: {
+    dir: path.join(repoRoot, '.agents', 'plugins', 'myorganiser', 'agents'),
+    fileName: (slug) => `${slug}.md`,
+  },
   codex: {
     dir: path.join(repoRoot, CODEX_ROLE_DIRECTORY),
     fileName: (slug) => `${slug}.toml`,

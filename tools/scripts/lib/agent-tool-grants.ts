@@ -66,6 +66,7 @@ export const INHERIT_ALL = '<inherited: all tools>';
  * `grant` key agrees with it.
  */
 const FRONTMATTER_FORMAT: Record<string, FrontmatterFormat> = {
+  antigravity: { grant: 'tools', style: 'block' },
   claude: { grant: 'tools', style: 'inline' },
   gemini: { grant: 'tools', style: 'block' },
   cursor: { grant: 'readonly' },
@@ -120,9 +121,12 @@ export function validateToolMap(map: AgentToolMap): void {
     if (cfg.grant === 'tools') {
       for (const role of vocabulary) {
         const tools = cfg.tools?.[role];
-        if (!Array.isArray(tools) || !tools.length) {
+        if (
+          !Array.isArray(tools) ||
+          tools.some((tool) => typeof tool !== 'string' || !tool.trim())
+        ) {
           throw new Error(
-            `agent-tool-map: harness "${harness}" has no tools for role "${role}". Resolve the cell; do not omit it.`,
+            `agent-tool-map: harness "${harness}" has invalid tools for role "${role}". Provide a string array (empty if unsupported); do not omit the cell.`,
           );
         }
       }
@@ -257,6 +261,9 @@ export function formatGrant(harness: string, grant: Grant): string {
   }
   const format = formatFor(harness);
   if (format.grant === 'tools' && format.style === 'block') {
+    if (!grant.tools.length) {
+      return 'tools: []\n';
+    }
     return `tools:\n${grant.tools.map((tool) => `  - ${tool}`).join('\n')}\n`;
   }
   return `tools: [${grant.tools.join(', ')}]\n`;

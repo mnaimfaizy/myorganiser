@@ -2,11 +2,13 @@ import { isAbsolute, resolve } from 'node:path';
 
 import {
   allowTool,
+  ANTIGRAVITY_HOOK,
   CODEX_HOOK,
   collectStrings,
   COMMAND_KEYS,
   denyTool,
   extractCommand,
+  extractFileRedirectTargets,
   getToolInput,
   getToolName,
   isLikelyWriteCommand,
@@ -38,6 +40,9 @@ const READ_TOOL_NAMES = new Set<string>([
 ]);
 
 const PATH_KEYS = new Set<string>([
+  // Antigravity file tools pass PascalCase `Path`; `Target`, `Replacement`, and
+  // `Content` carry file content and are intentionally excluded.
+  'Path',
   'dest',
   'destination',
   'dir',
@@ -190,14 +195,40 @@ function inspectPatchText(text: string, cwd?: string): string | null {
   return null;
 }
 
-function inspectNode(node: unknown, key = ''): string | null {
+function inspectCommand(rawCommand: string, cwd?: string): string | null {
+  const command = stripHeredocBodies(rawCommand);
+
+  if (!isLikelyWriteCommand(command)) {
+    return null;
+  }
+
+  const directReason = getProtectedPathReason(command, { isPath: false });
+  if (directReason) {
+    return directReason;
+  }
+
+  if (cwd) {
+    for (const target of extractFileRedirectTargets(command)) {
+      const resolvedReason = getProtectedPathReason(resolve(cwd, target), {
+        isPath: true,
+      });
+      if (resolvedReason) {
+        return resolvedReason;
+      }
+    }
+  }
+
+  return null;
+}
+
+function inspectNode(node: unknown, key = '', cwd?: string): string | null {
   if (node === null || node === undefined) {
     return null;
   }
 
   if (Array.isArray(node)) {
     for (const item of node) {
-      const reason = inspectNode(item, key);
+      const reason = inspectNode(item, key, cwd);
       if (reason) {
         return reason;
       }
@@ -208,7 +239,7 @@ function inspectNode(node: unknown, key = ''): string | null {
 
   if (typeof node === 'object') {
     for (const [childKey, childValue] of Object.entries(node)) {
-      const reason = inspectNode(childValue, childKey);
+      const reason = inspectNode(childValue, childKey, cwd);
       if (reason) {
         return reason;
       }
@@ -222,20 +253,56 @@ function inspectNode(node: unknown, key = ''): string | null {
   }
 
   if (COMMAND_KEYS.has(key)) {
-    const command = stripHeredocBodies(node);
-
-    if (!isLikelyWriteCommand(command)) {
-      return null;
-    }
-
-    return getProtectedPathReason(command, { isPath: false });
+    return inspectCommand(node, cwd);
   }
 
   if (PATH_KEYS.has(key)) {
-    return getProtectedPathReason(node, { isPath: true });
+    return getProtectedPathReason(cwd ? resolve(cwd, node) : node, {
+      isPath: true,
+    });
   }
 
   return null;
+}
+
+/**
+ * Normalize read-tool arguments before delegating to `inspectReadNode`:
+ * - Map Antigravity PascalCase `Path` to `path` so `read-policy.ts`'s
+ *   `READ_PATH_KEYS` inspects it.
+ * - Resolve relative path values against `cwd` when the harness reports one.
+ * - Leave `pattern` (search expression) untouched.
+ */
+function normalizeReadNode(
+  node: unknown,
+  cwd?: string,
+  resolvePath = false,
+): unknown {
+  if (typeof node === 'string') {
+    return resolvePath && cwd ? resolve(cwd, node) : node;
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((item) => normalizeReadNode(item, cwd, resolvePath));
+  }
+
+  if (node && typeof node === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      const normalizedKey = key === 'Path' ? 'path' : key;
+      const isPathKey =
+        normalizedKey !== 'pattern' && PATH_KEYS.has(normalizedKey);
+      const mapped = normalizeReadNode(value, cwd, isPathKey);
+      if (Object.prototype.hasOwnProperty.call(out, normalizedKey)) {
+        out[normalizedKey] = [out[normalizedKey], mapped];
+      } else {
+        out[normalizedKey] = mapped;
+      }
+    }
+
+    return out;
+  }
+
+  return node;
 }
 
 function inspectToolInput(
@@ -266,7 +333,7 @@ function inspectToolInput(
     }
 
     return (
-      inspectNode(toolInput) ??
+      inspectNode(toolInput, '', cwd) ??
       getProtectedPathReason(JSON.stringify(toolInput ?? {}), { isPath: false })
     );
   }
@@ -277,15 +344,10 @@ function inspectToolInput(
       toolName === 'command' ||
       toolName === 'shell' ||
       toolName === 'powershell' ||
+      toolName === 'run_command' ||
       toolName === 'runterminalcommand'
     ) {
-      const command = stripHeredocBodies(toolInput);
-
-      if (!isLikelyWriteCommand(command)) {
-        return null;
-      }
-
-      return getProtectedPathReason(command, { isPath: false });
+      return inspectCommand(toolInput, cwd);
     }
 
     if (!looksLikePath(toolInput)) {
@@ -293,29 +355,36 @@ function inspectToolInput(
     }
 
     // `execute` and `run` reach this branch with a command, not a path.
-    return getProtectedPathReason(toolInput, {
-      isPath: !SHELL_TOOL_NAMES.has(toolName),
-    });
+    const isPath = !SHELL_TOOL_NAMES.has(toolName);
+    return getProtectedPathReason(
+      isPath && cwd ? resolve(cwd, toolInput) : toolInput,
+      { isPath },
+    );
   }
 
-  return inspectNode(toolInput);
+  return inspectNode(toolInput, '', cwd);
 }
 
 async function main() {
   const payload = await readPayloadOrExit();
   const toolName = getToolName(payload);
   const toolInput = getToolInput(payload);
-  // Resolve relative paths against the tool cwd reported by Codex.
+  // Resolve relative paths against the tool cwd reported by Codex or Antigravity
+  // (Antigravity launches hook scripts with process cwd set to the hooks.json dir).
   const cwd =
-    CODEX_HOOK && typeof payload?.cwd === 'string' && isAbsolute(payload.cwd)
+    (CODEX_HOOK || ANTIGRAVITY_HOOK) &&
+    typeof payload?.cwd === 'string' &&
+    isAbsolute(payload.cwd)
       ? payload.cwd
       : undefined;
 
   if (READ_TOOL_NAMES.has(toolName)) {
     const readReason =
       typeof toolInput === 'string'
-        ? getSecretReadReason(toolInput, { pathOnly: true })
-        : inspectReadNode(toolInput);
+        ? getSecretReadReason(cwd ? resolve(cwd, toolInput) : toolInput, {
+            pathOnly: true,
+          })
+        : inspectReadNode(normalizeReadNode(toolInput, cwd));
 
     if (readReason) {
       denyTool(readReason);

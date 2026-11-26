@@ -18,6 +18,18 @@
     "graphify/*": "Query the Graphify MCP server"
   },
   "harnesses": {
+    "antigravity": {
+      "grant": "tools",
+      "tools": {
+        "read": ["read_file"],
+        "search": ["read_file"],
+        "edit": ["edit_file", "write_file"],
+        "execute": ["run_command", "manage_task"],
+        "web": ["search_web"],
+        "todo": [],
+        "graphify/*": []
+      }
+    },
     "codex": {
       "grant": "tools",
       "tools": {

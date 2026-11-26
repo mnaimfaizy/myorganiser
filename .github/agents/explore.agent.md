@@ -166,6 +166,15 @@ not as a failure.
 
 <!-- /harness -->
 
+<!-- harness:antigravity -->
+
+**Antigravity —** Graphify MCP tools (`get_neighbors`, `god_nodes`, `query_graph`, `get_node`, and
+`graph_stats`) are inherited via `inheritMcp: true` from the workspace plugin
+(`myorganiser-graphify`). If they are unavailable, fall back to file reads and note it under Scope,
+not as a failure.
+
+<!-- /harness -->
+
 ## Evidence Tagging
 
 Every finding must carry one of two tags:

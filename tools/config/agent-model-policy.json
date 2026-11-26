@@ -13,6 +13,7 @@
     "api-sync": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -23,6 +24,7 @@
     "api-writer": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -33,6 +35,7 @@
     "audit": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "haiku",
@@ -43,6 +46,7 @@
     "commit": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)", "MAI-Code-1.1-Flash (copilot)"],
         "claude": "haiku",
@@ -53,6 +57,7 @@
     "component-builder": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -63,6 +68,7 @@
     "component-reviewer": {
       "tier": "T2",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": ["Grok 4.6 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",
@@ -73,6 +79,7 @@
     "dep-audit": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "Claude Haiku 5.5 (copilot)"],
         "claude": "haiku",
@@ -83,6 +90,7 @@
     "dep-sync": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -94,6 +102,7 @@
       "tier": "T2",
       "rationale": "Writes a whole self-contained artifact from a brief, and the failure modes are judgment ones: an accessible-name pattern that is textbook-correct and wrong here, a claimed visual review that could not have happened, a doc-vs-source contradiction silently copied. The mechanical half is check-design-hygiene.ts; what is left needs reasoning quality.",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": ["Claude Sonnet 5.5 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",
@@ -104,6 +113,7 @@
     "docs": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "sonnet",
@@ -114,6 +124,7 @@
     "e2e-planner": {
       "tier": "T2",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": [
           "Claude Sonnet 5.5 (copilot)",
@@ -128,6 +139,7 @@
     "explore": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "sonnet",
@@ -138,6 +150,7 @@
     "issue-creator": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -148,6 +161,7 @@
     "preflight-check": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -158,6 +172,7 @@
     "prisma-writer": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -168,6 +183,7 @@
     "pr-author": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -178,6 +194,7 @@
     "release-notes": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -188,6 +205,7 @@
     "research": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "sonnet",
@@ -198,6 +216,7 @@
     "storybook-curator": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "haiku",
@@ -209,6 +228,7 @@
       "tier": "T0",
       "rationale": "ADR 0004 defines this as a deterministic static checklist gate; runtime judgment belongs to TestRunner.",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -219,6 +239,7 @@
     "test-runner": {
       "tier": "T1",
       "models": {
+        "antigravity": "inherit",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "inherit",
@@ -229,6 +250,7 @@
     "test-scaffold": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
@@ -239,6 +261,7 @@
     "version-bump": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",

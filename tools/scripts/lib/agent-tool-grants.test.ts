@@ -44,6 +44,7 @@ interface TestReadonlyHarness {
 interface TestMap {
   roles: Record<string, string>;
   harnesses: {
+    antigravity: TestToolsHarness;
     claude: TestToolsHarness;
     gemini: TestToolsHarness;
     cursor: TestReadonlyHarness;
@@ -57,6 +58,16 @@ function map(
   return {
     roles: { read: '', search: '', edit: '', execute: '', 'graphify/*': '' },
     harnesses: {
+      antigravity: {
+        grant: 'tools',
+        tools: {
+          read: ['read_file'],
+          search: ['read_file'],
+          edit: ['edit_file', 'write_file'],
+          execute: ['run_command', 'manage_task'],
+          'graphify/*': [],
+        },
+      },
       claude: {
         grant: 'tools',
         tools: {
@@ -110,6 +121,12 @@ test('a canonical agent without a tools: line is a hard error naming it', () => 
 
 test('the real map is valid', () => {
   assert.doesNotThrow(() => validateToolMap(REAL_MAP));
+});
+
+test('a tools harness may map an unsupported role to an empty array', () => {
+  const m = map();
+  m.harnesses.antigravity.tools['graphify/*'] = [];
+  assert.doesNotThrow(() => validateToolMap(m));
 });
 
 test('a tools harness missing a vocabulary role is a hard error', () => {
@@ -168,6 +185,43 @@ test('renders roles to Gemini tool names', () => {
   assert.deepEqual(renderGrant(['read', 'graphify/*'], 'gemini', 'e', map()), {
     tools: ['read_file', 'mcp_graphify_*'],
   });
+});
+
+test('renders roles to Antigravity tool names, deduplicating and skipping empty roles', () => {
+  assert.deepEqual(
+    renderGrant(
+      ['read', 'search', 'graphify/*'],
+      'antigravity',
+      'explore',
+      map(),
+    ),
+    {
+      tools: ['read_file'],
+    },
+  );
+  assert.deepEqual(
+    renderGrant(
+      ['read', 'edit', 'search', 'execute', 'todo'],
+      'antigravity',
+      'component-builder',
+      REAL_MAP,
+    ),
+    {
+      tools: [
+        'read_file',
+        'edit_file',
+        'write_file',
+        'run_command',
+        'manage_task',
+      ],
+    },
+  );
+  assert.deepEqual(
+    renderGrant(['web', 'read', 'search'], 'antigravity', 'research', REAL_MAP),
+    {
+      tools: ['read_file', 'search_web'],
+    },
+  );
 });
 
 test('an unknown role is a hard error naming agent and role', () => {
@@ -233,6 +287,8 @@ for (const [roles, tools] of CLAUDE_GRANT_CASES) {
 
 // --- readGrant / writeGrant ---------------------------------------------------
 
+const ANTIGRAVITY_FM =
+  '---\nname: code-explorer\ndescription: >\n  Reads things.\nsubagent: true\nmainAgent: false\nmodel: flash_lite\ninheritMcp: true\ntools:\n  - read_file\n---\n';
 const CLAUDE_FM =
   '---\nname: Audit\ndescription: >\n  Reads things.\ntools: [Read, Glob, Grep, Edit, Write, Bash]\nmodel: haiku\n---\n';
 const GEMINI_FM =
@@ -310,6 +366,7 @@ test('Cursor readonly true is written after model; false removes the key', () =>
 });
 
 const GRANT_ROUNDTRIP_CASES: Array<[string, string, Grant]> = [
+  [ANTIGRAVITY_FM, 'antigravity', { tools: ['read_file', 'search_web'] }],
   [CLAUDE_FM, 'claude', { tools: ['Read', 'WebFetch'] }],
   [GEMINI_FM, 'gemini', { tools: ['glob', 'mcp_graphify_*'] }],
   [CURSOR_FM, 'cursor', { readonly: true }],
@@ -369,7 +426,22 @@ test('replacing a missing tools key narrows from inherit-all', () => {
   });
 });
 
+test('rewrites only the Antigravity tools block, preserving subagent metadata and inheritMcp', () => {
+  const next = writeGrant(ANTIGRAVITY_FM, 'antigravity', {
+    tools: ['read_file', 'run_command', 'manage_task'],
+  });
+  assert.equal(
+    next,
+    '---\nname: code-explorer\ndescription: >\n  Reads things.\nsubagent: true\nmainAgent: false\nmodel: flash_lite\ninheritMcp: true\ntools:\n  - read_file\n  - run_command\n  - manage_task\n---\n',
+  );
+});
+
 test('formatGrant renders each harness shape, and false readonly as nothing', () => {
+  assert.equal(
+    formatGrant('antigravity', { tools: ['read_file'] }),
+    'tools:\n  - read_file\n',
+  );
+  assert.equal(formatGrant('antigravity', { tools: [] }), 'tools: []\n');
   assert.equal(
     formatGrant('claude', { tools: ['Read', 'Bash'] }),
     'tools: [Read, Bash]\n',
