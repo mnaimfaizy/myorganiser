@@ -21,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
 import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
+import { assertReviewedHookEnforcement } from '../tools/scripts/lib/reviewed-hook-snapshot.ts';
 import { planWaveForwarding } from '../tools/scripts/lib/sandcastle-resume.ts';
 import {
   blockedBy,
@@ -38,7 +39,7 @@ function fail(message: string, code = 1): never {
 function printHelp(): void {
   console.log(`
 Usage:
-  npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number> [--agent claude|cursor|copilot] [--model <model>]
+  npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number> [--agent claude|cursor|copilot|codex] [--model <model>]
 
 Flags:
   --prd <issue-number>   PRD issue number to dispatch
@@ -104,6 +105,20 @@ if (isNaN(prdNumber)) fail('--prd must be a number.');
 const forwarding = planWaveForwarding(process.argv);
 if (!forwarding.ok) fail(forwarding.message);
 const forwardedArgs: string[] = forwarding.forwarded;
+
+// Refuse before a wave can change issue labels or start a child dispatcher.
+const agentIndex = process.argv.indexOf('--agent');
+const selectedAgent =
+  (agentIndex < 0 ? undefined : process.argv[agentIndex + 1]) ??
+  process.env.SANDCASTLE_AGENT ??
+  'claude';
+if (selectedAgent.trim() === 'codex' && !process.argv.includes('--plan')) {
+  try {
+    assertReviewedHookEnforcement();
+  } catch (error) {
+    fail((error as Error).message);
+  }
+}
 
 // ─── Fetch all AFK slices for this PRD ────────────────────────────────────────
 

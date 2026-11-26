@@ -1,0 +1,6 @@
+[mcp_servers.graphify]
+# Git runs shell aliases from the worktree root, including in nested sessions.
+command = "git"
+args = ["-c", "alias.myorganiser-graphify=!node tools/scripts/codex-graphify-mcp.ts", "myorganiser-graphify"]
+enabled_tools = ["get_neighbors", "god_nodes"]
+startup_timeout_sec = 30

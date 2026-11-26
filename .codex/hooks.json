@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/scripts/copilot-hooks/pre-tool-use.ts\" --codex",
+            "commandWindows": "node \"$(git rev-parse --show-toplevel)/tools/scripts/copilot-hooks/pre-tool-use.ts\" --codex; exit $LASTEXITCODE",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/scripts/copilot-hooks/secret-scan.ts\" --codex",
+            "commandWindows": "node \"$(git rev-parse --show-toplevel)/tools/scripts/copilot-hooks/secret-scan.ts\" --codex; exit $LASTEXITCODE",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

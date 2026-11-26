@@ -18,6 +18,18 @@
     "graphify/*": "Query the Graphify MCP server"
   },
   "harnesses": {
+    "codex": {
+      "grant": "tools",
+      "tools": {
+        "read": ["read_source"],
+        "search": ["find_filename", "find_content"],
+        "edit": ["apply_patch"],
+        "execute": ["exec_command"],
+        "web": ["web_search"],
+        "todo": ["update_plan"],
+        "graphify/*": ["get_neighbors", "god_nodes"]
+      }
+    },
     "claude": {
       "grant": "tools",
       "tools": {
@@ -54,5 +66,31 @@
       "writableRoles": ["edit", "execute"]
     }
   },
-  "overrides": {}
+  "overrides": {
+    "explore": {
+      "codex": {
+        "tools": ["read_source", "find_filename", "find_content"],
+        "reason": "The restricted launcher supplies source tools; Graphify is unavailable in this isolated session."
+      }
+    },
+    "commit": {
+      "codex": {
+        "tools": ["staged_status", "staged_diff"],
+        "reason": "Commit inspects only the index and drafts a message. The bridge supplies fixed read-only Git operations."
+      }
+    },
+    "pr-author": {
+      "codex": {
+        "tools": [
+          "branch_summary",
+          "merge_base",
+          "branch_commits",
+          "branch_diff",
+          "read_source",
+          "read_issue"
+        ],
+        "reason": "PrAuthor inspects branch history, tracked sources and linked issues. The bridge supplies fixed read-only operations."
+      }
+    }
+  }
 }

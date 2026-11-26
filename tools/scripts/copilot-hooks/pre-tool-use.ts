@@ -1,5 +1,9 @@
+import { isAbsolute, resolve } from 'node:path';
+
 import {
   allowTool,
+  CODEX_HOOK,
+  collectStrings,
   COMMAND_KEYS,
   denyTool,
   extractCommand,
@@ -12,6 +16,13 @@ import {
   SHELL_TOOL_NAMES,
   stripHeredocBodies,
 } from './lib.ts';
+import {
+  getSecretReadReason,
+  inspectReadNode,
+  mentionsEnvFile,
+  type PathRule,
+  ruleMatches,
+} from './read-policy.ts';
 import { getSignoffWriteReason } from './signoff-guard.ts';
 
 /** Read-only tools across harnesses. Not mutating, but they can exfiltrate. */
@@ -24,32 +35,6 @@ const READ_TOOL_NAMES = new Set<string>([
   'search_files',
   'searchfiles',
   'view',
-]);
-
-/**
- * Path-bearing keys for read tools. Deliberately excludes `pattern` — that key
- * carries a search expression, not a path, and matching it would block a plain
- * `grep "secrets"`.
- */
-const READ_PATH_KEYS = new Set<string>([
-  'dir',
-  'directory',
-  'file',
-  'file_path',
-  'filename',
-  'filenames',
-  'filepath',
-  'filePath',
-  'files',
-  'folder',
-  'glob',
-  'notebook_path',
-  'path',
-  'paths',
-  'source',
-  'sources',
-  'target',
-  'targets',
 ]);
 
 const PATH_KEYS = new Set<string>([
@@ -78,15 +63,6 @@ const PATH_KEYS = new Set<string>([
   'target',
   'targets',
 ]);
-
-/** A path rule: matched against normalized text, unless `exclude` says otherwise. */
-interface PathRule {
-  pattern: RegExp;
-  reason: string;
-  exclude?: (normalized: string) => boolean;
-  /** Checked against structured path arguments only, never raw command text. */
-  pathOnly?: boolean;
-}
 
 /**
  * Workflow guards: generated or tool-owned outputs that must be regenerated
@@ -130,9 +106,7 @@ const WORKFLOW_PROTECTED_PATTERNS: PathRule[] = [
  */
 const SECRET_WRITE_PATTERNS: PathRule[] = [
   {
-    pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized: string) =>
-      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
+    matcher: mentionsEnvFile,
     reason:
       'Direct edits to environment files are blocked. Keep secrets in local env files or managed secret storage.',
   },
@@ -167,109 +141,6 @@ const PROTECTED_PATTERNS = SANDBOX
   ? SECRET_WRITE_PATTERNS
   : [...WORKFLOW_PROTECTED_PATTERNS, ...SECRET_WRITE_PATTERNS];
 
-/**
- * Read-side guard. `PROTECTED_PATTERNS` stops *writes* to generated and secret
- * files; these stop *reads* of secret material only. Generated code stays
- * readable — the point is to keep credentials out of the transcript.
- *
- * `pathOnly` rules are checked against structured path arguments but not against
- * raw shell command text, where the token is too ambiguous to match safely
- * (`.key` would fire on `obj.key`).
- */
-const SECRET_READ_PATTERNS: PathRule[] = [
-  {
-    pattern: /(^|[^a-z0-9])(?:\.env(?:\.[^/]+)?|[^/]+\.env)(?:$|[^a-z0-9])/i,
-    exclude: (normalized: string) =>
-      /\.env\.example(?:$|[^a-z0-9])/.test(normalized),
-    reason:
-      'Reading environment files is blocked. They hold live credentials — read `.env.example` for the shape, or ask the user for the specific value.',
-  },
-  {
-    pattern: /(^|[/\\])\.(?:ssh|aws|gnupg)(?:\/|$)/i,
-    reason:
-      'Reading SSH, AWS, or GnuPG configuration is blocked. That directory holds private key material.',
-  },
-  {
-    pattern: /(^|[^a-z0-9])id_(?:rsa|dsa|ecdsa|ed25519)(?:$|[^a-z0-9])/i,
-    reason:
-      'Reading private SSH key files is blocked. Keep private keys out of tool output.',
-  },
-  {
-    pattern:
-      /(^|[^a-z0-9])(?:\.npmrc|\.yarnrc(?:\.yml)?|credentials|secrets)(?:\/|$)/i,
-    reason:
-      'Reading registry or credentials files is blocked. They commonly contain auth tokens.',
-  },
-  {
-    pattern: /\.(?:pem|p8|p12|pfx)(?:$|[^a-z0-9])/i,
-    reason:
-      'Reading key or certificate bundles is blocked. Keep secret material out of tool output.',
-  },
-  {
-    pathOnly: true,
-    pattern: /\.(?:key|der|crt|cer)(?:$|[^a-z0-9])/i,
-    reason:
-      'Reading key or certificate files is blocked. Keep secret material out of tool output.',
-  },
-];
-
-function getSecretReadReason(
-  text: string,
-  { pathOnly = false }: { pathOnly?: boolean } = {},
-): string | null {
-  const normalized = normalizeText(text);
-
-  for (const rule of SECRET_READ_PATTERNS) {
-    if (rule.pathOnly && !pathOnly) {
-      continue;
-    }
-
-    if (typeof rule.exclude === 'function' && rule.exclude(normalized)) {
-      continue;
-    }
-
-    if (rule.pattern.test(normalized)) {
-      return rule.reason;
-    }
-  }
-
-  return null;
-}
-
-function inspectReadNode(node: unknown, key = ''): string | null {
-  if (node === null || node === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const reason = inspectReadNode(item, key);
-      if (reason) {
-        return reason;
-      }
-    }
-
-    return null;
-  }
-
-  if (typeof node === 'object') {
-    for (const [childKey, childValue] of Object.entries(node)) {
-      const reason = inspectReadNode(childValue, childKey);
-      if (reason) {
-        return reason;
-      }
-    }
-
-    return null;
-  }
-
-  if (typeof node !== 'string' || !READ_PATH_KEYS.has(key)) {
-    return null;
-  }
-
-  return getSecretReadReason(node, { pathOnly: true });
-}
-
 function looksLikePath(text: string): boolean {
   const normalized = normalizeText(text);
 
@@ -280,15 +151,14 @@ function looksLikePath(text: string): boolean {
   );
 }
 
-function getProtectedPathReason(text: string): string | null {
+function getProtectedPathReason(
+  text: string,
+  { isPath }: { isPath: boolean },
+): string | null {
   const normalized = normalizeText(text);
 
   for (const rule of PROTECTED_PATTERNS) {
-    if (typeof rule.exclude === 'function' && rule.exclude(normalized)) {
-      continue;
-    }
-
-    if (rule.pattern.test(normalized)) {
+    if (ruleMatches(rule, normalized, isPath)) {
       return rule.reason;
     }
   }
@@ -296,7 +166,7 @@ function getProtectedPathReason(text: string): string | null {
   return null;
 }
 
-function inspectPatchText(text: string): string | null {
+function inspectPatchText(text: string, cwd?: string): string | null {
   const lines = text.split(/\r?\n/);
 
   for (const line of lines) {
@@ -308,7 +178,10 @@ function inspectPatchText(text: string): string | null {
       continue;
     }
 
-    const reason = getProtectedPathReason(match[1] ?? match[2] ?? '');
+    const target = match[1];
+    const reason = getProtectedPathReason(cwd ? resolve(cwd, target) : target, {
+      isPath: true,
+    });
     if (reason) {
       return reason;
     }
@@ -355,17 +228,21 @@ function inspectNode(node: unknown, key = ''): string | null {
       return null;
     }
 
-    return getProtectedPathReason(command);
+    return getProtectedPathReason(command, { isPath: false });
   }
 
   if (PATH_KEYS.has(key)) {
-    return getProtectedPathReason(node);
+    return getProtectedPathReason(node, { isPath: true });
   }
 
   return null;
 }
 
-function inspectToolInput(toolName: string, toolInput: unknown): string | null {
+function inspectToolInput(
+  toolName: string,
+  toolInput: unknown,
+  cwd?: string,
+): string | null {
   if (!toolName) {
     return null;
   }
@@ -376,10 +253,22 @@ function inspectToolInput(toolName: string, toolInput: unknown): string | null {
     toolName === 'patch'
   ) {
     if (typeof toolInput === 'string') {
-      return inspectPatchText(toolInput);
+      return inspectPatchText(toolInput, cwd);
     }
 
-    return getProtectedPathReason(JSON.stringify(toolInput ?? {}));
+    // The serialized scan reads the input as text, so path arguments and patch
+    // headers are also judged as the paths they are.
+    for (const text of collectStrings(toolInput)) {
+      const reason = inspectPatchText(text, cwd);
+      if (reason) {
+        return reason;
+      }
+    }
+
+    return (
+      inspectNode(toolInput) ??
+      getProtectedPathReason(JSON.stringify(toolInput ?? {}), { isPath: false })
+    );
   }
 
   if (typeof toolInput === 'string') {
@@ -396,14 +285,17 @@ function inspectToolInput(toolName: string, toolInput: unknown): string | null {
         return null;
       }
 
-      return getProtectedPathReason(command);
+      return getProtectedPathReason(command, { isPath: false });
     }
 
     if (!looksLikePath(toolInput)) {
       return null;
     }
 
-    return getProtectedPathReason(toolInput);
+    // `execute` and `run` reach this branch with a command, not a path.
+    return getProtectedPathReason(toolInput, {
+      isPath: !SHELL_TOOL_NAMES.has(toolName),
+    });
   }
 
   return inspectNode(toolInput);
@@ -413,6 +305,11 @@ async function main() {
   const payload = await readPayloadOrExit();
   const toolName = getToolName(payload);
   const toolInput = getToolInput(payload);
+  // Resolve relative paths against the tool cwd reported by Codex.
+  const cwd =
+    CODEX_HOOK && typeof payload?.cwd === 'string' && isAbsolute(payload.cwd)
+      ? payload.cwd
+      : undefined;
 
   if (READ_TOOL_NAMES.has(toolName)) {
     const readReason =
@@ -434,7 +331,7 @@ async function main() {
   if (SHELL_TOOL_NAMES.has(toolName)) {
     // Heredoc bodies are kept: a Sign-off body or a waiver piped into `gh`
     // through one is exactly what this guard must see.
-    const signoffReason = getSignoffWriteReason(extractCommand(toolInput));
+    const signoffReason = getSignoffWriteReason(extractCommand(toolInput), cwd);
     if (signoffReason) {
       denyTool(signoffReason);
     }
@@ -450,7 +347,7 @@ async function main() {
     }
   }
 
-  const reason = inspectToolInput(toolName, toolInput);
+  const reason = inspectToolInput(toolName, toolInput, cwd);
   if (!reason) {
     allowTool();
   }

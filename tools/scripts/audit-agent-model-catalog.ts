@@ -63,6 +63,7 @@ interface AgentModelPolicy {
       claudeByComplexity: { low: string; medium: string; high: string };
       cursorDefault: string;
       copilotDefault: string;
+      codexDefault: string;
     };
   };
   catalogSources: CatalogSource[];
@@ -231,7 +232,7 @@ async function fetchSource(
 function assignmentRows(policy: AgentModelPolicy): string[] {
   return Object.entries(policy.agents).map(([slug, entry]) => {
     const models = entry.models;
-    return `| ${slug} | ${entry.tier} | ${modelsForDisplay(models.copilot)} | ${modelsForDisplay(models.claude)} | ${modelsForDisplay(models.cursor)} | ${modelsForDisplay(models.gemini)} |`;
+    return `| ${slug} | ${entry.tier} | ${modelsForDisplay(models.copilot)} | ${modelsForDisplay(models.claude)} | ${modelsForDisplay(models.cursor)} | ${modelsForDisplay(models.gemini)} | ${modelsForDisplay(models.codex)} |`;
   });
 }
 
@@ -371,8 +372,8 @@ async function main() {
     '',
     '## Current assignments',
     '',
-    '| Agent | Tier | Copilot | Claude | Cursor | Gemini |',
-    '| --- | --- | --- | --- | --- | --- |',
+    '| Agent | Tier | Copilot | Claude | Cursor | Gemini | Codex |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
     ...assignmentRows(policy),
     '',
     '## Sandcastle defaults',
@@ -380,6 +381,7 @@ async function main() {
     `- Claude low / medium / high: ${policy.orchestrators.sandcastle.claudeByComplexity.low} / ${policy.orchestrators.sandcastle.claudeByComplexity.medium} / ${policy.orchestrators.sandcastle.claudeByComplexity.high}`,
     `- Cursor: ${policy.orchestrators.sandcastle.cursorDefault}`,
     `- Copilot: ${policy.orchestrators.sandcastle.copilotDefault}`,
+    `- Codex: ${policy.orchestrators.sandcastle.codexDefault}`,
     '',
     '## Official sources',
     '',

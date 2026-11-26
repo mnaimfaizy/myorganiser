@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 
 import {
   SECRET_SCAN_HOOK,
+  codexPayload,
+  expectCodexDenial,
   expectAllowed,
   expectDenied,
   shellPayload,
@@ -32,6 +34,30 @@ const PASSPHRASE_FIXTURE = [
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
 describe('secret-scan hook', () => {
+  describe('Codex tools', () => {
+    it('blocks a synthetic credential in a shell command', () => {
+      expectCodexDenial(
+        SECRET_SCAN_HOOK,
+        codexPayload('Bash', 'Write-Output ' + AWS_ACCESS_KEY),
+        /secret-looking credential/i,
+      );
+    });
+
+    it('blocks a synthetic credential in an ordinary patch destination', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Add File: src/example.ts',
+        "+export const example = '" + GITHUB_TOKEN + "';",
+        '*** End Patch',
+      ].join('\n');
+      expectCodexDenial(
+        SECRET_SCAN_HOOK,
+        codexPayload('apply_patch', patch),
+        /github token-like secret/i,
+      );
+    });
+  });
+
   describe('credential detection', () => {
     it('should deny a command containing an AWS access key', () => {
       expectDenied(

@@ -8,6 +8,7 @@ This guide covers development in the MyOrganiser monorepo.
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Initial Setup](#initial-setup)
+  - [Codex Worktrees on Windows](#codex-worktrees-on-windows)
 - [Starting Local Development Dependencies and Services](#starting-local-development-dependencies-and-services)
   - [Starting Dependencies (Docker)](#starting-dependencies-docker)
   - [Starting the Backend](#starting-the-backend)
@@ -165,6 +166,48 @@ Install the following before you begin:
    ```
 
    This opens a graph of the projects and their dependencies.
+
+### Codex Worktrees on Windows
+
+Select the checked-in **MyOrganiser** local environment for a new Worktree chat.
+Its Windows setup installs the dependencies in the lockfile with the project's Corepack-managed Yarn.
+The **Start backend** and **Start web** actions run the same scripts as the
+manual startup commands below.
+
+Create a local `.env` from `.env.example` in the worktree and configure it using
+[Initial Setup](#initial-setup). Start PostgreSQL and MailHog using
+[Docker Compose](#starting-dependencies-docker) and apply the backend migrations
+with `corepack yarn nx run backend:migrate`. The web app needs the backend API.
+Worktrees share the host ports, so stop any other development servers that
+already use them before starting both actions.
+
+Codex finds the root `AGENTS.md` and shared Skills in the worktree. When a
+session starts in a nested directory, Codex also loads the Instruction Files
+along that path. For a task that moves into another directory, read its
+applicable `AGENTS.md` files before editing. Invoke the human-triggered Skills
+explicitly with `$implement` or `$orchestrate`.
+
+For the optional structural index, see [Graphify from a linked worktree](docs/graphify.md#from-a-linked-worktree).
+
+#### Review and verify the interactive guard hooks
+
+Open the worktree as a trusted project. In Codex Desktop on Windows, use
+**Review hooks** in the composer or open **Settings > Hooks**. In the CLI,
+run `/hooks`. Review the two commands from `.codex/hooks.json` and the
+shared scripts they invoke before trusting them. Codex skips new or changed
+hook definitions until you accept them. Review shared script changes as part
+of updating the worktree too. In a linked worktree, Codex can load hook
+definitions from the primary checkout. If the hooks are missing from the
+review list, check that the primary checkout contains the definitions.
+The commands run the shared guards from the worktree you opened.
+[Codex hook trust](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+
+In that session, ask Codex to run `git status --short` and add a plain-text file
+under `tmp/`. Both should proceed under your normal sandbox and approval policy.
+Then ask Codex to use its patch tool to add a harmless test file under
+`libs/app-api-client/src/`. The hook should refuse the patch before creating
+the file. The focused contract suites exercise synthetic credential inputs and
+the Sign-off Issue body-file guard without sending any GitHub writes.
 
 ## Starting Local Development Dependencies and Services
 

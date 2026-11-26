@@ -109,7 +109,9 @@ export function validateToolMap(map: AgentToolMap): void {
   }
 
   for (const [harness, cfg] of Object.entries(map.harnesses ?? {})) {
-    const format = FRONTMATTER_FORMAT[harness];
+    // Codex uses a TOML adapter, independently of Markdown frontmatter.
+    const format =
+      harness === 'codex' ? { grant: 'tools' } : FRONTMATTER_FORMAT[harness];
     if (!format || format.grant !== cfg.grant) {
       throw new Error(
         `agent-tool-map: harness "${harness}" declares grant "${cfg.grant}", but its frontmatter format is ${format ? `"${format.grant}"` : 'unknown'}`,

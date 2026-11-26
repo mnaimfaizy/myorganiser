@@ -113,6 +113,11 @@ Windows-native dispatch (from PowerShell, repo on `D:\`) works but is ~29 min/in
 
 ## Running a dispatch
 
+Codex is available for dispatch plan previews only. A real Codex dispatch
+refuses before launch while subscription authentication and reviewed-hook
+enforcement remain unverified. Do not treat a successful preview or a stored
+login as proof of either boundary. Existing provider defaults are unchanged.
+
 ```bash
 corepack yarn dispatch-agents --prd <issue-number>   # all ready AFK slices, one by one
 corepack yarn dispatch-waves  --prd <issue-number>   # dependency-ordered across waves
@@ -243,7 +248,7 @@ interactive Claude Code sessions, and any `complexity:high` issue routes to `cla
 the `--dry-run` output before committing to a large batch.
 
 Provider switching is optional: the default agent can live in `.sandcastle/secrets.env` (or the 1Password Environment) as
-`SANDCASTLE_AGENT=claude|cursor|copilot`. Per-provider model defaults can also live there
+`SANDCASTLE_AGENT=claude|cursor|copilot|codex` (`codex` is preview-only until #1641). Per-provider model defaults can also live there
 (`SANDCASTLE_CLAUDE_MODEL`, `SANDCASTLE_CURSOR_MODEL`, `SANDCASTLE_COPILOT_MODEL`), and
 `--model` always overrides them for a single run. Claude keeps the existing complexity-based
 model routing when no override is set.
@@ -530,7 +535,12 @@ run — a third turns one PRD into more than a day of wall clock.
 
 It deliberately does **not** wait when:
 
-- the reset time cannot be read — a guessed sleep either wastes hours or wakes into the same wall;
+- the reset time cannot be read, or is not in the future — a guessed sleep either wastes hours or
+  wakes into the same wall;
+- the interrupted work could not be committed, tagged and verified as a checkpoint — the run says
+  why and leaves the branch and worktree for inspection. A run that left no work at all still waits
+  and redispatches. After a wait, the slice resumes only if its branch and tag still point at the
+  checkpoint;
 - the provider's limit format is unknown to us. Only Claude Code has an observed format today;
   `cursor` and `copilot` classify as `unknown` and always preserve-and-exit instead. That is
   intended, not a gap — adding a matcher for a message we have never seen risks parking a run for

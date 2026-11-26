@@ -69,14 +69,17 @@ const MAX_BODY_FILE_BYTES = 256 * 1024;
  * login too, so the gate cannot tell them apart; this guard stops the agent's
  * tool call instead.
  */
-export function getSignoffWriteReason(command: string): string | null {
+export function getSignoffWriteReason(
+  command: string,
+  cwd = process.cwd(),
+): string | null {
   const writesIssue = GH_ISSUE_WRITE.test(command);
   const writesComment = GH_COMMENT_WRITE.test(command);
   if (!writesIssue && !writesComment) {
     return null;
   }
 
-  for (const text of [command, ...readBodyFiles(command)]) {
+  for (const text of [command, ...readBodyFiles(command, cwd)]) {
     if (text.includes(SIGNOFF_ISSUE_MARKER)) {
       return 'Writing a Sign-off Issue body is blocked: only the Maintainer ticks a Person Check, and the Merge Train adds checks as a script (ADR 0151). Ask the Maintainer to tick it.';
     }
@@ -102,26 +105,31 @@ export function getSignoffWriteReason(command: string): string | null {
 /**
  * The files a `gh` command reads its body from: `--body-file X` or `-F X`
  * (`gh issue`), `--input X` and `-F|--field key=@X` (`gh api`). A relative
- * path resolves against the hook's working directory, not the shell's after a
- * `cd`. Stdin (`-`), a file the command itself is about to write, and a
+ * path resolves against the tool's reported working directory when available.
+ * Stdin (`-`), a file the command itself is about to write, and a
  * missing or unreadable file cannot be read here and are skipped.
  */
-function readBodyFiles(command: string): string[] {
+function readBodyFiles(command: string, cwd: string): string[] {
   const paths = [
-    ...command.matchAll(
-      /(?:--body-file|--input|\s-F)[=\s]+(['"]?)([^\s'"=]+)\1(?=\s|$)/g,
+    ...Array.from(
+      command.matchAll(
+        /(?:--body-file|--input|\s-F)[=\s]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s'"=]+))(?=\s|$)/g,
+      ),
+      (match) => match[1] ?? match[2] ?? match[3],
     ),
-    ...command.matchAll(
-      /(?:\s-F|--field)[=\s]+[\w.[\]-]+=@(['"]?)([^\s'"]+)\1/g,
+    ...Array.from(
+      command.matchAll(
+        /(?:\s-F|--field)[=\s]+[\w.[\]-]+=@(['"]?)([^\s'"]+)\1/g,
+      ),
+      (match) => match[2],
     ),
-  ]
-    .map((match) => match[2])
-    .filter((path) => path !== '-');
+  ].filter((path) => path !== '-');
 
   return paths.flatMap((path) => {
     try {
-      const resolved = resolve(path);
-      if (statSync(resolved).size > MAX_BODY_FILE_BYTES) return [];
+      const resolved = resolve(cwd, path);
+      const stat = statSync(resolved);
+      if (!stat.isFile() || stat.size > MAX_BODY_FILE_BYTES) return [];
       return [readFileSync(resolved, 'utf8')];
     } catch {
       return [];

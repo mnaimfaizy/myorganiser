@@ -2826,7 +2826,12 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
             A reset time was <b>parsed</b>, not guessed. Only the observed
             <code>resets 4:30am (UTC)</code> shape is accepted; a bare local time
             would be ambiguous across the machines this runs on. An unreadable
-            timestamp exits.
+            timestamp, or one that is not in the future, exits.
+          </li>
+          <li>
+            The interrupted work was preserved as a verified checkpoint, or the
+            run left none. If the commit, tag or branch-equals-tag check
+            failed, the run exits instead of waiting.
           </li>
           <li>
             Fewer than <b>2</b> waits have been taken this run
@@ -2926,6 +2931,7 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
       "resumeSliceLogRunStartMarker": "--- Run started:",
       "resumeQuotaMaxWaits": 2,
       "resumeQuotaMaxWaitMs": 21600000,
+      "resumeQuotaWaitMarginMs": 300000,
       "resumeLimitClassifications": [
         "limit-hit",
         "other",
@@ -2939,7 +2945,6 @@ Your FIRST output must be the inventory required by rule 4. Only then start work
       "resumeCheckpointTagPattern": "wip/<issue>-checkpoint",
       "resumeCheckpointCommitVerifyFlag": "--no-verify",
       "resumeQuotaWaitFlag": "--wait-for-quota",
-      "resumeQuotaWaitMarginMs": 300000,
       "resumeAgentMaxIterations": 2
     }
   }

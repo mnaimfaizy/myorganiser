@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
+export const CODEX_HOOK_ARGS = ['--codex'];
+
 export const PRE_TOOL_USE_HOOK = join(import.meta.dirname, 'pre-tool-use.ts');
 export const SECRET_SCAN_HOOK = join(import.meta.dirname, 'secret-scan.ts');
 export const POST_TOOL_USE_HOOK = join(import.meta.dirname, 'post-tool-use.ts');
@@ -66,7 +68,7 @@ export function runHookRaw(
   hookPath: string,
   payload: unknown,
   options?: HookRunOptions,
-): { status: number | null; stdout: string } {
+): { status: number | null; stdout: string; stderr: string } {
   // The hooks read the sandbox marker from the environment, so the two modes
   // have to be driven through the child process rather than a module flag.
   const childEnv = { ...process.env };
@@ -94,7 +96,11 @@ export function runHookRaw(
     env: childEnv,
   });
 
-  return { status: result.status, stdout: result.stdout };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 export function expectDenied(
@@ -119,6 +125,30 @@ export function expectAllowed(
 
   assert.equal(outcome.status, 0);
   assert.equal(outcome.decision, 'allow');
+}
+
+export function codexPayload(
+  toolName: 'Bash' | 'apply_patch',
+  command: string,
+  cwd = process.cwd(),
+) {
+  return {
+    hook_event_name: 'PreToolUse',
+    tool_name: toolName,
+    tool_input: { command },
+    cwd,
+  };
+}
+
+export function expectCodexDenial(
+  hookPath: string,
+  payload: ReturnType<typeof codexPayload>,
+  reasonPattern: RegExp,
+): void {
+  const result = runHookRaw(hookPath, payload, { args: CODEX_HOOK_ARGS });
+  assert.equal(result.status, DENY_EXIT_CODE);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, reasonPattern);
 }
 
 export function shellPayload(toolName: string, command: string) {

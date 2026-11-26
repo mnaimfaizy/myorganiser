@@ -2,7 +2,7 @@ import process from 'node:process';
 
 /**
  * Shared helpers for multi-harness agent hooks (Copilot CLI/cloud, VS Code Copilot,
- * Cursor IDE/CLI, Claude Code).
+ * Cursor IDE/CLI, Claude Code, Codex).
  *
  * Scripts emit dual-format JSON so one implementation works across hosts.
  */
@@ -327,6 +327,11 @@ export function collectWriteTargets(
 }
 
 export function getToolName(payload: HookPayload | undefined): string {
+  if (CODEX_HOOK) {
+    const name = payload?.tool_name;
+    return name === 'Bash' || name === 'apply_patch' ? name.toLowerCase() : '';
+  }
+
   const value =
     payload?.toolName ??
     payload?.tool_name ??
@@ -338,6 +343,11 @@ export function getToolName(payload: HookPayload | undefined): string {
 }
 
 export function getToolInput(payload: HookPayload | undefined): unknown {
+  if (CODEX_HOOK) {
+    const input = payload?.tool_input as { command?: unknown } | undefined;
+    return typeof input?.command === 'string' ? input.command : null;
+  }
+
   const raw =
     payload?.toolArgs ??
     payload?.tool_args ??
@@ -421,7 +431,9 @@ export async function readPayloadOrExit(): Promise<HookPayload> {
     return JSON.parse(rawInput) as HookPayload;
   } catch (error) {
     console.error('[agent-hooks] Unable to parse hook payload.');
-    console.error(error instanceof Error ? error.message : String(error));
+    if (!CODEX_HOOK) {
+      console.error(error instanceof Error ? error.message : String(error));
+    }
     allowTool();
   }
 }
@@ -440,7 +452,8 @@ export function isMutatingTool(toolName: string): boolean {
  * flow decides. Copilot and Cursor launch without the flag and keep the
  * explicit allow their fail-closed modes need.
  */
-const DEFER_ALLOW = process.argv.includes('--defer');
+export const CODEX_HOOK = process.argv.includes('--codex');
+const DEFER_ALLOW = CODEX_HOOK || process.argv.includes('--defer');
 
 /**
  * Explicit allow for preToolUse. Required if Cursor `failClosed: true` is set —
@@ -466,11 +479,17 @@ export function allowTool(): never {
 }
 
 /**
- * Deny a tool call in a format accepted by Copilot, VS Code, Cursor, and Claude.
+ * Deny a tool call in the launcher’s harness format.
  * Exit 2 is the portable "block" signal across Cursor and Claude; Copilot
  * preToolUse also treats exit 2 as deny.
  */
 export function denyTool(reason: string): never {
+  if (CODEX_HOOK) {
+    // Codex takes the blocking reason from stderr when a hook exits 2.
+    console.error(reason);
+    process.exit(2);
+  }
+
   process.stdout.write(
     JSON.stringify({
       permissionDecision: 'deny',

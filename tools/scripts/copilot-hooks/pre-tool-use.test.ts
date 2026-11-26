@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   PRE_TOOL_USE_HOOK,
+  CODEX_HOOK_ARGS,
+  codexPayload,
+  expectCodexDenial,
+  runHookRaw,
   expectAllowed,
   expectDenied,
   runHook,
@@ -25,6 +29,68 @@ const API_SPECS_AGENTS = 'libs/api-specs/AGENTS.md';
 const PRIVATE_SSH_KEY = `keys/${['id', 'rsa'].join('_')}`;
 
 describe('pre-tool-use hook', () => {
+  describe('Codex tools', () => {
+    it('blocks a PowerShell write to generated code', () => {
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload(
+          'Bash',
+          'Set-Content libs\\app-api-client\\src\\index.ts example',
+        ),
+        /generated api client/i,
+      );
+    });
+
+    it('blocks a patch targeting a generated path relative to a nested workdir', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Add File: src/synthetic.ts',
+        '+example',
+        '*** End Patch',
+      ].join('\r\n');
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload(
+          'apply_patch',
+          patch,
+          join(process.cwd(), 'libs', 'app-api-client'),
+        ),
+        /generated api client/i,
+      );
+    });
+
+    it('blocks moving a file into a protected directory', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Update File: src/example.ts',
+        '*** Move to: libs/app-api-client/src/example.ts',
+        '*** End Patch',
+      ].join('\n');
+      expectCodexDenial(
+        PRE_TOOL_USE_HOOK,
+        codexPayload('apply_patch', patch),
+        /generated api client/i,
+      );
+    });
+
+    it('defers on a patch that mentions generated code in its content', () => {
+      const patch = [
+        '*** Begin Patch',
+        '*** Add File: notes.md',
+        '+*** Update File: libs/app-api-client/src/index.ts',
+        '*** End Patch',
+      ].join('\n');
+      const result = runHookRaw(
+        PRE_TOOL_USE_HOOK,
+        codexPayload('apply_patch', patch),
+        {
+          args: CODEX_HOOK_ARGS,
+        },
+      );
+      assert.deepEqual(result, { status: 0, stdout: '', stderr: '' });
+    });
+  });
+
   describe('read guard for read tools', () => {
     it('should deny reading an environment file', () => {
       expectDenied(
@@ -136,6 +202,261 @@ describe('pre-tool-use hook', () => {
         PRE_TOOL_USE_HOOK,
         shellPayload('PowerShell', 'Get-Content certs/api.pem'),
         /key or certificate/i,
+      );
+    });
+  });
+
+  describe('env accessor in code is not an environment file (#1640)', () => {
+    const ACCESSOR_COMMANDS = [
+      'node -e "console.log(process.env.HOME)"',
+      `node -e "console.log(process.env['HOME'])"`,
+      'node -e "console.log(Object.keys(process.env))"',
+      'node -e "console.log(import.meta.env.MODE)"',
+      'node -e "console.log(Deno.env.get(\'X\'))"',
+      'node -e "console.log(PROCESS.ENV.HOME)"',
+      'cat tools/scripts/lib/sandcastle-provider-env.ts',
+    ];
+    const ACCESSOR_WRITES = [
+      `sed -i 's/a/process.env.X/' tools/scripts/lib/sandcastle-provider-env.ts`,
+      `echo "const x = process.env.X;" > tools/scripts/lib/sandcastle-provider-env.ts`,
+      `echo "import.meta.env.MODE" >> src/app/page.tsx`,
+    ];
+
+    it('should allow shell reads whose text mentions the env accessor', () => {
+      for (const command of ACCESSOR_COMMANDS) {
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('Bash', command));
+      }
+    });
+
+    it('should allow shell writes whose text mentions the env accessor', () => {
+      for (const command of ACCESSOR_WRITES) {
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('Bash', command));
+        expectAllowed(PRE_TOOL_USE_HOOK, shellPayload('PowerShell', command));
+      }
+    });
+
+    it('should allow structured paths to an env-named source file', () => {
+      for (const tool_name of ['Read', 'Edit', 'Write']) {
+        expectAllowed(PRE_TOOL_USE_HOOK, {
+          tool_name,
+          tool_input: {
+            file_path: 'tools/scripts/lib/sandcastle-provider-env.ts',
+            content: 'const x = process.env.X;',
+          },
+        });
+      }
+    });
+
+    it('should still deny a read of the accessor next to a real env file', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `node -e "process.env.X" && cat ${ENV_FILE}`),
+        /environment/i,
+      );
+    });
+
+    it('should still deny the env example next to a real env file', () => {
+      expectDenied(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `cat ${ENV_EXAMPLE} ${ENV_FILE}`),
+        /environment/i,
+      );
+    });
+  });
+
+  describe('a path argument named like an env accessor is an environment file', () => {
+    const ACCESSOR_FILES = [
+      'process.env',
+      'import.meta.env',
+      'Deno.env',
+      'Bun.env',
+    ].flatMap((name) => [name, `config/${name}`, `config\\${name}`]);
+
+    const patchFor = (target: string) =>
+      [
+        '*** Begin Patch',
+        `*** Add File: ${target}`,
+        '+example',
+        '*** End Patch',
+      ].join('\n');
+
+    it('should deny a read tool given an accessor-named file path', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ file_path: path }, path]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Read', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a search whose path or glob is an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ path }, { glob: path }]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Grep', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a write tool given an accessor-named file path', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ file_path: path, content: 'x' }, path]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Write', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a Codex patch that targets an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload('apply_patch', patchFor(path)),
+          /environment/i,
+        );
+      }
+    });
+
+    it('should deny a structured patch input that targets an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ path }, { command: patchFor(path) }]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'apply_patch', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should allow a shell tool given the accessor in a plain command string', () => {
+      for (const tool_name of ['Bash', 'Execute', 'Run']) {
+        expectAllowed(PRE_TOOL_USE_HOOK, {
+          tool_name,
+          tool_input: 'node -e "console.log(process.env.PATH)"',
+        });
+      }
+    });
+
+    it('should allow a patch whose content mentions the env accessor', () => {
+      expectAllowed(PRE_TOOL_USE_HOOK, {
+        tool_name: 'apply_patch',
+        tool_input: {
+          command: [
+            '*** Begin Patch',
+            '*** Add File: src/synthetic.ts',
+            '+const x = process.env.X;',
+            '*** End Patch',
+          ].join('\n'),
+        },
+      });
+    });
+  });
+
+  describe('real environment file reads stay denied (#1640)', () => {
+    const ENV_PATHS = [
+      '.env',
+      '.env.local',
+      'apps/backend/.env',
+      'apps\\backend\\.env',
+      'foo.env',
+      // Only process, import.meta, Deno and Bun are exempt accessor roots, so
+      // names that merely contain ".env." stay refused.
+      'prod.env.bak',
+      'backend.env.local',
+      'foo.env.bak',
+      'config/process.env',
+      // Accepted false positive: a non-listed accessor looks like a file name.
+      'ctx.env.X',
+    ];
+
+    it('should deny structured reads of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        expectDenied(
+          PRE_TOOL_USE_HOOK,
+          { tool_name: 'Read', tool_input: { file_path } },
+          /environment/i,
+        );
+      }
+    });
+
+    it('should deny shell reads of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const command of [
+          `cat ${file_path}`,
+          `type ${file_path}`,
+          `Get-Content ${file_path}`,
+          `Get-Content -Path "${file_path}"`,
+        ]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            shellPayload('Bash', command),
+            /environment/i,
+          );
+        }
+      }
+    });
+  });
+
+  describe('real environment file writes stay denied (#1640)', () => {
+    const ENV_PATHS = [
+      '.env',
+      '.env.local',
+      'apps/backend/.env',
+      'foo.env',
+      'prod.env.bak',
+      'backend.env.local',
+      'foo.env.bak',
+      'config/process.env',
+      // Accepted false positive: a non-listed accessor looks like a file name.
+      'ctx.env.X',
+    ];
+
+    it('should deny structured writes of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const tool_name of ['Write', 'Edit']) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name, tool_input: { file_path, content: 'x' } },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny shell writes of each env path', () => {
+      for (const file_path of ENV_PATHS) {
+        for (const command of [
+          `echo x > ${file_path}`,
+          `cp x ${file_path}`,
+          `sed -i s/a/b/ ${file_path}`,
+        ]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            shellPayload('Bash', command),
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should allow writing the env example file', () => {
+      expectAllowed(PRE_TOOL_USE_HOOK, {
+        tool_name: 'Write',
+        tool_input: { file_path: ENV_EXAMPLE, content: 'X=' },
+      });
+      expectAllowed(
+        PRE_TOOL_USE_HOOK,
+        shellPayload('Bash', `echo X= > ${ENV_EXAMPLE}`),
       );
     });
   });
@@ -490,6 +811,50 @@ describe('pre-tool-use hook', () => {
         rmSync(dir, { recursive: true, force: true });
       }
     }
+
+    it('blocks a Sign-off Issue body file relative to the Codex tool cwd', () => {
+      withBodyFile(SIGNED_OFF_BODY, (bodyFile) => {
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload(
+            'Bash',
+            'gh issue edit 1600 --body-file body.md',
+            dirname(bodyFile),
+          ),
+          /sign-off issue/i,
+        );
+      });
+    });
+
+    it('blocks a Codex waiver passed through a quoted body-file path', () => {
+      withBodyFile('', (bodyFile) => {
+        const waiverFile = join(dirname(bodyFile), 'waiver body.md');
+        writeFileSync(waiverFile, WAIVER);
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload(
+            'Bash',
+            "gh issue comment 1600 --body-file 'waiver body.md'",
+            dirname(bodyFile),
+          ),
+          /waive/i,
+        );
+      });
+    });
+
+    it('defers on an ordinary Codex issue write with a body file', () => {
+      withBodyFile('Ordinary update', (bodyFile) => {
+        const event = codexPayload(
+          'Bash',
+          'gh issue edit 1599 --body-file body.md',
+          dirname(bodyFile),
+        );
+        const result = runHookRaw(PRE_TOOL_USE_HOOK, event, {
+          args: CODEX_HOOK_ARGS,
+        });
+        assert.deepEqual(result, { status: 0, stdout: '', stderr: '' });
+      });
+    });
 
     it('should deny an agent editing a Sign-off Issue body to tick a check', () => {
       expectDenied(

@@ -21,10 +21,13 @@ import {
 } from '../tools/scripts/lib/sandcastle-gate-log.ts';
 import {
   MAX_QUOTA_WAITS,
+  QUOTA_WAIT_MARGIN_MS,
   SLICE_DISPOSITIONS,
   formatWaitWindow,
   classifyRunFailure,
   decideWaitPolicy,
+  decideQuotaWaitAfterPreservation,
+  type SlicePreservation,
   tailLines,
   extractHandoff,
   HANDOFF_MARKER,
@@ -88,6 +91,7 @@ import {
   judgeRunOutcome,
 } from '../tools/scripts/lib/sandcastle-outcome.ts';
 import { loadHostEnv } from '../tools/scripts/lib/sandcastle-host-env.ts';
+import { assertReviewedHookEnforcement } from '../tools/scripts/lib/reviewed-hook-snapshot.ts';
 import {
   AGENT_KINDS,
   assertNoGitHubTokens,
@@ -476,7 +480,7 @@ Usage:
   Standalone mode yarn dispatch-agents --issue <issue-number> [--base <ref>]
   Sweep mode      yarn dispatch-agents --all-standalone [--limit <n>] [--base <ref>]
 
-  All accept [--agent claude|cursor|copilot] [--model <model>] [--dry-run]
+  All accept [--agent claude|cursor|copilot|codex] [--model <model>] [--dry-run]
   Interrupted slices resume by default; --fresh discards one deliberately.
 
 Flags:
@@ -732,6 +736,13 @@ function resolveClaudeAuth(
 }
 
 const agentKind = resolveAgentKind();
+if (agentKind === 'codex' && !dryRun && !gateOnly) {
+  try {
+    assertReviewedHookEnforcement();
+  } catch (error) {
+    fail((error as Error).message);
+  }
+}
 // --gate-only launches no agent, so it must not demand an agent credential. It is
 // the path a maintainer runs by hand to re-check a feature branch, often on a
 // machine where no credential source was ever set up.
@@ -1475,6 +1486,10 @@ function resolveModel(issue: Issue, agentKind: AgentKind): string {
       return (
         process.env.SANDCASTLE_COPILOT_MODEL ?? sandcastleModels.copilotDefault
       );
+    case 'codex':
+      return (
+        process.env.SANDCASTLE_CODEX_MODEL ?? sandcastleModels.codexDefault
+      );
   }
 }
 
@@ -1486,6 +1501,8 @@ function buildAgent(agentKind: AgentKind, model: string) {
       return cursor(model);
     case 'copilot':
       return copilot(model);
+    case 'codex':
+      return assertReviewedHookEnforcement();
   }
 }
 
@@ -1912,7 +1929,8 @@ function formatCrashLogTail(
 
 /**
  * Commit whatever the interrupted agent left behind onto its slice branch and tag it.
- * Returns the checkpoint, or undefined when there was nothing to preserve.
+ * Reports the verified checkpoint, that there was nothing to preserve, or why
+ * preservation failed — a failure must never be mistaken for "no work".
  *
  * --no-verify is deliberate: husky would lint and format half-finished code and
  * corrupt the very evidence being preserved. This mirrors the capture
@@ -1921,23 +1939,32 @@ function formatCrashLogTail(
 function preserveInterruptedSlice(
   issue: Issue,
   sliceBranch: string,
-): SliceCheckpoint | undefined {
-  if (!gitRefExists(sliceBranch)) return undefined;
+): SlicePreservation<SliceCheckpoint> {
+  const failed = (reason: string): SlicePreservation<SliceCheckpoint> => ({
+    kind: 'failed',
+    reason,
+  });
+  if (!gitRefExists(sliceBranch)) return { kind: 'nothing-to-preserve' };
 
   const worktreePath = join(worktreesDir, sliceBranch.replace(/\//g, '-'));
   ensureWorktreeRegistered(issue.number, worktreePath, sliceBranch);
   if (existsSync(worktreePath)) {
-    const dirty = (
-      spawnSync('git', ['-C', worktreePath, 'status', '--porcelain'], {
+    const status = spawnSync(
+      'git',
+      ['-C', worktreePath, 'status', '--porcelain'],
+      {
         encoding: 'utf8',
         windowsHide: true,
-      }).stdout || ''
-    ).trim();
+      },
+    );
+    if (status.status !== 0) return failed('git status failed in the worktree');
+    const dirty = status.stdout.trim();
     if (dirty) {
-      spawnSync('git', ['-C', worktreePath, 'add', '-A'], {
+      const add = spawnSync('git', ['-C', worktreePath, 'add', '-A'], {
         encoding: 'utf8',
         windowsHide: true,
       });
+      if (add.status !== 0) return failed('git add failed in the worktree');
       const commit = spawnSync(
         'git',
         [
@@ -1958,18 +1985,30 @@ function preserveInterruptedSlice(
         console.error(
           `  [#${issue.number}] could not commit the interrupted worktree:\n${commit.stderr}`,
         );
+        return failed('the checkpoint commit failed');
       }
+      const remaining = spawnSync(
+        'git',
+        ['-C', worktreePath, 'status', '--porcelain'],
+        { encoding: 'utf8', windowsHide: true },
+      );
+      if (remaining.status !== 0 || remaining.stdout.trim())
+        return failed(
+          'the worktree was still dirty after the checkpoint commit',
+        );
     }
   }
 
   // Nothing ahead of the base means there is no work to protect.
-  const ahead = (
-    spawnSync('git', ['rev-list', '--count', `${baseRef}..${sliceBranch}`], {
-      encoding: 'utf8',
-      windowsHide: true,
-    }).stdout || ''
-  ).trim();
-  if (ahead === '' || ahead === '0') return undefined;
+  const aheadResult = spawnSync(
+    'git',
+    ['rev-list', '--count', `${baseRef}..${sliceBranch}`],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  const ahead = (aheadResult.stdout || '').trim();
+  if (aheadResult.status !== 0 || ahead === '')
+    return failed('could not count commits ahead of the base');
+  if (ahead === '0') return { kind: 'nothing-to-preserve' };
 
   const sha = (
     spawnSync('git', ['rev-parse', '--short', sliceBranch], {
@@ -1978,13 +2017,33 @@ function preserveInterruptedSlice(
     }).stdout || ''
   ).trim();
 
+  if (!sha) return failed(`could not read the ${sliceBranch} head`);
+
   // -f so a later interruption of the same slice re-points the tag at the newer
   // checkpoint rather than failing and leaving the run without protection.
   const tag = `wip/${issue.number}-checkpoint`;
-  spawnSync('git', ['tag', '-f', tag, sliceBranch], {
+  const tagResult = spawnSync('git', ['tag', '-f', tag, sliceBranch], {
     encoding: 'utf8',
     windowsHide: true,
   });
+  if (tagResult.status !== 0) return failed(`git tag ${tag} failed`);
+  const branchHead = spawnSync(
+    'git',
+    ['rev-parse', '--verify', `${sliceBranch}^{commit}`],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  const tagHead = spawnSync(
+    'git',
+    ['rev-parse', '--verify', `${tag}^{commit}`],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  if (
+    branchHead.status !== 0 ||
+    tagHead.status !== 0 ||
+    !branchHead.stdout.trim() ||
+    branchHead.stdout.trim() !== tagHead.stdout.trim()
+  )
+    return failed(`${tag} does not point at the ${sliceBranch} head`);
 
   const fileCount = (
     spawnSync('git', ['diff', '--name-only', `${baseRef}..${sliceBranch}`], {
@@ -1995,7 +2054,31 @@ function preserveInterruptedSlice(
     .split('\n')
     .filter((line) => line.trim() !== '').length;
 
-  return { sha, tag, fileCount };
+  return { kind: 'preserved', checkpoint: { sha, tag, fileCount } };
+}
+
+/** The branch and its checkpoint tag both still point at the preserved commit. */
+function checkpointUnchanged(
+  sliceBranch: string,
+  checkpoint: SliceCheckpoint,
+): boolean {
+  const resolve = (ref: string) => {
+    const result = spawnSync(
+      'git',
+      ['rev-parse', '--verify', `${ref}^{commit}`],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+      },
+    );
+    return result.status === 0 ? result.stdout.trim() : '';
+  };
+  const saved = resolve(checkpoint.sha);
+  return (
+    saved !== '' &&
+    resolve(sliceBranch) === saved &&
+    resolve(checkpoint.tag) === saved
+  );
 }
 
 // ─── Build gate ───────────────────────────────────────────────────────────────
@@ -3620,7 +3703,7 @@ while (pendingSlices.length > 0) {
 
     // Preserve BEFORE reporting: the agent's work is the expensive thing here, and
     // the next dispatch of this issue deletes the branch it lives on.
-    const checkpoint = preserveInterruptedSlice(issue, sliceBranch);
+    let preservation = preserveInterruptedSlice(issue, sliceBranch);
 
     // Same reasoning applied to the transcripts: a crashed run is the one whose
     // sub-agent behaviour you most want to read, and sandcastle never captured it.
@@ -3645,42 +3728,60 @@ while (pendingSlices.length > 0) {
       logTail: log?.tail ?? [],
       now: failedAt,
     });
-    const waitDecision = decideWaitPolicy({
-      classification,
-      waitEnabled: waitForQuota,
-      waitsTaken: quotaWaitsTaken,
-      now: failedAt,
-    });
+    // Preservation is part of the decision: work that could not be committed,
+    // tagged and verified is never slept on.
+    const waitDecision = decideQuotaWaitAfterPreservation(
+      preservation,
+      decideWaitPolicy({
+        classification,
+        waitEnabled: waitForQuota,
+        waitsTaken: quotaWaitsTaken,
+        now: failedAt,
+      }),
+    );
 
     if (waitDecision.action === 'wait' && waitDecision.until) {
       const untilMs = waitDecision.until.getTime() - Date.now();
-      // A small margin past the stated reset: waking exactly on it risks meeting the
-      // same wall and burning one of the two waits for nothing.
-      const sleepMs = Math.max(untilMs, 0) + 5 * 60 * 1000;
+      const sleepMs = Math.max(untilMs, 0) + QUOTA_WAIT_MARGIN_MS;
       quotaWaitsTaken += 1;
       // Local time and duration, not a UTC timestamp: the sleep length is the same
       // either way, but a person can only judge whether it is SANE from the duration.
       console.error(
         `  [#${issue.number}] provider limit hit — ${classification.evidence ?? 'no detail'}\n` +
           `      Parking until ${formatWaitWindow(waitDecision.until, failedAt)}, ` +
-          `+5m margin, wait ${quotaWaitsTaken}/${MAX_QUOTA_WAITS}.\n` +
-          `      The slice will RESUME from its checkpoint, not restart.\n` +
-          `      Ctrl-C is safe — the checkpoint is already committed.`,
+          `+${QUOTA_WAIT_MARGIN_MS / 60_000}m margin, wait ${quotaWaitsTaken}/${MAX_QUOTA_WAITS}.\n` +
+          (preservation.kind === 'preserved'
+            ? `      The slice will RESUME from its checkpoint, not restart.\n` +
+              `      Ctrl-C is safe — the checkpoint is already committed.`
+            : `      The run left no work to preserve; the slice redispatches after the reset.`),
       );
       await new Promise((resolve) => setTimeout(resolve, sleepMs));
-      console.log(`  [#${issue.number}] resuming after the limit reset.`);
-      // Back into the queue: the next pass finds the checkpoint and resumes it.
-      pendingSlices.push(issue);
-      continue;
+      if (
+        preservation.kind !== 'preserved' ||
+        checkpointUnchanged(sliceBranch, preservation.checkpoint)
+      ) {
+        console.log(`  [#${issue.number}] resuming after the limit reset.`);
+        // Back into the queue: the next pass finds the same checkpoint, if any.
+        pendingSlices.push(issue);
+        continue;
+      }
+      console.error(
+        `  [#${issue.number}] checkpoint changed during the wait; leaving it for inspection.`,
+      );
+      preservation = {
+        kind: 'failed',
+        reason: 'the checkpoint changed during the wait',
+      };
     }
 
-    if (waitForQuota) {
+    if (waitForQuota && waitDecision.action !== 'wait') {
       console.error(
         `  [#${issue.number}] not waiting — ${waitDecision.reason}.`,
       );
     }
 
-    if (checkpoint) {
+    if (preservation.kind === 'preserved') {
+      const checkpoint = preservation.checkpoint;
       console.error(
         `  [#${issue.number}] checkpoint ${checkpoint.sha} on ${sliceBranch} ` +
           `(${checkpoint.fileCount} file(s)), tagged ${checkpoint.tag}.\n` +
@@ -3701,9 +3802,14 @@ while (pendingSlices.length > 0) {
           `present in a checkpoint do not mean a Gated Pipeline ran. See ` +
           `\`docs/sandcastle/RUNBOOK.md\` under "Recovering an interrupted run".`,
       ]);
-    } else {
+    } else if (preservation.kind === 'nothing-to-preserve') {
       console.error(
         `  [#${issue.number}] nothing to preserve — the run left no work on ${sliceBranch}.`,
+      );
+    } else {
+      console.error(
+        `  [#${issue.number}] could not preserve the interrupted work: ${preservation.reason}.\n` +
+          `      Inspect ${sliceBranch} and its worktree before retrying.`,
       );
     }
 

@@ -36,7 +36,12 @@ const PLACEHOLDER = 'placeholder';
 const fixtureLines = (names: string[]): string =>
   names.map((name) => [name, PLACEHOLDER].join('=')).join('\n') + '\n';
 
-function runEntry(entry: string, args: string[], names: string[]) {
+function runEntry(
+  entry: string,
+  args: string[],
+  names: string[],
+  agent?: string,
+) {
   const cwd = mkdtempSync(join(tmpdir(), 'sandcastle-refusal-'));
   try {
     mkdirSync(join(cwd, '.sandcastle'));
@@ -63,7 +68,11 @@ function runEntry(entry: string, args: string[], names: string[]) {
       {
         cwd,
         encoding: 'utf8',
-        env: { PATH: `${bin}:${process.env.PATH ?? ''}`, HOME: cwd },
+        env: {
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          HOME: cwd,
+          ...(agent ? { SANDCASTLE_AGENT: agent } : {}),
+        },
       },
     );
     const reached = TOOLS.filter((tool) =>
@@ -104,4 +113,50 @@ test('--help still works with a populated forwarded env file: it reads nothing',
   const result = runEntry('main.mts', ['--help'], ['CURSOR_API_KEY']);
   assert.equal(result.status, 0);
   assert.match(result.stdout, /secrets\.env/);
+});
+
+test('a Codex wave refuses before contacting GitHub when hook enforcement is unverified', () => {
+  const result = runEntry(
+    'dispatch-waves.mts',
+    ['--prd', '1', '--agent', 'codex'],
+    [],
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /Reviewed hook enforcement has not been established/,
+  );
+  assert.deepEqual(result.reached, []);
+});
+
+test('Codex dispatch modes refuse before contacting GitHub or Docker', () => {
+  for (const mode of [
+    ['--issue', '1'],
+    ['--prd', '1'],
+    ['--prd', '1', '--issue', '2'],
+    ['--all-standalone'],
+  ]) {
+    const result = runEntry('main.mts', [...mode, '--agent', 'codex'], []);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /Reviewed hook enforcement has not been established/,
+    );
+    assert.deepEqual(result.reached, []);
+  }
+});
+
+test('Codex chosen by environment also refuses both live entry points', () => {
+  for (const [entry, args] of [
+    ['main.mts', ['--issue', '1']],
+    ['dispatch-waves.mts', ['--prd', '1', '--dry-run']],
+  ] as const) {
+    const result = runEntry(entry, [...args], [], 'codex');
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /Reviewed hook enforcement has not been established/,
+    );
+    assert.deepEqual(result.reached, []);
+  }
 });

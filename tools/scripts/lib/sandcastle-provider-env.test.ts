@@ -71,6 +71,17 @@ test('copilot gets exactly COPILOT_GITHUB_TOKEN', () => {
   );
 });
 
+test('codex receives no host provider or GitHub credential in its environment', () => {
+  assert.deepEqual(
+    providerEnvironment({
+      agentKind: 'codex',
+      claudeAuth: null,
+      env: EVERYTHING_SET,
+    }),
+    {},
+  );
+});
+
 test('no agent kind ever receives GH_TOKEN or GITHUB_TOKEN', () => {
   for (const agentKind of AGENT_KINDS) {
     for (const claudeAuth of ['subscription', 'api', 'none', null] as const) {
