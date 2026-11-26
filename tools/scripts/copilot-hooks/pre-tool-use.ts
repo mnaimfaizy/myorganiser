@@ -3,6 +3,7 @@ import { isAbsolute, resolve } from 'node:path';
 import {
   allowTool,
   CODEX_HOOK,
+  collectStrings,
   COMMAND_KEYS,
   denyTool,
   extractCommand,
@@ -150,11 +151,14 @@ function looksLikePath(text: string): boolean {
   );
 }
 
-function getProtectedPathReason(text: string): string | null {
+function getProtectedPathReason(
+  text: string,
+  { isPath }: { isPath: boolean },
+): string | null {
   const normalized = normalizeText(text);
 
   for (const rule of PROTECTED_PATTERNS) {
-    if (ruleMatches(rule, normalized)) {
+    if (ruleMatches(rule, normalized, isPath)) {
       return rule.reason;
     }
   }
@@ -175,7 +179,9 @@ function inspectPatchText(text: string, cwd?: string): string | null {
     }
 
     const target = match[1];
-    const reason = getProtectedPathReason(cwd ? resolve(cwd, target) : target);
+    const reason = getProtectedPathReason(cwd ? resolve(cwd, target) : target, {
+      isPath: true,
+    });
     if (reason) {
       return reason;
     }
@@ -222,11 +228,11 @@ function inspectNode(node: unknown, key = ''): string | null {
       return null;
     }
 
-    return getProtectedPathReason(command);
+    return getProtectedPathReason(command, { isPath: false });
   }
 
   if (PATH_KEYS.has(key)) {
-    return getProtectedPathReason(node);
+    return getProtectedPathReason(node, { isPath: true });
   }
 
   return null;
@@ -250,7 +256,19 @@ function inspectToolInput(
       return inspectPatchText(toolInput, cwd);
     }
 
-    return getProtectedPathReason(JSON.stringify(toolInput ?? {}));
+    // The serialized scan reads the input as text, so path arguments and patch
+    // headers are also judged as the paths they are.
+    for (const text of collectStrings(toolInput)) {
+      const reason = inspectPatchText(text, cwd);
+      if (reason) {
+        return reason;
+      }
+    }
+
+    return (
+      inspectNode(toolInput) ??
+      getProtectedPathReason(JSON.stringify(toolInput ?? {}), { isPath: false })
+    );
   }
 
   if (typeof toolInput === 'string') {
@@ -267,14 +285,17 @@ function inspectToolInput(
         return null;
       }
 
-      return getProtectedPathReason(command);
+      return getProtectedPathReason(command, { isPath: false });
     }
 
     if (!looksLikePath(toolInput)) {
       return null;
     }
 
-    return getProtectedPathReason(toolInput);
+    // `execute` and `run` reach this branch with a command, not a path.
+    return getProtectedPathReason(toolInput, {
+      isPath: !SHELL_TOOL_NAMES.has(toolName),
+    });
   }
 
   return inspectNode(toolInput);

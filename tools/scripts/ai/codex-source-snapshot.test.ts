@@ -34,15 +34,22 @@ const allowed = [
   'src/credentials-form.tsx',
   'src/key.ts',
   '.sshconfig',
-  'src/process.env.d/types.ts',
 ];
+const accessorNamed = [
+  'process.env',
+  'import.meta.env',
+  'Deno.env',
+  'Bun.env',
+].flatMap((name) => [name, `config/${name}`]);
 const denied = [
+  ...accessorNamed,
+  // A path argument gets no accessor exemption, in a directory name either.
+  'src/process.env.d/types.ts',
   '.env',
   '.env.local',
   'apps/backend/.env',
   'config/prod.env.bak',
   'config\\staging.ENV',
-  'config/process.env',
   '.env.example.d/.env',
   '.ssh',
   'home/.aws/config',
@@ -130,6 +137,24 @@ test('capture starts no child process, however many entries it walks', async (t)
     assert.equal(names.length, size);
     assert.equal(started(), 1, `capture of ${size} files started a process`);
   }
+});
+
+test('capture leaves out a file named like an env accessor', async (t) => {
+  const temp = mkdtempSync(join(tmpdir(), 'codex-snapshot-'));
+  t.after(() => rmSync(temp, { recursive: true, force: true }));
+  const worktree = join(temp, 'worktree');
+  mkdirSync(join(worktree, 'config'), { recursive: true });
+  for (const name of [...accessorNamed, '.env.example', 'source.txt']) {
+    writeFileSync(join(worktree, name), 'content\n');
+  }
+
+  const names = await captureSource(
+    worktree,
+    repository,
+    join(temp, 'snapshot.json'),
+  );
+
+  assert.deepEqual(names.sort(), ['.env.example', 'source.txt']);
 });
 
 test('capture of this repository includes its agent guide', async (t) => {

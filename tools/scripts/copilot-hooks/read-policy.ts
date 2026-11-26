@@ -37,15 +37,20 @@ const READ_PATH_KEYS = new Set<string>([
  */
 export interface PathRule {
   pattern?: RegExp;
-  matcher?: (normalized: string) => boolean;
+  matcher?: (normalized: string, isPath: boolean) => boolean;
   reason: string;
   /** Checked against structured path arguments only, never raw command text. */
   pathOnly?: boolean;
 }
 
-export function ruleMatches(rule: PathRule, normalized: string): boolean {
+/** `isPath`: the text is a structured path argument, not raw command text. */
+export function ruleMatches(
+  rule: PathRule,
+  normalized: string,
+  isPath: boolean,
+): boolean {
   if (rule.matcher) {
-    return rule.matcher(normalized);
+    return rule.matcher(normalized, isPath);
   }
 
   return rule.pattern?.test(normalized) ?? false;
@@ -57,6 +62,8 @@ const TOKEN_SEPARATORS = /[\s"'`=;|&<>(){}[\],!$]+/;
 /**
  * Code accessors for the process environment. They name a runtime object, not a
  * file, so such an accessor in a command is not a read of an environment file.
+ * The exemption is for raw command text only: a structured path argument names a
+ * file, whatever it is called.
  * Only these roots are exempt, as a word of their own or inside a path-like word
  * (never as its last segment, which is a file name). Anything else containing
  * `.env` stays refused (`prod.env.bak`, `foo.env`, `config/<root>.env`).
@@ -70,10 +77,10 @@ const ENV_EXAMPLE_SEGMENT = /\.env\.example(?:$|[^a-z0-9])/;
 
 /**
  * True when normalized text names an environment file. Judged per word, so a
- * `.env.example` next to a real `.env` does not excuse it, and the env accessor
- * in code does not count. Shared by the read and write guards.
+ * `.env.example` next to a real `.env` does not excuse it, and in command text
+ * the env accessor does not count. Shared by the read and write guards.
  */
-export function mentionsEnvFile(normalized: string): boolean {
+export function mentionsEnvFile(normalized: string, isPath: boolean): boolean {
   for (const token of normalized.split(TOKEN_SEPARATORS)) {
     if (!token.includes('.env')) {
       continue;
@@ -86,7 +93,7 @@ export function mentionsEnvFile(normalized: string): boolean {
       // An accessor may sit inside a sed expression (`s/a/<accessor>/`), but
       // the final segment of a slashed token is a file name: not exempt.
       const isAccessor =
-        ENV_ACCESSOR.test(segment) && (last === 0 || index < last);
+        !isPath && ENV_ACCESSOR.test(segment) && (last === 0 || index < last);
 
       if (
         !isAccessor &&
@@ -156,7 +163,7 @@ export function getSecretReadReason(
       continue;
     }
 
-    if (ruleMatches(rule, normalized)) {
+    if (ruleMatches(rule, normalized, pathOnly)) {
       return rule.reason;
     }
   }

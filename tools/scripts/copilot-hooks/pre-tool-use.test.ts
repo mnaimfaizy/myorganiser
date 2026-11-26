@@ -264,6 +264,104 @@ describe('pre-tool-use hook', () => {
     });
   });
 
+  describe('a path argument named like an env accessor is an environment file', () => {
+    const ACCESSOR_FILES = [
+      'process.env',
+      'import.meta.env',
+      'Deno.env',
+      'Bun.env',
+    ].flatMap((name) => [name, `config/${name}`, `config\\${name}`]);
+
+    const patchFor = (target: string) =>
+      [
+        '*** Begin Patch',
+        `*** Add File: ${target}`,
+        '+example',
+        '*** End Patch',
+      ].join('\n');
+
+    it('should deny a read tool given an accessor-named file path', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ file_path: path }, path]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Read', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a search whose path or glob is an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ path }, { glob: path }]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Grep', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a write tool given an accessor-named file path', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ file_path: path, content: 'x' }, path]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'Write', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should deny a Codex patch that targets an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        expectCodexDenial(
+          PRE_TOOL_USE_HOOK,
+          codexPayload('apply_patch', patchFor(path)),
+          /environment/i,
+        );
+      }
+    });
+
+    it('should deny a structured patch input that targets an accessor-named file', () => {
+      for (const path of ACCESSOR_FILES) {
+        for (const tool_input of [{ path }, { command: patchFor(path) }]) {
+          expectDenied(
+            PRE_TOOL_USE_HOOK,
+            { tool_name: 'apply_patch', tool_input },
+            /environment/i,
+          );
+        }
+      }
+    });
+
+    it('should allow a shell tool given the accessor in a plain command string', () => {
+      for (const tool_name of ['Bash', 'Execute', 'Run']) {
+        expectAllowed(PRE_TOOL_USE_HOOK, {
+          tool_name,
+          tool_input: 'node -e "console.log(process.env.PATH)"',
+        });
+      }
+    });
+
+    it('should allow a patch whose content mentions the env accessor', () => {
+      expectAllowed(PRE_TOOL_USE_HOOK, {
+        tool_name: 'apply_patch',
+        tool_input: {
+          command: [
+            '*** Begin Patch',
+            '*** Add File: src/synthetic.ts',
+            '+const x = process.env.X;',
+            '*** End Patch',
+          ].join('\n'),
+        },
+      });
+    });
+  });
+
   describe('real environment file reads stay denied (#1640)', () => {
     const ENV_PATHS = [
       '.env',
