@@ -13,6 +13,8 @@
  * revisit them.
  */
 
+import type { AgentKind } from './sandcastle-provider-env.ts';
+
 /**
  * What the orchestrator should do with a slice branch it is about to dispatch.
  *
@@ -479,7 +481,7 @@ export const LIMIT_CLASSIFICATIONS = Object.freeze({
 export type LimitClassificationKind =
   (typeof LIMIT_CLASSIFICATIONS)[keyof typeof LIMIT_CLASSIFICATIONS];
 
-export type AgentKind = 'claude' | 'cursor' | 'copilot' | 'codex';
+export type { AgentKind };
 
 /**
  * Per-provider matchers over a log tail.

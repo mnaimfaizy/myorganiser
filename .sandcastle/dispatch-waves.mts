@@ -39,7 +39,7 @@ function fail(message: string, code = 1): never {
 function printHelp(): void {
   console.log(`
 Usage:
-  npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number> [--agent claude|cursor|copilot] [--model <model>]
+  npx tsx .sandcastle/dispatch-waves.mts --prd <issue-number> [--agent claude|cursor|copilot|codex] [--model <model>]
 
 Flags:
   --prd <issue-number>   PRD issue number to dispatch

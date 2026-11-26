@@ -480,7 +480,7 @@ Usage:
   Standalone mode yarn dispatch-agents --issue <issue-number> [--base <ref>]
   Sweep mode      yarn dispatch-agents --all-standalone [--limit <n>] [--base <ref>]
 
-  All accept [--agent claude|cursor|copilot] [--model <model>] [--dry-run]
+  All accept [--agent claude|cursor|copilot|codex] [--model <model>] [--dry-run]
   Interrupted slices resume by default; --fresh discards one deliberately.
 
 Flags:

@@ -248,7 +248,7 @@ interactive Claude Code sessions, and any `complexity:high` issue routes to `cla
 the `--dry-run` output before committing to a large batch.
 
 Provider switching is optional: the default agent can live in `.sandcastle/secrets.env` (or the 1Password Environment) as
-`SANDCASTLE_AGENT=claude|cursor|copilot`. Per-provider model defaults can also live there
+`SANDCASTLE_AGENT=claude|cursor|copilot|codex` (`codex` is preview-only until #1641). Per-provider model defaults can also live there
 (`SANDCASTLE_CLAUDE_MODEL`, `SANDCASTLE_CURSOR_MODEL`, `SANDCASTLE_COPILOT_MODEL`), and
 `--model` always overrides them for a single run. Claude keeps the existing complexity-based
 model routing when no override is set.
