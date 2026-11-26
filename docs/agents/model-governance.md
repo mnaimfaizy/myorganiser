@@ -1,6 +1,6 @@
 # Agent model governance
 
-MyOrganiser pins sub-agent models by **role** across GitHub Copilot, Claude Code, Cursor, and Gemini CLI. Assignments live in one versioned policy file; harness agent files are synchronized adapters. A monthly audit detects drift and catalog changes but never rewrites pins automatically.
+MyOrganiser pins sub-agent models by **role** across GitHub Copilot, Claude Code, Cursor, Gemini CLI, and Codex. Assignments live in one versioned policy file; harness agent files are synchronized adapters. A monthly audit detects drift and catalog changes but never rewrites pins automatically.
 
 See [ADR 0013: Role-pinned sub-agent model governance](../adr/0013-bounded-subagent-model-governance.md) for the decision record.
 
@@ -49,6 +49,7 @@ Executable adapters:
 
 - `.github/agents/*.agent.md` (canonical bodies)
 - `.claude/agents/*.md`, `.cursor/agents/*.md`, `.gemini/agents/*.md` (synced bodies, model frontmatter, and tool grants)
+- `.codex/bridge-roles/*.toml` (generated Codex role adapters: synced body, model, and tool grant)
 
 ### Tool grants
 
@@ -166,7 +167,7 @@ Use usage reports to investigate:
 ## Limitations
 
 - Public documentation pages are not stable machine-readable APIs; layout changes can trigger false snapshot drift.
-- Harness identifiers differ: Copilot display names, Claude aliases, Cursor slugs, and Gemini model IDs.
+- Harness identifiers differ: Copilot display names, Claude aliases, Cursor slugs, Gemini model IDs, and Codex model IDs.
 - Not every provider exposes per-sub-agent telemetry.
 - Legacy log records may not contain timestamps or PRD linkage.
 - Sandcastle orchestrator routing and sub-agent role assignments are related policies but use different model identifiers.

@@ -15,6 +15,7 @@ Keep these directories structurally synchronized with `.github/agents` as the ca
 - `.claude/agents`
 - `.cursor/agents`
 - `.gemini/agents`
+- `.codex/bridge-roles` (generated Codex role adapters, one TOML per role)
 
 Synchronization means:
 
@@ -53,7 +54,7 @@ Rendered into both.
 
 Rules:
 
-- Valid harness names: `claude`, `copilot`, `cursor`, `gemini`. `copilot` means `.github/agents`.
+- Valid harness names: `claude`, `codex`, `copilot`, `cursor`, `gemini`. `copilot` means `.github/agents`; `codex` means `.codex/bridge-roles`.
 - Unmarked content goes to every harness. Use markers sparingly — a shared body is the default.
 - Markers must sit alone on their own line and must not nest. Violations, unknown harness names, and
   unbalanced markers are hard errors, not warnings: a marker that silently fails to apply
@@ -66,8 +67,8 @@ Rules:
 ## Tool Grants
 
 Capabilities are declared once, by role, in the canonical body: `tools: [read, search, execute]`.
-Never hand-edit `tools:` (or Cursor's `readonly:`) in `.claude/agents`, `.cursor/agents`, or
-`.gemini/agents` — `yarn agents:sync:check` reports the edit as `toolDrift` and `yarn agents:sync`
+Never hand-edit `tools:` (or Cursor's `readonly:`) in `.claude/agents`, `.cursor/agents`,
+`.gemini/agents`, or `.codex/bridge-roles` — `yarn agents:sync:check` reports the edit as `toolDrift` and `yarn agents:sync`
 overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-derived-from-canonical-roles.md).
 
 - Roles: `read`, `search`, `edit`, `execute`, `web`, `todo`, `graphify/*`. An unknown role is a hard error.
@@ -108,6 +109,7 @@ Model assignments come from `tools/config/agent-model-policy.json`. Agent bodies
 - Claude (`.claude/agents`): uses one alias or model ID.
 - Cursor (`.cursor/agents`): uses one model ID. `CodeExplorer` must use `composer-2.5`.
 - Gemini (`.gemini/agents`): uses one model ID.
+- Codex (`.codex/bridge-roles`): uses one model ID.
 
 Assignment strategy:
 
@@ -121,7 +123,7 @@ Assignment strategy:
 Run this workflow after any of the following:
 
 - Edit to any file in `.github/agents/**`
-- Edit to any file in `.claude/agents/**`, `.cursor/agents/**`, or `.gemini/agents/**`
+- Edit to any file in `.claude/agents/**`, `.cursor/agents/**`, `.gemini/agents/**`, or `.codex/bridge-roles/**`
 - Agent add/remove in any harness
 - Model change in any agent frontmatter
 
