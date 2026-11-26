@@ -56,7 +56,7 @@ test('sync creates and checks every role, repairs drift and preserves legacy ada
     '.github/agents',
     '.claude/agents',
     '.cursor/agents',
-    '.gemini/agents',
+    '.agents/plugins/myorganiser/agents',
   ];
   for (const path of [
     ...dirs,
