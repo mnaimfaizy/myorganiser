@@ -1,17 +1,19 @@
-@AGENTS.md
+# Google Antigravity
 
-# Gemini CLI
+This file is a Harness Adapter for Google Antigravity (App, IDE, and `agy` CLI). Shared always-on policy lives in `AGENTS.md` (auto-discovered by Antigravity). Do not restate it here, and keep per-file rule documents within Antigravity's 24 KB rule cap.
 
-This file is a Harness Adapter. Shared always-on policy lives in `AGENTS.md`. Do not restate it here.
+## Skills
 
-## Context
+Repo Skills live in `.agents/skills/` and are auto-discovered. Load the Skill for a named workflow instead of copying its procedure into this file.
 
-`.gemini/settings.json` lists `AGENTS.md` in `context.fileName` so this Harness loads the Instruction File.
+## Workspace Plugin
 
-## Commands
+The MyOrganiser workspace plugin lives in `.agents/plugins/myorganiser/` and provides:
 
-Thin `.toml` files under `.gemini/commands/` point at Skills: a `description` and a `prompt` that `@{...}`-includes the Skill's `SKILL.md`. Gemini CLI loads only `.toml` command files ([Custom commands](https://geminicli.com/docs/cli/custom-commands/)), so a `.md` adapter there is never a command. Put procedures in `.agents/skills/`, not in the command file.
+- The `myorganiser-graphify` MCP server (`.agents/plugins/myorganiser/mcp_config.json`).
+- `PreToolUse` security hooks (`.agents/plugins/myorganiser/hooks.json`).
+- Synced specialist subagents under `.agents/plugins/myorganiser/agents/`.
 
 ## Sub-agents
 
-Generated copies live in `.gemini/agents/`. Canonical bodies are `.github/agents/*.agent.md`. After any Sub-agent change: `yarn agents:sync` then `yarn agents:sync:check`.
+Generated Antigravity copies live in `.agents/plugins/myorganiser/agents/`. Canonical bodies are `.github/agents/*.agent.md`. After any Sub-agent change: `yarn agents:sync` then `yarn agents:sync:check`.

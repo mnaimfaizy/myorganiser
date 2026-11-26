@@ -1005,7 +1005,7 @@ _Avoid_: research doc, investigation, internal note, planning doc
 ## Harness & Instructions
 
 **Harness**:
-A coding-agent product that loads this repo's instructions (Claude Code, Cursor, OpenAI Codex, GitHub Copilot, OpenCode, Gemini CLI).
+A coding-agent product that loads this repo's instructions (Claude Code, Cursor, OpenAI Codex, GitHub Copilot, OpenCode, Google Antigravity).
 _Avoid_: IDE, vendor, tool (when you mean the product)
 
 **Instruction File**:

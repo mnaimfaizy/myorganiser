@@ -44,8 +44,8 @@ interface TestReadonlyHarness {
 interface TestMap {
   roles: Record<string, string>;
   harnesses: {
+    antigravity: TestToolsHarness;
     claude: TestToolsHarness;
-    gemini: TestToolsHarness;
     cursor: TestReadonlyHarness;
   };
   overrides: Record<string, Record<string, AgentOverride>>;
@@ -57,6 +57,16 @@ function map(
   return {
     roles: { read: '', search: '', edit: '', execute: '', 'graphify/*': '' },
     harnesses: {
+      antigravity: {
+        grant: 'tools',
+        tools: {
+          read: ['read_file'],
+          search: ['read_file'],
+          edit: ['edit_file', 'write_file'],
+          execute: ['run_command', 'manage_task'],
+          'graphify/*': [],
+        },
+      },
       claude: {
         grant: 'tools',
         tools: {
@@ -65,16 +75,6 @@ function map(
           edit: ['Edit', 'Write'],
           execute: ['Bash'],
           'graphify/*': ['mcp__graphify__query_graph'],
-        },
-      },
-      gemini: {
-        grant: 'tools',
-        tools: {
-          read: ['read_file'],
-          search: ['glob', 'grep_search'],
-          edit: ['replace', 'write_file'],
-          execute: ['run_shell_command'],
-          'graphify/*': ['mcp_graphify_*'],
         },
       },
       cursor: { grant: 'readonly', writableRoles: ['edit', 'execute'] },
@@ -112,10 +112,16 @@ test('the real map is valid', () => {
   assert.doesNotThrow(() => validateToolMap(REAL_MAP));
 });
 
+test('a tools harness may map an unsupported role to an empty array', () => {
+  const m = map();
+  m.harnesses.antigravity.tools['graphify/*'] = [];
+  assert.doesNotThrow(() => validateToolMap(m));
+});
+
 test('a tools harness missing a vocabulary role is a hard error', () => {
   const m = map();
-  delete m.harnesses.gemini.tools.execute;
-  assert.throws(() => validateToolMap(m), /gemini.*execute/);
+  delete m.harnesses.antigravity.tools.execute;
+  assert.throws(() => validateToolMap(m), /antigravity.*execute/);
 });
 
 test('a tools harness mapping a role outside the vocabulary is a hard error', () => {
@@ -164,10 +170,41 @@ test('renders roles to Claude tools in vocabulary order, not declaration order',
   );
 });
 
-test('renders roles to Gemini tool names', () => {
-  assert.deepEqual(renderGrant(['read', 'graphify/*'], 'gemini', 'e', map()), {
-    tools: ['read_file', 'mcp_graphify_*'],
-  });
+test('renders roles to Antigravity tool names, deduplicating and skipping empty roles', () => {
+  assert.deepEqual(
+    renderGrant(
+      ['read', 'search', 'graphify/*'],
+      'antigravity',
+      'explore',
+      map(),
+    ),
+    {
+      tools: ['read_file'],
+    },
+  );
+  assert.deepEqual(
+    renderGrant(
+      ['read', 'edit', 'search', 'execute', 'todo'],
+      'antigravity',
+      'component-builder',
+      REAL_MAP,
+    ),
+    {
+      tools: [
+        'read_file',
+        'edit_file',
+        'write_file',
+        'run_command',
+        'manage_task',
+      ],
+    },
+  );
+  assert.deepEqual(
+    renderGrant(['web', 'read', 'search'], 'antigravity', 'research', REAL_MAP),
+    {
+      tools: ['read_file', 'search_web'],
+    },
+  );
 });
 
 test('an unknown role is a hard error naming agent and role', () => {
@@ -200,7 +237,7 @@ test('an override replaces the rendered grant for that agent and harness only', 
   assert.deepEqual(renderGrant(['read'], 'claude', 'audit', m), {
     tools: ['Read', 'Bash'],
   });
-  assert.deepEqual(renderGrant(['read'], 'gemini', 'audit', m), {
+  assert.deepEqual(renderGrant(['read'], 'antigravity', 'audit', m), {
     tools: ['read_file'],
   });
   assert.deepEqual(renderGrant(['read'], 'claude', 'other', m), {
@@ -233,10 +270,10 @@ for (const [roles, tools] of CLAUDE_GRANT_CASES) {
 
 // --- readGrant / writeGrant ---------------------------------------------------
 
+const ANTIGRAVITY_FM =
+  '---\nname: code-explorer\ndescription: >\n  Reads things.\nsubagent: true\nmainAgent: false\nmodel: flash_lite\ninheritMcp: true\ntools:\n  - read_file\n---\n';
 const CLAUDE_FM =
   '---\nname: Audit\ndescription: >\n  Reads things.\ntools: [Read, Glob, Grep, Edit, Write, Bash]\nmodel: haiku\n---\n';
-const GEMINI_FM =
-  '---\nname: audit\ndescription: >\n  Reads things.\nmodel: gemini-3.6-flash\ntools:\n  - read_file\n  - list_files\n---\n';
 const CURSOR_FM =
   '---\nname: Audit\ndescription: Reads things.\nmodel: composer-2.5\n---\n';
 
@@ -246,9 +283,13 @@ test('reads an inline Claude tools list', () => {
   });
 });
 
-test('reads a YAML block Gemini tools list', () => {
-  assert.deepEqual(readGrant(GEMINI_FM, 'gemini'), {
-    tools: ['read_file', 'list_files'],
+test('reads a YAML block Antigravity tools list', () => {
+  const fm = ANTIGRAVITY_FM.replace(
+    '  - read_file\n',
+    '  - read_file\n  - search_web\n',
+  );
+  assert.deepEqual(readGrant(fm, 'antigravity'), {
+    tools: ['read_file', 'search_web'],
   });
 });
 
@@ -280,22 +321,25 @@ test('inserts a Claude tools line before model when absent', () => {
   );
 });
 
-test('rewrites only the Gemini tools block, leaving keys after it intact', () => {
-  const fm = GEMINI_FM.replace(
-    '  - list_files\n',
-    '  - list_files\ntemperature: 0.2\n',
+test('rewrites only the Antigravity tools block, leaving keys after it intact', () => {
+  const fm = ANTIGRAVITY_FM.replace(
+    '  - read_file\n',
+    '  - read_file\n  - search_web\nmaxSteps: 10\n',
   );
   assert.equal(
-    writeGrant(fm, 'gemini', { tools: ['read_file', 'glob'] }),
-    fm.replace('  - read_file\n  - list_files\n', '  - read_file\n  - glob\n'),
+    writeGrant(fm, 'antigravity', { tools: ['read_file', 'run_command'] }),
+    fm.replace(
+      '  - read_file\n  - search_web\n',
+      '  - read_file\n  - run_command\n',
+    ),
   );
 });
 
-test('appends a Gemini tools block when absent', () => {
-  const fm = '---\nname: a\nmodel: m\n---\n';
+test('appends an Antigravity tools block when absent', () => {
+  const fm = '---\nname: a\nmodel: flash\n---\n';
   assert.equal(
-    writeGrant(fm, 'gemini', { tools: ['read_file'] }),
-    '---\nname: a\nmodel: m\ntools:\n  - read_file\n---\n',
+    writeGrant(fm, 'antigravity', { tools: ['read_file'] }),
+    '---\nname: a\nmodel: flash\ntools:\n  - read_file\n---\n',
   );
 });
 
@@ -310,8 +354,8 @@ test('Cursor readonly true is written after model; false removes the key', () =>
 });
 
 const GRANT_ROUNDTRIP_CASES: Array<[string, string, Grant]> = [
+  [ANTIGRAVITY_FM, 'antigravity', { tools: ['read_file', 'search_web'] }],
   [CLAUDE_FM, 'claude', { tools: ['Read', 'WebFetch'] }],
-  [GEMINI_FM, 'gemini', { tools: ['glob', 'mcp_graphify_*'] }],
   [CURSOR_FM, 'cursor', { readonly: true }],
 ];
 
@@ -360,7 +404,7 @@ test('Cursor gaining readonly narrows; losing it widens', () => {
   );
 });
 
-// Claude Code and Gemini CLI both give an agent with no tools key every tool.
+// Claude Code and Antigravity both give an agent with no tools key every tool.
 test('replacing a missing tools key narrows from inherit-all', () => {
   assert.deepEqual(describeGrantChange(null, { tools: ['Read'] }), {
     widened: [],
@@ -369,14 +413,25 @@ test('replacing a missing tools key narrows from inherit-all', () => {
   });
 });
 
+test('rewrites only the Antigravity tools block, preserving subagent metadata and inheritMcp', () => {
+  const next = writeGrant(ANTIGRAVITY_FM, 'antigravity', {
+    tools: ['read_file', 'run_command', 'manage_task'],
+  });
+  assert.equal(
+    next,
+    '---\nname: code-explorer\ndescription: >\n  Reads things.\nsubagent: true\nmainAgent: false\nmodel: flash_lite\ninheritMcp: true\ntools:\n  - read_file\n  - run_command\n  - manage_task\n---\n',
+  );
+});
+
 test('formatGrant renders each harness shape, and false readonly as nothing', () => {
+  assert.equal(
+    formatGrant('antigravity', { tools: ['read_file'] }),
+    'tools:\n  - read_file\n',
+  );
+  assert.equal(formatGrant('antigravity', { tools: [] }), 'tools: []\n');
   assert.equal(
     formatGrant('claude', { tools: ['Read', 'Bash'] }),
     'tools: [Read, Bash]\n',
-  );
-  assert.equal(
-    formatGrant('gemini', { tools: ['glob'] }),
-    'tools:\n  - glob\n',
   );
   assert.equal(formatGrant('cursor', { readonly: true }), 'readonly: true\n');
   assert.equal(formatGrant('cursor', { readonly: false }), '');

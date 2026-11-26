@@ -2,7 +2,7 @@ import process from 'node:process';
 
 /**
  * Shared helpers for multi-harness agent hooks (Copilot CLI/cloud, VS Code Copilot,
- * Cursor IDE/CLI, Claude Code, Codex).
+ * Cursor IDE/CLI, Claude Code, Codex, Antigravity).
  *
  * Scripts emit dual-format JSON so one implementation works across hosts.
  */
@@ -24,6 +24,16 @@ export interface HookPayload {
   args?: unknown;
   arguments?: unknown;
   cwd?: unknown;
+  // Antigravity PreToolUse / PostToolUse envelope fields
+  conversationId?: unknown;
+  workspacePaths?: unknown;
+  hookEventName?: unknown;
+  stepIdx?: unknown;
+  toolCall?: {
+    id?: unknown;
+    name?: unknown;
+    args?: unknown;
+  };
 }
 
 /** An open heredoc waiting for its terminator line. */
@@ -67,6 +77,10 @@ export const MUTATING_TOOL_NAMES = new Set<string>([
   'bash',
   'edit',
   'write',
+  // Antigravity tool names
+  'edit_file',
+  'run_command',
+  'write_file',
 ]);
 
 export function normalizeText(value: string): string {
@@ -80,12 +94,14 @@ export const SHELL_TOOL_NAMES = new Set<string>([
   'execute',
   'powershell',
   'run',
+  'run_command',
   'runterminalcommand',
   'shell',
 ]);
 
 /** Input keys that hold a shell command. */
 export const COMMAND_KEYS = new Set<string>([
+  'CommandLine',
   'cmd',
   'command',
   'script',
@@ -96,10 +112,12 @@ export const COMMAND_KEYS = new Set<string>([
  * Input keys that name a file a tool is about to write.
  *
  * Deliberately excludes `pattern` (a search expression, not a destination) and
- * every content-bearing key — `content`, `new_string`, `old_string`. Matching
+ * every content-bearing key — `content`, `new_string`, `old_string`, as well as
+ * Antigravity's PascalCase `Content`, `Target`, and `Replacement`. Matching
  * content is how a hook ends up firing because a document *mentions* a path.
  */
 export const WRITE_PATH_KEYS = new Set<string>([
+  'Path',
   'dest',
   'destination',
   'dir',
@@ -135,6 +153,21 @@ export function hasFileRedirect(normalized: string): boolean {
   }
 
   return false;
+}
+
+/** Extract non-null file paths written by shell redirection (`>` / `>>`). */
+export function extractFileRedirectTargets(command: string): string[] {
+  const normalized = normalizeText(command);
+  const targets: string[] = [];
+
+  for (const match of normalized.matchAll(FILE_REDIRECT)) {
+    const target = match[1].replace(/^['"]|['"]$/g, '');
+    if (target && !NULL_SINKS.has(target)) {
+      targets.push(target);
+    }
+  }
+
+  return targets;
 }
 
 /**
@@ -332,7 +365,13 @@ export function getToolName(payload: HookPayload | undefined): string {
     return name === 'Bash' || name === 'apply_patch' ? name.toLowerCase() : '';
   }
 
+  const toolCallName =
+    payload?.toolCall && typeof payload.toolCall === 'object'
+      ? payload.toolCall.name
+      : undefined;
+
   const value =
+    toolCallName ??
     payload?.toolName ??
     payload?.tool_name ??
     payload?.tool ??
@@ -348,7 +387,13 @@ export function getToolInput(payload: HookPayload | undefined): unknown {
     return typeof input?.command === 'string' ? input.command : null;
   }
 
+  const toolCallArgs =
+    payload?.toolCall && typeof payload.toolCall === 'object'
+      ? payload.toolCall.args
+      : undefined;
+
   const raw =
+    toolCallArgs ??
     payload?.toolArgs ??
     payload?.tool_args ??
     payload?.toolInput ??
@@ -453,14 +498,24 @@ export function isMutatingTool(toolName: string): boolean {
  * explicit allow their fail-closed modes need.
  */
 export const CODEX_HOOK = process.argv.includes('--codex');
+export const ANTIGRAVITY_HOOK = process.argv.includes('--antigravity');
 const DEFER_ALLOW = CODEX_HOOK || process.argv.includes('--defer');
 
 /**
  * Explicit allow for preToolUse. Required if Cursor `failClosed: true` is set —
  * empty stdout is treated as hook failure and blocks the tool. Under `--defer`
  * it exits 0 with no output: no decision, so the normal permission flow applies.
+ * Under `--antigravity`, Antigravity parses JSON on exit 0: `{}` defers to
+ * native permission rules when `--defer` is also set, otherwise `{ decision: 'allow' }`.
  */
 export function allowTool(): never {
+  if (ANTIGRAVITY_HOOK) {
+    process.stdout.write(
+      DEFER_ALLOW ? '{}' : JSON.stringify({ decision: 'allow' }),
+    );
+    process.exit(0);
+  }
+
   if (DEFER_ALLOW) {
     process.exit(0);
   }
@@ -481,9 +536,15 @@ export function allowTool(): never {
 /**
  * Deny a tool call in the launcher’s harness format.
  * Exit 2 is the portable "block" signal across Cursor and Claude; Copilot
- * preToolUse also treats exit 2 as deny.
+ * preToolUse also treats exit 2 as deny. Antigravity reads `{ decision: 'deny', reason }`
+ * from stdout on exit 0.
  */
 export function denyTool(reason: string): never {
+  if (ANTIGRAVITY_HOOK) {
+    process.stdout.write(JSON.stringify({ decision: 'deny', reason }));
+    process.exit(0);
+  }
+
   if (CODEX_HOOK) {
     // Codex takes the blocking reason from stderr when a hook exits 2.
     console.error(reason);

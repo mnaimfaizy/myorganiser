@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -7,6 +8,7 @@ import {
   expectCodexDenial,
   expectAllowed,
   expectDenied,
+  runHookRaw,
   shellPayload,
 } from './hook-harness.ts';
 
@@ -54,6 +56,128 @@ describe('secret-scan hook', () => {
         SECRET_SCAN_HOOK,
         codexPayload('apply_patch', patch),
         /github token-like secret/i,
+      );
+    });
+  });
+
+  describe('Antigravity tools', () => {
+    const ANTIGRAVITY_ARGS = ['--antigravity'];
+    const ANTIGRAVITY_DEFER_ARGS = ['--antigravity', '--defer'];
+
+    function antigravityPayload(
+      name: 'run_command' | 'write_file' | 'edit_file' | 'read_file',
+      args: Record<string, unknown>,
+      cwd = REPO_ROOT,
+    ) {
+      return {
+        conversationId: 'conv-secret-1',
+        workspacePaths: [REPO_ROOT],
+        hookEventName: 'PreToolUse',
+        cwd,
+        stepIdx: 1,
+        toolCall: { id: 'call-1', name, args },
+      };
+    }
+
+    function expectAntigravityDenied(
+      payload: ReturnType<typeof antigravityPayload>,
+      reasonPattern: RegExp,
+      args = ANTIGRAVITY_ARGS,
+    ) {
+      const result = runHookRaw(SECRET_SCAN_HOOK, payload, { args });
+      assert.equal(result.status, 0);
+      const parsed = JSON.parse(result.stdout) as {
+        decision?: string;
+        reason?: string;
+      };
+      assert.equal(parsed.decision, 'deny');
+      assert.match(parsed.reason ?? '', reasonPattern);
+    }
+
+    it('denies secrets in run_command, write_file, and edit_file with exit 0 JSON', () => {
+      expectAntigravityDenied(
+        antigravityPayload('run_command', {
+          CommandLine: `echo ${AWS_ACCESS_KEY}`,
+        }),
+        /secret-looking credential/i,
+      );
+      expectAntigravityDenied(
+        antigravityPayload('write_file', {
+          Path: 'src/config.ts',
+          Content: `export const token = '${GITHUB_TOKEN}';`,
+        }),
+        /github token-like secret/i,
+        ANTIGRAVITY_DEFER_ARGS,
+      );
+      expectAntigravityDenied(
+        antigravityPayload('edit_file', {
+          Path: 'src/config.ts',
+          Target: 'const key = "";',
+          Replacement: `const key = "${PRIVATE_KEY_MARKER}";`,
+        }),
+        /private key/i,
+        ANTIGRAVITY_DEFER_ARGS,
+      );
+    });
+
+    it('allows or defers benign Antigravity tool calls', () => {
+      const payload = antigravityPayload('write_file', {
+        Path: 'src/app/page.tsx',
+        Content: 'export default function Page() { return null; }',
+      });
+
+      const allowResult = runHookRaw(SECRET_SCAN_HOOK, payload, {
+        args: ANTIGRAVITY_ARGS,
+      });
+      assert.equal(allowResult.status, 0);
+      assert.deepEqual(JSON.parse(allowResult.stdout), { decision: 'allow' });
+
+      const deferResult = runHookRaw(SECRET_SCAN_HOOK, payload, {
+        args: ANTIGRAVITY_DEFER_ARGS,
+      });
+      assert.equal(deferResult.status, 0);
+      assert.deepEqual(JSON.parse(deferResult.stdout), {});
+    });
+
+    it('exempts literal credential fixtures in write_file and edit_file inside tmp/code-review via payload.cwd', () => {
+      for (const payload of [
+        antigravityPayload(
+          'write_file',
+          {
+            Path: 'tmp/code-review/report.json',
+            Content: `{"citation": "${PASSPHRASE_FIXTURE}"}`,
+          },
+          REPO_ROOT,
+        ),
+        antigravityPayload(
+          'edit_file',
+          {
+            Path: 'tmp/code-review/answers.json',
+            Target: '"answer": ""',
+            Replacement: `"answer": "${PASSPHRASE_FIXTURE}"`,
+          },
+          REPO_ROOT,
+        ),
+      ]) {
+        const result = runHookRaw(SECRET_SCAN_HOOK, payload, {
+          args: ANTIGRAVITY_DEFER_ARGS,
+        });
+        assert.equal(result.status, 0);
+        assert.deepEqual(JSON.parse(result.stdout), {});
+      }
+
+      // Same relative path with cwd outside REPO_ROOT is still denied.
+      expectAntigravityDenied(
+        antigravityPayload(
+          'write_file',
+          {
+            Path: 'tmp/code-review/report.json',
+            Content: `{"citation": "${PASSPHRASE_FIXTURE}"}`,
+          },
+          join(REPO_ROOT, 'apps'),
+        ),
+        /credential|literal/i,
+        ANTIGRAVITY_DEFER_ARGS,
       );
     });
   });

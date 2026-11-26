@@ -13,11 +13,11 @@ The facts below were read from each Harness's documentation on 2026-11-11. An it
 
 ## Tiers
 
-| Tier                  | Harnesses                                  | How the Chief of Staff works                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1: Live Sessions**  | Claude Code (desktop and CLI), OpenCode    | It can start, message and hear back from separate sessions natively.                                                                                                                                                             |
-| **2: Start and poll** | Cursor, OpenAI Codex, GitHub Copilot       | It starts headless runs or cloud agents. It cannot message a run that is still working, so it resumes the session by id with the answer. It learns that a run ended from the process exiting, a status call, or the report file. |
-| **3: Sequential**     | Gemini CLI, or any Harness without `spawn` | It uses `dispatch-agents` for AFK work and Sub-agents for the rest, one at a time in its own session, and says so in the Dispatch Plan.                                                                                          |
+| Tier                  | Harnesses                                                   | How the Chief of Staff works                                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1: Live Sessions**  | Claude Code (desktop and CLI), OpenCode, Google Antigravity | It can start, message and hear back from separate sessions or async subagents natively.                                                                                                                                          |
+| **2: Start and poll** | Cursor, OpenAI Codex, GitHub Copilot                        | It starts headless runs or cloud agents. It cannot message a run that is still working, so it resumes the session by id with the answer. It learns that a run ended from the process exiting, a status call, or the report file. |
+| **3: Sequential**     | Any Harness without `spawn`                                 | It uses `dispatch-agents` for AFK work and Sub-agents for the rest, one at a time in its own session, and says so in the Dispatch Plan.                                                                                          |
 
 On every tier, a headless run cannot ask anything mid-run: a project `ask` rule refuses in a headless run ([ADR 0099](../../../docs/adr/0099-a-project-ask-rule-is-a-refusal-in-a-headless-run.md)). Its brief tells it to stop at a Decision Request, writing it to `report.md`. The Chief of Staff relays the question and resumes the run with the answer.
 
@@ -25,16 +25,16 @@ Every cloud Executor works from a clone of the remote, so it sees only pushed br
 
 ## Finding the Skill
 
-Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code reaches it through the committed `.claude/skills` symlink. Gemini CLI also gets the thin command adapter every human-invoked Skill has, `.gemini/commands/orchestrate.toml`.
+Every Harness except Claude Code reads `.agents/skills/` directly (Antigravity auto-discovers `.agents/skills/` alongside its workspace plugin in `.agents/plugins/myorganiser/`). Claude Code reaches it through the committed `.claude/skills` symlink.
 
-| Harness     | Invoke         | Notes                                                                               |
-| ----------- | -------------- | ----------------------------------------------------------------------------------- |
-| Claude Code | `/orchestrate` | Honours `disable-model-invocation` and `argument-hint`.                             |
-| Cursor      | `/orchestrate` | `disable-model-invocation` makes it slash-only.                                     |
-| Codex       | `$orchestrate` | A slash form does not work. Invoke it explicitly; it has no `agents/openai.yaml`.   |
-| Copilot     | `/orchestrate` | VS Code agent mode; **check before use** for Copilot CLI.                           |
-| OpenCode    | `@orchestrate` | No slash form for Skills. A thin `.opencode/commands/orchestrate.md` could add one. |
-| Gemini CLI  | `/orchestrate` | Through `.gemini/commands/orchestrate.toml`.                                        |
+| Harness     | Invoke                              | Notes                                                                                                                      |
+| ----------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | `/orchestrate`                      | Honours `disable-model-invocation` and `argument-hint`.                                                                    |
+| Cursor      | `/orchestrate`                      | `disable-model-invocation` makes it slash-only.                                                                            |
+| Codex       | `$orchestrate`                      | A slash form does not work. Invoke it explicitly; it has no `agents/openai.yaml`.                                          |
+| Copilot     | `/orchestrate`                      | VS Code agent mode; **check before use** for Copilot CLI.                                                                  |
+| OpenCode    | `@orchestrate`                      | No slash form for Skills. A thin `.opencode/commands/orchestrate.md` could add one.                                        |
+| Antigravity | `/orchestrate` or mention the Skill | Auto-discovered from `.agents/skills/` across the App, IDE, and `agy` CLI; plugin lives in `.agents/plugins/myorganiser/`. |
 
 ## Claude Code
 
@@ -92,13 +92,16 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
 - `await`: the cloud agent's Pull Request and session state through `gh`; no completion command was found.
 - `report`: the Pull Request, and the report files for local runs.
 
-## Gemini CLI
+## Google Antigravity
 
-- `spawn`: `gemini -p "<brief>"` from the Delegation's worktree, through the shell. A worktree flag needs `experimental.worktrees`.
-- `message`: `gemini -r <id> "<msg>"` resumes a stopped session. A running one cannot be messaged.
-- `await`: the process exiting: 0 success, 1 error, 42 bad input, 53 turn limit.
-- `report`: the report files.
-- Gemini CLI reads `AGENTS.md` only when `context.fileName` lists it, as this repository's `.gemini/settings.json` does.
+Available across the Antigravity desktop app, IDE, and `agy` CLI. Discovers `AGENTS.md`, `GEMINI.md`, `.agents/skills/`, and the workspace plugin under `.agents/plugins/myorganiser/` natively.
+
+- `spawn`:
+  - native async subagents via `invoke_subagent` with `Workspace: "share"` (shared repository with its own worktree) or `Workspace: "branch"` (isolated clone), using synced specialists in `.agents/plugins/myorganiser/agents/`;
+  - launching separate headless sessions via the `agy` CLI is **check before use**.
+- `message`: `send_message` to an active subagent's `conversationId` (reactive wakeup, no polling required).
+- `await`: reactive notification when a subagent completes or messages back; end the turn without polling.
+- `report`: the subagent's `send_message` summary, plus the Delegation's `report.md`, `log.md`, branch, and Pull Request.
 
 ## Sources
 
@@ -107,4 +110,4 @@ Every Harness except Claude Code reads `.agents/skills/` directly. Claude Code r
 - Cursor: [Skills](https://cursor.com/docs/context/skills), [CLI parameters](https://cursor.com/docs/cli/reference/parameters), [Cloud Agents API](https://cursor.com/docs/cloud-agent/api/endpoints)
 - Codex: [Build skills](https://learn.chatgpt.com/docs/build-skills), [Non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [Developer commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli), [Cloud](https://learn.chatgpt.com/docs/cloud)
 - Copilot: [About agent skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills), [Run Copilot CLI programmatically](https://docs.github.com/en/copilot/how-tos/copilot-cli/automate-copilot-cli/run-cli-programmatically), [Start cloud agent sessions](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/start-copilot-sessions)
-- Gemini CLI: [Skills](https://geminicli.com/docs/cli/skills/), [Headless](https://geminicli.com/docs/cli/headless/), [CLI reference](https://geminicli.com/docs/cli/cli-reference/)
+- Google Antigravity: built-in Antigravity customization and subagent documentation (desktop app, IDE, and `agy` CLI)

@@ -28,12 +28,14 @@ const REPO_ROOT = resolve(
 );
 const REVIEWER_OUTPUT_DIR = `${REPO_ROOT}/tmp/code-review`;
 
-/** Claude Code's file-writing tools. A shell command is never a reviewer write. */
+/** File-writing tools eligible for reviewer output exemption. A shell command never qualifies. */
 const REVIEWER_WRITE_TOOLS = new Set<string>([
   'write',
   'edit',
   'multiedit',
   'multi_edit',
+  'write_file',
+  'edit_file',
 ]);
 
 const SECRET_PATTERNS: {

@@ -2,10 +2,6 @@
   "$comment": "Translates the capability roles declared in canonical .github/agents/*.agent.md `tools:` lines into each harness's grant. Roles are authoritative; this file only translates them. Rendered by tools/scripts/sync-subagents.ts via tools/scripts/lib/agent-tool-grants.ts. See ADR 0081 and issue #421.",
   "reviewedAt": "2026-09-14",
   "sources": {
-    "gemini": [
-      "https://geminicli.com/docs/reference/tools/",
-      "https://geminicli.com/docs/core/subagents/"
-    ],
     "cursor": ["https://cursor.com/docs/agent/subagents"]
   },
   "roles": {
@@ -18,6 +14,18 @@
     "graphify/*": "Query the Graphify MCP server"
   },
   "harnesses": {
+    "antigravity": {
+      "grant": "tools",
+      "tools": {
+        "read": ["read_file"],
+        "search": ["read_file"],
+        "edit": ["edit_file", "write_file"],
+        "execute": ["run_command", "manage_task"],
+        "web": ["search_web"],
+        "todo": [],
+        "graphify/*": []
+      }
+    },
     "codex": {
       "grant": "tools",
       "tools": {
@@ -46,18 +54,6 @@
           "mcp__graphify__god_nodes",
           "mcp__graphify__graph_stats"
         ]
-      }
-    },
-    "gemini": {
-      "grant": "tools",
-      "tools": {
-        "read": ["read_file", "read_many_files"],
-        "search": ["glob", "grep_search", "list_directory"],
-        "edit": ["replace", "write_file"],
-        "execute": ["run_shell_command"],
-        "web": ["web_fetch", "google_web_search"],
-        "todo": ["write_todos"],
-        "graphify/*": ["mcp_graphify_*"]
       }
     },
     "cursor": {

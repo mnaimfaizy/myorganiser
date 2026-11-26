@@ -1,0 +1,21 @@
+{
+  "myorganiser-guardrails": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_file|edit_file|read_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../../../tools/scripts/copilot-hooks/secret-scan.ts --antigravity",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node ../../../tools/scripts/copilot-hooks/pre-tool-use.ts --antigravity",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

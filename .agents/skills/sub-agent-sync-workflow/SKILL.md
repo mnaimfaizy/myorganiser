@@ -14,7 +14,7 @@ Keep these directories structurally synchronized with `.github/agents` as the ca
 - `.github/agents` (canonical)
 - `.claude/agents`
 - `.cursor/agents`
-- `.gemini/agents`
+- `.agents/plugins/myorganiser/agents`
 - `.codex/bridge-roles` (generated Codex role adapters, one TOML per role)
 
 Synchronization means:
@@ -35,13 +35,20 @@ file does not survive the next sync. This is not hypothetical: the Graphify prob
 was added to `.claude/agents/explore.md` on 2026-06-19 and silently deleted on 2026-07-02 that way.
 
 When an instruction genuinely applies to only some harnesses — MCP tool names are the usual case,
-since the same server is `mcp__graphify__*` in Claude, `mcp_graphify_*` in Gemini, and `graphify/*`
-in Copilot — put it in **canonical**, wrapped in a marker:
+since the same server is `mcp__graphify__*` in Claude, inherited via `inheritMcp: true` from
+`myorganiser-graphify` in Antigravity, and `graphify/*` in Copilot — put it in **canonical**,
+wrapped in a marker:
 
 ```markdown
 <!-- harness:claude -->
 
 Rendered only into .claude/agents/.
+
+<!-- /harness -->
+
+<!-- harness:antigravity -->
+
+Rendered only into .agents/plugins/myorganiser/agents/.
 
 <!-- /harness -->
 
@@ -54,7 +61,7 @@ Rendered into both.
 
 Rules:
 
-- Valid harness names: `claude`, `codex`, `copilot`, `cursor`, `gemini`. `copilot` means `.github/agents`; `codex` means `.codex/bridge-roles`.
+- Valid harness names: `antigravity`, `claude`, `codex`, `copilot`, `cursor`. `copilot` means `.github/agents`; `codex` means `.codex/bridge-roles`; `antigravity` means `.agents/plugins/myorganiser/agents`.
 - Unmarked content goes to every harness. Use markers sparingly — a shared body is the default.
 - Markers must sit alone on their own line and must not nest. Violations, unknown harness names, and
   unbalanced markers are hard errors, not warnings: a marker that silently fails to apply
@@ -67,12 +74,12 @@ Rules:
 ## Tool Grants
 
 Capabilities are declared once, by role, in the canonical body: `tools: [read, search, execute]`.
-Never hand-edit `tools:` (or Cursor's `readonly:`) in `.claude/agents`, `.cursor/agents`,
-`.gemini/agents`, or `.codex/bridge-roles` — `yarn agents:sync:check` reports the edit as `toolDrift` and `yarn agents:sync`
-overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-derived-from-canonical-roles.md).
+Never hand-edit `tools:` (or Antigravity's `inheritMcp:`, or Cursor's `readonly:`) in `.claude/agents`, `.cursor/agents`,
+`.agents/plugins/myorganiser/agents`, or `.codex/bridge-roles` — `yarn agents:sync:check` reports the edit as `toolDrift` and `yarn agents:sync`
+overwrites it. See [ADR 0081](../../../docs/adr/0081-sub-agent-tool-grants-are-derived-from-canonical-roles.md) and [ADR 0154](../../../docs/adr/0154-antigravity-replaces-gemini-cli-harness.md).
 
 - Roles: `read`, `search`, `edit`, `execute`, `web`, `todo`, `graphify/*`. An unknown role is a hard error.
-- Claude and Gemini render an allowlist from the map. Cursor has no per-agent tool list and gets
+- Claude and Antigravity render an allowlist from the map (`tools:` YAML list in Antigravity, plus `inheritMcp: true` when the agent declares MCP access such as `graphify/*`). Cursor has no per-agent tool list and gets
   `readonly: true` unless the agent declares `edit` or `execute`.
 - `--apply` prints each grant change with `WIDENED` apart from `narrowed`. Read the widenings before
   committing.
@@ -108,7 +115,7 @@ Model assignments come from `tools/config/agent-model-policy.json`. Agent bodies
 - GitHub Copilot (`.github/agents`): can define model priority lists.
 - Claude (`.claude/agents`): uses one alias or model ID.
 - Cursor (`.cursor/agents`): uses one model ID. `CodeExplorer` must use `composer-2.5`.
-- Gemini (`.gemini/agents`): uses one model ID.
+- Antigravity (`.agents/plugins/myorganiser/agents`): uses one tier pin (`flash_lite`, `flash`, `pro`, or `inherit`).
 - Codex (`.codex/bridge-roles`): uses one model ID.
 
 Assignment strategy:
@@ -123,7 +130,7 @@ Assignment strategy:
 Run this workflow after any of the following:
 
 - Edit to any file in `.github/agents/**`
-- Edit to any file in `.claude/agents/**`, `.cursor/agents/**`, `.gemini/agents/**`, or `.codex/bridge-roles/**`
+- Edit to any file in `.claude/agents/**`, `.cursor/agents/**`, `.agents/plugins/myorganiser/agents/**`, or `.codex/bridge-roles/**`
 - Agent add/remove in any harness
 - Model change in any agent frontmatter
 

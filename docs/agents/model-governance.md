@@ -1,8 +1,8 @@
 # Agent model governance
 
-MyOrganiser pins sub-agent models by **role** across GitHub Copilot, Claude Code, Cursor, Gemini CLI, and Codex. Assignments live in one versioned policy file; harness agent files are synchronized adapters. A monthly audit detects drift and catalog changes but never rewrites pins automatically.
+MyOrganiser pins sub-agent models by **role** across GitHub Copilot, Claude Code, Cursor, Google Antigravity, and Codex. Assignments live in one versioned policy file; harness agent files are synchronized adapters. A monthly audit detects drift and catalog changes but never rewrites pins automatically.
 
-See [ADR 0013: Role-pinned sub-agent model governance](../adr/0013-bounded-subagent-model-governance.md) for the decision record.
+See [ADR 0013: Role-pinned sub-agent model governance](../adr/0013-bounded-subagent-model-governance.md) and [ADR 0154: Antigravity replaces Gemini CLI as a supported Harness](../adr/0154-antigravity-replaces-gemini-cli-harness.md) for the decision record.
 
 Two static pages illustrate this, both self-contained — open either in a browser, no build step
 and no network:
@@ -48,7 +48,7 @@ Each sub-agent has a fixed model assignment per harness. The orchestrator does n
 Executable adapters:
 
 - `.github/agents/*.agent.md` (canonical bodies)
-- `.claude/agents/*.md`, `.cursor/agents/*.md`, `.gemini/agents/*.md` (synced bodies, model frontmatter, and tool grants)
+- `.claude/agents/*.md`, `.cursor/agents/*.md`, `.agents/plugins/myorganiser/agents/*.md` (synced bodies, model frontmatter, and tool grants)
 - `.codex/bridge-roles/*.toml` (generated Codex role adapters: synced body, model, and tool grant)
 
 ### Tool grants
@@ -64,7 +64,7 @@ role. Hand-edits to a harness file's grant are reported as `toolDrift` and overw
 | ----------- | --------------------------------------------------------------------------------------------- |
 | Copilot     | Canonical roles, verbatim                                                                     |
 | Claude Code | `tools: [...]` allowlist rendered from the map                                                |
-| Gemini CLI  | `tools:` YAML list rendered from the map                                                      |
+| Antigravity | `tools:` YAML list rendered from the map; MCP-enabled agents also receive `inheritMcp: true`  |
 | Cursor      | `readonly: true` unless the agent declares `edit` or `execute`; no per-agent tool list exists |
 
 **Cursor gap.** Cursor subagents inherit the parent's tools, and `readonly` is the only capability key.
@@ -108,7 +108,7 @@ The reporter merges `.sandcastle/usage/agent-usage.jsonl` with older token lines
 
 The [monthly audit workflow](../../.github/workflows/monthly-agent-model-audit.yml) runs on the first day of each month and supports manual dispatch.
 
-1. Validate all four harness assignments against policy.
+1. Validate all harness assignments against policy.
 2. Fetch first-party catalog sources.
 3. Check required model terms, retirement tables, and catalog and pricing snapshots.
 4. Publish the report in the workflow summary.
@@ -131,7 +131,7 @@ The workflow does not open a PR or rewrite model pins. Catalog presence does not
 
 A model term can still be "found" after its retirement: Copilot moves a retired model out of the supported-models table and into "Model retirement history" on the same page. The audit therefore reads that table (model, date, suggested alternative) and compares each date with the run date. A name matches only when it equals the term, so `GPT-5.1-Codex` retiring says nothing about `GPT-5.1`. Only Copilot publishes such a table today; a source without one is not checked for retirements, and a table the audit can find but not read is a source warning.
 
-Catalog snapshots are change detectors, not benchmarks. Gemini’s `latest-model` page is a launch splash (currently Gemini 3.8 Flash) and omits still-GA IDs from visible HTML, so the Gemini catalog check uses the [pricing page](https://ai.google.dev/gemini-api/docs/pricing?hl=en), which still lists `gemini-3.6-flash` and `gemini-3.5-flash-lite`.
+Catalog snapshots are change detectors, not benchmarks. Antigravity uses abstract tier pins (`flash_lite`, `flash`, `pro`, `inherit`) rather than versioned Gemini API model IDs, so it needs no external Gemini pricing-page scraper ([ADR 0154](../adr/0154-antigravity-replaces-gemini-cli-harness.md)).
 
 ## Safe update procedure
 
@@ -167,7 +167,7 @@ Use usage reports to investigate:
 ## Limitations
 
 - Public documentation pages are not stable machine-readable APIs; layout changes can trigger false snapshot drift.
-- Harness identifiers differ: Copilot display names, Claude aliases, Cursor slugs, Gemini model IDs, and Codex model IDs.
+- Harness identifiers differ: Copilot display names, Claude aliases, Cursor slugs, Antigravity tier pins (`flash_lite`, `flash`, `pro`, `inherit`), and Codex model IDs.
 - Not every provider exposes per-sub-agent telemetry.
 - Legacy log records may not contain timestamps or PRD linkage.
 - Sandcastle orchestrator routing and sub-agent role assignments are related policies but use different model identifiers.
@@ -175,6 +175,7 @@ Use usage reports to investigate:
 ## References
 
 - [ADR 0013: Role-pinned sub-agent model governance](../adr/0013-bounded-subagent-model-governance.md)
+- [ADR 0154: Antigravity replaces Gemini CLI as a supported Harness](../adr/0154-antigravity-replaces-gemini-cli-harness.md)
 - [ADR 0081: Sub-agent tool grants are derived from canonical roles](../adr/0081-sub-agent-tool-grants-are-derived-from-canonical-roles.md)
 - [Tool map](../../tools/config/agent-tool-map.json)
 - [ADR 0012: Tiered quality gates](../adr/0012-tiered-quality-gates.md)

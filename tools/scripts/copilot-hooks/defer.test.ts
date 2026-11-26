@@ -78,3 +78,112 @@ describe('--defer flag behavior', () => {
     });
   });
 });
+
+describe('Antigravity guard approval flow', () => {
+  const antigravityEvents = [
+    {
+      conversationId: 'conv-1',
+      workspacePaths: [process.cwd()],
+      hookEventName: 'PreToolUse',
+      cwd: process.cwd(),
+      stepIdx: 1,
+      toolCall: {
+        id: 'call-1',
+        name: 'run_command',
+        args: { CommandLine: 'git status --short' },
+      },
+    },
+    {
+      conversationId: 'conv-1',
+      workspacePaths: [process.cwd()],
+      hookEventName: 'PreToolUse',
+      cwd: process.cwd(),
+      stepIdx: 2,
+      toolCall: {
+        id: 'call-2',
+        name: 'write_file',
+        args: { Path: 'src/notes.md', Content: 'hello' },
+      },
+    },
+    {
+      conversationId: 'conv-1',
+      workspacePaths: [process.cwd()],
+      hookEventName: 'PreToolUse',
+      cwd: process.cwd(),
+      stepIdx: 3,
+      toolCall: {
+        id: 'call-3',
+        name: 'edit_file',
+        args: { Path: 'src/notes.md', Target: 'hello', Replacement: 'world' },
+      },
+    },
+    {
+      conversationId: 'conv-1',
+      workspacePaths: [process.cwd()],
+      hookEventName: 'PreToolUse',
+      cwd: process.cwd(),
+      stepIdx: 4,
+      toolCall: {
+        id: 'call-4',
+        name: 'read_file',
+        args: { Path: 'src/notes.md' },
+      },
+    },
+  ];
+
+  for (const hook of [PRE_TOOL_USE_HOOK, SECRET_SCAN_HOOK]) {
+    it(
+      'returns {} on routine tools under --antigravity --defer for ' +
+        basename(hook),
+      () => {
+        for (const event of antigravityEvents) {
+          const result = runHookRaw(hook, event, {
+            args: ['--antigravity', '--defer'],
+          });
+          assert.deepEqual(result, { status: 0, stdout: '{}', stderr: '' });
+        }
+      },
+    );
+
+    it(
+      'returns {"decision":"allow"} on routine tools under --antigravity without --defer for ' +
+        basename(hook),
+      () => {
+        const result = runHookRaw(hook, antigravityEvents[0], {
+          args: ['--antigravity'],
+        });
+        assert.deepEqual(result, {
+          status: 0,
+          stdout: '{"decision":"allow"}',
+          stderr: '',
+        });
+      },
+    );
+  }
+
+  it('still denies a protected write with exit 0 JSON under --antigravity --defer', () => {
+    const result = runHookRaw(
+      PRE_TOOL_USE_HOOK,
+      {
+        conversationId: 'conv-1',
+        workspacePaths: [process.cwd()],
+        hookEventName: 'PreToolUse',
+        cwd: process.cwd(),
+        stepIdx: 5,
+        toolCall: {
+          id: 'call-5',
+          name: 'write_file',
+          args: { Path: ENV_FILE, Content: 'SECRET=1' },
+        },
+      },
+      { args: ['--antigravity', '--defer'] },
+    );
+    assert.equal(result.status, 0);
+    const parsed = JSON.parse(result.stdout) as {
+      decision?: string;
+      reason?: string;
+    };
+    assert.equal(parsed.decision, 'deny');
+    assert.match(parsed.reason ?? '', /environment/i);
+  });
+});

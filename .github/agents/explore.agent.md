@@ -156,12 +156,11 @@ agent's tools and have no per-agent `tools:` grant of their own.
 
 <!-- /harness -->
 
-<!-- harness:gemini -->
+<!-- harness:antigravity -->
 
-**Gemini CLI —** the tools are `mcp_graphify_get_neighbors`, `mcp_graphify_god_nodes`,
-`mcp_graphify_query_graph`, `mcp_graphify_get_node` and `mcp_graphify_graph_stats`, registered in
-`.gemini/settings.json`. Gemini CLI has an open bug where subagents do not always receive MCP tools
-(google-gemini/gemini-cli#17005, #19599); if they are missing, use Glob/Grep and note it under Scope,
+**Antigravity —** Graphify MCP tools (`get_neighbors`, `god_nodes`, `query_graph`, `get_node`, and
+`graph_stats`) are inherited via `inheritMcp: true` from the workspace plugin
+(`myorganiser-graphify`). If they are unavailable, fall back to file reads and note it under Scope,
 not as a failure.
 
 <!-- /harness -->

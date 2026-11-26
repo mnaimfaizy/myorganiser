@@ -28,6 +28,58 @@ const API_SPECS_AGENTS = 'libs/api-specs/AGENTS.md';
 // that its own repo-wide scanners would flag.
 const PRIVATE_SSH_KEY = `keys/${['id', 'rsa'].join('_')}`;
 
+const ANTIGRAVITY_HOOK_ARGS = ['--antigravity'];
+const ANTIGRAVITY_DEFER_ARGS = ['--antigravity', '--defer'];
+
+function antigravityPayload(
+  name: 'run_command' | 'write_file' | 'edit_file' | 'read_file',
+  args: Record<string, unknown>,
+  cwd = process.cwd(),
+) {
+  return {
+    conversationId: 'conv-test-1',
+    workspacePaths: [process.cwd()],
+    hookEventName: 'PreToolUse',
+    cwd,
+    stepIdx: 1,
+    toolCall: {
+      id: 'call-1',
+      name,
+      args,
+    },
+  };
+}
+
+function expectAntigravityDenial(
+  payload: ReturnType<typeof antigravityPayload>,
+  reasonPattern: RegExp,
+  args = ANTIGRAVITY_HOOK_ARGS,
+) {
+  const result = runHookRaw(PRE_TOOL_USE_HOOK, payload, { args });
+  assert.equal(result.status, 0);
+  const parsed = JSON.parse(result.stdout) as {
+    decision?: string;
+    reason?: string;
+  };
+  assert.equal(parsed.decision, 'deny');
+  assert.match(parsed.reason ?? '', reasonPattern);
+}
+
+function expectAntigravityAllow(
+  payload: ReturnType<typeof antigravityPayload>,
+  { defer = false }: { defer?: boolean } = {},
+) {
+  const result = runHookRaw(PRE_TOOL_USE_HOOK, payload, {
+    args: defer ? ANTIGRAVITY_DEFER_ARGS : ANTIGRAVITY_HOOK_ARGS,
+  });
+  assert.equal(result.status, 0);
+  assert.equal(result.stderr, '');
+  assert.deepEqual(
+    JSON.parse(result.stdout),
+    defer ? {} : { decision: 'allow' },
+  );
+}
+
 describe('pre-tool-use hook', () => {
   describe('Codex tools', () => {
     it('blocks a PowerShell write to generated code', () => {
@@ -88,6 +140,157 @@ describe('pre-tool-use hook', () => {
         },
       );
       assert.deepEqual(result, { status: 0, stdout: '', stderr: '' });
+    });
+  });
+
+  describe('Antigravity tools', () => {
+    it('allows or defers safe run_command, write_file, edit_file, and read_file calls', () => {
+      const safeCalls = [
+        antigravityPayload('run_command', {
+          CommandLine: 'git status --short',
+        }),
+        antigravityPayload('write_file', {
+          Path: ORDINARY_SOURCE,
+          Content: 'export default function Page() { return null; }',
+        }),
+        antigravityPayload('edit_file', {
+          Path: ORDINARY_SOURCE,
+          // PascalCase Target/Replacement are file content, not write paths.
+          Target: `see ${GENERATED_CLIENT}`,
+          Replacement: 'const x = process.env.HOME;',
+        }),
+        antigravityPayload('read_file', { Path: ORDINARY_SOURCE }),
+        antigravityPayload('read_file', { Path: ENV_EXAMPLE }),
+      ];
+
+      for (const payload of safeCalls) {
+        expectAntigravityAllow(payload, { defer: false });
+        expectAntigravityAllow(payload, { defer: true });
+      }
+    });
+
+    it('denies secret reads via read_file and run_command with exit 0 JSON', () => {
+      expectAntigravityDenial(
+        antigravityPayload('read_file', { Path: ENV_FILE }),
+        /environment/i,
+      );
+      expectAntigravityDenial(
+        antigravityPayload('read_file', { Path: 'certs/tls.key' }),
+        /key or certificate/i,
+        ANTIGRAVITY_DEFER_ARGS,
+      );
+      expectAntigravityDenial(
+        antigravityPayload('run_command', { CommandLine: `cat ${ENV_FILE}` }),
+        /environment/i,
+        ANTIGRAVITY_DEFER_ARGS,
+      );
+    });
+
+    it('resolves relative read_file paths against payload.cwd', () => {
+      expectAntigravityDenial(
+        antigravityPayload(
+          'read_file',
+          { Path: 'config' },
+          join(process.cwd(), '.ssh'),
+        ),
+        /ssh|key material/i,
+      );
+    });
+
+    it('denies secret and protected writes via write_file and edit_file', () => {
+      expectAntigravityDenial(
+        antigravityPayload('write_file', { Path: ENV_FILE, Content: 'A=1' }),
+        /environment/i,
+      );
+      expectAntigravityDenial(
+        antigravityPayload('edit_file', {
+          Path: GENERATED_SPEC,
+          Target: 'a',
+          Replacement: 'b',
+        }),
+        /openapi|generated/i,
+        ANTIGRAVITY_DEFER_ARGS,
+      );
+    });
+
+    it('resolves relative write_file and edit_file paths against payload.cwd', () => {
+      expectAntigravityDenial(
+        antigravityPayload(
+          'write_file',
+          { Path: 'src/index.ts', Content: 'export {};' },
+          join(process.cwd(), 'libs', 'app-api-client'),
+        ),
+        /generated api client/i,
+      );
+      expectAntigravityDenial(
+        antigravityPayload(
+          'edit_file',
+          {
+            Path: 'migrations/001/migration.sql',
+            Target: 'SELECT 1;',
+            Replacement: 'SELECT 2;',
+          },
+          join(process.cwd(), 'apps', 'backend', 'src', 'prisma'),
+        ),
+        /prisma migrations/i,
+      );
+    });
+
+    it('denies dangerous run_command writes including relative redirects via payload.cwd', () => {
+      expectAntigravityDenial(
+        antigravityPayload('run_command', {
+          CommandLine: `echo x >> ${GENERATED_CLIENT}`,
+        }),
+        /generated api client/i,
+      );
+      expectAntigravityDenial(
+        antigravityPayload(
+          'run_command',
+          { CommandLine: 'echo x > src/index.ts' },
+          join(process.cwd(), 'libs', 'app-api-client'),
+        ),
+        /generated api client/i,
+      );
+      expectAntigravityAllow(
+        antigravityPayload(
+          'run_command',
+          { CommandLine: 'echo x > README.md' },
+          join(process.cwd(), 'libs', 'app-api-client'),
+        ),
+        { defer: true },
+      );
+    });
+
+    it('resolves Sign-off Issue --body-file relative to payload.cwd for run_command', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'antigravity-signoff-'));
+      const bodyFile = join(dir, 'body.md');
+      writeFileSync(
+        bodyFile,
+        '<!-- signoff-issue -->\n- [x] sign in on staging `1590:3f9a0c1d2e4b`',
+      );
+      try {
+        expectAntigravityDenial(
+          antigravityPayload(
+            'run_command',
+            { CommandLine: 'gh issue edit 1600 --body-file body.md' },
+            dirname(bodyFile),
+          ),
+          /sign-off issue/i,
+          ANTIGRAVITY_DEFER_ARGS,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('does not block write_file when only Content mentions a protected path', () => {
+      expectAntigravityAllow(
+        antigravityPayload('write_file', {
+          Path: 'docs/notes.md',
+          Content: `Regenerate ${GENERATED_CLIENT} via yarn api:generate.`,
+        }),
+        { defer: true },
+      );
     });
   });
 
@@ -589,7 +792,7 @@ describe('pre-tool-use hook', () => {
     it('should allow ordinary directory listing', () => {
       expectAllowed(
         PRE_TOOL_USE_HOOK,
-        shellPayload('Bash', 'ls .cursor/ .gemini/'),
+        shellPayload('Bash', 'ls .cursor/ .agents/'),
       );
     });
 

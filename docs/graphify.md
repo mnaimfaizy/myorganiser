@@ -148,22 +148,19 @@ Registered in five harnesses. The MCP server itself is harness-agnostic — plai
 so only the registration differs, and the formats are **not** interchangeable. Each was checked
 against that harness's own docs rather than copied from `.mcp.json`.
 
-| Harness           | MCP config                              | Top-level key | Agent tool grant                                         |
-| ----------------- | --------------------------------------- | ------------- | -------------------------------------------------------- |
-| Claude Code       | `.mcp.json`                             | `mcpServers`  | `mcp__graphify__*` in `.claude/agents/explore.md`        |
-| Copilot / VS Code | `.vscode/mcp.json`                      | `servers`     | `graphify/*` in `.github/agents/explore.agent.md`        |
-| Cursor            | `.cursor/mcp.json`                      | `mcpServers`  | none — Cursor subagents inherit the parent agent's tools |
-| Gemini CLI        | `.gemini/settings.json` (project scope) | `mcpServers`  | `mcp_graphify_*` in `.gemini/agents/explore.md`          |
-| Codex             | `.codex/config.toml` (trusted project)  | `mcp_servers` | `get_neighbors` and `god_nodes`                          |
+| Harness           | MCP config                                                                               | Top-level key | Agent tool grant                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------- |
+| Claude Code       | `.mcp.json`                                                                              | `mcpServers`  | `mcp__graphify__*` in `.claude/agents/explore.md`                     |
+| Copilot / VS Code | `.vscode/mcp.json`                                                                       | `servers`     | `graphify/*` in `.github/agents/explore.agent.md`                     |
+| Cursor            | `.cursor/mcp.json`                                                                       | `mcpServers`  | none — Cursor subagents inherit the parent agent's tools              |
+| Antigravity       | `.agents/plugins/myorganiser/mcp_config.json` (workspace plugin, `myorganiser-graphify`) | `mcpServers`  | `inheritMcp: true` in `.agents/plugins/myorganiser/agents/explore.md` |
+| Codex             | `.codex/config.toml` (trusted project)                                                   | `mcp_servers` | `get_neighbors` and `god_nodes`                                       |
 
-Two caveats:
-
-- The Gemini entry uses `includeTools` to allowlist the same five read-only tools the other harnesses
-  grant, so `triage_prs` and `get_pr_impact` — which invert risk for hub and barrel files — are not
-  reachable there at all.
-- Gemini CLI has an open bug where subagents do not always receive MCP tools
-  (google-gemini/gemini-cli#17005, #19599). CodeExplorer is told to fall back to Glob/Grep and note
-  it under Scope, so this degrades rather than breaks.
+Antigravity registers the server as `myorganiser-graphify` inside the committed workspace plugin
+(`.agents/plugins/myorganiser/mcp_config.json`) with relative path `../../../graphify-out/graph.json`,
+and grants MCP access to `CodeExplorer` via `inheritMcp: true` in
+`.agents/plugins/myorganiser/agents/explore.md`. If Graphify tools are unavailable, `CodeExplorer`
+falls back to file reads and notes it under Scope.
 
 The harnesses share the same local prerequisite: `uv tool install "graphifyy[mcp]==0.9.43"` plus one
 manual graph build (below). Without it a harness simply has no graphify tools, which is the

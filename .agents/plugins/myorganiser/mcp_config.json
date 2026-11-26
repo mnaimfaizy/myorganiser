@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "myorganiser-graphify": {
+      "command": "graphify-mcp",
+      "args": ["../../../graphify-out/graph.json"]
+    }
+  }
+}

@@ -13,107 +13,108 @@
     "api-sync": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "api-writer": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "audit": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "commit": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)", "MAI-Code-1.1-Flash (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.5-flash-lite"
+        "cursor": "composer-2.5"
       }
     },
     "component-builder": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "component-reviewer": {
       "tier": "T2",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": ["Grok 4.6 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",
-        "cursor": "grok-4.6",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "grok-4.6"
       }
     },
     "dep-audit": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "Claude Haiku 5.5 (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "dep-sync": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.5-flash-lite"
+        "cursor": "composer-2.5"
       }
     },
     "designer": {
       "tier": "T2",
       "rationale": "Writes a whole self-contained artifact from a brief, and the failure modes are judgment ones: an accessible-name pattern that is textbook-correct and wrong here, a claimed visual review that could not have happened, a doc-vs-source contradiction silently copied. The mechanical half is check-design-hygiene.ts; what is left needs reasoning quality.",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": ["Claude Sonnet 5.5 (copilot)", "GPT-5.6 Terra (copilot)"],
         "claude": "sonnet",
-        "cursor": "grok-4.6",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "grok-4.6"
       }
     },
     "docs": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "sonnet",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "e2e-planner": {
       "tier": "T2",
       "models": {
+        "antigravity": "pro",
         "codex": "gpt-6.2-astra",
         "copilot": [
           "Claude Sonnet 5.5 (copilot)",
@@ -121,129 +122,128 @@
           "Grok 4.6 (copilot)"
         ],
         "claude": "sonnet",
-        "cursor": "grok-4.6",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "grok-4.6"
       }
     },
     "explore": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "sonnet",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.5-flash-lite"
+        "cursor": "composer-2.5"
       }
     },
     "issue-creator": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "preflight-check": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.5-flash-lite"
+        "cursor": "composer-2.5"
       }
     },
     "prisma-writer": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)", "GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "pr-author": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "release-notes": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "research": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "sonnet",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "storybook-curator": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "test-reviewer": {
       "tier": "T0",
       "rationale": "ADR 0004 defines this as a deterministic static checklist gate; runtime judgment belongs to TestRunner.",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "test-runner": {
       "tier": "T1",
       "models": {
+        "antigravity": "inherit",
         "codex": "gpt-6.2-sol",
         "copilot": ["Gemini 3.8 Flash (copilot)"],
         "claude": "inherit",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "test-scaffold": {
       "tier": "T1",
       "models": {
+        "antigravity": "flash",
         "codex": "gpt-6.2-sol",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.6-flash"
+        "cursor": "composer-2.5"
       }
     },
     "version-bump": {
       "tier": "T0",
       "models": {
+        "antigravity": "flash_lite",
         "codex": "gpt-6-luna",
         "copilot": ["GPT-5.6 Luna (copilot)"],
         "claude": "haiku",
-        "cursor": "composer-2.5",
-        "gemini": "gemini-3.5-flash-lite"
+        "cursor": "composer-2.5"
       }
     }
   },
@@ -286,13 +286,6 @@
       "requiredTerms": ["Composer 2.5", "Grok 4.6"],
       "linePrefixes": ["Composer ", "Grok "],
       "snapshotSha256": "a058ed9f276a41eb792f923bfbe5f40e361aaf274e5fe1329288f4a7017dee3f"
-    },
-    {
-      "harness": "gemini",
-      "url": "https://ai.google.dev/gemini-api/docs/pricing?hl=en",
-      "requiredTerms": ["gemini-3.6-flash", "gemini-3.5-flash-lite"],
-      "linePrefixes": ["Gemini "],
-      "snapshotSha256": "492f15447cd0061602d04e0436b5605fd6b2372e284252050c69666676fa0752"
     }
   ],
   "costSources": {
@@ -325,16 +318,6 @@
         "Other Models"
       ],
       "snapshotSha256": "22dd776a583233b3242ff5bffbc79926c1d4265d057e2465a49bddbc6b6f632c"
-    },
-    "gemini": {
-      "url": "https://ai.google.dev/gemini-api/docs/pricing?hl=en",
-      "lineKeywords": [
-        "Gemini 3.6 Flash",
-        "Gemini 3.5 Flash-Lite",
-        "Input price",
-        "Output price"
-      ],
-      "snapshotSha256": "2b17deaf3be3b1daefd4f4d3e76b8dbfe50cf22f96e6834335c21fb4a1185780"
     }
   }
 }
