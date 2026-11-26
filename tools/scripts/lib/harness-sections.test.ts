@@ -30,7 +30,7 @@ test('keeps a block only for the harness it names', () => {
     'Shared intro.\n\nClaude only.\n\nShared outro.',
   );
   assert.equal(
-    renderHarnessSections(body, 'gemini'),
+    renderHarnessSections(body, 'antigravity'),
     'Shared intro.\n\nShared outro.',
   );
 });
@@ -55,8 +55,8 @@ test('dropping a block does not leave a widening blank gap', () => {
     'Claude.',
     '<!-- /harness -->',
     '',
-    '<!-- harness:gemini -->',
-    'Gemini.',
+    '<!-- harness:antigravity -->',
+    'Antigravity.',
     '<!-- /harness -->',
     '',
     'After.',
@@ -105,7 +105,7 @@ test('rejects nested blocks', () => {
 test('rejects an inline marker that would otherwise leak to every harness', () => {
   const body = 'Text <!-- harness:claude --> more text';
   assert.throws(
-    () => renderHarnessSections(body, 'gemini'),
+    () => renderHarnessSections(body, 'antigravity'),
     /stray harness marker/,
   );
 });
@@ -127,7 +127,7 @@ test('supports antigravity harness markers', () => {
     'Shared intro.\n\nAntigravity only.\n\nShared outro.',
   );
   assert.equal(
-    renderHarnessSections(body, 'gemini'),
+    renderHarnessSections(body, 'claude'),
     'Shared intro.\n\nShared outro.',
   );
 });
@@ -136,5 +136,9 @@ test('rejects an unknown target harness', () => {
   assert.throws(
     () => renderHarnessSections('x', 'windsurf'),
     /Unknown harness "windsurf"/,
+  );
+  assert.throws(
+    () => renderHarnessSections('x', 'gemini'),
+    /Unknown harness "gemini"/,
   );
 });

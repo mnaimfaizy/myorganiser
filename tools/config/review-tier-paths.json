@@ -119,7 +119,6 @@
         ".agents/**",
         ".claude/**",
         ".cursor/**",
-        ".gemini/**",
         ".github/copilot-instructions.md",
         ".github/instructions/**",
         "skills-lock.json",

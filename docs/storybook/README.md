@@ -65,7 +65,7 @@ When using AI agents for Storybook tasks, route requests through the Storybook d
 - Skill: `.agents/skills/storybook-delegation-workflow/SKILL.md`
 - Copilot sub-agent: `.github/agents/storybook-curator.agent.md`
 - Claude sub-agent: `.claude/agents/storybook-curator.md`
-- Gemini sub-agent: `.gemini/agents/storybook-curator.md`
+- Antigravity sub-agent: `.agents/plugins/myorganiser/agents/storybook-curator.md`
 
 The sub-agent must analyze requirement quality before file edits, request clarification when requirements are incomplete, and may challenge weak requirements to keep UX/accessibility quality high.
 

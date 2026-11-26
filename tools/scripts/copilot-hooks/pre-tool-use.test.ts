@@ -792,7 +792,7 @@ describe('pre-tool-use hook', () => {
     it('should allow ordinary directory listing', () => {
       expectAllowed(
         PRE_TOOL_USE_HOOK,
-        shellPayload('Bash', 'ls .cursor/ .gemini/'),
+        shellPayload('Bash', 'ls .cursor/ .agents/'),
       );
     });
 

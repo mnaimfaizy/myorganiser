@@ -41,10 +41,6 @@ const HARNESS_PATHS: Record<string, HarnessPathConfig> = {
     dir: path.join(repoRoot, '.cursor', 'agents'),
     fileName: (slug) => `${slug}.md`,
   },
-  gemini: {
-    dir: path.join(repoRoot, '.gemini', 'agents'),
-    fileName: (slug) => `${slug}.md`,
-  },
 };
 
 /** The subset of `tools/config/agent-model-policy.json` this sync reads. */

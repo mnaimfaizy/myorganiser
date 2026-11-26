@@ -88,14 +88,6 @@ const HARNESS_CONFIG: Record<string, HarnessSyncConfig> = {
     extension: '.md',
     nameTransform: (name) => name,
   },
-  gemini: {
-    dir: path.join(repoRoot, '.gemini', 'agents'),
-    extension: '.md',
-    nameTransform: (name, slug) => {
-      if (slug === 'explore') return 'code-explorer';
-      return toKebab(name);
-    },
-  },
 };
 
 const USAGE = `Usage:\n  node tools/scripts/sync-subagents.ts --check\n  node tools/scripts/sync-subagents.ts --apply [--no-prune]\n\nNotes:\n  - Canonical source is .github/agents/*.agent.md\n  - Tool grants are rendered from the canonical tools: roles through\n    tools/config/agent-tool-map.json (Cursor: a derived readonly flag). A target whose\n    grant differs is reported as toolDrift; --apply rewrites only the grant lines and\n    prints each change labelled as widened or narrowed.\n  - All other existing target frontmatter is preserved verbatim; the body is synced.\n  - A target whose frontmatter cannot be parsed is reported as malformed and skipped,\n    never rewritten.\n  - Canonical bodies may scope a section to specific harnesses:\n      <!-- harness:claude,cursor -->  ...  <!-- /harness -->\n    Unmarked content goes to every harness. See tools/scripts/lib/harness-sections.ts.\n  - Missing target files are created with rendered frontmatter.\n  - --apply prunes extra files by default (disable with --no-prune).\n`;
@@ -204,19 +196,6 @@ function buildFrontmatter(
       'mainAgent: false',
       `model: ${model}`,
       ...(roles.includes('graphify/*') ? ['inheritMcp: true'] : []),
-      ...grantLines,
-      '---',
-      '',
-    ].join('\n');
-  }
-
-  if (harness === 'gemini') {
-    return [
-      '---',
-      `name: ${name}`,
-      'description: >',
-      `  ${description}`,
-      `model: ${model}`,
       ...grantLines,
       '---',
       '',

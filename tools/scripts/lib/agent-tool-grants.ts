@@ -8,7 +8,7 @@
  * rules here stay testable. See ADR 0081.
  *
  * A grant is one of two shapes, chosen by the harness's `grant` key in the map:
- *   { tools: string[] }     Claude Code, Gemini CLI — an allowlist
+ *   { tools: string[] }     Antigravity, Claude Code — an allowlist
  *   { readonly: boolean }   Cursor — it has no per-agent tool list
  *
  * Every gap is a hard error. A role that silently renders to nothing would
@@ -55,7 +55,7 @@ interface ReadonlyFrontmatterFormat {
 type FrontmatterFormat = ToolsFrontmatterFormat | ReadonlyFrontmatterFormat;
 
 /**
- * Label used when a file had no grant at all. Claude Code and Gemini CLI both
+ * Label used when a file had no grant at all. Claude Code and Antigravity both
  * give an agent without a `tools` key every tool, so writing one narrows.
  */
 export const INHERIT_ALL = '<inherited: all tools>';
@@ -68,7 +68,6 @@ export const INHERIT_ALL = '<inherited: all tools>';
 const FRONTMATTER_FORMAT: Record<string, FrontmatterFormat> = {
   antigravity: { grant: 'tools', style: 'block' },
   claude: { grant: 'tools', style: 'inline' },
-  gemini: { grant: 'tools', style: 'block' },
   cursor: { grant: 'readonly' },
 };
 
@@ -294,7 +293,7 @@ export function writeGrant(
   }
 
   // Match what buildFrontmatter emits: Claude puts tools before model,
-  // Gemini appends the block after it.
+  // Antigravity appends the block after it.
   const format = formatFor(harness);
   if (format.grant === 'tools' && format.style === 'block') {
     return frontmatter.replace(/\n---\n$/, `\n${formatted}---\n`);

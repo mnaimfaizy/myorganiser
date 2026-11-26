@@ -3,10 +3,11 @@
  *
  * `.github/agents/*.agent.md` is the canonical body for every harness, and the
  * sync script overwrites each target's body from it wholesale. That is normally
- * what we want — one body, four harnesses — but some instructions only make
+ * what we want — one body, every harness — but some instructions only make
  * sense where a specific harness grants a specific tool. MCP tools are the
  * motivating case: the same graphify server is called `mcp__graphify__*` in
- * Claude Code, `mcp_graphify_*` in Gemini CLI, and `graphify/*` in Copilot.
+ * Claude Code, inherited via `inheritMcp: true` in Antigravity, and
+ * `graphify/*` in Copilot.
  *
  * Writing those differences straight into a target file does not survive: the
  * next `yarn agents:sync` regenerates the body from canonical and the edit is
@@ -42,7 +43,6 @@ export const KNOWN_HARNESSES = Object.freeze([
   'codex',
   'copilot',
   'cursor',
-  'gemini',
 ] as const);
 
 export type KnownHarness = (typeof KNOWN_HARNESSES)[number];

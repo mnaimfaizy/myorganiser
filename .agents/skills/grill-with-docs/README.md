@@ -13,7 +13,7 @@
 
 - In Claude: Reference this skill when you want to grill a plan
 - In Cursor/GitHub Copilot: Ask to "grill this plan" or "stress-test against docs"
-- In Gemini: Use this skill for domain-driven design conversations
+- In Google Antigravity: Reference this skill (auto-discovered from `.agents/skills/`) for domain-driven design conversations
 
 ## Key Files
 

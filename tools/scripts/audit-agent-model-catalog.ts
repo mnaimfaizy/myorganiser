@@ -30,7 +30,6 @@ interface AgentModelAssignment {
   copilot: string | string[];
   claude: string | string[];
   cursor: string | string[];
-  gemini: string | string[];
   antigravity: string;
   [harness: string]: string | string[];
 }
@@ -233,7 +232,7 @@ async function fetchSource(
 function assignmentRows(policy: AgentModelPolicy): string[] {
   return Object.entries(policy.agents).map(([slug, entry]) => {
     const models = entry.models;
-    return `| ${slug} | ${entry.tier} | ${modelsForDisplay(models.copilot)} | ${modelsForDisplay(models.claude)} | ${modelsForDisplay(models.cursor)} | ${modelsForDisplay(models.gemini)} | ${modelsForDisplay(models.codex)} | ${modelsForDisplay(models.antigravity)} |`;
+    return `| ${slug} | ${entry.tier} | ${modelsForDisplay(models.copilot)} | ${modelsForDisplay(models.claude)} | ${modelsForDisplay(models.cursor)} | ${modelsForDisplay(models.codex)} | ${modelsForDisplay(models.antigravity)} |`;
   });
 }
 
@@ -373,8 +372,8 @@ async function main() {
     '',
     '## Current assignments',
     '',
-    '| Agent | Tier | Copilot | Claude | Cursor | Gemini | Codex | Antigravity |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| Agent | Tier | Copilot | Claude | Cursor | Codex | Antigravity |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
     ...assignmentRows(policy),
     '',
     '## Sandcastle defaults',
