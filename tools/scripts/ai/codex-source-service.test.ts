@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { captureSource } from './codex-source-snapshot.ts';
 
-test('the service exposes only the guarded snapshot through bounded reads and searches', (t) => {
+test('the service exposes only the guarded snapshot through bounded reads and searches', async (t) => {
   const temp = mkdtempSync(join(tmpdir(), 'codex-source-'));
   t.after(() => rmSync(temp, { recursive: true, force: true }));
   const worktree = join(temp, 'worktree');
@@ -31,7 +31,7 @@ test('the service exposes only the guarded snapshot through bounded reads and se
   );
   const snapshot = join(temp, 'snapshot.json');
   const repository = fileURLToPath(new URL('../../../', import.meta.url));
-  assert.deepEqual(captureSource(worktree, repository, snapshot), [
+  assert.deepEqual(await captureSource(worktree, repository, snapshot), [
     'source.txt',
   ]);
   assert.doesNotMatch(readFileSync(snapshot, 'utf8'), /secret|outside/);

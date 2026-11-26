@@ -32,6 +32,6 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
   );
   if (result.status !== 0 || result.error)
     throw new Error(
-      `Cannot protect the temporary context directory: ${result.stderr?.trim() || result.error?.message || 'unknown error'}`,
+      `Cannot protect the temporary context directory. The restricted launcher does not run inside a Codex sandbox; run it from a Windows terminal outside Codex. ${result.stderr?.trim() || result.error?.message || 'unknown error'}`,
     );
 }

@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   closeSync,
   fstatSync,
@@ -10,51 +9,54 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
+
+// The read hook's own rules, from the guarded worktree, evaluated in this
+// process: one hook process per directory entry took minutes per launch.
+// A policy that cannot be loaded or does not answer aborts the capture.
+export async function loadReadPolicy(guardDirectory: string) {
+  const module = resolve(
+    guardDirectory,
+    'tools/scripts/copilot-hooks/read-policy.ts',
+  );
+  let policy: { inspectReadNode?: (node: unknown) => unknown };
+  try {
+    policy = await import(pathToFileURL(module).href);
+  } catch {
+    throw new Error('Could not verify repository read policy');
+  }
+  const inspect = policy.inspectReadNode;
+  if (typeof inspect !== 'function')
+    throw new Error('Could not verify repository read policy');
+  return (path: string): boolean => {
+    const reason = inspect({ path });
+    if (reason === null) return true;
+    if (typeof reason === 'string' && reason) return false;
+    throw new Error('Could not verify repository read policy');
+  };
+}
 
 // Capture a bounded, immutable view before starting the restricted child.
 // A failed guard, changing file or exceeded bound aborts the whole capture.
-export function captureSource(
+export async function captureSource(
   rootDirectory: string,
   guardDirectory: string,
   destination: string,
 ) {
-  const root = realpathSync(rootDirectory);
+  const root = realpathSync.native(rootDirectory);
   const files: Array<[string, string]> = [];
   let visited = 0;
   let totalBytes = 0;
-  const guard = resolve(
-    guardDirectory,
-    'tools/scripts/copilot-hooks/pre-tool-use.ts',
-  );
+  const canRead = await loadReadPolicy(guardDirectory);
 
   function isInside(path: string) {
-    const remainder = relative(root, realpathSync(path));
+    const remainder = relative(root, realpathSync.native(path));
     return (
       !isAbsolute(remainder) &&
       remainder !== '..' &&
       !remainder.startsWith(`..${sep}`)
     );
-  }
-
-  function canRead(path: string) {
-    const result = spawnSync(process.execPath, [guard], {
-      cwd: guardDirectory,
-      input: JSON.stringify({ toolName: 'read', toolArgs: { path } }),
-      encoding: 'utf8',
-      timeout: 4000,
-      maxBuffer: 8192,
-      windowsHide: true,
-    });
-    let decision;
-    try {
-      decision = JSON.parse(result.stdout).permissionDecision;
-    } catch {
-      throw new Error('Could not verify repository read policy');
-    }
-    if (result.status === 0 && decision === 'allow') return true;
-    if (result.status === 2 && decision === 'deny') return false;
-    throw new Error('Could not verify repository read policy');
   }
 
   function walk(directory: string) {
