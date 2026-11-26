@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { captureRoleContext } from './codex-role-context.ts';
 import { screenContext } from './codex-context-guard.ts';
 import { protectDirectory } from './codex-private-directory.ts';
+import { isolateGitEnvironment } from '../lib/git-environment.ts';
+
+isolateGitEnvironment();
 
 test('secret and path guards reject sensitive context', () => {
   const syntheticToken = 'ghp_' + 'A'.repeat(25);
