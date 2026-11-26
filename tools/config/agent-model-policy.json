@@ -255,7 +255,8 @@
         "high": "claude-opus-5-5"
       },
       "cursorDefault": "composer-2.5",
-      "copilotDefault": "claude-sonnet-5.5"
+      "copilotDefault": "claude-sonnet-5.5",
+      "codexDefault": "gpt-6.2-sol"
     }
   },
   "catalogSources": [

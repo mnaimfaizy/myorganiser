@@ -1487,7 +1487,9 @@ function resolveModel(issue: Issue, agentKind: AgentKind): string {
         process.env.SANDCASTLE_COPILOT_MODEL ?? sandcastleModels.copilotDefault
       );
     case 'codex':
-      return process.env.SANDCASTLE_CODEX_MODEL ?? 'gpt-6.2-sol';
+      return (
+        process.env.SANDCASTLE_CODEX_MODEL ?? sandcastleModels.codexDefault
+      );
   }
 }
 
@@ -3747,7 +3749,7 @@ while (pendingSlices.length > 0) {
       console.error(
         `  [#${issue.number}] provider limit hit — ${classification.evidence ?? 'no detail'}\n` +
           `      Parking until ${formatWaitWindow(waitDecision.until, failedAt)}, ` +
-          `+5m margin, wait ${quotaWaitsTaken}/${MAX_QUOTA_WAITS}.\n` +
+          `+${QUOTA_WAIT_MARGIN_MS / 60_000}m margin, wait ${quotaWaitsTaken}/${MAX_QUOTA_WAITS}.\n` +
           (preservation.kind === 'preserved'
             ? `      The slice will RESUME from its checkpoint, not restart.\n` +
               `      Ctrl-C is safe — the checkpoint is already committed.`

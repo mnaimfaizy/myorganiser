@@ -63,6 +63,7 @@ interface AgentModelPolicy {
       claudeByComplexity: { low: string; medium: string; high: string };
       cursorDefault: string;
       copilotDefault: string;
+      codexDefault: string;
     };
   };
   catalogSources: CatalogSource[];
@@ -380,6 +381,7 @@ async function main() {
     `- Claude low / medium / high: ${policy.orchestrators.sandcastle.claudeByComplexity.low} / ${policy.orchestrators.sandcastle.claudeByComplexity.medium} / ${policy.orchestrators.sandcastle.claudeByComplexity.high}`,
     `- Cursor: ${policy.orchestrators.sandcastle.cursorDefault}`,
     `- Copilot: ${policy.orchestrators.sandcastle.copilotDefault}`,
+    `- Codex: ${policy.orchestrators.sandcastle.codexDefault}`,
     '',
     '## Official sources',
     '',
